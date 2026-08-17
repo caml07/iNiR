@@ -3069,6 +3069,12 @@ Singleton {
             property JsonObject windows: JsonObject {
                 property bool showTitlebar: true // Client-side decoration for shell apps
                 property bool centerTitle: true
+                // Optional per-window identity remapping for apps whose windows
+                // all share one app_id (e.g. browser PWA windows). Each entry:
+                // { appIdRegex, titleRegex, desktopId } — both regexes are
+                // optional but at least one is required. The first matching
+                // rule wins; malformed rules are ignored; empty = no changes.
+                property list<var> appIdentityRules: []
             }
 
             property JsonObject settingsUi: JsonObject {

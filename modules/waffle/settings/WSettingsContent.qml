@@ -18,6 +18,7 @@ Item {
     
     property var pages: []
     property int currentPage: 0
+    property bool loadEnabled: true
     // Parent/child currentPage is bidirectional. Delay child writeback until
     // construction finishes so a persisted or command-line page is not reset
     // by this component's initial default value.
@@ -198,7 +199,7 @@ Item {
         { pageIndex: 6, pageName: "Interface", section: "Notifications", label: "Ignore app timeout", targetLabel: "Ignore app timeout", keywords: ["notification", "timeout", "app", "ignore", "override"] },
         { pageIndex: 6, pageName: "Interface", section: "Notifications", label: "Popup position", targetLabel: "Popup position", keywords: ["notification", "position", "popup", "corner", "top", "bottom", "left", "right"] },
         { pageIndex: 6, pageName: "Interface", section: "Notifications", label: "Do Not Disturb", targetLabel: "Do Not Disturb", keywords: ["notification", "dnd", "silent", "mute", "disturb", "quiet"] },
-        { pageIndex: 6, pageName: "Interface", section: "On-Screen Display", label: "Media OSD", targetLabel: "Media OSD", keywords: ["osd", "media", "music", "player", "shortcuts"] },
+        { pageIndex: 6, pageName: "Interface", section: "On-Screen Display", label: "Media OSD", targetLabel: "Media OSD", keywords: ["osd", "media", "music", "player", "shortcuts", "pill", "track", "game", "automatic", "skip"] },
         { pageIndex: 6, pageName: "Interface", section: "On-Screen Display", label: "OSD timeout", targetLabel: "OSD timeout", keywords: ["osd", "volume", "brightness", "media", "timeout", "duration"] },
         { pageIndex: 6, pageName: "Interface", section: "Floating tools (Super+G)", label: "Floating tools (Super+G)", targetLabel: "Floating tools (Super+G)", keywords: ["super+g", "super g", "overlay", "floating", "tools", "widgets", "desktop", "notes", "image", "crosshair", "mixer", "resources", "fps", "recorder"] },
         { pageIndex: 6, pageName: "Interface", section: "Screen Recording", label: "Recording audio", targetLabel: "Recording audio", keywords: ["screen", "record", "recording", "video", "capture", "wf-recorder", "audio", "system sound", "desktop audio", "microphone", "mic", "mix", "pipewire"] },
@@ -951,11 +952,10 @@ Item {
                 id: pageStack
                 anchors.fill: parent
                 
-                // Bounded retention: only the current page and its immediate
-                // neighbours stay instantiated. Search never forces pages alive —
-                // static index entries navigate to an unloaded page and the
-                // targetLabel focus retry waits for it to register its controls.
-                property int keepRadius: 1
+                // Keep only the active page alive. Search navigates to an
+                // unloaded page and the targetLabel focus retry waits for it to
+                // register its controls.
+                property int keepRadius: 0
 
                  Repeater {
                      id: pageRepeater
@@ -965,7 +965,7 @@ Item {
                          id: pageLoader
                          required property int index
                          anchors.fill: parent
-                         active: Config.ready && Math.abs(index - root.currentPage) <= pageStack.keepRadius
+                         active: root.loadEnabled && Math.abs(index - root.currentPage) <= pageStack.keepRadius
                         asynchronous: index !== root.currentPage
                         source: root.pages[index].component
                         visible: index === root.currentPage && status === Loader.Ready

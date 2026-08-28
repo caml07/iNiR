@@ -447,13 +447,19 @@ Scope {
                 }
 
                 // Dashboard panel below workspace thumbnails
-                OverviewDashboard {
+                Loader {
                     id: dashboardPanel
                     anchors.horizontalCenter: parent.horizontalCenter
-                    panelVisible: root.visible
-                    visible: root.shouldShow && (root.searchingText == "")
-                        && (Config.options?.overview?.dashboard?.enable ?? false)
+                    active: Config.options?.overview?.dashboard?.enable ?? false
+                    visible: active && status === Loader.Ready
+                        && root.shouldShow && (root.searchingText == "")
                     opacity: root._presentedOpen ? 1 : 0
+                    sourceComponent: Component {
+                        OverviewDashboard {
+                            panelVisible: root.visible
+                            availableWidth: dashboardPanel.parent?.width ?? root.width
+                        }
+                    }
 
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled

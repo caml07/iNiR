@@ -16,13 +16,13 @@ Text {
     }
     transform: root.animateChange ? [slideTransform] : []
 
-    renderType: Text.NativeRendering
+    renderType: Text.QtRendering
     verticalAlignment: Text.AlignVCenter
     property bool shouldUseNumberFont: /^\d+$/.test(root.text)
     property var defaultFont: shouldUseNumberFont ? Appearance.font.family.numbers : Appearance.font.family.main
     
     font {
-        hintingPreference: Font.PreferDefaultHinting
+        hintingPreference: Font.PreferNoHinting
         family: defaultFont
         pixelSize: Appearance?.font.pixelSize.small ?? 15
         variableAxes: shouldUseNumberFont ? ({}) : Appearance.font.variableAxes.main
@@ -30,7 +30,8 @@ Text {
         // (token-driven, absolute px). Numbers stay untracked so digit columns
         // don't drift. Other styles unaffected (0).
         letterSpacing: (Appearance?.zzzEverywhere && !root.shouldUseNumberFont)
-            ? (Appearance?.zzz.tracking ?? 0) : 0
+            ? (Appearance?.zzz.tracking ?? 0)
+            : (Appearance?.regaliaEverywhere && !root.shouldUseNumberFont) ? 0.12 : 0
     }
     color: Appearance?.colors.colOnLayer0 ?? "black"
     linkColor: Appearance?.colors.colPrimary

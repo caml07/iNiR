@@ -199,7 +199,7 @@ ShellRoot {
                 deferred: Math.floor(root._bootDeferredAt - root._bootShellEntryAt),
                 lateFeatures: Math.floor(root._bootLateFeaturesAt - root._bootDeferredAt)
             },
-            shellPid: 0,
+            shellPid: Quickshell.processId,
             writtenAt: Math.floor(Date.now())
         };
         bootPhaseWriter.setText(JSON.stringify(data, null, 2));
@@ -468,8 +468,7 @@ ShellRoot {
     IpcHandler {
         target: "settingsNav"
         function page(index: int): void {
-            GlobalStates.settingsOverlayRequestedPage = index
-            GlobalStates.settingsOverlayOpen = true
+            GlobalStates.openSettingsPage(index)
         }
         function count(): int { return SettingsPageRegistry.pages.length }
         function current(): int { return GlobalStates.settingsOverlayCurrentPage }
@@ -575,17 +574,25 @@ ShellRoot {
     IpcHandler {
         target: "overview"
         function _isWaffle(): bool { return (Config.options?.panelFamily ?? "ii") === "waffle" }
+        function _usePillLauncher(): bool {
+            return !_isWaffle()
+                && (Config.options?.bar?.appearanceStyle ?? "classic") === "pill"
+                && (Config.options?.bar?.pill?.superSpaceLauncher ?? "overview") === "pill"
+        }
         function toggle(): void {
             if (_isWaffle()) { GlobalStates.searchOpen = !GlobalStates.searchOpen; return }
+            if (_usePillLauncher()) { GlobalStates.pillSurfaceCommand("toggle", "launcher"); return }
             GlobalStates.overviewSearchPrefix = ""
             GlobalStates.toggleOverview("")
         }
         function close(): void {
             if (_isWaffle()) { GlobalStates.searchOpen = false; return }
+            if (_usePillLauncher()) { GlobalStates.pillSurfaceCommand("close", "launcher"); return }
             GlobalStates.overviewOpen = false
         }
         function open(): void {
             if (_isWaffle()) { GlobalStates.searchOpen = true; return }
+            if (_usePillLauncher()) { GlobalStates.pillSurfaceCommand("open", "launcher"); return }
             GlobalStates.overviewSearchPrefix = ""
             GlobalStates.openOverview("")
         }

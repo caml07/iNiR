@@ -18,6 +18,7 @@ Rectangle {
     // Optional hook for the parent view (e.g., WallhavenView) to request auto-scroll
     // when the user clicks paging buttons.
     property var onNextPageRequested
+    property var onClearRequested
 
     property string previewDownloadPath
     property string downloadPath
@@ -249,7 +250,8 @@ Rectangle {
                         required property var modelData
                         imageData: modelData
                         fallbackTags: root.responseData?.tags ?? []
-                        aspectCrop: root.responseData?.provider === "wallhaven"
+                        aspectCrop: root.cleanLayout || root.responseData?.provider === "wallhaven"
+                        lazyTagFetch: root.responseData?.provider === "wallhaven"
                         rowHeight: imageRow.rowHeight
                         // Clean layout: no radius, no background. Normal: 50 for single image, normal rounding for multiple
                         imageRadius: root.cleanLayout ? Appearance.rounding.small : (imageRow.modelData.images.length == 1 ? 50 : Appearance.rounding.normal)
@@ -348,7 +350,9 @@ Rectangle {
                     if (root.tagInputField) {
                         root.tagInputField.text = ""
                     }
-                    if (root.responseData.provider === "wallhaven") {
+                    if (root.onClearRequested) {
+                        root.onClearRequested(root.responseData)
+                    } else if (root.responseData.provider === "wallhaven") {
                         Wallhaven.clearResponses()
                     } else {
                         Booru.clearResponses()

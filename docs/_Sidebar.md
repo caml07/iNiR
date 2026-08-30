@@ -35,5 +35,7 @@
 - [Runtime](RUNTIME)
 - [Packages](PACKAGES)
 - [Compositors](COMPOSITORS)
+- [Void Linux](VOID)
+- [Void VM validation](VOID_VM_VALIDATION)
 - [Optimization](OPTIMIZATION)
 - [NixOS](NIXOS)

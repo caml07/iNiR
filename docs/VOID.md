@@ -12,6 +12,8 @@ built against and will be revised after VM validation. Decisions: see
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
   musl libc; `seatd` without elogind; building ydotool from source.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
+  The completed graphics/session checkpoint is recorded in
+  `docs/VOID_VM_VALIDATION.md`.
 
 ## How the port decides what to do
 
@@ -137,6 +139,9 @@ not enough — without the user-manager socket, `systemctl --user` hangs for
 10-30s).
 
 ## VM validation
+
+The detailed 2026-08-29 VM execution log is in
+`docs/VOID_VM_VALIDATION.md`.
 
 Recipe (QEMU, KVM available on the host):
 

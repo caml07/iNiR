@@ -56,5 +56,6 @@ The shell is configurable through Settings and `config.json`. Persistent writes 
 | Desktop references | [Managed desktop items](DESKTOP_ITEMS) |
 | Compositor support | [Compositors](COMPOSITORS) |
 | Performance | [Optimization](OPTIMIZATION) |
+| Void Linux port | [Void](VOID), [VM validation](VOID_VM_VALIDATION) |
 
 If the wiki disagrees with the current shell, the shell wins. Then the wiki gets fixed.

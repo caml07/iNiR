@@ -470,3 +470,12 @@ repair_legacy_quickshell_malloc_environment() {
   INIR_LEGACY_MALLOC_ENV_REPAIRED=$repaired
   return 0
 }
+
+# Check if a usable systemd user manager is available.
+# Returns 0 if the socket exists AND systemctl --user responds within 3s.
+# This is the predicate from ADR-0002, gating all systemd-sensitive paths.
+# Does NOT check distro name or mere presence of systemctl binary.
+function has_usable_systemd_user_manager() {
+  [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
+    timeout 3s systemctl --user show-environment >/dev/null 2>&1
+}

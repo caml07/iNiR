@@ -26,6 +26,10 @@ _detect_compositor_for_migration() {
 }
 
 migration_check() {
+  # No-op if usable systemd user manager is not available (ADR-0002).
+  # Without the predicate, systemctl --user can block for 10-30s.
+  has_usable_systemd_user_manager || return 1
+
   # Needs migration if a graphical-session.target.wants link exists.
   local old_link="${_systemd_user_dir}/graphical-session.target.wants/inir.service"
 
@@ -50,6 +54,10 @@ migration_preview() {
 }
 
 migration_apply() {
+  # No-op if usable systemd user manager is not available (ADR-0002).
+  # Without the predicate, systemctl --user can block for 10-30s.
+  has_usable_systemd_user_manager || return 0
+
   local old_link="${_systemd_user_dir}/graphical-session.target.wants/inir.service"
   local service_file="${_systemd_user_dir}/inir.service"
 
@@ -64,7 +72,5 @@ migration_apply() {
     ln -sf "$service_file" "$new_wants_dir/inir.service"
   fi
 
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl --user daemon-reload >/dev/null 2>&1 || true
-  fi
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
 }

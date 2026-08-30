@@ -5,6 +5,10 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 runtime_root="$(cd -- "$script_dir/.." && pwd)"
 launcher="${INIR_LAUNCHER_PATH:-$runtime_root/scripts/inir}"
 
+# Reuse the production predicate so systemd-only invariants are skipped when
+# this script runs in a session without a usable systemd user manager.
+source "$runtime_root/sdata/lib/functions.sh"
+
 run_runtime=false
 if [[ "${1:-}" == "--with-runtime" ]]; then
     run_runtime=true
@@ -23,18 +27,24 @@ bash -n \
     "$runtime_root/sdata/migrations/"*.sh
 
 step "session tray ordering"
-service_unit="$runtime_root/assets/systemd/inir.service"
-if ! grep -qx 'Type=dbus' "$service_unit" \
-        || ! grep -qx 'BusName=org.kde.StatusNotifierWatcher' "$service_unit" \
-        || ! grep -qx 'Before=graphical-session.target' "$service_unit" \
-        || grep -qx 'After=graphical-session.target' "$service_unit" \
-        || grep -qx 'Requisite=graphical-session.target' "$service_unit"; then
-    printf 'FAIL: inir.service does not gate XDG autostart on the tray watcher\n' >&2
-    exit 1
-fi
-if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"; then
-    printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
-    exit 1
+# This check is conditional on the usable systemd user manager predicate (ADR-0002).
+# The service unit is part of the systemd path implementation.
+if has_usable_systemd_user_manager; then
+    service_unit="$runtime_root/assets/systemd/inir.service"
+    if ! grep -qx 'Type=dbus' "$service_unit" \
+            || ! grep -qx 'BusName=org.kde.StatusNotifierWatcher' "$service_unit" \
+            || ! grep -qx 'Before=graphical-session.target' "$service_unit" \
+            || grep -qx 'After=graphical-session.target' "$service_unit" \
+            || grep -qx 'Requisite=graphical-session.target' "$service_unit"; then
+        printf 'FAIL: inir.service does not gate XDG autostart on the tray watcher\n' >&2
+        exit 1
+    fi
+    if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"; then
+        printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
+        exit 1
+    fi
+else
+    printf 'SKIP: systemd user manager predicate false — skipping systemd service unit checks\n'
 fi
 if grep -q '^Environment=MALLOC_' "$service_unit" \
         || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
@@ -505,20 +515,26 @@ bash "$launcher" status >/dev/null
 
 step "application launch environment"
 # XWayland is not guaranteed to own :0. Preserve live DISPLAY discovery and validation.
-shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
-inir_launcher="$runtime_root/scripts/inir"
-if ! grep -Fq 'systemctl --user show-environment' "$shell_exec" \
-        || ! grep -Fq '_manager_display="$(manager_value DISPLAY)"' "$shell_exec" \
-        || ! grep -Fq 'valid_display "$DISPLAY"' "$shell_exec" \
-        || ! grep -Fq 'for _x in /tmp/.X11-unix/X*' "$shell_exec"; then
-    printf 'FAIL: application launches do not recover the live XWayland DISPLAY environment\n' >&2
-    exit 1
-fi
-if ! grep -Fq 'vars_to_import+=("DISPLAY=$DISPLAY")' "$inir_launcher" \
-        || ! grep -Fq 'for _xsock in /tmp/.X11-unix/X*' "$inir_launcher" \
-        || ! grep -Fq 'systemctl --user set-environment "${vars_to_import[@]}"' "$inir_launcher"; then
-    printf 'FAIL: session environment does not publish the XWayland DISPLAY to the user manager\n' >&2
-    exit 1
+# These checks are conditional on the usable systemd user manager predicate (ADR-0002).
+# In the reference implementation (systemd path), the predicate holds.
+if has_usable_systemd_user_manager; then
+    shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
+    inir_launcher="$runtime_root/scripts/inir"
+    if ! grep -Fq 'systemctl --user show-environment' "$shell_exec" \
+            || ! grep -Fq '_manager_display="$(manager_value DISPLAY)"' "$shell_exec" \
+            || ! grep -Fq 'valid_display "$DISPLAY"' "$shell_exec" \
+            || ! grep -Fq 'for _x in /tmp/.X11-unix/X*' "$shell_exec"; then
+        printf 'FAIL: application launches do not recover the live XWayland DISPLAY environment\n' >&2
+        exit 1
+    fi
+    if ! grep -Fq 'vars_to_import+=("DISPLAY=$DISPLAY")' "$inir_launcher" \
+            || ! grep -Fq 'for _xsock in /tmp/.X11-unix/X*' "$inir_launcher" \
+            || ! grep -Fq 'systemctl --user set-environment "${vars_to_import[@]}"' "$inir_launcher"; then
+        printf 'FAIL: session environment does not publish the XWayland DISPLAY to the user manager\n' >&2
+        exit 1
+    fi
+else
+    printf 'SKIP: systemd user manager predicate false — skipping systemd-specific environment checks\n'
 fi
 if grep -Fq 'MALLOC_ARENA_MAX' "$shell_exec" \
         || grep -Fq 'MALLOC_MMAP_THRESHOLD_' "$shell_exec"; then

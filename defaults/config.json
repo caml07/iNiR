@@ -1348,11 +1348,6 @@
             "scale": 0.5
         },
         "openingZoomAnimation": false,
-        "recorder": {
-            "autoHideOnFullscreen": true,
-            "suppressToasts": true,
-            "disableNiriAnims": false
-        },
         "scrimAnimationDurationMs": 60,
         "scrimDim": 100
     },
@@ -1384,6 +1379,45 @@
         "topMargin": 80,
         "windowTileMargin": 6,
         "workspaceSpacing": 5
+    },
+    "orbit": {
+        "balancedGrid": true,
+        "closeOnSelect": true,
+        "enable": true,
+        "hotCorner": "topRight",
+        "hotCornerDwellMs": 0,
+        "hotCornerEnable": true,
+        "hotCornerSize": 12,
+        "maxPanelWidthPercent": 92,
+        "motionStyle": "spring",
+        "scrimDim": 35,
+        "scrollNavigation": true,
+        "scrollSteps": 1,
+        "showStash": true,
+        "showTrail": true,
+        "showWorkspaceNumbers": true,
+        "shelf": {
+            "closeOnAction": true,
+            "enable": true,
+            "modules": [
+                "locator",
+                "trail",
+                "niri",
+                "actions",
+                "stash"
+            ],
+            "pinnedActions": [
+                "open-clipboard",
+                "toggle-tiling",
+                "toggle-dashboard"
+            ]
+        },
+        "stashRestoreMode": "original",
+        "trailItems": 5,
+        "windowGap": 4,
+        "workspaceCount": 3,
+        "workspaceScalePercent": 27,
+        "workspaceSpacing": 18
     },
     "performance": {
         "blurAreas": {

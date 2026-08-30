@@ -1805,6 +1805,7 @@ Singleton {
                 property JsonObject backdrop: JsonObject {
                     property bool enable: true
                     property bool hideWallpaper: false
+                    property string fillMode: "fill" // "fill", "fit"
                     property bool useMainWallpaper: true
                     property string wallpaperPath: ""
                     property string thumbnailPath: "" // Thumbnail for animated wallpapers (video/gif)
@@ -2536,11 +2537,6 @@ Singleton {
                     property string imageSource: "https://media.tenor.com/H5U5bJzj3oAAAAAi/kukuru.gif"
                     property real scale: 0.5
                 }
-                property JsonObject recorder: JsonObject {
-                    property bool autoHideOnFullscreen: true
-                    property bool suppressToasts: true
-                    property bool disableNiriAnims: false
-                }
             }
 
             property JsonObject overview: JsonObject {
@@ -2580,6 +2576,36 @@ Singleton {
                     property bool showVolume: true
                     property bool showWeather: true
                     property bool showSystem: true
+                }
+            }
+
+            property JsonObject orbit: JsonObject {
+                property bool enable: true
+                property bool hotCornerEnable: true
+                property string hotCorner: "topRight"
+                property int hotCornerSize: 12
+                property int hotCornerDwellMs: 0
+                property int workspaceCount: 3
+                property int workspaceScalePercent: 27
+                property int maxPanelWidthPercent: 92
+                property int workspaceSpacing: 18
+                property int windowGap: 4
+                property int scrimDim: 35
+                property bool showWorkspaceNumbers: true
+                property bool balancedGrid: true
+                property bool closeOnSelect: true
+                property bool scrollNavigation: true
+                property int scrollSteps: 1
+                property string motionStyle: "spring"
+                property bool showTrail: true
+                property int trailItems: 5
+                property bool showStash: true
+                property string stashRestoreMode: "original"
+                property JsonObject shelf: JsonObject {
+                    property bool enable: true
+                    property list<string> modules: ["locator", "trail", "niri", "actions", "stash"]
+                    property list<string> pinnedActions: ["open-clipboard", "toggle-tiling", "toggle-dashboard"]
+                    property bool closeOnAction: true
                 }
             }
 
@@ -2641,6 +2667,7 @@ Singleton {
                     // instead of the external swappy/satty tools.
                     property bool useNativeEditor: true
                 }
+                property string savePath: "" // Empty = use XDG Pictures/Screenshots
                 property string screenshotNameFormat: "ss-%Y%m%d-%H%M%S" // date(1) format for screenshot filenames (without extension)
             }
 

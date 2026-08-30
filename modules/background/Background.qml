@@ -708,10 +708,17 @@ Scope {
             bgRoot._parallaxTransitionReason = String(reason ?? "")
             parallaxResumeAnimation.stop()
             parallaxTransitionPauseTimer.stop()
+            parallaxTransitionWatchdog.stop()
 
             if (!waitForCrossfader) {
                 parallaxTransitionPauseTimer.interval = bgRoot._wallpaperTransitionDurationMs + bgRoot.parallaxTransitionSettleMs
                 parallaxTransitionPauseTimer.restart()
+            } else {
+                parallaxTransitionWatchdog.interval = Math.max(
+                    1000,
+                    bgRoot._wallpaperTransitionDurationMs + bgRoot.parallaxTransitionSettleMs + 500
+                )
+                parallaxTransitionWatchdog.restart()
             }
         }
 
@@ -719,6 +726,7 @@ Scope {
             if (!bgRoot.parallaxTransitionActive)
                 return
             bgRoot._parallaxWaitingCrossfader = false
+            parallaxTransitionWatchdog.stop()
             parallaxTransitionPauseTimer.interval = bgRoot.parallaxTransitionSettleMs
             parallaxTransitionPauseTimer.restart()
         }
@@ -967,10 +975,31 @@ Scope {
             interval: bgRoot._wallpaperTransitionDurationMs + bgRoot.parallaxTransitionSettleMs
             repeat: false
             onTriggered: {
+                parallaxTransitionWatchdog.stop()
                 bgRoot._parallaxWaitingCrossfader = false
                 bgRoot._parallaxTransitionReason = ""
                 bgRoot.parallaxTransitionActive = false
                 parallaxResumeAnimation.restart()
+            }
+        }
+
+        Timer {
+            id: parallaxTransitionWatchdog
+            repeat: false
+            onTriggered: {
+                if (!bgRoot.parallaxTransitionActive || !bgRoot._parallaxWaitingCrossfader)
+                    return
+                bgRoot.settleParallaxAfterTransition()
+            }
+        }
+
+        Connections {
+            target: AwwwBackend
+            function onActiveChanged(): void {
+                if (!AwwwBackend.active)
+                    return
+                if (bgRoot._parallaxWaitingCrossfader && bgRoot._parallaxTransitionReason === "wallpaper")
+                    bgRoot.settleParallaxAfterTransition()
             }
         }
 

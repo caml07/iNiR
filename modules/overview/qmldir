@@ -3,6 +3,7 @@ ActionModeView 1.0 ActionModeView.qml
 OverviewAllAppsGrid 1.0 OverviewAllAppsGrid.qml
 OverviewDashboard 1.0 OverviewDashboard.qml
 OverviewNiriWidget 1.0 OverviewNiriWidget.qml
+OrbitShelf 1.0 OrbitShelf.qml
 Overview 1.0 Overview.qml
 OverviewWidget 1.0 OverviewWidget.qml
 OverviewWindow 1.0 OverviewWindow.qml

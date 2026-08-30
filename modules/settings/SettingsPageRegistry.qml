@@ -231,6 +231,14 @@ Singleton {
             desc: Translation.tr("Move and resize persistent shell surfaces"),
             essential: true,
             component: "modules/settings/ShellLayoutConfig.qml"
+        },
+        {
+            key: "orbit",
+            name: Translation.tr("Orbit"),
+            icon: "hub",
+            desc: Translation.tr("Niri workspace navigator, Trail and Stash"),
+            essential: true,
+            component: "modules/settings/OrbitConfig.qml"
         }
     ]
 
@@ -239,7 +247,7 @@ Singleton {
     readonly property var defaultCategories: [
         { label: Translation.tr("Essentials"), pages: [0] },
         { label: Translation.tr("Appearance"), pages: [4, 25, 3, 14, 21] },
-        { label: Translation.tr("Shell"), pages: [2, 26, 5, 22, 23, 16, 10, 11, 18, 19, 20] },
+        { label: Translation.tr("Shell"), pages: [2, 26, 27, 5, 22, 23, 16, 10, 11, 18, 19, 20] },
         { label: Translation.tr("System"), pages: [1, 24, 7, 6, 12, 15, 8, 17] },
         { label: Translation.tr("Reference"), pages: [9, 13] }
     ]
@@ -301,6 +309,34 @@ Singleton {
 
         _staticSearchIndex = [
         {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Activation"),
+            label: Translation.tr("Orbit hot corner"),
+            description: Translation.tr("Open the Niri workspace navigator from any screen corner"),
+            keywords: ["orbit", "overview", "task view", "hot corner", "niri", "workspace", "navigation"]
+        },
+        {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Workspace layout"),
+            label: Translation.tr("Orbit layout"),
+            description: Translation.tr("Visible workspaces, scale, spacing and balanced window grid"),
+            keywords: ["orbit", "workspace", "grid", "scale", "spacing", "preview", "window"]
+        },
+        {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Navigation"),
+            label: Translation.tr("Trail and Stash"),
+            description: Translation.tr("Recent-window navigation and temporary window parking"),
+            keywords: ["orbit", "trail", "stash", "recent", "mru", "minimize", "park", "window"]
+        },
+        {
+            pageIndex: 27, pageName: root.pages[27].name,
+            section: Translation.tr("Material motion"),
+            label: Translation.tr("Orbit motion"),
+            description: Translation.tr("Spring, glide and instant entry motion") ,
+            keywords: ["orbit", "animation", "motion", "spring", "glide", "material"]
+        },
+        {
             pageIndex: 26, pageName: root.pages[26].name,
             section: Translation.tr("Live shell layout"),
             label: Translation.tr("Edit live"),
@@ -330,6 +366,20 @@ Singleton {
             label: Translation.tr("Bar & screen"),
             description: Translation.tr("Bar position and screen rounding"),
             keywords: ["bar", "position", "screen", "round", "corner"]
+        },
+        {
+            pageIndex: 0, pageName: root.pages[0].name,
+            section: Translation.tr("Capture locations"),
+            label: Translation.tr("Recordings folder"),
+            description: Translation.tr("Where screen recordings are saved"),
+            keywords: ["capture", "record", "recording", "video", "save", "path", "folder", "directory"]
+        },
+        {
+            pageIndex: 0, pageName: root.pages[0].name,
+            section: Translation.tr("Capture locations"),
+            label: Translation.tr("Screenshots folder"),
+            description: Translation.tr("Where iNiR screenshots are saved"),
+            keywords: ["capture", "screenshot", "snip", "save", "path", "folder", "directory", "picture"]
         },
         {
             pageIndex: 19, pageName: root.pages[19].name,
@@ -755,6 +805,13 @@ Singleton {
             label: Translation.tr("Backdrop"),
             description: Translation.tr("Panel backdrop wallpaper and effects"),
             keywords: ["backdrop", "panel", "wallpaper", "blur", "vignette", "saturation"]
+        },
+        {
+            pageIndex: 3, pageName: root.pages[3].name,
+            section: Translation.tr("Multi-monitor"),
+            label: Translation.tr("Show entire backdrop"),
+            description: Translation.tr("Fit the full backdrop without cropping"),
+            keywords: ["backdrop", "wallpaper", "fit", "full", "entire", "crop", "zoom", "bars"]
         },
         {
             pageIndex: 3, pageName: root.pages[3].name,
@@ -1233,10 +1290,24 @@ Singleton {
         },
         {
             pageIndex: 6, pageName: root.pages[6].name,
+            section: Translation.tr("Screen recording"),
+            label: Translation.tr("Recording folder"),
+            description: Translation.tr("Choose where screen recordings are saved"),
+            keywords: ["recording", "video", "save", "path", "folder", "directory", "destination"]
+        },
+        {
+            pageIndex: 6, pageName: root.pages[6].name,
             section: Translation.tr("Region selector (screen snipping/Google Lens)"),
             label: Translation.tr("Region selector"),
             description: Translation.tr("Screenshot region selector tool"),
             keywords: ["region", "selector", "screenshot", "snip", "area", "capture"]
+        },
+        {
+            pageIndex: 6, pageName: root.pages[6].name,
+            section: Translation.tr("Region selector (screen snipping/Google Lens)"),
+            label: Translation.tr("Screenshots folder"),
+            description: Translation.tr("Choose where iNiR screenshots are saved"),
+            keywords: ["screenshot", "snip", "capture", "save", "path", "folder", "directory", "destination"]
         },
         {
             pageIndex: 6, pageName: root.pages[6].name,

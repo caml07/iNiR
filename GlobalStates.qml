@@ -51,6 +51,7 @@ Singleton {
     property bool oskOpen: false
     property bool overlayOpen: false
     property bool overviewOpen: false
+    property string overviewMode: "default"
     property string overviewTargetOutput: ""
     property string overviewSearchPrefix: ""
     signal pillSurfaceCommand(string command, string surface)
@@ -323,6 +324,7 @@ Singleton {
             Config.options?.sidebar?.screenList ?? [])
 
     function openOverview(outputName): void {
+        overviewMode = "default"
         overviewTargetOutput = root.resolveOutputName(outputName, [])
         overviewOpen = true
     }
@@ -333,11 +335,31 @@ Singleton {
 
     function toggleOverview(outputName): void {
         const resolved = root.resolveOutputName(outputName, [])
-        if (overviewOpen && overviewPresentationOutput === resolved)
+        if (overviewOpen && overviewMode === "default" && overviewPresentationOutput === resolved)
             root.closeOverview()
         else
             root.openOverview(resolved)
     }
+
+    function openOrbit(outputName): void {
+        if (!(Config.options?.orbit?.enable ?? true))
+            return
+        overviewMode = "orbit"
+        overviewSearchPrefix = ""
+        overviewTargetOutput = root.resolveOutputName(outputName, [])
+        overviewOpen = true
+    }
+
+    function toggleOrbit(outputName): void {
+        const resolved = root.resolveOutputName(outputName, [])
+        if (overviewOpen && overviewMode === "orbit" && overviewPresentationOutput === resolved)
+            root.closeOverview()
+        else
+            root.openOrbit(resolved)
+    }
+
+    function openTaskView(outputName): void { root.openOrbit(outputName) }
+    function toggleTaskView(outputName): void { root.toggleOrbit(outputName) }
 
     function openSidebarLeft(outputName): void {
         sidebarLeftTargetOutput = root.resolveOutputName(outputName,

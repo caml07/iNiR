@@ -428,9 +428,26 @@ ShellRoot {
 
     IpcHandler {
         target: "taskview"
-        function toggle(): void { GlobalStates.waffleTaskViewOpen = !GlobalStates.waffleTaskViewOpen }
-        function close(): void { GlobalStates.waffleTaskViewOpen = false }
-        function open(): void { GlobalStates.waffleTaskViewOpen = true }
+        function _isWaffle(): bool { return (Config.options?.panelFamily ?? "ii") === "waffle" }
+        function toggle(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = !GlobalStates.waffleTaskViewOpen; return }
+            if (CompositorService.isNiri) GlobalStates.toggleOrbit("")
+        }
+        function close(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = false; return }
+            if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview()
+        }
+        function open(): void {
+            if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = true; return }
+            if (CompositorService.isNiri) GlobalStates.openOrbit("")
+        }
+    }
+
+    IpcHandler {
+        target: "orbit"
+        function toggle(): void { if (CompositorService.isNiri) GlobalStates.toggleOrbit("") }
+        function close(): void { if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview() }
+        function open(): void { if (CompositorService.isNiri) GlobalStates.openOrbit("") }
     }
 
     // IPC for settings - overlay mode or separate window based on config

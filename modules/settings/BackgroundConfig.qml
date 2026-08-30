@@ -2085,6 +2085,18 @@ ContentPage {
                 }
 
                 SettingsSwitch {
+                    visible: (Config.options?.background?.backdrop?.enable ?? true)
+                        && (Config.options?.background?.backdrop?.hideWallpaper ?? false)
+                    buttonIcon: "fit_screen"
+                    text: Translation.tr("Show entire backdrop")
+                    checked: (Config.options?.background?.backdrop?.fillMode ?? "fill") === "fit"
+                    onCheckedChanged: Config.setNestedValue("background.backdrop.fillMode", checked ? "fit" : "fill")
+                    StyledToolTip {
+                        text: Translation.tr("Fit the full backdrop inside the screen instead of cropping it. Bars may appear when the image aspect ratio differs from the display.")
+                    }
+                }
+
+                SettingsSwitch {
                     visible: (Config.options?.background?.backdrop?.enable ?? true) && !(Config.options?.background?.backdrop?.hideWallpaper ?? false)
                     buttonIcon: "image"
                     text: Translation.tr("Use main wallpaper")

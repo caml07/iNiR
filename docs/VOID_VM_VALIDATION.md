@@ -241,14 +241,59 @@ The host-side Bash contract suite also passed:
 4 suites passed, 0 suites failed
 ```
 
+## PR 2 dependency validation
+
+On 2026-08-30, the PR 2 branch `feat/void-dependencies` was validated from
+the canonical `/home/voidcaml/inir-src` checkout on Void:
+
+```text
+branch=feat/void-dependencies
+commit=ad00883e feat(install): add Void XBPS dependency installation (PR2)
+worktree=clean
+```
+
+The dependency route was run twice with setup and file installation skipped:
+
+```bash
+cd /home/voidcaml/inir-src
+./setup install -y --skip-sysupdate --skip-setups --skip-files
+xbps-query -l | sort > /tmp/inir-pr2-packages-1.txt
+./setup install -y --skip-sysupdate --skip-setups --skip-files
+xbps-query -l | sort > /tmp/inir-pr2-packages-2.txt
+diff -u /tmp/inir-pr2-packages-1.txt /tmp/inir-pr2-packages-2.txt
+```
+
+Both runs completed successfully. The final `diff` was empty, confirming
+package-install idempotency. XBPS prefixes already-installed package notices
+with `ERROR`, but both transactions completed and the installer reported:
+
+```text
+Dependencies installed
+Installation complete
+```
+
+All five groups passed: base, audio, toolkit, screencapture, and fonts/theme.
+Void-specific names validated by the VM include `python3-Pillow`, `geoclue2`,
+`tesseract-ocr`, `tesseract-ocr-eng`, `tesseract-ocr-spa`, and `ImageMagick`.
+The unavailable `adw-gtk3`, `capitaine-cursors`, and `whitesur-icon-theme`
+packages were excluded from the XBPS group.
+
+Host-side PR 2 validation also passed:
+
+```text
+5 suites passed, 0 suites failed
+27 tests passed, 0 tests failed
+```
+
+PR 2 is complete on the fork and ready for PR 3, `feat/void-runit-install`.
+
 ## What remains
 
-- Test iNiR/QuickShell again after the active-output fix, from the local VM
-  session rather than SSH.
+- Test iNiR/QuickShell from the local VM session rather than SSH.
 - Enable and test the Void session supervisor tiers, starting with the
   `turnstile` per-user service and then the `runsvdir` fallback.
-- Implement the Void core changes described in `docs/VOID.md`.
-- Test the installer on a fresh Void snapshot.
+- Implement the remaining Void core changes described in `docs/VOID.md`,
+  starting with the runit service layout and startup injection.
 - Run shellcheck and `make test-local` before opening the implementation PR.
 
 `make test-local` is currently blocked by the pre-existing

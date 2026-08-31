@@ -2,7 +2,30 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `docs/void` (base: upstream `prerelease`).
+on branch `docs/void` (base: upstream `prerelease`). PR2 is complete on the
+fork; PR3 is next.
+
+## Current progress (2026-08-30)
+
+- PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM;
+  documentation remains on this branch until the complete port is ready.
+- PR2 `feat/void-dependencies`: committed as `ad00883e` and pushed to
+  `origin/feat/void-dependencies`.
+- The canonical VM checkout is `/home/voidcaml/inir-src` on
+  `feat/void-dependencies`; its worktree was clean after validation.
+- Host validation passed: 5 suites and 27 tests, with 0 failures. `bash -n`
+  and `git diff --check` also passed.
+- VM validation passed all five dependency groups twice. The sorted
+  `xbps-query -l` snapshots produced an empty second-run diff.
+- Validated Void package names include `python3-Pillow`, `geoclue2`,
+  `tesseract-ocr*`, and `ImageMagick`. `adw-gtk3`, `capitaine-cursors`, and
+  `whitesur-icon-theme` are not in the current Void repositories and were
+  excluded from the XBPS group.
+- PR3 is ready to start as `feat/void-runit-install`. It must implement and
+  validate the per-user runit service layout, idempotent startup injection,
+  and confirmed enabling of `dbus`, `elogind`, `polkitd`, and `turnstiled`.
+
+The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 
 ## Where things are
 

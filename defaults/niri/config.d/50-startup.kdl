@@ -7,9 +7,11 @@
 // Tip: use spawn-sh-at-startup for shell pipelines or variable expansion.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// BEGIN inir-systemd-environment
 // Export XDG_MENU_PREFIX into the systemd user session and rebuild the
 // sycoca database so KDE/Qt apps see the correct .desktop entries.
 spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+// END inir-systemd-environment
 
 // Clipboard history: wl-paste watches the clipboard and cliphist stores it.
 // Text goes through clipboard-store.py, which strips browser markup: `--type
@@ -25,6 +27,12 @@ spawn-at-startup "bash" "-c" "wl-paste --type image --watch ~/.config/quickshell
 // disk mount, etc.). iNiR's setup auto-detects which agent is installed and
 // patches this line accordingly (KDE, GNOME, MATE, LXQt, or lxpolkit).
 spawn-at-startup "/usr/lib/mate-polkit/polkit-mate-authentication-agent-1"
+
+// BEGIN inir-runsvdir-fallback
+// iNiR shell supervisor (runsvdir fallback for non-systemd).
+// Do not add a compositor startup entry here or you'll get two shells.
+spawn-sh-at-startup "exec runsvdir ~/.config/service"
+// END inir-runsvdir-fallback
 
 // ── iNiR shell ──────────────────────────────────────────────────────────────
 // iNiR is managed by the user systemd service (inir.service).

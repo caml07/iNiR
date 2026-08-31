@@ -1580,6 +1580,20 @@ _get_systemd_user_env() {
     printf '%s' "$_cached_systemd_env"
 }
 
+# Check if the usable systemd user manager predicate holds.
+# Returns 0 if systemd user manager is usable, 1 otherwise.
+# This is the same predicate used in the installer (ADR-0002).
+has_usable_systemd_user_manager() {
+  [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
+    timeout 3s systemctl --user show-environment >/dev/null 2>&1
+}
+
+# Check if we're using runit supervisor (predicate is false)
+# Returns 0 if runit supervisor should be used, 1 if systemd is active.
+is_using_runit_supervisor() {
+  ! has_usable_systemd_user_manager
+}
+
 apply_gpu_policy() {
     # Pin Qt/Mesa to the iGPU on hybrid laptops so the dGPU can stay in
     # runtime PM suspend.  Coupled to resources.monitorGpu (Settings UI):
@@ -1946,6 +1960,12 @@ wait_for_stop() {
 }
 
 is_inir_service_enabled() {
+    if is_using_runit_supervisor; then
+        # For runit, check if the service directory exists and has a run script
+        [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir/run" ]]
+        return $?
+    fi
+
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2129,6 +2149,10 @@ start_inir_service_if_enabled() {
 start_background() {
     local dir="$1"
     if is_inir_service_enabled; then
+        if is_using_runit_supervisor; then
+            sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1 || true
+            return 0
+        fi
         ensure_service_unit_available
         ensure_systemd_graphical_env
         systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
@@ -2752,6 +2776,10 @@ require_command() {
 }
 
 is_inir_service_active() {
+    if is_using_runit_supervisor; then
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>/dev/null | grep -q '^run:'
+        return $?
+    fi
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2760,10 +2788,20 @@ is_inir_service_active() {
 }
 
 is_current_process_inir_service() {
+    if is_using_runit_supervisor; then
+        return 1
+    fi
     grep -q '/inir\.service' "/proc/$$/cgroup" 2>/dev/null
 }
 
 stop_inir_service_if_active() {
+    if is_using_runit_supervisor; then
+        if is_inir_service_active; then
+            sv down "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1 || true
+            return 0
+        fi
+        return 1
+    fi
     if is_inir_service_active; then
         systemctl --user stop inir.service >/dev/null 2>&1 || true
         return 0
@@ -2779,6 +2817,12 @@ restart_inir_service_if_active() {
 
 report_inir_service_failure() {
     local lines="${1:-20}"
+
+    if is_using_runit_supervisor; then
+        printf '\n\033[31m── inir runit service status ──\033[0m\n' >&2
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>&1 | sed -n '1,18p' >&2 || true
+        return 0
+    fi
 
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
@@ -2798,6 +2842,23 @@ report_inir_service_failure() {
 restart_inir_service_or_fail() {
     local dir="$1"
     local quiet="${2:-}"
+
+    if is_using_runit_supervisor; then
+        ensure_systemd_graphical_env
+        sv restart "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1 || true
+        if ! wait_for_start "$dir"; then
+            echo "Timed out waiting for iNiR to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        if ! is_inir_service_active; then
+            echo "iNiR service failed to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        [[ -z "$quiet" ]] && printf 'done.\n'
+        return 0
+    fi
 
     ensure_service_unit_available
     ensure_systemd_graphical_env
@@ -2965,6 +3026,55 @@ ensure_service_unit_available() {
 run_service_command() {
     local action="${1:-status}"
     shift || true
+
+    local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
+
+    if is_using_runit_supervisor; then
+        case "$action" in
+            install)
+                # Runit service is installed by the installer (3.files.sh)
+                echo "Runit service already installed at $runit_service_dir"
+                ;;
+            uninstall|remove)
+                sv down "$runit_service_dir" >/dev/null 2>&1 || true
+                rm -rf "$runit_service_dir"
+                echo "Removed runit service"
+                ;;
+            enable)
+                sv up "$runit_service_dir" >/dev/null 2>&1 || true
+                echo "Enabled runit service"
+                ;;
+            disable)
+                sv down "$runit_service_dir" >/dev/null 2>&1 || true
+                echo "Disabled runit service"
+                ;;
+            start)
+                exec sv up "$runit_service_dir"
+                ;;
+            stop)
+                exec sv down "$runit_service_dir"
+                ;;
+            restart)
+                exec sv restart "$runit_service_dir"
+                ;;
+            status)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            logs)
+                # For runit, use sv status (journalctl doesn't exist without systemd)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            -h|--help|"")
+                service_usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown service action: $action" >&2
+                exit 1
+                ;;
+        esac
+        return 0
+    fi
 
     case "$action" in
         install)

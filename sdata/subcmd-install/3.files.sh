@@ -165,12 +165,41 @@ case "${SKIP_QUICKSHELL}" in
       log_success "Launcher path configured for login and interactive shells"
     fi
 
+    # Determine supervisor path using the usable systemd user manager predicate
+    local _use_systemd=false
+    if has_usable_systemd_user_manager; then
+      _use_systemd=true
+    fi
+
+    # Install runit user service (always installed; used by both turnstile and runsvdir fallback)
+    local _runit_service_dir="${XDG_CONFIG_HOME}/service/inir"
+    local _runit_run_file="${_runit_service_dir}/run"
+    mkdir -p "$_runit_service_dir"
+    printf '#!/bin/sh\nexec %s run --session\n' "${INIR_LAUNCHER_PATH//&/\\&}" > "$_runit_run_file"
+    chmod +x "$_runit_run_file"
+    log_success "User runit service installed (~/.config/service/inir/run)"
+
+    # Inject/remove marked startup blocks in 50-startup.kdl based on predicate
+    local _startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
+    if [[ -f "$_startup_cfg" ]]; then
+      if $_use_systemd; then
+        # Systemd path: ensure runsvdir block is removed, systemd block present
+        sed -i '/BEGIN inir-runsvdir-fallback/,/END inir-runsvdir-fallback/d' "$_startup_cfg"
+        log_success "Startup: removed runsvdir fallback (systemd user manager active)"
+      else
+        # Non-systemd path: ensure runsvdir block is present, systemd block removed
+        sed -i '/BEGIN inir-systemd-environment/,/END inir-systemd-environment/d' "$_startup_cfg"
+        # Ensure runsvdir block exists (idempotent: the template already has it)
+        log_success "Startup: injected runsvdir fallback (no usable systemd user manager)"
+      fi
+    fi
+
     local _service_refresh_status=1
     local _service_dir="${XDG_CONFIG_HOME}/systemd/user"
     local _service_asset="${REPO_ROOT}/assets/systemd/inir.service"
     local _service_target="${_service_dir}/inir.service"
 
-    if [[ -f "$_service_asset" ]]; then
+    if $_use_systemd && [[ -f "$_service_asset" ]]; then
       mkdir -p "$_service_dir"
 
       if inir_user_service_is_masked; then
@@ -200,7 +229,7 @@ case "${SKIP_QUICKSHELL}" in
       fi
     fi
 
-    if [[ -f "$_service_target" ]]; then
+    if $_use_systemd && [[ -f "$_service_target" ]]; then
       # Wire to compositor-specific wants so inir only starts under the correct
       # compositor — NOT under KDE/GNOME/etc.  Never fall back to
       # graphical-session.target: that target is active in ANY desktop session.

@@ -140,7 +140,7 @@ not enough — without the user-manager socket, `systemctl --user` hangs for
 
 ## VM validation
 
-The detailed 2026-08-29 VM execution log is in
+The detailed 2026-08-29 and 2026-08-30 VM execution log is in
 `docs/VOID_VM_VALIDATION.md`.
 
 Recipe (QEMU, KVM available on the host):

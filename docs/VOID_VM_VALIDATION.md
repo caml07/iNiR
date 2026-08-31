@@ -207,15 +207,52 @@ The full response also listed the QEMU monitor's additional advertised modes.
 The make-or-break VM graphics test is now passed: VirGL is active and Niri
 has a usable `Virtual-1` output at `1280x800`.
 
+## Predicate and migration guard validation
+
+On 2026-08-30, the PR 1 branch `feat/void-systemd-predicate` was checked from
+an SSH session in the Void guest. The test used the real elogind runtime path,
+not a temporary test directory:
+
+```text
+runtime=/run/user/1000
+socket=/run/user/1000/systemd/private
+socket_exists=false
+predicate=false
+elapsed_ms=2
+```
+
+The migration contract was then tested in an isolated temporary home and
+configuration directory. A mocked `systemctl` function counted invocations so
+the test did not depend on the command merely being absent from `PATH`:
+
+```text
+021-systemd-single-instance check_rc=1 apply_rc=0
+022-service-compositor-wants check_rc=1 apply_rc=0
+systemctl_calls=0
+```
+
+This confirms that Void without a usable systemd user manager treats both
+migrations as no-ops, returns in under three seconds, and does not call
+`systemctl --user`.
+
+The host-side Bash contract suite also passed:
+
+```text
+4 suites passed, 0 suites failed
+```
+
 ## What remains
 
-- Test iNiR/QuickShell again after the active-output fix.
+- Test iNiR/QuickShell again after the active-output fix, from the local VM
+  session rather than SSH.
 - Enable and test the Void session supervisor tiers, starting with the
   `turnstile` per-user service and then the `runsvdir` fallback.
 - Implement the Void core changes described in `docs/VOID.md`.
 - Test the installer on a fresh Void snapshot.
 - Run shellcheck and `make test-local` before opening the implementation PR.
 
-The VM work did not modify repository source code. The only repository-local
-working-tree change carried throughout the VM session was the existing local
-edit to `AGENTS.md`.
+`make test-local` is currently blocked by the pre-existing
+`schema/wizard defaults: schema wallhaven tab` check. ShellCheck was not
+available in the host environment. No upstream PR has been opened; the Void
+port remains a fork progress branch until the complete VM integration gate
+passes.

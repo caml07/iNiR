@@ -44,7 +44,7 @@ declare -A AUR_HELPER_CMD=(
 # Quickshell - the shell framework itself. Fedora's distro package is currently
 # below iNiR's 0.3 requirement, so its installer selects the release COPR until
 # the official package catches up. Debian resolves this from stable backports.
-DEPS_CRITICAL_QUICKSHELL="arch:quickshell fedora:quickshell debian:quickshell ubuntu:COMPILE:https://github.com/quickshell-mirror/quickshell opensuse:COMPILE:https://github.com/quickshell-mirror/quickshell void:COMPILE:https://github.com/quickshell-mirror/quickshell"
+DEPS_CRITICAL_QUICKSHELL="arch:quickshell fedora:quickshell debian:quickshell ubuntu:COMPILE:https://github.com/quickshell-mirror/quickshell opensuse:COMPILE:https://github.com/quickshell-mirror/quickshell void:quickshell"
 
 # Niri compositor
 DEPS_CRITICAL_NIRI="arch:niri fedora:niri debian:COMPILE:https://github.com/YaLTeR/niri opensuse:COMPILE:https://github.com/YaLTeR/niri void:niri"
@@ -56,7 +56,7 @@ DEPS_QT6_BASE="arch:qt6-base fedora:qt6-qtbase debian:qt6-base-dev ubuntu:qt6-ba
 DEPS_QT6_DECLARATIVE="arch:qt6-declarative fedora:qt6-qtdeclarative debian:qt6-declarative-dev ubuntu:qt6-declarative-dev opensuse:qt6-declarative-devel void:qt6-declarative"
 DEPS_QT6_SVG="arch:qt6-svg fedora:qt6-qtsvg debian:libqt6svg6-dev ubuntu:libqt6svg6-dev opensuse:qt6-svg-devel void:qt6-svg"
 DEPS_QT6_WAYLAND="arch:qt6-wayland fedora:qt6-qtwayland debian:qt6-wayland-dev ubuntu:qt6-wayland-dev opensuse:qt6-wayland-devel void:qt6-wayland"
-DEPS_QT6_5COMPAT="arch:qt6-5compat fedora:qt6-qt5compat debian:qt6-5compat-dev ubuntu:qt6-5compat-dev opensuse:qt6-5compat-devel void:qt6-5compat"
+DEPS_QT6_5COMPAT="arch:qt6-5compat fedora:qt6-qt5compat debian:qt6-5compat-dev ubuntu:qt6-5compat-dev opensuse:qt6-5compat-devel void:qt6-qt5compat"
 DEPS_QT6_MULTIMEDIA="arch:qt6-multimedia fedora:qt6-qtmultimedia debian:qt6-multimedia-dev ubuntu:qt6-multimedia-dev opensuse:qt6-multimedia-devel void:qt6-multimedia"
 DEPS_QT6_IMAGEFORMATS="arch:qt6-imageformats fedora:qt6-qtimageformats debian:qt6-image-formats-plugins ubuntu:qt6-image-formats-plugins opensuse:qt6-imageformats void:qt6-imageformats"
 DEPS_QT6_VIRTUALKEYBOARD="arch:qt6-virtualkeyboard fedora:qt6-qtvirtualkeyboard debian:qt6-virtualkeyboard-dev ubuntu:qt6-virtualkeyboard-dev opensuse:qt6-virtualkeyboard-devel void:qt6-virtualkeyboard"
@@ -159,7 +159,7 @@ DEPS_MISC_NAUTILUS="arch:nautilus fedora:nautilus debian:nautilus ubuntu:nautilu
 DEPS_MISC_FOOT="arch:foot fedora:foot debian:foot ubuntu:foot opensuse:foot void:foot"
 DEPS_MISC_KITTY="arch:kitty fedora:kitty debian:kitty ubuntu:kitty opensuse:kitty void:kitty"
 DEPS_MISC_POLKIT="arch:polkit fedora:polkit debian:polkitd ubuntu:policykit-1 opensuse:polkit void:polkit"
-DEPS_MISC_UV="arch:uv fedora:uv debian:CARGO:uv ubuntu:CARGO:uv opensuse:CARGO:uv void:CARGO:uv"
+DEPS_MISC_UV="arch:uv fedora:uv debian:CARGO:uv ubuntu:CARGO:uv opensuse:CARGO:uv void:uv"
 DEPS_MISC_GOWALL="arch:AUR:gowall-bin fedora:gowall debian:COMPILE:https://github.com/Achno/gowall ubuntu:COMPILE:https://github.com/Achno/gowall opensuse:COMPILE:https://github.com/Achno/gowall void:gowall"
 DEPS_MISC_MISSIONCENTER="arch:mission-center fedora:FLATPAK:io.missioncenter.MissionCenter debian:FLATPAK:io.missioncenter.MissionCenter ubuntu:FLATPAK:io.missioncenter.MissionCenter opensuse:FLATPAK:io.missioncenter.MissionCenter void:FLATPAK:io.missioncenter.MissionCenter"
 DEPS_MISC_KCONFIG="arch:kconfig fedora:kf6-kconfig debian:libkf6config-bin ubuntu:libkf6config-bin opensuse:kconfig void:kconfig"

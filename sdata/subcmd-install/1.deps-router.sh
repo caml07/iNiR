@@ -32,9 +32,8 @@ case "$OS_GROUP_ID" in
     ;;
     
   void)
-    printf "${STY_YELLOW}Void Linux support is experimental${STY_RST}\n"
-    printf "${STY_YELLOW}Using generic installer with guidance${STY_RST}\n"
-    source ./sdata/dist-generic/install-deps.sh
+    printf "${STY_GREEN}Using Void Linux installer${STY_RST}\n"
+    source ./sdata/dist-void/install-deps.sh
     ;;
     
   gentoo)

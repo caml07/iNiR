@@ -826,9 +826,14 @@ SH
 chmod +x "$turnstile_test_root/bin/systemctl"
 cat > "$turnstile_test_root/bin/sv" <<'SH'
 #!/bin/sh
-printf 'run: %s: (pid 123) 1s\n' "$2"
+exit 1
 SH
 chmod +x "$turnstile_test_root/bin/sv"
+cat > "$turnstile_test_root/bin/pgrep" <<'SH'
+#!/bin/sh
+printf '123\n'
+SH
+chmod +x "$turnstile_test_root/bin/pgrep"
 cat > "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
 // BEGIN inir-runsvdir-fallback
 spawn-sh-at-startup "exec runsvdir ~/.config/service"

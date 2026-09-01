@@ -498,8 +498,11 @@ function has_usable_systemd_user_manager() {
 
 has_active_turnstile() {
   local service_path="${INIR_TURNSTILED_SERVICE_PATH:-/var/service/turnstiled}"
-  command -v sv >/dev/null 2>&1 &&
-    sv status "$service_path" 2>/dev/null | grep -q '^run:'
+  [[ -e "$service_path" ]] || return 1
+  if command -v sv >/dev/null 2>&1 && sv status "$service_path" 2>/dev/null | grep -q '^run:'; then
+    return 0
+  fi
+  pgrep -x turnstiled >/dev/null 2>&1
 }
 
 configure_turnstile_user_services() {

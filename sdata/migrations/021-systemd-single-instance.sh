@@ -6,6 +6,11 @@ MIGRATION_DESCRIPTION="Removes compositor startup of inir, installs/enables the 
 MIGRATION_TARGET_FILE="~/.config/systemd/user/inir.service + ~/.config/niri/config.d/50-startup.kdl"
 MIGRATION_REQUIRED=true
 
+# Source the predicate helper when migrations run outside the installer.
+_migration_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck source=/dev/null
+source "${_migration_repo_root}/sdata/lib/functions.sh" 2>/dev/null || true
+
 migration_check() {
   # No-op if usable systemd user manager is not available (ADR-0002).
   # Without the predicate, systemctl --user can block for 10-30s.
@@ -96,8 +101,13 @@ import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
-pattern = re.compile(r'^(?![ \t]*//).*spawn-sh-at-startup.*runsvdir.*\n?', re.MULTILINE)
+pattern = re.compile(
+    r'(?ms)^[ \t]*// BEGIN inir-runsvdir-fallback\n'
+    r'.*?^[ \t]*// END inir-runsvdir-fallback\n?'
+)
 new_text = pattern.sub('', text)
+pattern = re.compile(r'^(?![ \t]*//).*spawn-sh-at-startup.*runsvdir.*\n?', re.MULTILINE)
+new_text = pattern.sub('', new_text)
 if new_text != text:
     path.write_text(new_text)
 PY

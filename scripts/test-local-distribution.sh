@@ -43,14 +43,21 @@ if has_usable_systemd_user_manager; then
         printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
         exit 1
     fi
+    # MALLOC check for systemd service unit
+    if grep -q '^Environment=MALLOC_' "$service_unit" \
+            || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
+            || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then
+        printf 'FAIL: iNiR still overrides the glibc allocator at runtime\n' >&2
+        exit 1
+    fi
 else
     printf 'SKIP: systemd user manager predicate false — skipping systemd service unit checks\n'
-fi
-if grep -q '^Environment=MALLOC_' "$service_unit" \
-        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
-        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then
-    printf 'FAIL: iNiR still overrides the glibc allocator at runtime\n' >&2
-    exit 1
+    # MALLOC check for non-systemd (launcher and env scripts only)
+    if grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
+            || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then
+        printf 'FAIL: iNiR still overrides the glibc allocator at runtime\n' >&2
+        exit 1
+    fi
 fi
 
 step "service mask handling"
@@ -513,13 +520,48 @@ step "launcher resolution"
 bash "$launcher" path >/dev/null
 bash "$launcher" status >/dev/null
 
+step "runit service controls"
+runit_test_root="$(mktemp -d)"
+mkdir -p "$runit_test_root/bin" "$runit_test_root/config/service/inir" "$runit_test_root/home"
+printf '#!/bin/sh\nexit 0\n' > "$runit_test_root/config/service/inir/run"
+cat > "$runit_test_root/bin/sv" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" > "$INIR_TEST_SV_LOG"
+SH
+cat > "$runit_test_root/bin/systemctl" <<'SH'
+#!/bin/sh
+: > "$INIR_TEST_SYSTEMCTL_CALLED"
+exit 1
+SH
+chmod +x "$runit_test_root/config/service/inir/run" "$runit_test_root/bin/sv" "$runit_test_root/bin/systemctl"
+if ! (
+    export HOME="$runit_test_root/home"
+    export XDG_CONFIG_HOME="$runit_test_root/config"
+    export XDG_RUNTIME_DIR="$runit_test_root/runtime"
+    export PATH="$runit_test_root/bin:$PATH"
+    export INIR_TEST_SV_LOG="$runit_test_root/sv.log"
+    export INIR_TEST_SYSTEMCTL_CALLED="$runit_test_root/systemctl.called"
+    "$launcher" service restart
+); then
+    printf 'FAIL: runit service restart command failed\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+if [[ "$(<"$runit_test_root/sv.log")" != "restart $runit_test_root/config/service/inir" ]] \
+        || [[ -e "$runit_test_root/systemctl.called" ]]; then
+    printf 'FAIL: runit service restart did not use sv exclusively\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+rm -rf "$runit_test_root"
+
 step "application launch environment"
 # XWayland is not guaranteed to own :0. Preserve live DISPLAY discovery and validation.
 # These checks are conditional on the usable systemd user manager predicate (ADR-0002).
 # In the reference implementation (systemd path), the predicate holds.
+shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
+inir_launcher="$runtime_root/scripts/inir"
 if has_usable_systemd_user_manager; then
-    shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
-    inir_launcher="$runtime_root/scripts/inir"
     if ! grep -Fq 'systemctl --user show-environment' "$shell_exec" \
             || ! grep -Fq '_manager_display="$(manager_value DISPLAY)"' "$shell_exec" \
             || ! grep -Fq 'valid_display "$DISPLAY"' "$shell_exec" \
@@ -535,6 +577,20 @@ if has_usable_systemd_user_manager; then
     fi
 else
     printf 'SKIP: systemd user manager predicate false — skipping systemd-specific environment checks\n'
+fi
+files_stage="$runtime_root/sdata/subcmd-install/3.files.sh"
+startup_kdl="$runtime_root/defaults/niri/config.d/50-startup.kdl"
+if grep -Fq 'spawn-sh-at-startup "exec runsvdir ~/.config/service"' "$startup_kdl" \
+        || ! grep -Fq 'update_inir_startup_supervisor' "$files_stage" \
+        || ! grep -Fq 'BEGIN inir-runsvdir-fallback' "$files_stage" \
+        || ! grep -Fq 'runsvdir ~/.config/service' "$files_stage"; then
+    printf 'FAIL: startup supervisor template/injection contract is invalid\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'is_using_runit_supervisor && return 0' "$inir_launcher" \
+        || ! grep -Fq 'sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"' "$inir_launcher"; then
+    printf 'FAIL: runit paths are not isolated from systemd\n' >&2
+    exit 1
 fi
 if grep -Fq 'MALLOC_ARENA_MAX' "$shell_exec" \
         || grep -Fq 'MALLOC_MMAP_THRESHOLD_' "$shell_exec"; then
@@ -624,6 +680,44 @@ if [[ -e "$runtime_root/sdata/migrations/037-scope-quickshell-malloc-env.sh" ]];
     printf 'FAIL: allocator cleanup was added as a second migration instead of update/doctor repair\n' >&2
     exit 1
 fi
+
+step "migration predicate guards"
+migration_021="$runtime_root/sdata/migrations/021-systemd-single-instance.sh"
+migration_022="$runtime_root/sdata/migrations/022-service-compositor-wants.sh"
+migration_test_root="$(mktemp -d)"
+mkdir -p "$migration_test_root/bin" "$migration_test_root/config" "$migration_test_root/home"
+cat > "$migration_test_root/bin/systemctl" <<'SH'
+#!/bin/sh
+: > "$INIR_TEST_SYSTEMCTL_CALLED"
+exit 1
+SH
+chmod +x "$migration_test_root/bin/systemctl"
+for migration_file in "$migration_021" "$migration_022"; do
+    if ! (
+        export HOME="$migration_test_root/home"
+        export REPO_ROOT="$runtime_root"
+        export XDG_CONFIG_HOME="$migration_test_root/config"
+        export XDG_RUNTIME_DIR="$migration_test_root/runtime"
+        export PATH="$migration_test_root/bin:$PATH"
+        export INIR_TEST_SYSTEMCTL_CALLED="$migration_test_root/systemctl.called"
+        # Arrange: no user-manager socket or migration state.
+        # Act: evaluate the migration in the non-systemd profile.
+        # Assert: it is a no-op without invoking systemctl.
+        source "$migration_file"
+        migration_check && exit 1
+        migration_apply
+    ); then
+        printf 'FAIL: %s is not a non-systemd no-op\n' "$(basename "$migration_file")" >&2
+        rm -rf "$migration_test_root"
+        exit 1
+    fi
+done
+if [[ -e "$migration_test_root/systemctl.called" ]]; then
+    printf 'FAIL: non-systemd migrations invoked systemctl\n' >&2
+    rm -rf "$migration_test_root"
+    exit 1
+fi
+rm -rf "$migration_test_root"
 
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"

@@ -2610,6 +2610,96 @@ run_update() {
         fi
     fi
 
+    # Ensure runit service exists and render startup supervisor KDL block
+    # (mirrors sdata/subcmd-install/3.files.sh logic for non-systemd paths)
+    source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
+
+    update_inir_startup_supervisor() {
+        local file="$1"
+        local use_systemd="$2"
+        python3 - "$file" "$use_systemd" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+use_systemd = sys.argv[2] == "true"
+text = path.read_text()
+
+text = re.sub(
+    r'(?ms)^[ \t]*// BEGIN inir-(?:systemd-environment|runsvdir-fallback)\n'
+    r'.*?^[ \t]*// END inir-(?:systemd-environment|runsvdir-fallback)\n?',
+    '',
+    text,
+)
+text = re.sub(r'(?m)^[ \t]*spawn-sh-at-startup.*runsvdir.*\n?', '', text)
+text = re.sub(
+    r'(?m)^[ \t]*spawn-at-startup "bash" "-c" '
+    r'"systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"\n?',
+    '',
+    text,
+)
+text = re.sub(
+    r'(?m)^[ \t]*// iNiR is managed by the user systemd service \(inir\.service\)\.\n'
+    r'^[ \t]*// Do not add a compositor startup entry here or you\'ll get two shells\.\n?',
+    '',
+    text,
+)
+
+if use_systemd:
+    supervisor_comment = '''// iNiR is managed by the user systemd service (inir.service).
+// Do not add a compositor startup entry here or you'll get two shells.'''
+    block = '''// BEGIN inir-systemd-environment
+// Export XDG_MENU_PREFIX into the systemd user session and rebuild the
+// sycoca database so KDE/Qt apps see the correct .desktop entries.
+spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+// END inir-systemd-environment'''
+else:
+    supervisor_comment = '''// iNiR is managed by the runit user service (service/inir).
+// Do not add a compositor startup entry here or you'll get two shells.'''
+    block = '''// BEGIN inir-runsvdir-fallback
+// iNiR shell supervisor (runsvdir fallback for non-systemd).
+// Do not add a compositor startup entry here or you'll get two shells.
+spawn-sh-at-startup "exec runsvdir ~/.config/service"
+// END inir-runsvdir-fallback'''
+
+path.write_text(text.rstrip() + "\n\n" + supervisor_comment + "\n\n" + block + "\n")
+PY
+    }
+
+    local _runit_service_dir="${XDG_CONFIG_HOME}/service/inir"
+    local _runit_run_file="${_runit_service_dir}/run"
+    local _launcher_path="${XDG_BIN_HOME}/inir"
+    if [[ -x "$_launcher_path" ]] && [[ ! -x "$_runit_run_file" ]]; then
+        mkdir -p "$_runit_service_dir"
+        local _runit_launcher_quoted
+        _runit_launcher_quoted="$(printf '%s' "$_launcher_path" | sed "s/'/'\\\\''/g")"
+        printf "#!/bin/sh\nexec '%s' run --session\n" "$_runit_launcher_quoted" > "$_runit_run_file"
+        chmod +x "$_runit_run_file"
+        tui_dim "Installed user runit service (~/.config/service/inir/run)"
+    fi
+
+    local _startup_target="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
+    [[ -f "$_startup_target" ]] || _startup_target="${XDG_CONFIG_HOME}/niri/config.kdl"
+    if [[ -f "$_startup_target" ]]; then
+        local _turnstile_enabled=false
+        if [[ -e /var/service/turnstiled || -L /var/service/turnstiled ]]; then
+            _turnstile_enabled=true
+        fi
+        if has_usable_systemd_user_manager; then
+            update_inir_startup_supervisor "$_startup_target" true
+            tui_dim "Startup: selected systemd user manager"
+        elif $_turnstile_enabled; then
+            update_inir_startup_supervisor "$_startup_target" false
+            sed -i '/BEGIN inir-runsvdir-fallback/,/END inir-runsvdir-fallback/d' "$_startup_target"
+            sed -i 's#// iNiR is managed by the runit user service (service/inir).#// iNiR is managed by the turnstile user service (service/inir).#' "$_startup_target"
+            tui_dim "Startup: turnstiled is enabled; leaving supervision to turnstile"
+        else
+            update_inir_startup_supervisor "$_startup_target" false
+            tui_dim "Startup: selected runsvdir fallback"
+        fi
+    fi
+
     local niri_config="${XDG_CONFIG_HOME}/niri/config.kdl"
     local niri_startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
     local niri_binds_cfg="${XDG_CONFIG_HOME}/niri/config.d/70-binds.kdl"

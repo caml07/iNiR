@@ -6,6 +6,11 @@ MIGRATION_DESCRIPTION="Moves the inir.service wants link from graphical-session.
 MIGRATION_TARGET_FILE="~/.config/systemd/user/*.wants/inir.service"
 MIGRATION_REQUIRED=true
 
+# Source the predicate helper when migrations run outside the installer.
+_migration_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck source=/dev/null
+source "${_migration_repo_root}/sdata/lib/functions.sh" 2>/dev/null || true
+
 _systemd_user_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
 _detect_compositor_for_migration() {

@@ -390,15 +390,40 @@ The following blockers were identified and fixed before VM re-test:
    systemd and runsvdir comment variants, preventing duplicate comments on
    repeated renders.
 
+8. **Void Fish package name** — Void provides the `fish` executable through the
+   `fish-shell` package, not a package named `fish`. Added `fish-shell` to the
+   base profile and changed the `ONLY_MISSING_DEPS` command map accordingly.
+
 All local tests pass (13 suites including new: rsync failure propagation,
 supervisor reconciliation, Void profile, turnstile not used in fallback).
-VM re-test pending.
+
+## PR3.0 VM checkpoint (2026-08-31)
+
+The fresh install completed successfully at version `2.29.3`:
+
+- File verification passed for critical QML, Niri, iNiR, theming, Fuzzel and
+  generated color files.
+- `fish-shell` was installed manually after the first terminal launch exposed
+  the Void package-name mismatch; Kitty then launched Fish successfully.
+- The graphical session ran Niri 26.04 on Wayland with QuickShell 0.3.0.
+- `runsvdir /home/voidcaml/.config/service` was running under the Niri session.
+- `sv status ~/.config/service/inir` reported `run:` with QuickShell alive.
+- `pgrep` confirmed `runsv inir`, QuickShell, clipboard watchers and `swayidle`.
+- `grep -c 'BEGIN inir-runsvdir-fallback' ~/.config/niri/config.d/50-startup.kdl`
+  returned `1`, confirming no duplicate startup block.
+
+This validates the PR3.0 installer and runsvdir fallback in the VM. One
+follow-up remains: a terminal launched inside that session reported
+`XDG_SESSION_TYPE=tty` and an empty `WAYLAND_DISPLAY`, despite Niri and
+QuickShell working. Diagnose environment propagation before PR3.1; do not
+reinterpret this as a supervisor failure.
 
 ## What remains
 
-- Test iNiR/QuickShell from a local VM Niri session (not SSH).
-- PR3.0: validate the implemented runsvdir fallback — installer, KDL injection,
-  migrations, `scripts/inir` sv controls, idempotency.
+- Investigate Wayland environment propagation from the `dbus-run-session niri
+  --session` launch path (`XDG_SESSION_TYPE` and `WAYLAND_DISPLAY`).
+- PR3.0 validation is complete: installer, KDL injection, migrations,
+  `scripts/inir` sv controls, service liveness and idempotency all passed.
 - PR3.1: enable turnstile + elogind profile — confirmed elevation, D-Bus user
   service, envdir propagation, `manage_rundir=no`, remove runsvdir KDL block.
 - PR3.2: non-systemd runtime adapters — UI/services zero systemctl calls.

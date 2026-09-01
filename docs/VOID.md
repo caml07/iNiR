@@ -88,6 +88,7 @@ service (`~/.config/service/dbus`), not the system `dbus` service.
 ## Dependencies (XBPS)
 
 Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
+`fish-shell` (provides `/usr/bin/fish` used by terminal and iNiR launchers),
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
 `uv` (repo), `NetworkManager`, `pipewire`, `wl-clipboard`, `cliphist`,

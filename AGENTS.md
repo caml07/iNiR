@@ -13,8 +13,8 @@ complete on the fork; PR3 is split into sequential PRs.
   `pkg-config`, `cairo-devel`, `python3-devel`, `glib-devel`,
   `gobject-introspection`, `python3-gobject-devel`, `libffi-devel` to base
   packages; added `ONLY_MISSING_DEPS` handling for update path.
-- The canonical VM checkout is `/home/voidcaml/inir-src` on
-  `feat/void-dependencies`; its worktree was clean after validation.
+- The canonical VM checkout is `/home/voidcaml/inir-src`. PR3.0 was installed
+  and exercised successfully in the Void VM on 2026-08-31.
 - Host validation passed: 5 suites and 27 tests, with 0 failures. `bash -n`
   and `git diff --check` also passed.
 - VM validation passed all five dependency groups twice. The sorted
@@ -25,12 +25,26 @@ complete on the fork; PR3 is split into sequential PRs.
   excluded from the XBPS group.
 - PR3 is split into four sequential branches/PRs:
   - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile);
-    **implementation complete, local tests pass**, VM validation pending.
+    **implementation and VM validation complete**, local tests pass.
   - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
+
+### Latest VM checkpoint
+
+- Install completed at version `2.29.3`; all critical QML/config files verified.
+- `fish-shell` had to be installed explicitly because Void names the package
+  `fish-shell`, not `fish`. The dependency profile now installs it and maps the
+  `fish` command to that package.
+- In the Niri session: `runsvdir /home/voidcaml/.config/service`, `runsv inir`,
+  `/usr/bin/qs -n ...` and `swayidle` were all running.
+- `sv status ~/.config/service/inir` reported `run:` for 1043 seconds; the
+  startup file contained exactly one `inir-runsvdir-fallback` block.
+- Remaining follow-up: the terminal environment reported `XDG_SESSION_TYPE=tty`
+  and an empty `WAYLAND_DISPLAY` even though Niri and QuickShell were working.
+  Investigate session environment propagation before PR3.1.
 
 ## Where things are
 

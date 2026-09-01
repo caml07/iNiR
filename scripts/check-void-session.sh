@@ -39,6 +39,7 @@ else
 fi
 
 section "SPICE agent"
+agent_exit=2
 if command -v spice-vdagentd >/dev/null 2>&1; then
   printf 'spice-vdagentd=%s\n' "$(command -v spice-vdagentd)"
 else
@@ -47,7 +48,8 @@ fi
 if command -v spice-vdagent >/dev/null 2>&1; then
   printf 'spice-vdagent=%s\n' "$(command -v spice-vdagent)"
   timeout 3s spice-vdagent -d 2>&1
-  printf 'spice-vdagent-exit=%s\n' "$?"
+  agent_exit="$?"
+  printf 'spice-vdagent-exit=%s\n' "$agent_exit"
 else
   printf 'spice-vdagent=missing\n'
 fi
@@ -60,6 +62,8 @@ if [[ ! -e /dev/virtio-ports/com.redhat.spice.0 ]]; then
   printf '%s\n' 'SPICE channel is missing: add a Spice agent channel in Virt-Manager.'
 elif ! command -v spice-vdagent >/dev/null 2>&1; then
   printf '%s\n' 'SPICE agent is missing: install the spice-vdagent package.'
+elif [[ -z "${DISPLAY:-}" && -n "${WAYLAND_DISPLAY:-}" && "$agent_exit" -ne 0 ]]; then
+  printf '%s\n' 'SPICE agent exited in Wayland-only session; this agent requires an X11 DISPLAY.'
 elif [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
   printf '%s\n' 'No graphical display variable is present in this shell.'
 else

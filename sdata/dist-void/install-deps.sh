@@ -21,6 +21,7 @@ VOID_BASE_PACKAGES=(
   # Core compositor and shell
   niri
   quickshell
+  fish-shell
 
   # Qt6 (required for Quickshell)
   qt6-base
@@ -161,7 +162,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [python3]="python3"
     [wlsunset]="wlsunset"
     [dunstify]="dunst"
-    [fish]="fish"
+    [fish]="fish-shell"
     [magick]="ImageMagick"
     [swaylock]="swaylock"
     [swayidle]="swayidle"

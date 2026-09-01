@@ -2,13 +2,12 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `docs/void` (base: upstream `prerelease`). PR2 is complete on the
-fork; PR3 is split into sequential PRs.
+on branch `feat/void-runsvdir-supervisor` (base: upstream `prerelease`). PR2 is
+complete on the fork; PR3 is split into sequential PRs.
 
 ## Current progress (2026-08-31)
 
-- PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM;
-  documentation remains on this branch until the complete port is ready.
+- PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
 - PR2 `feat/void-dependencies`: committed as `ad00883e` and pushed to
   `origin/feat/void-dependencies`.
 - The canonical VM checkout is `/home/voidcaml/inir-src` on
@@ -22,7 +21,8 @@ fork; PR3 is split into sequential PRs.
   `whitesur-icon-theme` are not in the current Void repositories and were
   excluded from the XBPS group.
 - PR3 is split into four sequential branches/PRs:
-  - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile).
+  - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile);
+    implementation checks pass locally, VM validation remains pending.
   - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
@@ -68,10 +68,11 @@ restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
 - `services/deferred/PackageSearch.qml` — `xbps-query -Rs/-s`,
   `sudo xbps-install -S/--`, `sudo xbps-remove -Rns`.
 - `services/AppCatalog.qml` + `defaults/app-catalog.json` — `xbps` targets.
-- `sdata/subcmd-install/3.files.sh` — install `~/.config/service/inir/run`
-  (exec launcher `run --session`), install `~/.config/service/dbus/run` and
-  `dbus.check` from turnstile examples for turnstile path, enable-system-services step
-  (`ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/`, confirmed).
+- `sdata/subcmd-install/3.files.sh` — PR3.0 installs
+  `~/.config/service/inir/run` (exec launcher `run --session`) and injects the
+  runsvdir startup block. PR3.1 adds `~/.config/service/dbus/run` and
+  `dbus.check` from turnstile examples plus confirmed system-service enabling
+  (`ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/`).
 - `scripts/inir` — `sv` branches in restart/kill/stop/status/logs when the
   predicate is false.
 - `sdata/lib/doctor.sh` — `xbps-query -L` repo check; no-session-bus

@@ -1,7 +1,7 @@
 # Void VM validation log
 
-Validation record for the Void Linux port work performed on 2026-08-29 and
-2026-08-31. This is an execution log, not a replacement for the port
+Validation record for the Void Linux port work performed on 2026-08-29,
+2026-08-30 and 2026-08-31. This is an execution log, not a replacement for the port
 specification in `docs/VOID.md`.
 
 ## Host and VM
@@ -296,11 +296,11 @@ guest. Key findings that affect the PR3 plan:
 xbps-query -p pkgver turnstile elogind dbus niri
 ```
 
-```
-turnstile-0.3.0_1
-elogind-255.17_2
-dbus-1.16.0_1
-niri-26.04_1
+This query failed because this `xbps-query` accepts one package name per
+invocation, so package versions were not recorded by this probe.
+
+```text
+ERROR: xbps-query: too many arguments
 ```
 
 `/usr/share/examples/turnstile` contains the expected `dbus.run` and
@@ -324,7 +324,8 @@ grep -RIn 'manage_rundir\|TURNSTILE_ENV_DIR\|turnstile-ready' \
 
 Observations:
 
-- The installed turnstile version is 0.3.0_1.
+- The installed turnstile version remains unverified; the multi-package
+  `xbps-query` probe failed with "too many arguments".
 - The documentation explicitly recommends `manage_rundir = no` with elogind
   (README line 47), but the default config ships with `manage_rundir = yes`.
   PR3.1 must resolve this explicitly.
@@ -356,7 +357,7 @@ PR3.1: turnstile activation is a clean transition, not a migration.
 ## What remains
 
 - Test iNiR/QuickShell from a local VM Niri session (not SSH).
-- PR3.0: implement and validate runsvdir fallback — installer, KDL injection,
+- PR3.0: validate the implemented runsvdir fallback — installer, KDL injection,
   migrations, `scripts/inir` sv controls, idempotency.
 - PR3.1: enable turnstile + elogind profile — confirmed elevation, D-Bus user
   service, envdir propagation, `manage_rundir=no`, remove runsvdir KDL block.

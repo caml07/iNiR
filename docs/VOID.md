@@ -8,7 +8,9 @@ built against and will be revised after VM validation. Decisions: see
 ## Status
 
 - V1 scope: **per-user installer works on Void** (same install path as Arch,
-  no root). An XBPS package is a separate milestone (see Packaging).
+  with no root required for the base install). Optional system-service
+  activation is a separate, confirmed root step. An XBPS package is a
+  separate milestone (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
   musl libc; `seatd` without elogind; building ydotool from source.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
@@ -132,12 +134,12 @@ milestone with its own recipe (documented here, not yet built):
 ## Startup template
 
 `defaults/niri/config.d/50-startup.kdl` is the single source; setup injects
-and removes marked blocks per distro and predicate (ADR-0003). Today the
-template has three systemd-hard facts: the `systemctl --user
-import-environment XDG_MENU_PREFIX && kbuildsycoca6` line, the
-"managed by inir.service" comment, and no runsvdir entry. Injection must be
-idempotent, and migration 021 must remove the runsvdir line when the
-predicate holds (no double shell on Void+systemd).
+and removes marked blocks per distro and predicate (ADR-0003). The template
+keeps the systemd environment command as an unmarked default; setup renders
+that command or the marked runsvdir block for the selected supervisor. It
+also handles an existing split `config.d/50-startup.kdl` or monolithic
+`config.kdl`. Injection must be idempotent, and migration 021 must remove the
+runsvdir block when the predicate holds (no double shell on Void+systemd).
 
 ## Migration rules
 
@@ -177,6 +179,9 @@ qemu-system-x86_64 \
 
 PR3 is split into four sequential PRs:
 - PR3.0 `feat/void-runsvdir-supervisor`: runit fallback, no turnstile.
+  If turnstiled is already enabled, setup leaves supervision to it and does
+  not inject a second runsvdir supervisor; full turnstile configuration is
+  PR3.1.
 - PR3.1 `feat/void-turnstile-session`: turnstile + elogind with confirmed elevation.
 - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
 - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.

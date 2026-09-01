@@ -28,6 +28,32 @@ function setup_user_groups(){
 #####################################################################################
 function setup_systemd_services(){
   tui_info "Setting up systemd services..."
+
+  if [[ "${OS_GROUP_ID:-}" == void ]]; then
+    tui_info "Setting up Void runit session services..."
+    if ! command -v sv >/dev/null 2>&1; then
+      log_warning "runit 'sv' not found, skipping Void service setup"
+      return 0
+    fi
+    if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Void session services (dbus, elogind, polkitd, turnstiled)?" "yes"; then
+      elevate ln -sfn /etc/sv/dbus /var/service/dbus
+      elevate ln -sfn /etc/sv/elogind /var/service/elogind
+      elevate ln -sfn /etc/sv/polkitd /var/service/polkitd
+      elevate ln -sfn /etc/sv/turnstiled /var/service/turnstiled
+      log_success "Void session services enabled"
+    else
+      log_info "Enable Void session services with: sudo ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/"
+    fi
+    if [[ -f /etc/turnstile/turnstiled.conf ]] && grep -Eq '^[[:space:]]*manage_rundir[[:space:]]*=[[:space:]]*yes' /etc/turnstile/turnstiled.conf; then
+      if [[ "${ask:-true}" == true ]] && tui_confirm "Set turnstile manage_rundir=no for elogind?" "yes"; then
+        elevate sed -i -E 's/^[[:space:]]*manage_rundir[[:space:]]*=.*/manage_rundir = no/' /etc/turnstile/turnstiled.conf
+        log_success "Turnstile configured to use elogind's runtime directory"
+      else
+        log_warning "Turnstile still manages /run/user; set manage_rundir = no for elogind"
+      fi
+    fi
+    return 0
+  fi
   
   # Check if systemd is available
   if ! command -v systemctl &>/dev/null || [[ ! -d /run/systemd/system ]]; then

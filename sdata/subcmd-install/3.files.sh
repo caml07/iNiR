@@ -23,61 +23,6 @@ INIR_APPLICATIONS_DIR="${XDG_DATA_HOME}/applications"
 INIR_ICON_DIR="${XDG_DATA_HOME}/icons/hicolor/scalable/apps"
 local _use_systemd=false
 
-update_inir_startup_supervisor() {
-  local file="$1"
-  local use_systemd="$2"
-
-  python3 - "$file" "$use_systemd" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-path = Path(sys.argv[1])
-use_systemd = sys.argv[2] == "true"
-text = path.read_text()
-
-text = re.sub(
-    r'(?ms)^[ \t]*// BEGIN inir-(?:systemd-environment|runsvdir-fallback)\n'
-    r'.*?^[ \t]*// END inir-(?:systemd-environment|runsvdir-fallback)\n?',
-    '',
-    text,
-)
-text = re.sub(r'(?m)^[ \t]*spawn-sh-at-startup.*runsvdir.*\n?', '', text)
-text = re.sub(
-    r'(?m)^[ \t]*spawn-at-startup "bash" "-c" '
-    r'"systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"\n?',
-    '',
-    text,
-)
-# Remove both comment variants (systemd and runsvdir)
-text = re.sub(
-    r'(?m)^[ \t]*// iNiR is managed by the (?:user systemd service \(inir\.service\)|runit user service \(service/inir\))\.\n'
-    r'^[ \t]*// Do not add a compositor startup entry here or you\'ll get two shells\.\n?',
-    '',
-    text,
-)
-
-if use_systemd:
-    supervisor_comment = '''// iNiR is managed by the user systemd service (inir.service).
-// Do not add a compositor startup entry here or you'll get two shells.'''
-    block = '''// BEGIN inir-systemd-environment
-// Export XDG_MENU_PREFIX into the systemd user session and rebuild the
-// sycoca database so KDE/Qt apps see the correct .desktop entries.
-spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
-// END inir-systemd-environment'''
-else:
-    supervisor_comment = '''// iNiR is managed by the runit user service (service/inir).
-// Do not add a compositor startup entry here or you'll get two shells.'''
-    block = '''// BEGIN inir-runsvdir-fallback
-// iNiR shell supervisor (runsvdir fallback for non-systemd).
-// Do not add a compositor startup entry here or you'll get two shells.
-spawn-sh-at-startup "exec runsvdir ~/.config/service"
-// END inir-runsvdir-fallback'''
-
-path.write_text(text.rstrip() + "\n\n" + supervisor_comment + "\n\n" + block + "\n")
-PY
-}
-
 # Create quickshell state directories
 v mkdir -p "${XDG_STATE_HOME}/quickshell/user/generated/wallpaper"
 v mkdir -p "${XDG_STATE_HOME}/quickshell/user/generated/terminal"
@@ -221,20 +166,10 @@ case "${SKIP_QUICKSHELL}" in
       log_success "Launcher path configured for login and interactive shells"
     fi
 
-    # Determine supervisor path using the usable systemd user manager predicate
-    if has_usable_systemd_user_manager; then
+    # Determine supervisor path once; the shared reconciler owns the service file.
+    if [[ "$(inir_supervisor)" == systemd ]]; then
       _use_systemd=true
     fi
-
-    # Install the shared runit user service used by PR3's non-systemd tiers.
-    local _runit_service_dir="${XDG_CONFIG_HOME}/service/inir"
-    local _runit_run_file="${_runit_service_dir}/run"
-    mkdir -p "$_runit_service_dir"
-    local _runit_launcher_quoted
-    _runit_launcher_quoted="$(printf '%s' "$INIR_LAUNCHER_PATH" | sed "s/'/'\\\\''/g")"
-    printf "#!/bin/sh\nexec '%s' run --session\n" "$_runit_launcher_quoted" > "$_runit_run_file"
-    chmod +x "$_runit_run_file"
-    log_success "User runit service installed (~/.config/service/inir/run)"
 
     local _service_refresh_status=1
     local _service_dir="${XDG_CONFIG_HOME}/systemd/user"
@@ -425,21 +360,11 @@ case "${SKIP_NIRI}" in
     ;;
 esac
 
-# Render the startup supervisor after the Niri config has been installed.
-# Use shared helper (PR3.0: always runsvdir fallback when no systemd; turnstile is PR3.1)
+# Render the startup supervisor and service after the Niri config has been installed.
 source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
-local _startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
-local _startup_target="$_startup_cfg"
-[[ -f "$_startup_target" ]] || _startup_target="${XDG_CONFIG_HOME}/niri/config.kdl"
-if [[ -f "$_startup_target" ]]; then
-  if $_use_systemd; then
-    update_inir_startup_supervisor "$_startup_target" true
-    log_success "Startup: selected systemd user manager"
-  else
-    update_inir_startup_supervisor "$_startup_target" false
-    log_success "Startup: selected runsvdir fallback"
-  fi
-fi
+local _selected_supervisor
+_selected_supervisor="$(reconcile_inir_supervisor)"
+log_success "Startup: selected ${_selected_supervisor} supervisor"
 
 # Theming templates — defaults/ is the primary source (kept in sync with dots/)
 if [[ -d "defaults/matugen" ]]; then

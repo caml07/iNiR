@@ -496,10 +496,48 @@ function has_usable_systemd_user_manager() {
     timeout 3s systemctl --user show-environment >/dev/null 2>&1
 }
 
+has_active_turnstile() {
+  local service_path="${INIR_TURNSTILED_SERVICE_PATH:-/var/service/turnstiled}"
+  command -v sv >/dev/null 2>&1 &&
+    sv status "$service_path" 2>/dev/null | grep -q '^run:'
+}
+
+configure_turnstile_user_services() {
+  local service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
+  local examples="/usr/share/examples/turnstile"
+  local target
+
+  mkdir -p "$service_root/dbus" "$service_root/turnstile-ready"
+  for target in run check; do
+    [[ -f "$examples/dbus.$target" ]] || continue
+    install -m 755 "$examples/dbus.$target" "$service_root/dbus/$target"
+  done
+
+  local ready_conf="$service_root/turnstile-ready/conf"
+  touch "$ready_conf"
+  if ! grep -Eq '^core_services=.*dbus' "$ready_conf"; then
+    if grep -q '^core_services=' "$ready_conf"; then
+      sed -i -E 's/^core_services="([^"]*)"/core_services="\1 dbus"/' "$ready_conf"
+    else
+      printf 'core_services="dbus"\n' >> "$ready_conf"
+    fi
+  fi
+}
+
+inir_supervisor() {
+  if has_usable_systemd_user_manager; then
+    printf 'systemd\n'
+  elif has_active_turnstile; then
+    printf 'turnstile\n'
+  else
+    printf 'runsvdir\n'
+  fi
+}
+
 # Reconcile supervisor state for iNiR (shared by install and update).
 # Creates/updates runit service, renders startup KDL block.
 # Args: (none - uses XDG_CONFIG_HOME, XDG_BIN_HOME)
-# Returns: 0 on success, prints "systemd" or "runsvdir" on stdout if restart possible.
+# Returns: 0 on success, prints the selected supervisor on stdout.
 reconcile_inir_supervisor() {
   local launcher_path="${XDG_BIN_HOME:-$HOME/.local/bin}/inir"
   local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
@@ -507,25 +545,33 @@ reconcile_inir_supervisor() {
   local startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/50-startup.kdl"
   [[ -f "$startup_target" ]] || startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
 
-  # Ensure runit service exists (used by both runsvdir and turnstile tiers)
-  if [[ -x "$launcher_path" ]] && [[ ! -x "$runit_run_file" ]]; then
+  local supervisor
+  supervisor="$(inir_supervisor)"
+
+  # Ensure runit service exists (used by both runsvdir and turnstile tiers).
+  if [[ -x "$launcher_path" ]]; then
     mkdir -p "$runit_service_dir"
     local launcher_quoted
     launcher_quoted="$(printf '%s' "$launcher_path" | sed "s/'/'\\\\''/g")"
-    printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
+    if [[ "$supervisor" == turnstile ]]; then
+      printf "#!/bin/sh\nexec chpst -e \"\$TURNSTILE_ENV_DIR\" '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
+    else
+      printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
+    fi
     chmod +x "$runit_run_file"
   fi
+  [[ "$supervisor" == turnstile ]] && configure_turnstile_user_services
 
   update_inir_startup_supervisor() {
     local file="$1"
-    local use_systemd="$2"
-    python3 - "$file" "$use_systemd" <<'PY'
+    local supervisor="$2"
+    python3 - "$file" "$supervisor" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 path = Path(sys.argv[1])
-use_systemd = sys.argv[2] == "true"
+supervisor = sys.argv[2]
 text = path.read_text()
 
 text = re.sub(
@@ -541,15 +587,15 @@ text = re.sub(
     '',
     text,
 )
-# Remove both comment variants (systemd and runsvdir)
+# Remove all supervisor comment variants.
 text = re.sub(
-    r'(?m)^[ \t]*// iNiR is managed by the (?:user systemd service \(inir\.service\)|runit user service \(service/inir\))\.\n'
+    r'(?m)^[ \t]*// iNiR is managed by the (?:user systemd service \(inir\.service\)|runit user service \(service/inir\)|turnstile user service \(service/inir\))\.\n'
     r'^[ \t]*// Do not add a compositor startup entry here or you\'ll get two shells\.\n?',
     '',
     text,
 )
 
-if use_systemd:
+if supervisor == "systemd":
     supervisor_comment = '''// iNiR is managed by the user systemd service (inir.service).
 // Do not add a compositor startup entry here or you'll get two shells.'''
     block = '''// BEGIN inir-systemd-environment
@@ -557,7 +603,7 @@ if use_systemd:
 // sycoca database so KDE/Qt apps see the correct .desktop entries.
 spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
 // END inir-systemd-environment'''
-else:
+elif supervisor == "runsvdir":
     supervisor_comment = '''// iNiR is managed by the runit user service (service/inir).
 // Do not add a compositor startup entry here or you'll get two shells.'''
     block = '''// BEGIN inir-runsvdir-fallback
@@ -565,18 +611,19 @@ else:
 // Do not add a compositor startup entry here or you'll get two shells.
 spawn-sh-at-startup "exec runsvdir ~/.config/service"
 // END inir-runsvdir-fallback'''
+else:
+    supervisor_comment = '''// iNiR is managed by the turnstile user service (service/inir).
+// Do not add a compositor startup entry here or you'll get two shells.'''
+    block = ''
 
-path.write_text(text.rstrip() + "\n\n" + supervisor_comment + "\n\n" + block + "\n")
+suffix = f"\n\n{supervisor_comment}\n"
+if block:
+    suffix += f"\n{block}\n"
+path.write_text(text.rstrip() + suffix)
 PY
   }
 
-  if has_usable_systemd_user_manager; then
-    [[ -f "$startup_target" ]] && update_inir_startup_supervisor "$startup_target" true
-    printf 'systemd\n'
-    return 0
-  fi
-
-  [[ -f "$startup_target" ]] && update_inir_startup_supervisor "$startup_target" false
-  printf 'runsvdir\n'
+  [[ -f "$startup_target" ]] && update_inir_startup_supervisor "$startup_target" "$supervisor"
+  printf '%s\n' "$supervisor"
   return 0
 }

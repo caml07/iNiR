@@ -581,9 +581,9 @@ fi
 files_stage="$runtime_root/sdata/subcmd-install/3.files.sh"
 startup_kdl="$runtime_root/defaults/niri/config.d/50-startup.kdl"
 if grep -Fq 'spawn-sh-at-startup "exec runsvdir ~/.config/service"' "$startup_kdl" \
-        || ! grep -Fq 'update_inir_startup_supervisor' "$files_stage" \
-        || ! grep -Fq 'BEGIN inir-runsvdir-fallback' "$files_stage" \
-        || ! grep -Fq 'runsvdir ~/.config/service' "$files_stage"; then
+        || ! grep -Fq 'reconcile_inir_supervisor' "$files_stage" \
+        || ! grep -Fq 'BEGIN inir-runsvdir-fallback' "$runtime_root/sdata/lib/functions.sh" \
+        || ! grep -Fq 'runsvdir ~/.config/service' "$runtime_root/sdata/lib/functions.sh"; then
     printf 'FAIL: startup supervisor template/injection contract is invalid\n' >&2
     exit 1
 fi
@@ -752,9 +752,9 @@ step "supervisor reconciliation helper"
 # Need ask=false for non-interactive x function behavior
 ask=false
 source "$runtime_root/sdata/lib/functions.sh"
-# Test runsvdir path (no systemd)
+# Test runsvdir path (no systemd and no turnstile)
 reconcile_test_root="$(mktemp -d)"
-mkdir -p "$reconcile_test_root/bin" "$reconcile_test_root/home/.local/bin" "$reconcile_test_root/home/.config/niri/config.d"
+mkdir -p "$reconcile_test_root/bin" "$reconcile_test_root/home/.local/bin" "$reconcile_test_root/home/.config/niri/config.d" "$reconcile_test_root/var/service"
 cat > "$reconcile_test_root/home/.local/bin/inir" <<'SH'
 #!/bin/sh
 exit 0
@@ -765,6 +765,11 @@ cat > "$reconcile_test_root/bin/systemctl" <<'SH'
 exit 1
 SH
 chmod +x "$reconcile_test_root/bin/systemctl"
+cat > "$reconcile_test_root/bin/sv" <<'SH'
+#!/bin/sh
+exit 1
+SH
+chmod +x "$reconcile_test_root/bin/sv"
 # Create startup KDL file (required for reconcile to render)
 cat > "$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
 // 50 — Processes spawned at login
@@ -774,6 +779,7 @@ export HOME="$reconcile_test_root/home"
 export XDG_BIN_HOME="$reconcile_test_root/home/.local/bin"
 export XDG_CONFIG_HOME="$reconcile_test_root/home/.config"
 export XDG_RUNTIME_DIR="$reconcile_test_root/runtime"
+export INIR_TURNSTILED_SERVICE_PATH="$reconcile_test_root/var/service/turnstiled"
 export PATH="$reconcile_test_root/bin:$PATH"
 # No systemd socket = predicate false = runsvdir
 if ! reconcile_inir_supervisor | grep -q '^runsvdir$'; then
@@ -805,6 +811,55 @@ if ! diff -q "$startup_kdl" "$startup_kdl.bak" >/dev/null; then
 fi
 rm -rf "$reconcile_test_root"
 
+step "turnstile supervisor selection"
+turnstile_test_root="$(mktemp -d)"
+mkdir -p "$turnstile_test_root/bin" "$turnstile_test_root/home/.local/bin" "$turnstile_test_root/home/.config/niri/config.d" "$turnstile_test_root/var/service/turnstiled"
+cat > "$turnstile_test_root/home/.local/bin/inir" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$turnstile_test_root/home/.local/bin/inir"
+cat > "$turnstile_test_root/bin/systemctl" <<'SH'
+#!/bin/sh
+exit 1
+SH
+chmod +x "$turnstile_test_root/bin/systemctl"
+cat > "$turnstile_test_root/bin/sv" <<'SH'
+#!/bin/sh
+printf 'run: %s: (pid 123) 1s\n' "$2"
+SH
+chmod +x "$turnstile_test_root/bin/sv"
+cat > "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
+// BEGIN inir-runsvdir-fallback
+spawn-sh-at-startup "exec runsvdir ~/.config/service"
+// END inir-runsvdir-fallback
+KDL
+if ! (
+    export HOME="$turnstile_test_root/home"
+    export XDG_BIN_HOME="$turnstile_test_root/home/.local/bin"
+    export XDG_CONFIG_HOME="$turnstile_test_root/home/.config"
+    export XDG_RUNTIME_DIR="$turnstile_test_root/runtime"
+    export INIR_TURNSTILED_SERVICE_PATH="$turnstile_test_root/var/service/turnstiled"
+    export PATH="$turnstile_test_root/bin:$PATH"
+    result="$(reconcile_inir_supervisor)"
+    [[ "$result" == turnstile ]]
+    turnstile_run="$turnstile_test_root/home/.config/service/inir/run"
+    turnstile_conf="$turnstile_test_root/home/.config/service/turnstile-ready/conf"
+    grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_run"
+    grep -Fxq 'core_services="dbus"' "$turnstile_conf"
+    ! grep -Fq 'runsvdir' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    cp "$turnstile_run" "$turnstile_run.before"
+    cp "$turnstile_conf" "$turnstile_conf.before"
+    reconcile_inir_supervisor >/dev/null
+    cmp -s "$turnstile_run" "$turnstile_run.before"
+    cmp -s "$turnstile_conf" "$turnstile_conf.before"
+); then
+    printf 'FAIL: active turnstile was not selected exclusively\n' >&2
+    rm -rf "$turnstile_test_root"
+    exit 1
+fi
+rm -rf "$turnstile_test_root"
+
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 for pkg in rsync base-devel pkg-config cairo-devel python3-devel glib-devel gobject-introspection python3-gobject-devel libffi-devel; do
@@ -819,15 +874,13 @@ if ! grep -q 'ONLY_MISSING_DEPS' "$void_deps"; then
     exit 1
 fi
 
-step "turnstile not used in PR3.0 fallback"
-# 3.files.sh must not detect turnstile
-if grep -q 'turnstiled' "$runtime_root/sdata/subcmd-install/3.files.sh"; then
-    printf 'FAIL: 3.files.sh still references turnstile (PR3.1 scope)\n' >&2
+step "turnstile profile contracts"
+if ! grep -Fq 'manage_rundir = no' "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
+    printf 'FAIL: Void setup does not configure turnstile for elogind\n' >&2
     exit 1
 fi
-# setup must not detect turnstile in supervisor logic
-if grep -q 'turnstiled' "$runtime_root/setup"; then
-    printf 'FAIL: setup still references turnstile in supervisor logic (PR3.1 scope)\n' >&2
+if ! grep -Fq 'turnstile-ready/conf' "$runtime_root/sdata/lib/functions.sh"; then
+    printf 'FAIL: Void setup does not configure turnstile-ready core services\n' >&2
     exit 1
 fi
 

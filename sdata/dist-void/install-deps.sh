@@ -66,6 +66,17 @@ VOID_BASE_PACKAGES=(
 
   # UV (fast Python package manager, in Void repo)
   uv
+
+  # Build/runtime deps for Python native extensions (pycairo, pygobject, opencv)
+  rsync
+  base-devel
+  pkg-config
+  cairo-devel
+  python3-devel
+  glib-devel
+  gobject-introspection
+  python3-gobject-devel
+  libffi-devel
 )
 
 # Audio: optional audio stack
@@ -131,6 +142,63 @@ VOID_FONTS_PACKAGES=(
   # adw-gtk3, capitaine-cursors, and whitesur-icon-theme are not in Void repos.
   noto-fonts-emoji
 )
+
+#####################################################################################
+# Optional: install only a specific list of missing deps (update path)
+#####################################################################################
+if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
+  tui_info "Installing missing dependencies only..."
+
+  declare -A cmd_to_pkg=(
+    [qs]="quickshell"
+    [niri]="niri"
+    [nmcli]="NetworkManager"
+    [wpctl]="wireplumber"
+    [jq]="jq"
+    [rsync]="rsync"
+    [curl]="curl"
+    [git]="git"
+    [python3]="python3"
+    [wlsunset]="wlsunset"
+    [dunstify]="dunst"
+    [fish]="fish"
+    [magick]="ImageMagick"
+    [swaylock]="swaylock"
+    [swayidle]="swayidle"
+    [grim]="grim"
+    [mpv]="mpv"
+    [cliphist]="cliphist"
+    [wl-copy]="wl-clipboard"
+    [wl-paste]="wl-clipboard"
+    [pkg-config]="pkg-config"
+    [cc]="gcc"
+    [gcc]="gcc"
+    [python3-devel]="python3-devel"
+    [cairo-devel]="cairo-devel"
+    [gobject-introspection]="gobject-introspection"
+    [python3-gobject-devel]="python3-gobject-devel"
+    [glib-devel]="glib-devel"
+    [libffi-devel]="libffi-devel"
+  )
+
+  _miss_installflags=(-S)
+  $ask || _miss_installflags+=(-y)
+
+  _miss_pkgs=()
+  _miss_cmds=()
+  read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
+  for cmd in "${_miss_cmds[@]}"; do
+    _miss_pkg="${cmd_to_pkg[$cmd]:-$cmd}"
+    [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
+  done
+
+  if [[ ${#_miss_pkgs[@]} -gt 0 ]]; then
+    v pkg_sudo xbps-install "${_miss_installflags[@]}" "${_miss_pkgs[@]}"
+  fi
+
+  unset ONLY_MISSING_DEPS
+  return 0
+fi
 
 #####################################################################################
 # System update

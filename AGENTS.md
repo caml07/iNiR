@@ -8,8 +8,11 @@ complete on the fork; PR3 is split into sequential PRs.
 ## Current progress (2026-08-31)
 
 - PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
-- PR2 `feat/void-dependencies`: committed as `ad00883e` and pushed to
-  `origin/feat/void-dependencies`.
+- PR2 `feat/void-dependencies`: committed as `3444ccbd` and pushed to
+  `origin/feat/void-dependencies`. **Fixed**: added `rsync`, `base-devel`,
+  `pkg-config`, `cairo-devel`, `python3-devel`, `glib-devel`,
+  `gobject-introspection`, `python3-gobject-devel`, `libffi-devel` to base
+  packages; added `ONLY_MISSING_DEPS` handling for update path.
 - The canonical VM checkout is `/home/voidcaml/inir-src` on
   `feat/void-dependencies`; its worktree was clean after validation.
 - Host validation passed: 5 suites and 27 tests, with 0 failures. `bash -n`
@@ -22,7 +25,7 @@ complete on the fork; PR3 is split into sequential PRs.
   excluded from the XBPS group.
 - PR3 is split into four sequential branches/PRs:
   - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile);
-    implementation checks pass locally, VM validation remains pending.
+    **implementation complete, local tests pass**, VM validation pending.
   - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.

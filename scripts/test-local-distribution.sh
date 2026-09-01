@@ -719,6 +719,118 @@ if [[ -e "$migration_test_root/systemctl.called" ]]; then
 fi
 rm -rf "$migration_test_root"
 
+step "rsync failure propagation"
+# rsync_dir__sync must fail when rsync fails, not succeed via awk pipe
+# Need ask=false for non-interactive x function behavior
+ask=false
+source "$runtime_root/sdata/lib/functions.sh"
+rsync_test_root="$(mktemp -d)"
+mkdir -p "$rsync_test_root/bin" "$rsync_test_root/src/dir" "$rsync_test_root/dst"
+echo "content" > "$rsync_test_root/src/dir/file.txt"
+# Fake rsync that fails
+cat > "$rsync_test_root/bin/rsync" <<'SH'
+#!/bin/sh
+exit 1
+SH
+chmod +x "$rsync_test_root/bin/rsync"
+export PATH="$rsync_test_root/bin:$PATH"
+export INSTALLED_LISTFILE="$rsync_test_root/installed.list"
+if rsync_dir__sync "$rsync_test_root/src" "$rsync_test_root/dst" 2>/dev/null; then
+    printf 'FAIL: rsync_dir__sync succeeded despite rsync failure\n' >&2
+    rm -rf "$rsync_test_root"
+    exit 1
+fi
+# Verify no manifest was written on failure
+if [[ -f "$rsync_test_root/installed.list" && -s "$rsync_test_root/installed.list" ]]; then
+    printf 'FAIL: installed.list written despite rsync failure\n' >&2
+    rm -rf "$rsync_test_root"
+    exit 1
+fi
+rm -rf "$rsync_test_root"
+
+step "supervisor reconciliation helper"
+# Need ask=false for non-interactive x function behavior
+ask=false
+source "$runtime_root/sdata/lib/functions.sh"
+# Test runsvdir path (no systemd)
+reconcile_test_root="$(mktemp -d)"
+mkdir -p "$reconcile_test_root/bin" "$reconcile_test_root/home/.local/bin" "$reconcile_test_root/home/.config/niri/config.d"
+cat > "$reconcile_test_root/home/.local/bin/inir" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$reconcile_test_root/home/.local/bin/inir"
+cat > "$reconcile_test_root/bin/systemctl" <<'SH'
+#!/bin/sh
+exit 1
+SH
+chmod +x "$reconcile_test_root/bin/systemctl"
+# Create startup KDL file (required for reconcile to render)
+cat > "$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
+// 50 — Processes spawned at login
+spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+KDL
+export HOME="$reconcile_test_root/home"
+export XDG_BIN_HOME="$reconcile_test_root/home/.local/bin"
+export XDG_CONFIG_HOME="$reconcile_test_root/home/.config"
+export XDG_RUNTIME_DIR="$reconcile_test_root/runtime"
+export PATH="$reconcile_test_root/bin:$PATH"
+# No systemd socket = predicate false = runsvdir
+if ! reconcile_inir_supervisor | grep -q '^runsvdir$'; then
+    printf 'FAIL: reconcile_inir_supervisor did not select runsvdir\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
+# Verify runit service created
+if [[ ! -x "$reconcile_test_root/home/.config/service/inir/run" ]]; then
+    printf 'FAIL: runit service not created\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
+# Verify KDL has runsvdir block
+startup_kdl="$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl"
+if ! grep -q 'runsvdir ~/.config/service' "$startup_kdl"; then
+    printf 'FAIL: KDL missing runsvdir block\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
+# Idempotent: second run should not change KDL
+cp "$startup_kdl" "$startup_kdl.bak"
+reconcile_inir_supervisor >/dev/null
+if ! diff -q "$startup_kdl" "$startup_kdl.bak" >/dev/null; then
+    printf 'FAIL: second reconcile_inir_supervisor changed KDL\n' >&2
+    diff -u "$startup_kdl.bak" "$startup_kdl" >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
+rm -rf "$reconcile_test_root"
+
+step "Void dependency profile"
+void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
+for pkg in rsync base-devel pkg-config cairo-devel python3-devel glib-devel gobject-introspection python3-gobject-devel libffi-devel; do
+    if ! grep -q "^[[:space:]]*$pkg$" "$void_deps"; then
+        printf 'FAIL: Void base packages missing %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
+# ONLY_MISSING_DEPS handling present
+if ! grep -q 'ONLY_MISSING_DEPS' "$void_deps"; then
+    printf 'FAIL: Void installer missing ONLY_MISSING_DEPS handling\n' >&2
+    exit 1
+fi
+
+step "turnstile not used in PR3.0 fallback"
+# 3.files.sh must not detect turnstile
+if grep -q 'turnstiled' "$runtime_root/sdata/subcmd-install/3.files.sh"; then
+    printf 'FAIL: 3.files.sh still references turnstile (PR3.1 scope)\n' >&2
+    exit 1
+fi
+# setup must not detect turnstile in supervisor logic
+if grep -q 'turnstiled' "$runtime_root/setup"; then
+    printf 'FAIL: setup still references turnstile in supervisor logic (PR3.1 scope)\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

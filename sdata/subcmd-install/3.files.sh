@@ -49,8 +49,9 @@ text = re.sub(
     '',
     text,
 )
+# Remove both comment variants (systemd and runsvdir)
 text = re.sub(
-    r'(?m)^[ \t]*// iNiR is managed by the user systemd service \(inir\.service\)\.\n'
+    r'(?m)^[ \t]*// iNiR is managed by the (?:user systemd service \(inir\.service\)|runit user service \(service/inir\))\.\n'
     r'^[ \t]*// Do not add a compositor startup entry here or you\'ll get two shells\.\n?',
     '',
     text,
@@ -425,22 +426,15 @@ case "${SKIP_NIRI}" in
 esac
 
 # Render the startup supervisor after the Niri config has been installed.
+# Use shared helper (PR3.0: always runsvdir fallback when no systemd; turnstile is PR3.1)
+source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
 local _startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
 local _startup_target="$_startup_cfg"
 [[ -f "$_startup_target" ]] || _startup_target="${XDG_CONFIG_HOME}/niri/config.kdl"
 if [[ -f "$_startup_target" ]]; then
-  local _turnstile_enabled=false
-  if [[ -e /var/service/turnstiled || -L /var/service/turnstiled ]]; then
-    _turnstile_enabled=true
-  fi
   if $_use_systemd; then
     update_inir_startup_supervisor "$_startup_target" true
     log_success "Startup: selected systemd user manager"
-  elif $_turnstile_enabled; then
-    update_inir_startup_supervisor "$_startup_target" false
-    sed -i '/BEGIN inir-runsvdir-fallback/,/END inir-runsvdir-fallback/d' "$_startup_target"
-    sed -i 's#// iNiR is managed by the runit user service (service/inir).#// iNiR is managed by the turnstile user service (service/inir).#' "$_startup_target"
-    log_info "Startup: turnstiled is enabled; leaving supervision to turnstile"
   else
     update_inir_startup_supervisor "$_startup_target" false
     log_success "Startup: selected runsvdir fallback"

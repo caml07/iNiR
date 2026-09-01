@@ -194,14 +194,30 @@ rsync_dir(){
   x mkdir -p "$2"
   local dest="$(realpath -se $2)"
   x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
-  rsync -a "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
+  local _rsync_tmp
+  _rsync_tmp="$(mktemp)"
+  rsync -a "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ > "$_rsync_tmp" || {
+    local _rsync_rc=$?
+    rm -f "$_rsync_tmp"
+    return $_rsync_rc
+  }
+  awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' "$_rsync_tmp" >> "${INSTALLED_LISTFILE}"
+  rm -f "$_rsync_tmp"
 }
 
 rsync_dir__sync(){
   x mkdir -p "$2"
   local dest="$(realpath -se $2)"
   x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
-  rsync -a --delete "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
+  local _rsync_tmp
+  _rsync_tmp="$(mktemp)"
+  rsync -a --delete "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ > "$_rsync_tmp" || {
+    local _rsync_rc=$?
+    rm -f "$_rsync_tmp"
+    return $_rsync_rc
+  }
+  awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' "$_rsync_tmp" >> "${INSTALLED_LISTFILE}"
+  rm -f "$_rsync_tmp"
 }
 
 function install_file(){
@@ -303,7 +319,7 @@ if not contains -- "${launcher_dir}" \$PATH
 end
 EOF
 
-  if command -v systemctl >/dev/null 2>&1; then
+  if has_usable_systemd_user_manager; then
     local manager_path
     manager_path="$(systemctl --user show-environment 2>/dev/null \
       | sed -n 's/^PATH=//p' | head -1)"
@@ -418,7 +434,7 @@ inir_user_service_is_masked() {
     return 0
   fi
 
-  command -v systemctl >/dev/null 2>&1 || return 1
+  has_usable_systemd_user_manager || return 1
   state="$(systemctl --user is-enabled inir.service 2>/dev/null || true)"
   [[ "$state" == "masked" || "$state" == "masked-runtime" ]]
 }
@@ -455,7 +471,7 @@ repair_legacy_quickshell_malloc_environment() {
     [[ "${MALLOC_ARENA_MAX:-}" == "2" ]] && unset MALLOC_ARENA_MAX
     [[ "${MALLOC_MMAP_THRESHOLD_:-}" == "131072" ]] && unset MALLOC_MMAP_THRESHOLD_
 
-    if command -v systemctl >/dev/null 2>&1; then
+    if has_usable_systemd_user_manager; then
       local manager_env=""
       manager_env="$(systemctl --user show-environment 2>/dev/null || true)"
       if grep -qx 'MALLOC_ARENA_MAX=2' <<< "$manager_env"; then
@@ -478,4 +494,89 @@ repair_legacy_quickshell_malloc_environment() {
 function has_usable_systemd_user_manager() {
   [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
     timeout 3s systemctl --user show-environment >/dev/null 2>&1
+}
+
+# Reconcile supervisor state for iNiR (shared by install and update).
+# Creates/updates runit service, renders startup KDL block.
+# Args: (none - uses XDG_CONFIG_HOME, XDG_BIN_HOME)
+# Returns: 0 on success, prints "systemd" or "runsvdir" on stdout if restart possible.
+reconcile_inir_supervisor() {
+  local launcher_path="${XDG_BIN_HOME:-$HOME/.local/bin}/inir"
+  local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
+  local runit_run_file="${runit_service_dir}/run"
+  local startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/50-startup.kdl"
+  [[ -f "$startup_target" ]] || startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
+
+  # Ensure runit service exists (used by both runsvdir and turnstile tiers)
+  if [[ -x "$launcher_path" ]] && [[ ! -x "$runit_run_file" ]]; then
+    mkdir -p "$runit_service_dir"
+    local launcher_quoted
+    launcher_quoted="$(printf '%s' "$launcher_path" | sed "s/'/'\\\\''/g")"
+    printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
+    chmod +x "$runit_run_file"
+  fi
+
+  update_inir_startup_supervisor() {
+    local file="$1"
+    local use_systemd="$2"
+    python3 - "$file" "$use_systemd" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+use_systemd = sys.argv[2] == "true"
+text = path.read_text()
+
+text = re.sub(
+    r'(?ms)^[ \t]*// BEGIN inir-(?:systemd-environment|runsvdir-fallback)\n'
+    r'.*?^[ \t]*// END inir-(?:systemd-environment|runsvdir-fallback)\n?',
+    '',
+    text,
+)
+text = re.sub(r'(?m)^[ \t]*spawn-sh-at-startup.*runsvdir.*\n?', '', text)
+text = re.sub(
+    r'(?m)^[ \t]*spawn-at-startup "bash" "-c" '
+    r'"systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"\n?',
+    '',
+    text,
+)
+# Remove both comment variants (systemd and runsvdir)
+text = re.sub(
+    r'(?m)^[ \t]*// iNiR is managed by the (?:user systemd service \(inir\.service\)|runit user service \(service/inir\))\.\n'
+    r'^[ \t]*// Do not add a compositor startup entry here or you\'ll get two shells\.\n?',
+    '',
+    text,
+)
+
+if use_systemd:
+    supervisor_comment = '''// iNiR is managed by the user systemd service (inir.service).
+// Do not add a compositor startup entry here or you'll get two shells.'''
+    block = '''// BEGIN inir-systemd-environment
+// Export XDG_MENU_PREFIX into the systemd user session and rebuild the
+// sycoca database so KDE/Qt apps see the correct .desktop entries.
+spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+// END inir-systemd-environment'''
+else:
+    supervisor_comment = '''// iNiR is managed by the runit user service (service/inir).
+// Do not add a compositor startup entry here or you'll get two shells.'''
+    block = '''// BEGIN inir-runsvdir-fallback
+// iNiR shell supervisor (runsvdir fallback for non-systemd).
+// Do not add a compositor startup entry here or you'll get two shells.
+spawn-sh-at-startup "exec runsvdir ~/.config/service"
+// END inir-runsvdir-fallback'''
+
+path.write_text(text.rstrip() + "\n\n" + supervisor_comment + "\n\n" + block + "\n")
+PY
+  }
+
+  if has_usable_systemd_user_manager; then
+    [[ -f "$startup_target" ]] && update_inir_startup_supervisor "$startup_target" true
+    printf 'systemd\n'
+    return 0
+  fi
+
+  [[ -f "$startup_target" ]] && update_inir_startup_supervisor "$startup_target" false
+  printf 'runsvdir\n'
+  return 0
 }

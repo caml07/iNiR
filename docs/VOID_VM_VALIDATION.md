@@ -354,6 +354,46 @@ warning: /etc/sv/turnstiled: unable to open supervise/ok: file does not exist
 but not enabled (no supervise directory). This confirms the starting state for
 PR3.1: turnstile activation is a clean transition, not a migration.
 
+## PR3.0 implementation fixes (2026-08-31)
+
+The following blockers were identified and fixed before VM re-test:
+
+1. **Missing build deps in Void profile** — `sdata/dist-void/install-deps.sh` lacked
+   `rsync`, `base-devel`, `pkg-config`, `cairo-devel`, `python3-devel`,
+   `glib-devel`, `gobject-introspection`, `python3-gobject-devel`, `libffi-devel`.
+   Added to `VOID_BASE_PACKAGES` (PR2 fix `3444ccbd`).
+
+2. **rsync failure masked by `rsync | awk` pipeline** — `rsync_dir` and
+   `rsync_dir__sync` in `sdata/lib/functions.sh` now write rsync output to a
+   temp file, check its exit code, and only then process with awk. On failure,
+   the manifest is not updated and the function returns the rsync error code.
+
+3. **`systemctl --user` calls without predicate** — All user-systemd calls in
+   `sdata/lib/functions.sh` (`ensure_launcher_path_in_shells`,
+   `inir_user_service_is_masked`, `repair_legacy_quickshell_malloc_environment`)
+   and `setup` (`sync_user_inir_service_from_repo_if_present`,
+   `ensure_user_inir_service_enabled`, package-managed update restart) now
+   gate on `has_usable_systemd_user_manager` instead of `command -v systemctl`.
+
+4. **Supervisor logic duplicated and turnstile leaked into PR3.0** — Extracted
+   `reconcile_inir_supervisor()` shared helper to `sdata/lib/functions.sh`.
+   PR3.0 now always selects `runsvdir` when predicate is false; turnstile
+   detection removed from both `3.files.sh` and `setup` (turnstile is PR3.1 scope).
+
+5. **`setup update` used different rsync excludes than install** — Update now
+   calls `rsync_dir__sync` with full `RUNTIME_EXCLUDES` and propagates failures.
+
+6. **`ONLY_MISSING_DEPS` implemented for Void** — Update path no longer
+   installs full package matrix when doctor reports missing commands.
+
+7. **KDL idempotency** — `update_inir_startup_supervisor` now removes both
+   systemd and runsvdir comment variants, preventing duplicate comments on
+   repeated renders.
+
+All local tests pass (13 suites including new: rsync failure propagation,
+supervisor reconciliation, Void profile, turnstile not used in fallback).
+VM re-test pending.
+
 ## What remains
 
 - Test iNiR/QuickShell from a local VM Niri session (not SSH).

@@ -48,7 +48,9 @@ Item {
         || internal.pendingSource !== "" || internal.loadingSource !== ""
     readonly property bool shaderTransitionBusy: shaderTransitionRequested && transitionBusy
     property string _activeShader: ""
-    readonly property bool _shaderRenderActive: _transitioning && _activeShader !== ""
+    readonly property bool _shaderRequestedActive: _transitioning && _activeShader !== ""
+    readonly property bool _shaderRenderActive: _shaderRequestedActive
+        && shaderTransition.shaderReady && shaderTransition.shaderPresented
     readonly property bool _canTransition: enableTransitions && Appearance.animationsEnabled && _normalizedTransitionType(transitionType) !== "none"
     readonly property string _effectiveType: _canTransition ? _normalizedTransitionType(transitionType) : "none"
     readonly property real _zoomEnterFrom: 1.12
@@ -128,6 +130,13 @@ Item {
             return shaderTransitionTypes[Math.max(0, Math.min(shaderTransitionTypes.length - 1, index))]
         }
         return isShaderTransitionType(raw) ? raw : ""
+    }
+
+    function _startShaderTransitionIfReady(): void {
+        if (!root._shaderRequestedActive || !shaderTransition.shaderReady
+                || !shaderTransition.shaderPresented || transitionAnim.running)
+            return
+        transitionAnim.restart()
     }
 
     function _normalizedTransitionType(rawType: string): string {
@@ -359,7 +368,10 @@ Item {
             transitionFromIndex = activeIndex
             transitionToIndex = activeIndex === 0 ? 1 : 0
             transitionState.progress = 0
-            transitionAnim.restart()
+            if (root._activeShader === "")
+                transitionAnim.restart()
+            else
+                Qt.callLater(root._startShaderTransitionIfReady)
         }
     }
 
@@ -710,15 +722,44 @@ Item {
         }
     }
 
+    // ShaderEffect samples Image texture providers without applying Image.fillMode.
+    // Render each slot first so shader transitions receive the exact same
+    // aspect-correct crop/fit pixels that the user sees before and after them.
+    ShaderEffectSource {
+        id: shaderFromTexture
+        anchors.fill: parent
+        visible: false
+        live: root._shaderRequestedActive
+        sourceItem: !root._shaderRequestedActive ? null
+            : (internal.transitionFromIndex === 0 ? img0 : img1)
+    }
+
+    ShaderEffectSource {
+        id: shaderToTexture
+        anchors.fill: parent
+        visible: false
+        live: root._shaderRequestedActive
+        sourceItem: !root._shaderRequestedActive ? null
+            : (internal.transitionToIndex === 0 ? img0 : img1)
+    }
+
 
     ShaderEffect {
         id: shaderTransition
         anchors.fill: parent
-        z: 20
-        visible: root._shaderRenderActive
+        // Keep the effect *rendering* while the outgoing image is still visible.
+        // An item hidden behind an opaque sibling can be culled by the scene graph,
+        // so merely waiting a couple of frames does not guarantee its sampler
+        // textures have actually been consumed. A tiny non-zero opacity forces a
+        // real warm-up render without producing a perceptible overlay.
+        z: root._shaderRequestedActive ? 20 : -1
+        visible: root._shaderRequestedActive
+        opacity: shaderPresented ? 1 : 0.001
+        property bool shaderReady: false
+        property bool shaderPresented: false
 
-        property var fromImage: internal.transitionFromIndex === 0 ? img0 : img1
-        property var toImage: internal.transitionToIndex === 0 ? img0 : img1
+        property var fromImage: shaderFromTexture
+        property var toImage: shaderToTexture
         // Qt's default fragment shader is active while no transition QSB is
         // selected and expects a sampler named `source`. Keep it bound to the
         // outgoing image so the idle ShaderEffect is valid too; transition QSBs
@@ -737,12 +778,73 @@ Item {
             ? Qt.resolvedUrl("wallpaperTransitions/" + root._activeShader + ".frag.qsb")
             : ""
 
-        onVisibleChanged: if (!visible) time = 0
+        onFragmentShaderChanged: {
+            shaderReady = false
+            shaderPresented = false
+            shaderPrimeTimer.stop()
+            if (fragmentShader === "")
+                return
+            Qt.callLater(() => {
+                if (status === ShaderEffect.Compiled) {
+                    shaderReady = true
+                    shaderPrimeTimer.restart()
+                }
+            })
+        }
+        onStatusChanged: {
+            if (!root._shaderRequestedActive)
+                return
+            if (status === ShaderEffect.Compiled) {
+                shaderReady = true
+                shaderPrimeTimer.restart()
+            } else if (status === ShaderEffect.Error) {
+                console.warn("[WallpaperCrossfader] Shader failed:", log)
+                shaderReady = false
+                shaderPresented = false
+                shaderPrimeTimer.stop()
+                root._activeShader = ""
+                if (root._transitioning && !transitionAnim.running)
+                    transitionAnim.restart()
+            }
+        }
+        onVisibleChanged: {
+            if (!visible) {
+                time = 0
+                shaderReady = false
+                shaderPresented = false
+                shaderPrimeTimer.stop()
+                return
+            }
+            // Reusing the same QSB does not emit fragmentShaderChanged/statusChanged
+            // again. Rearm the presentation warm-up from the already-compiled state.
+            if (fragmentShader !== "" && status === ShaderEffect.Compiled) {
+                shaderReady = true
+                shaderPrimeTimer.restart()
+            }
+        }
+
+        // Compiled only means the QSB is ready. The two ShaderEffectSource
+        // textures are rendered by the scene graph on the following frame; keep
+        // the outgoing wallpaper in front until that first texture frame exists.
+        Timer {
+            id: shaderPrimeTimer
+            // Three 60 Hz frames gives the QSB and both ShaderEffectSource textures
+            // time to participate in the scene graph before the outgoing image is
+            // hidden. Faster displays simply get a few more harmless warm-up frames.
+            interval: 50
+            repeat: false
+            onTriggered: {
+                if (!root._shaderRequestedActive || !shaderTransition.shaderReady)
+                    return
+                shaderTransition.shaderPresented = true
+                root._startShaderTransitionIfReady()
+            }
+        }
 
         Timer {
             interval: 16
             repeat: true
-            running: shaderTransition.visible
+            running: root._shaderRenderActive
             onTriggered: shaderTransition.time += interval / 1000
         }
     }

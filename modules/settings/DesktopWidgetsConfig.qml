@@ -3705,33 +3705,224 @@ ContentPage {
             ContentSubsection {
                 title: Translation.tr("Visualizer")
 
+                SettingsNote {
+                    icon: "tune"
+                    text: Translation.tr("Advanced → Cava controls the shared audio capture, stereo mode and global Cava palette. These options only shape how this Media Player draws that signal.")
+                }
+
                 WidgetSettingRow {
                     label: Translation.tr("Type")
                     icon: "graphic_eq"
                     trailing: false
                     ConfigSelectionArray {
+                        Layout.fillWidth: true
                         currentValue: Config.getNestedValue("background.widgets.mediaControls.visualizerType", "wave")
-                        onSelected: newValue => Config.setNestedValue("background.widgets.mediaControls.visualizerType", newValue)
+                        onSelected: newValue => {
+                            Config.setNestedValue("background.widgets.mediaControls.visualizerType", newValue)
+                            if (newValue === "organic"
+                                    && Config.getNestedValue("background.widgets.mediaControls.visualizerPosition", "bottom") === "none")
+                                Config.setNestedValue("background.widgets.mediaControls.visualizerPosition", "fill")
+                        }
                         options: [
                             { displayName: Translation.tr("Wave"), icon: "waves", value: "wave" },
                             { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
+                            { displayName: Translation.tr("Organic"), icon: "bubble_chart", value: "organic" },
                         ]
                     }
                 }
 
                 WidgetSettingRow {
-                    label: Translation.tr("Position")
+                    label: Translation.tr("Placement")
                     icon: "swap_vert"
                     trailing: false
                     ConfigSelectionArray {
-                        currentValue: Config.getNestedValue("background.widgets.mediaControls.visualizerPosition", "bottom")
-                        onSelected: newValue => Config.setNestedValue("background.widgets.mediaControls.visualizerPosition", newValue)
-                        options: [
+                        Layout.fillWidth: true
+                        currentValue: Config.getNestedValue(
+                            "background.widgets.mediaControls.visualizerPosition", "bottom")
+                        onSelected: newValue => Config.setNestedValue(
+                            "background.widgets.mediaControls.visualizerPosition", newValue)
+                        options: Config.getNestedValue("background.widgets.mediaControls.visualizerType", "wave") === "organic" ? [
+                            { displayName: Translation.tr("On"), icon: "visibility", value: "fill" },
+                            { displayName: Translation.tr("Off"), icon: "visibility_off", value: "none" },
+                        ] : [
                             { displayName: Translation.tr("Bottom"), icon: "vertical_align_bottom", value: "bottom" },
                             { displayName: Translation.tr("Top"), icon: "vertical_align_top", value: "top" },
                             { displayName: Translation.tr("Fill"), icon: "fullscreen", value: "fill" },
                             { displayName: Translation.tr("Off"), icon: "visibility_off", value: "none" },
                         ]
+                    }
+                }
+
+                WidgetSettingRow {
+                    label: Translation.tr("Colors")
+                    icon: "palette"
+                    trailing: false
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        currentValue: Config.getNestedValue(
+                            "background.widgets.mediaControls.visualizerPaletteMode", "cava")
+                        onSelected: newValue => Config.setNestedValue(
+                            "background.widgets.mediaControls.visualizerPaletteMode", newValue)
+                        options: [
+                            { displayName: Translation.tr("Cava palette"), icon: "palette", value: "cava" },
+                            { displayName: Translation.tr("Accent"), icon: "colors", value: "accent" },
+                            { displayName: Translation.tr("Album"), icon: "album", value: "player" },
+                        ]
+                    }
+                }
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 8
+
+                    WidgetSettingRow {
+                        label: Translation.tr("Smoothing")
+                        StyledSpinBox {
+                            from: 0; to: 8; stepSize: 1
+                            value: Config.getNestedValue("background.widgets.mediaControls.visualizerSmoothing", 2)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.visualizerSmoothing", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.mediaControls.visualizerType", "wave") !== "organic"
+                        label: Translation.tr("Opacity")
+                        StyledSpinBox {
+                            from: 5; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.visualizerOpacity", 55)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.visualizerOpacity", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.mediaControls.visualizerType", "wave") !== "organic"
+                        label: Translation.tr("Motion range")
+                        StyledSpinBox {
+                            from: 10; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.visualizerRange", 88)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.visualizerRange", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue("background.widgets.mediaControls.visualizerType", "wave") === "bars"
+                        label: Translation.tr("Bar count")
+                        StyledSpinBox {
+                            from: 8; to: 128; stepSize: 4
+                            value: Config.getNestedValue("background.widgets.mediaControls.visualizerBarCount", 32)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.visualizerBarCount", value)
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Response")
+
+                ConfigSelectionArray {
+                    currentValue: Config.getNestedValue(
+                        "background.widgets.mediaControls.visualizerFrequencyProfile", "flat")
+                    onSelected: newValue => Config.setNestedValue(
+                        "background.widgets.mediaControls.visualizerFrequencyProfile", newValue)
+                    options: [
+                        { displayName: Translation.tr("Flat"), icon: "horizontal_rule", value: "flat" },
+                        { displayName: Translation.tr("Bass"), icon: "graphic_eq", value: "bass" },
+                        { displayName: Translation.tr("Warm"), icon: "local_fire_department", value: "warm" },
+                        { displayName: Translation.tr("Vocal"), icon: "record_voice_over", value: "vocal" },
+                        { displayName: Translation.tr("Treble"), icon: "trending_up", value: "treble" },
+                        { displayName: Translation.tr("Smile"), icon: "waves", value: "smile" },
+                    ]
+                }
+
+                WidgetSettingRow {
+                    label: Translation.tr("Accent strength")
+                    enabled: Config.getNestedValue(
+                        "background.widgets.mediaControls.visualizerFrequencyProfile", "flat") !== "flat"
+                    opacity: enabled ? 1 : 0.45
+                    StyledSpinBox {
+                        from: 0; to: 100; stepSize: 5
+                        value: Config.getNestedValue(
+                            "background.widgets.mediaControls.visualizerAccentStrength", 70)
+                        onValueModified: Config.setNestedValue(
+                            "background.widgets.mediaControls.visualizerAccentStrength", value)
+                    }
+                }
+            }
+
+            ContentSubsection {
+                visible: Config.getNestedValue("background.widgets.mediaControls.visualizerType", "wave") === "organic"
+                title: Translation.tr("Organic motion")
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 8
+
+                    WidgetSettingRow {
+                        label: Translation.tr("Sensitivity")
+                        StyledSpinBox {
+                            from: 25; to: 200; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicSensitivity", 35)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicSensitivity", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Pulse")
+                        StyledSpinBox {
+                            from: 0; to: 150; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicPulse", 150)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicPulse", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Motion speed")
+                        StyledSpinBox {
+                            from: 20; to: 250; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicMotionSpeed", 250)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicMotionSpeed", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Glow")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicGlow", 100)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicGlow", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Reach")
+                        StyledSpinBox {
+                            from: 20; to: 140; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicReach", 35)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicReach", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Idle motion")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicIdleMotion", 40)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicIdleMotion", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Presence")
+                        StyledSpinBox {
+                            from: 10; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicOpacity", 100)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicOpacity", value)
+                        }
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Range")
+                        StyledSpinBox {
+                            from: 20; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicRange", 20)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicRange", value)
+                        }
                     }
                 }
             }
@@ -3752,6 +3943,21 @@ ContentPage {
                     "playerPreset": "full",
                     "visualizerType": "wave",
                     "visualizerPosition": "bottom",
+                    "visualizerPaletteMode": "cava",
+                    "visualizerOpacity": 55,
+                    "visualizerSmoothing": 2,
+                    "visualizerFrequencyProfile": "flat",
+                    "visualizerAccentStrength": 70,
+                    "visualizerRange": 88,
+                    "visualizerBarCount": 32,
+                    "organicSensitivity": 35,
+                    "organicPulse": 150,
+                    "organicMotionSpeed": 250,
+                    "organicIdleMotion": 40,
+                    "organicGlow": 100,
+                    "organicOpacity": 100,
+                    "organicReach": 35,
+                    "organicRange": 20,
                     "lyricsExpanded": false,
                     "widgetScale": 100,
                     "widgetOpacity": 100,
@@ -3856,6 +4062,7 @@ ContentPage {
                         { displayName: Translation.tr("Cava"), icon: "palette", value: "cava" },
                         { displayName: Translation.tr("Accent"), icon: "colors", value: "accent" },
                         { displayName: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" },
+                        { displayName: Translation.tr("Album"), icon: "album", value: "album" },
                     ]
                 }
 
@@ -3990,6 +4197,11 @@ ContentPage {
             ContentSubsection {
                 title: Translation.tr("Response")
 
+                SettingsNote {
+                    icon: "equalizer"
+                    text: Translation.tr("Advanced → Cava controls the shared audio capture and global palette source. These controls shape only this desktop visualizer.")
+                }
+
                 ConfigSelectionArray {
                     currentValue: Config.getNestedValue(
                         "background.widgets.visualizer.frequencyProfile", "flat")
@@ -4028,9 +4240,48 @@ ContentPage {
                         StyledSpinBox {
                             from: 25; to: 200; stepSize: 5
                             value: Config.getNestedValue(
-                                "background.widgets.visualizer.organicSensitivity", 50)
+                                "background.widgets.visualizer.organicSensitivity", 25)
                             onValueModified: Config.setNestedValue(
                                 "background.widgets.visualizer.organicSensitivity", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Pulse (%)")
+                        StyledSpinBox {
+                            from: 0; to: 150; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicPulse", 150)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicPulse", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Motion speed (%)")
+                        StyledSpinBox {
+                            from: 20; to: 250; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicMotionSpeed", 250)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicMotionSpeed", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Idle motion (%)")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicIdleMotion", 18)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicIdleMotion", value)
                         }
                     }
 
@@ -4041,7 +4292,7 @@ ContentPage {
                         StyledSpinBox {
                             from: 10; to: 100; stepSize: 5
                             value: Config.getNestedValue(
-                                "background.widgets.visualizer.organicOpacity", 85)
+                                "background.widgets.visualizer.organicOpacity", 100)
                             onValueModified: Config.setNestedValue(
                                 "background.widgets.visualizer.organicOpacity", value)
                         }
@@ -4054,7 +4305,7 @@ ContentPage {
                         StyledSpinBox {
                             from: 0; to: 100; stepSize: 5
                             value: Config.getNestedValue(
-                                "background.widgets.visualizer.organicGlow", 45)
+                                "background.widgets.visualizer.organicGlow", 100)
                             onValueModified: Config.setNestedValue(
                                 "background.widgets.visualizer.organicGlow", value)
                         }
@@ -4065,25 +4316,37 @@ ContentPage {
                             "background.widgets.visualizer.vizType", "bars") === "organic"
                         label: Translation.tr("Cover size (%)")
                         StyledSpinBox {
-                            from: 35; to: 75; stepSize: 1
+                            from: 30; to: 90; stepSize: 1
                             value: Config.getNestedValue(
-                                "background.widgets.visualizer.organicCoverSize", 57)
+                                "background.widgets.visualizer.organicCoverSize", 51)
                             onValueModified: Config.setNestedValue(
                                 "background.widgets.visualizer.organicCoverSize", value)
                         }
                     }
 
                     WidgetSettingRow {
-                        label: Config.getNestedValue(
-                            "background.widgets.visualizer.vizType", "bars") === "organic"
-                            ? Translation.tr("Motion range (%)")
-                            : Translation.tr("Spectrum height (%)")
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") !== "organic"
+                        label: Translation.tr("Spectrum height (%)")
                         StyledSpinBox {
                             from: 10; to: 100; stepSize: 5
                             value: Config.getNestedValue(
                                 "background.widgets.visualizer.fillRatio", 90)
                             onValueModified: Config.setNestedValue(
                                 "background.widgets.visualizer.fillRatio", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Motion range (%)")
+                        StyledSpinBox {
+                            from: 20; to: 100; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicRange", 20)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicRange", value)
                         }
                     }
 
@@ -4153,8 +4416,11 @@ ContentPage {
             WidgetAppearanceControls {
                 configPath: "background.widgets.visualizer"
                 configEntry: Config.getNestedValue("background.widgets.visualizer", ({}))
-                hasSemanticPalette: Config.getNestedValue(
-                    "background.widgets.visualizer.paletteMode", "cava") !== "cava"
+                hasSemanticPalette: {
+                    const mode = Config.getNestedValue(
+                        "background.widgets.visualizer.paletteMode", "cava")
+                    return mode === "accent" || mode === "primary"
+                }
                 hasCardControls: true
             }
 
@@ -4172,10 +4438,14 @@ ContentPage {
                     "waveMode": "fill",
                     "frequencyProfile": "flat",
                     "smoothing": 2,
-                    "organicSensitivity": 50,
-                    "organicOpacity": 85,
-                    "organicGlow": 45,
-                    "organicCoverSize": 57,
+                    "organicSensitivity": 25,
+                    "organicPulse": 150,
+                    "organicMotionSpeed": 250,
+                    "organicIdleMotion": 18,
+                    "organicOpacity": 100,
+                    "organicGlow": 100,
+                    "organicCoverSize": 51,
+                    "organicRange": 20,
                     "fillRatio": 90,
                     "barOpacity": 100,
                     "waveOpacity": -1,

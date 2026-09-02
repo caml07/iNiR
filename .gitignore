@@ -132,6 +132,7 @@ docs/*_WIP.md
 *-INTERNAL.md
 
 # ── Credentials (NEVER commit) ──────────────────────────────
+/vault/Config/
 .env
 .env.*
 secrets.json

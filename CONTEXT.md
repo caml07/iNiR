@@ -21,8 +21,8 @@ _Avoid_: process manager, service manager
 
 **Turnstile user service**:
 A per-user service in `~/.config/service/` supervised by the `turnstiled`
-daemon, runit-compatible, controlled with `sv`. Turnstile can also provide
-the session D-Bus bus as a core service and exports service env via
+daemon, runit-compatible, controlled with `sv`. Turnstile can also provide the
+session D-Bus bus as a core service and exports service env via
 `turnstile-update-runit-env` / `chpst -e "$TURNSTILE_ENV_DIR"`.
 _Avoid_: system runit service
 
@@ -43,8 +43,25 @@ A documented, explicitly out-of-scope-for-V1 configuration: `musl` libc,
 or `seatd` + `turnstile` without elogind (acpid for power management).
 _Avoid_: supported configuration
 
+**Capability**:
+A user-visible function of iNiR, such as wallpaper transitions, screen
+recording, simulated paste, or package search. A capability is not the package
+or daemon that implements it.
+_Avoid_: dependency, optional binary
+
+**Provider**:
+The concrete XBPS package, Flatpak, or pinned upstream artifact that implements
+a capability on Void.
+_Avoid_: fallback, whatever is installed
+
+**Supported capability**:
+A capability with a validated provider, provisioning path, activation model,
+working UI operation, and repeatable verification. A visible control or a
+detected binary alone is not support.
+_Avoid_: available feature, best effort
+
 **Non-systemd session**:
-A login session started through `niri-session` on runit Void: no systemd
-user manager, session D-Bus provided by niri-session (dbus-run-session) or
-by turnstile's core services, env propagated to services via
-`dbus-update-activation-environment` or turnstile envdir.
+A login session started through `niri --session` on runit Void: no systemd
+user manager, session D-Bus provided by `dbus-run-session` or by turnstile,
+env propagated to services via `dbus-update-activation-environment` or
+turnstile envdir.

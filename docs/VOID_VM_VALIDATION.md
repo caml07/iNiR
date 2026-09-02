@@ -1,8 +1,8 @@
 # Void VM validation log
 
-Validation record for the Void Linux port work performed on 2026-08-29. This
-is an execution log, not a replacement for the port specification in
-`docs/VOID.md`.
+Validation record for the Void Linux port work performed on 2026-08-29,
+2026-08-30 and 2026-08-31. This is an execution log, not a replacement for the port
+specification in `docs/VOID.md`.
 
 ## Host and VM
 
@@ -285,19 +285,218 @@ Host-side PR 2 validation also passed:
 27 tests passed, 0 tests failed
 ```
 
-PR 2 is complete on the fork and ready for PR 3, `feat/void-runit-install`.
+PR 2 is complete on the fork and ready for PR 3, `feat/void-runsvdir-supervisor`.
+
+## Turnstile contract validation (2026-08-31)
+
+On 2026-08-31, the installed turnstile package was inspected from the Void
+guest. Key findings that affect the PR3 plan:
+
+```text
+xbps-query -p pkgver turnstile elogind dbus niri
+```
+
+This query failed because this `xbps-query` accepts one package name per
+invocation, so package versions were not recorded by this probe.
+
+```text
+ERROR: xbps-query: too many arguments
+```
+
+`/usr/share/examples/turnstile` contains the expected `dbus.run` and
+`dbus.check` examples for the user D-Bus service.
+
+```text
+grep -RIn 'manage_rundir\|TURNSTILE_ENV_DIR\|turnstile-ready' \
+  /usr/share/doc/turnstile /etc/turnstile 2>/dev/null
+```
+
+```
+/usr/share/doc/turnstile/README.voidlinux:6:these services can be listed in ~/.config/service/turnstile-ready/conf, for
+/usr/share/doc/turnstile/README.voidlinux:11:The turnstile-ready service is created by turnstile on first login.
+/usr/share/doc/turnstile/README.voidlinux:21:	+ exec chpst -e "$TURNSTILE_ENV_DIR" foo
+/usr/share/doc/turnstile/README.voidlinux:23:Inside user services, the convenience variable "$TURNSTILE_ENV_DIR" can be used
+/usr/share/doc/turnstile/README.voidlinux:47:  (manage_rundir = no)
+/etc/turnstile/backend/runit.conf:10:ready_sv="turnstile-ready"
+/etc/turnstile/turnstiled.conf:48:# Note that lingering is disabled when manage_rundir is
+/etc/turnstile/turnstiled.conf:81:manage_rundir = yes
+```
+
+Observations:
+
+- The installed turnstile version remains unverified; the multi-package
+  `xbps-query` probe failed with "too many arguments".
+- The documentation explicitly recommends `manage_rundir = no` with elogind
+  (README line 47), but the default config ships with `manage_rundir = yes`.
+  PR3.1 must resolve this explicitly.
+- User services must wrap their exec with `chpst -e "$TURNSTILE_ENV_DIR"` to
+  receive the session environment (README line 21).
+- The session D-Bus bus is **not** started automatically by
+  `core_services="dbus"`; the user must install the example `dbus.run` and
+  `dbus.check` into `~/.config/service/dbus/` and then list `dbus` in
+  `turnstile-ready/conf`.
+- The `turnstile-ready` service is created by turnstile on first login; it is
+  not present before that.
+
+Service status check:
+
+```text
+sudo sv status /var/service/elogind
+run: /var/service/elogind: (pid 625) 14488s; run: log: (pid 624) 14488s
+```
+
+```text
+sudo sv status /etc/sv/turnstiled
+warning: /etc/sv/turnstiled: unable to open supervise/ok: file does not exist
+```
+
+`elogind` is active and providing `/run/user/1000`. `turnstiled` is installed
+but not enabled (no supervise directory). This confirms the starting state for
+PR3.1: turnstile activation is a clean transition, not a migration.
+
+## PR3.0 implementation fixes (2026-08-31)
+
+The following blockers were identified and fixed before VM re-test:
+
+1. **Missing build deps in Void profile** — `sdata/dist-void/install-deps.sh` lacked
+   `rsync`, `base-devel`, `pkg-config`, `cairo-devel`, `python3-devel`,
+   `glib-devel`, `gobject-introspection`, `python3-gobject-devel`, `libffi-devel`.
+   Added to `VOID_BASE_PACKAGES` (PR2 fix `3444ccbd`).
+
+2. **rsync failure masked by `rsync | awk` pipeline** — `rsync_dir` and
+   `rsync_dir__sync` in `sdata/lib/functions.sh` now write rsync output to a
+   temp file, check its exit code, and only then process with awk. On failure,
+   the manifest is not updated and the function returns the rsync error code.
+
+3. **`systemctl --user` calls without predicate** — All user-systemd calls in
+   `sdata/lib/functions.sh` (`ensure_launcher_path_in_shells`,
+   `inir_user_service_is_masked`, `repair_legacy_quickshell_malloc_environment`)
+   and `setup` (`sync_user_inir_service_from_repo_if_present`,
+   `ensure_user_inir_service_enabled`, package-managed update restart) now
+   gate on `has_usable_systemd_user_manager` instead of `command -v systemctl`.
+
+4. **Supervisor logic duplicated and turnstile leaked into PR3.0** — Extracted
+   `reconcile_inir_supervisor()` shared helper to `sdata/lib/functions.sh`.
+   PR3.0 now always selects `runsvdir` when predicate is false; turnstile
+   detection removed from both `3.files.sh` and `setup` (turnstile is PR3.1 scope).
+
+5. **`setup update` used different rsync excludes than install** — Update now
+   calls `rsync_dir__sync` with full `RUNTIME_EXCLUDES` and propagates failures.
+
+6. **`ONLY_MISSING_DEPS` implemented for Void** — Update path no longer
+   installs full package matrix when doctor reports missing commands.
+
+7. **KDL idempotency** — `update_inir_startup_supervisor` now removes both
+   systemd and runsvdir comment variants, preventing duplicate comments on
+   repeated renders.
+
+8. **Void Fish package name** — Void provides the `fish` executable through the
+   `fish-shell` package, not a package named `fish`. Added `fish-shell` to the
+   base profile and changed the `ONLY_MISSING_DEPS` command map accordingly.
+
+All local tests pass (13 suites including new: rsync failure propagation,
+supervisor reconciliation, Void profile, turnstile not used in fallback).
+
+## PR3.0 VM checkpoint (2026-08-31)
+
+The fresh install completed successfully at version `2.29.3`:
+
+- File verification passed for critical QML, Niri, iNiR, theming, Fuzzel and
+  generated color files.
+- `fish-shell` was installed manually after the first terminal launch exposed
+  the Void package-name mismatch; Kitty then launched Fish successfully.
+- The graphical session ran Niri 26.04 on Wayland with QuickShell 0.3.0.
+- `runsvdir /home/voidcaml/.config/service` was running under the Niri session.
+- `sv status ~/.config/service/inir` reported `run:` with QuickShell alive.
+- `pgrep` confirmed `runsv inir`, QuickShell, clipboard watchers and `swayidle`.
+- `grep -c 'BEGIN inir-runsvdir-fallback' ~/.config/niri/config.d/50-startup.kdl`
+  returned `1`, confirming no duplicate startup block.
+
+This validates the PR3.0 installer and runsvdir fallback in the VM.
+
+## PR3.1 VM checkpoint (2026-09-01)
+
+The `feat/void-turnstile-session` branch was installed from the canonical
+`/home/voidcaml/inir-src` checkout. The system-service symlinks and elogind
+configuration were then explicitly enabled with root confirmation.
+
+The Void system services were active after enabling their `/var/service`
+symlinks:
+
+```text
+run: /var/service/dbus
+run: /var/service/elogind
+run: /var/service/polkitd
+run: /var/service/turnstiled
+```
+
+The resulting profile was verified as:
+
+```text
+/etc/turnstile/turnstiled.conf: manage_rundir = no
+~/.config/service/turnstile-ready/conf: core_services="dbus"
+~/.config/service/inir/run: exec chpst -e "$TURNSTILE_ENV_DIR" ... run --session
+```
+
+After the next tty login, turnstile created and supervised `dbus`, `inir`, and
+`turnstile-ready` under `~/.config/service`. The Niri startup file contained
+only the turnstile ownership comment and no `inir-runsvdir-fallback` block.
+The `runsvdir` process observed after login belongs to turnstile's runit
+backend, not Niri's fallback; exactly one supervisor owns the iNiR service.
+
+From Kitty in the Niri session, the environment was correct:
+
+```text
+WAYLAND_DISPLAY=wayland-1
+XDG_SESSION_TYPE=wayland
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+```
+
+The VM's SPICE agent channel and `spice-vdagentd` daemon were present, but
+`spice-vdagent` exits with status 1 because the session has no X11 `DISPLAY`.
+This is an X11-agent limitation in the Wayland-only Niri session and is not a
+turnstile or iNiR failure.
 
 ## What remains
 
-- Test iNiR/QuickShell from the local VM session rather than SSH.
-- Enable and test the Void session supervisor tiers, starting with the
-  `turnstile` per-user service and then the `runsvdir` fallback.
-- Implement the remaining Void core changes described in `docs/VOID.md`,
-  starting with the runit service layout and startup injection.
-- Run shellcheck and `make test-local` before opening the implementation PR.
+- PR3.0 validation is complete: installer, KDL injection, migrations,
+  `scripts/inir` sv controls, service liveness and idempotency all passed.
+- PR3.1 validation is complete: confirmed elevation, D-Bus user service,
+  envdir propagation, `manage_rundir = no`, and removal of the Niri runsvdir
+  block all passed.
+- PR3.2 implementation and VM validation are complete on
+  `feat/void-nonsystemd-runtime` (2026-09-02). The versioned checker passed over
+  SSH from the host:
 
-`make test-local` is currently blocked by the pre-existing
-`schema/wizard defaults: schema wallhaven tab` check. ShellCheck was not
-available in the host environment. No upstream PR has been opened; the Void
-port remains a fork progress branch until the complete VM integration gate
-passes.
+  ```bash
+  ssh voidcaml@192.168.122.141 '
+  cd ~/inir-src && git fetch origin &&
+  git checkout feat/void-nonsystemd-runtime && git pull --ff-only &&
+  export XDG_RUNTIME_DIR=/run/user/$(id -u) &&
+  export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus &&
+  INIR_EXPECTED_COMMIT="$(git rev-parse origin/feat/void-nonsystemd-runtime)" \
+    ./scripts/check-void-pr32.sh
+  '
+  ```
+
+  The checker requires a false usable-systemd-user-manager predicate, a real
+  user bus, clean branch state, iNiR `sv` supervision, and supported
+  `loginctl` power verbs. It skips XEmbed service checks when
+  `xembedsniproxy` is not installed.
+- Observed result: branch `feat/void-nonsystemd-runtime`, commit `a5ca5d7e`,
+  clean checkout, `/run/user/1000`, and
+  `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. All required checks
+  passed; `xembedsniproxy` was not installed and was reported as optional.
+- PR3.3: predicate-safe Awww, GameMode, clipboard, captures, and thumbnails;
+  add the official XBPS Awww provider and remove the undefined
+  `discover-overlay` integration. WARP provider/lifecycle validation belongs to
+  PR4 and the toggle must not issue a systemd command on Void meanwhile.
+- PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
+  `docs/VOID_CAPABILITIES.md`.
+- PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
+  sweep, clean VM installation, and the external-disk validation.
+- Run shellcheck and `make test-local` before each PR.
+
+`make test-local` passed for PR3.2. ShellCheck was not available in the host
+environment. No upstream PR has been opened; the Void port remains a fork
+progress branch while PR3.3 is developed.

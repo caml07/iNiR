@@ -8,12 +8,15 @@ built against and will be revised after VM validation. Decisions: see
 ## Status
 
 - V1 scope: **per-user installer works on Void** (same install path as Arch,
-  no root). An XBPS package is a separate milestone (see Packaging).
+  with no root required for the base install). Optional system-service
+  activation is a separate, confirmed root step. An XBPS package is a
+  separate milestone (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
-  musl libc; `seatd` without elogind; building ydotool from source.
+  musl libc and `seatd` without elogind. Ydotool is now part of the toolkit
+  parity work and requires a validated provider before V1 closes.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
-  The completed graphics/session checkpoint is recorded in
-  `docs/VOID_VM_VALIDATION.md`.
+  The graphics, runsvdir fallback, and turnstile session checkpoints are
+  recorded in `docs/VOID_VM_VALIDATION.md`.
 
 ## How the port decides what to do
 
@@ -32,22 +35,26 @@ Void can run systemd; Arch can lack a user manager. See ADR-0002.
 Three tiers, decided by the predicate (ADR-0001):
 
 1. **systemd** (predicate holds) → `inir.service`, as on Arch.
-2. **turnstile** (`turnstiled` service running) → per-user service
+2. **turnstile** (`turnstiled` service active) → per-user service
    `~/.config/service/inir/run`:
    ```sh
    #!/bin/sh
-   exec /path/to/inir run --session
+   exec chpst -e "$TURNSTILE_ENV_DIR" /path/to/inir run --session
    ```
-   - Turnstile also provides the session D-Bus bus:
-     `core_services="dbus"` in `~/.config/service/turnstile-ready/conf`.
-   - With elogind: `manage_rundir=no` in `/etc/turnstile/turnstiled.conf`.
+   - Turnstile also provides the session D-Bus bus via a dedicated
+     user service. Install `~/.config/service/dbus/run` and
+     `~/.config/service/dbus/check` from turnstile examples,
+     then add `dbus` to `core_services` in
+     `~/.config/service/turnstile-ready/conf`.
+    - With elogind: `manage_rundir = no` in `/etc/turnstile/turnstiled.conf`.
    - Session env for services: `turnstile-update-runit-env VAR=value`, read
-     with `exec chpst -e "$TURNSTILE_ENV_DIR" ...`.
+      with `exec chpst -e "$TURNSTILE_ENV_DIR" ...`.
 3. **runsvdir fallback** (zero system deps) → Niri spawns it:
    ```kdl
    spawn-sh-at-startup "exec runsvdir ~/.config/service"
    ```
-   Niri kills its spawns on exit; session env is inherited from Niri.
+    Niri kills its spawn on exit; session env is inherited from Niri. This is
+    distinct from the runsvdir process that turnstile's runit backend owns.
 
 Control: `sv restart|down|up ~/.config/service/inir` (non-systemd
 equivalent of `systemctl --user`). `inir logs` → `sv status` (journalctl
@@ -55,9 +62,11 @@ does not exist without systemd).
 
 ## Session
 
-- Supported session entry: `niri-session` (Void's, provided by the `niri`
-  package). It execs `niri --session` and wraps in `dbus-run-session` when
-  `DBUS_SESSION_BUS_ADDRESS` is unset (the turnstile path already has a bus).
+- Supported session entry: `niri --session` (Void's `niri` package provides
+  `/usr/bin/niri` with a desktop entry `Exec=/usr/bin/niri --session`; the
+  `niri-session` wrapper was not present in the tested package).
+   Under the turnstile profile, start it after a normal tty login; turnstile
+   creates the user services and session D-Bus bus during login.
 - Manual `niri` launches are unsupported: doctor warns when the session
   lacks a D-Bus bus.
 - Env propagation without systemd: `dbus-update-activation-environment`
@@ -75,9 +84,13 @@ Auto-enabled with confirmation during setup (`ln -s /etc/sv/<svc> /var/service/`
 Guided only (never auto-enabled): `seatd` (+ `_seatd` group) and `sddm`
 (package built with `-DUSE_ELOGIND=ON`).
 
+Note: the session D-Bus bus under turnstile is provided by a **user**
+service (`~/.config/service/dbus`), not the system `dbus` service.
+
 ## Dependencies (XBPS)
 
 Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
+`fish-shell` (provides `/usr/bin/fish` used by terminal and iNiR launchers),
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
 `uv` (repo), `NetworkManager`, `pipewire`, `wl-clipboard`, `cliphist`,
@@ -90,9 +103,24 @@ Notes:
   `deps-map.sh` must say `void:quickshell`, not `void:COMPILE`.
 - `kf6-kirigami` / `kf6-syntax-highlighting` are needed only for the
   compile-from-source profile, not the base install.
-- `ydotool` is NOT packaged in Void; compiling it is a compatibility profile.
+- `ydotool` is not packaged in the current Void repositories. PR4 must provide
+  a pinned upstream build, runit service, permissions, and update path before
+  simulated paste is marked supported.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.
 - Repo sanity: `xbps-query -L` (doctor check).
+
+## Capability providers
+
+Void follows the same dependency-profile model as Arch. A selected profile is
+supported only when iNiR provisions, activates, operates, and verifies every
+capability it exposes. Provider resolution prefers official XBPS packages,
+then a maintained Flatpak, then a pinned upstream artifact with an update
+path. See ADR-0004 and `docs/VOID_CAPABILITIES.md`.
+
+`discover-overlay` is not a supported capability: the repository contains no
+provider, origin, install path, or documented user requirement for it. PR3.3
+removes its GameMode setting and process control instead of inventing a Void
+service.
 
 ## Package management UI (Updates / PackageSearch / AppCatalog)
 
@@ -124,12 +152,12 @@ milestone with its own recipe (documented here, not yet built):
 ## Startup template
 
 `defaults/niri/config.d/50-startup.kdl` is the single source; setup injects
-and removes marked blocks per distro and predicate (ADR-0003). Today the
-template has three systemd-hard facts: the `systemctl --user
-import-environment XDG_MENU_PREFIX && kbuildsycoca6` line, the
-"managed by inir.service" comment, and no runsvdir entry. Injection must be
-idempotent, and migration 021 must remove the runsvdir line when the
-predicate holds (no double shell on Void+systemd).
+and removes marked blocks per distro and predicate (ADR-0003). The template
+keeps the systemd environment command as an unmarked default; setup renders
+that command, the marked runsvdir block, or no startup block for turnstile.
+It also handles an existing split `config.d/50-startup.kdl` or monolithic
+`config.kdl`. Injection must be idempotent, and migration 021 must remove the
+runsvdir block when the predicate holds (no double shell on Void+systemd).
 
 ## Migration rules
 
@@ -138,9 +166,33 @@ no-ops when the predicate is false (their `command -v systemctl` check is
 not enough — without the user-manager socket, `systemctl --user` hangs for
 10-30s).
 
+## Development PR queue
+
+The Void port targets `snowarch/inir:prerelease`. Existing development branches
+are cumulative on the fork so they can be exercised end to end; before an
+upstream pull request is opened, its review diff is rebuilt from the then-current
+`upstream/prerelease` after its predecessor merges.
+
+| Order | Branch | Scope | Required validation |
+|---|---|---|---|
+| 1 | `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch `make test-local`; predicate true on Arch and false in a Void non-systemd session. |
+| 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
+| 3 | `feat/void-runit-install` | Delivered as PR3.0-PR3.3: supervisors, lifecycle, session runtime, and optional runtime adapters. | Complete PR3.3 capability checks; retain all PR3.0-PR3.2 VM contracts. |
+| 4 | `feat/void-capability-providers` | System-backed capabilities: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. | Provision each selected provider twice and exercise its UI action and runit service. |
+| 5 | `feat/void-desktop-parity` | Flatpak/upstream desktop providers, themes, Mission Center, OCR languages, and remaining default parity. | No selected profile or default references an unavailable provider. |
+| 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
+| 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
+
+Documentation and VM observations stay on the fork's `docs/void` branch while
+the port is in development; they are not opened as a separate upstream PR.
+The final integration gate is a clean Void installation on an external disk:
+clone the fork at the merged implementation commit, run iNiR's normal one-line
+installer, and record the exact commands and observations in
+`docs/VOID_VM_VALIDATION.md`.
+
 ## VM validation
 
-The detailed 2026-08-29 and 2026-08-30 VM execution log is in
+The detailed 2026-08-29, 2026-08-30 and 2026-08-31 VM execution log is in
 `docs/VOID_VM_VALIDATION.md`.
 
 Recipe (QEMU, KVM available on the host):
@@ -162,15 +214,32 @@ qemu-system-x86_64 \
 - Verification order in the VM:
   0. Quickshell 0.3.0 (repo) runs iNiR — the make-or-break check.
   1. Installer end-to-end on a fresh Void.
-  2. Session: niri-session → shell supervised (turnstile, then runsvdir).
+  2. Session: `niri --session` → shell supervised (runsvdir fallback, then turnstile).
   3. Services: dbus/elogind/polkitd/turnstiled up.
   4. UI: updates list, search/install/remove via xbps.
   5. `test-local-distribution.sh` with predicate-conditional invariants.
 
+PR3 is split into four sequential PRs:
+- PR3.0 `feat/void-runsvdir-supervisor`: runit fallback, no turnstile.
+  If turnstiled is already enabled, setup leaves supervision to it and does
+  not inject a second runsvdir supervisor; full turnstile configuration is
+  PR3.1.
+- PR3.1 `feat/void-turnstile-session`: turnstile + elogind with confirmed elevation.
+  Complete and VM validated.
+- PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
+  Implementation and VM validation are complete. XEmbed uses a runit user
+  service so crashes are restarted by `runsv` instead of `systemd-run`; the
+  service is optional when `xembedsniproxy` is not installed.
+- PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww, GameMode,
+  clipboard, captures, and thumbnails; install the official Void Awww provider;
+  remove the undefined `discover-overlay` integration. WARP remains visible
+  but its supported provider and runit lifecycle are delivered in PR4.
+
 ## FAQ / gotchas
 
-- **Two shells after install**: a hand-written startup entry or migration
-  021 applied on Void. Remove the `spawn-*`/runsvdir lines.
+- **Two shells after install**: a hand-written startup entry, or both Niri and
+  turnstile owning `~/.config/service`. Remove hand-written
+  `spawn-*`/runsvdir lines and rerun setup so it selects one tier.
 - **Shell crashes and stays dead**: no supervisor (tier 3 requires the
   runsvdir entry; check `sv status ~/.config/service/inir`).
 - **`inir logs` fails**: journalctl is systemd-only; use `sv status` (+
@@ -180,6 +249,34 @@ qemu-system-x86_64 \
   (`xbps-install -Sf quickshell` or local template rebuild).
 - **Suspend/hibernate**: `loginctl suspend` (elogind) replaces
   `systemctl suspend`; `acpid` is the alternative in the seatd profile.
+- **SPICE clipboard in a Wayland-only Niri session**: Void's
+  `spice-vdagent` requires an X11 `DISPLAY`. The SPICE channel and daemon can
+  be healthy while clipboard integration remains unavailable. This does not
+  affect iNiR or turnstile.
+
+## PR3.2 VM checkpoint
+
+Keep `scripts/check-void-pr32.sh` as the repeatable, versioned validation
+contract. SSH is only the transport; export the graphical user's runtime and
+D-Bus address explicitly:
+
+```bash
+ssh voidcaml@192.168.122.141 '
+cd ~/inir-src &&
+git fetch origin &&
+git checkout feat/void-nonsystemd-runtime &&
+git pull --ff-only &&
+export XDG_RUNTIME_DIR=/run/user/$(id -u) &&
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus &&
+INIR_EXPECTED_COMMIT="$(git rev-parse origin/feat/void-nonsystemd-runtime)" \
+  ./scripts/check-void-pr32.sh
+'
+```
+
+The checker requires the false usable-systemd-user-manager predicate, a real
+session bus, `sv` supervision of iNiR, supported `loginctl` power verbs, and a
+clean expected branch. XEmbed is optional and is checked only when its binary
+is installed.
 
 ## Sources
 

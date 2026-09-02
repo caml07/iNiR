@@ -549,6 +549,8 @@ reconcile_inir_supervisor() {
   local launcher_path="${XDG_BIN_HOME:-$HOME/.local/bin}/inir"
   local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
   local runit_run_file="${runit_service_dir}/run"
+  local xembed_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir-xembedsniproxy"
+  local xembed_run_file="${xembed_service_dir}/run"
   local startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/50-startup.kdl"
   [[ -f "$startup_target" ]] || startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
 
@@ -566,6 +568,20 @@ reconcile_inir_supervisor() {
       printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
     fi
     chmod +x "$runit_run_file"
+  fi
+  if [[ "$supervisor" != systemd ]]; then
+    if command -v xembedsniproxy >/dev/null 2>&1; then
+      mkdir -p "$xembed_service_dir"
+      if [[ "$supervisor" == turnstile ]]; then
+        printf '#!/bin/sh\n# Managed by iNiR.\nxembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"\nexec chpst -e "\$TURNSTILE_ENV_DIR" env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"\n' > "$xembed_run_file"
+      else
+        printf '#!/bin/sh\n# Managed by iNiR.\nxembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"\nexec env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"\n' > "$xembed_run_file"
+      fi
+      chmod +x "$xembed_run_file"
+    fi
+  elif [[ -f "$xembed_run_file" ]] && grep -q '^# Managed by iNiR\.' "$xembed_run_file"; then
+    command -v sv >/dev/null 2>&1 && sv down "$xembed_service_dir" >/dev/null 2>&1 || true
+    rm -rf "$xembed_service_dir"
   fi
   if [[ "$supervisor" == turnstile ]] && ! configure_turnstile_user_services; then
     return 1

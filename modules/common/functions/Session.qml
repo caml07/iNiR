@@ -32,7 +32,6 @@ Singleton {
         interval: 900
         repeat: false
         onTriggered: {
-            Quickshell.execDetached(["/usr/bin/systemctl", "hibernate", "-i"])
             Quickshell.execDetached(["/usr/bin/loginctl", "hibernate"])
         }
     }
@@ -42,7 +41,7 @@ Singleton {
         interval: 600
         repeat: false
         onTriggered: {
-            Quickshell.execDetached(["/usr/bin/systemctl", "suspend", "-i"])
+            Quickshell.execDetached(["/usr/bin/loginctl", "suspend"])
         }
     }
 
@@ -87,7 +86,7 @@ Singleton {
             lock()
             _suspendTimer.restart()
         } else {
-            Quickshell.execDetached(["/usr/bin/systemctl", "suspend", "-i"])
+            Quickshell.execDetached(["/usr/bin/loginctl", "suspend"])
         }
     }
 
@@ -119,19 +118,16 @@ Singleton {
 
     function poweroff() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/systemctl", "poweroff", "-i"])
         Quickshell.execDetached(["/usr/bin/loginctl", "poweroff"])
     }
 
     function reboot() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/systemctl", "reboot", "-i"])
         Quickshell.execDetached(["/usr/bin/loginctl", "reboot"])
     }
 
     function rebootToFirmware() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/systemctl", "reboot", "--firmware-setup"])
         Quickshell.execDetached(["/usr/bin/loginctl", "reboot", "--firmware-setup"])
     }
 

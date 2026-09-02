@@ -555,6 +555,37 @@ if [[ "$(<"$runit_test_root/sv.log")" != "restart $runit_test_root/config/servic
 fi
 rm -rf "$runit_test_root"
 
+step "non-systemd runtime adapters"
+shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
+memory_service="$runtime_root/services/MemoryPressureService.qml"
+tray_service="$runtime_root/services/TrayService.qml"
+session_service="$runtime_root/modules/common/functions/Session.qml"
+idle_service="$runtime_root/services/Idle.qml"
+cursor_helper="$runtime_root/scripts/niri-config.py"
+gtk_theme="$runtime_root/scripts/colors/apply-gtk-theme.sh"
+if ! grep -Fq 'service", "restart' "$memory_service" \
+        || ! grep -Fq 'inir-xembedsniproxy' "$tray_service" \
+        || ! grep -Fq 'sv up' "$tray_service" \
+        || ! grep -Fq 'xembed_service_dir' "$runtime_root/sdata/lib/functions.sh" \
+        || ! grep -Fq 'chpst -e "\$TURNSTILE_ENV_DIR"' "$runtime_root/sdata/lib/functions.sh" \
+        || grep -Fq 'systemctl", "suspend' "$session_service" \
+        || grep -Fq 'systemctl suspend' "$idle_service" \
+        || ! grep -Fq 'dbus-update-activation-environment' "$cursor_helper" \
+        || ! grep -Fq 'systemd/private' "$gtk_theme"; then
+    printf 'FAIL: non-systemd runtime adapters are incomplete\n' >&2
+    exit 1
+fi
+if grep -Fq 'systemctl --user show-environment' "$tray_service" \
+        && ! grep -Fq 'systemd/private' "$tray_service"; then
+    printf 'FAIL: XEmbed runtime predicate is not socket-gated\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'systemd_user_manager_usable' "$shell_exec" \
+        || ! grep -Fq 'systemd_user_manager_usable" = true' "$shell_exec"; then
+    printf 'FAIL: application launcher can use systemd-run without a usable manager\n' >&2
+    exit 1
+fi
+
 step "application launch environment"
 # XWayland is not guaranteed to own :0. Preserve live DISPLAY discovery and validation.
 # These checks are conditional on the usable systemd user manager predicate (ADR-0002).

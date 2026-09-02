@@ -507,12 +507,16 @@ has_active_turnstile() {
 
 configure_turnstile_user_services() {
   local service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
-  local examples="/usr/share/examples/turnstile"
+  local examples="${INIR_TURNSTILE_EXAMPLES:-/usr/share/examples/turnstile}"
   local target
+
+  [[ -f "$examples/dbus.run" && -f "$examples/dbus.check" ]] || {
+    printf 'Turnstile D-Bus examples not found in %s\n' "$examples" >&2
+    return 1
+  }
 
   mkdir -p "$service_root/dbus" "$service_root/turnstile-ready"
   for target in run check; do
-    [[ -f "$examples/dbus.$target" ]] || continue
     install -m 755 "$examples/dbus.$target" "$service_root/dbus/$target"
   done
 
@@ -563,7 +567,9 @@ reconcile_inir_supervisor() {
     fi
     chmod +x "$runit_run_file"
   fi
-  [[ "$supervisor" == turnstile ]] && configure_turnstile_user_services
+  if [[ "$supervisor" == turnstile ]] && ! configure_turnstile_user_services; then
+    return 1
+  fi
 
   update_inir_startup_supervisor() {
     local file="$1"

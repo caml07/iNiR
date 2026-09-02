@@ -36,18 +36,23 @@ function setup_systemd_services(){
       return 0
     fi
     if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Void session services (dbus, elogind, polkitd, turnstiled)?" "yes"; then
-      elevate ln -sfn /etc/sv/dbus /var/service/dbus
-      elevate ln -sfn /etc/sv/elogind /var/service/elogind
-      elevate ln -sfn /etc/sv/polkitd /var/service/polkitd
-      elevate ln -sfn /etc/sv/turnstiled /var/service/turnstiled
-      log_success "Void session services enabled"
+      if elevate sh -c 'ln -sfn /etc/sv/dbus /var/service/dbus && ln -sfn /etc/sv/elogind /var/service/elogind && ln -sfn /etc/sv/polkitd /var/service/polkitd && ln -sfn /etc/sv/turnstiled /var/service/turnstiled'; then
+        log_success "Void session services enabled"
+      else
+        log_warning "Could not enable all Void session services"
+        return 1
+      fi
     else
       log_info "Enable Void session services with: sudo ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/"
     fi
-    if [[ -f /etc/turnstile/turnstiled.conf ]] && grep -Eq '^[[:space:]]*manage_rundir[[:space:]]*=[[:space:]]*yes' /etc/turnstile/turnstiled.conf; then
+    if [[ -f /etc/turnstile/turnstiled.conf ]]; then
       if [[ "${ask:-true}" == true ]] && tui_confirm "Set turnstile manage_rundir=no for elogind?" "yes"; then
-        elevate sed -i -E 's/^[[:space:]]*manage_rundir[[:space:]]*=.*/manage_rundir = no/' /etc/turnstile/turnstiled.conf
-        log_success "Turnstile configured to use elogind's runtime directory"
+        if elevate sh -c 'if grep -q "^[[:space:]]*manage_rundir[[:space:]]*=" /etc/turnstile/turnstiled.conf; then sed -i -E "s/^[[:space:]]*manage_rundir[[:space:]]*=.*/manage_rundir = no/" /etc/turnstile/turnstiled.conf; else printf "\nmanage_rundir = no\n" >> /etc/turnstile/turnstiled.conf; fi'; then
+          log_success "Turnstile configured to use elogind's runtime directory"
+        else
+          log_warning "Could not configure turnstile for elogind"
+          return 1
+        fi
       else
         log_warning "Turnstile still manages /run/user; set manage_rundir = no for elogind"
       fi
@@ -162,7 +167,7 @@ function setup_super_daemon(){
   x cp "$service_src" "$service_dst"
   
   # Enable service if in graphical session
-  if [[ -n "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+  if has_usable_systemd_user_manager; then
     v systemctl --user daemon-reload
     v systemctl --user enable inir-super-overview.service --now
   else
@@ -182,7 +187,7 @@ function disable_super_daemon_if_present(){
   local service_dst="${systemd_user_dir}/ii-super-overview.service"
 
   # Best-effort stop/disable user service if we appear to be in a graphical session
-  if [[ -n "${DBUS_SESSION_BUS_ADDRESS}" && -f "${service_dst}" ]]; then
+  if has_usable_systemd_user_manager && [[ -f "${service_dst}" ]]; then
     systemctl --user disable --now ii-super-overview.service 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
   elif [[ -f "${service_dst}" ]]; then

@@ -814,6 +814,10 @@ rm -rf "$reconcile_test_root"
 step "turnstile supervisor selection"
 turnstile_test_root="$(mktemp -d)"
 mkdir -p "$turnstile_test_root/bin" "$turnstile_test_root/home/.local/bin" "$turnstile_test_root/home/.config/niri/config.d" "$turnstile_test_root/var/service/turnstiled"
+mkdir -p "$turnstile_test_root/examples"
+printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/examples/dbus.run"
+printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/examples/dbus.check"
+chmod +x "$turnstile_test_root/examples/dbus.run" "$turnstile_test_root/examples/dbus.check"
 cat > "$turnstile_test_root/home/.local/bin/inir" <<'SH'
 #!/bin/sh
 exit 0
@@ -845,6 +849,7 @@ if ! (
     export XDG_CONFIG_HOME="$turnstile_test_root/home/.config"
     export XDG_RUNTIME_DIR="$turnstile_test_root/runtime"
     export INIR_TURNSTILED_SERVICE_PATH="$turnstile_test_root/var/service/turnstiled"
+    export INIR_TURNSTILE_EXAMPLES="$turnstile_test_root/examples"
     export PATH="$turnstile_test_root/bin:$PATH"
     result="$(reconcile_inir_supervisor)"
     [[ "$result" == turnstile ]]
@@ -858,6 +863,9 @@ if ! (
     reconcile_inir_supervisor >/dev/null
     cmp -s "$turnstile_run" "$turnstile_run.before"
     cmp -s "$turnstile_conf" "$turnstile_conf.before"
+    if INIR_TURNSTILE_EXAMPLES="$turnstile_test_root/missing" configure_turnstile_user_services; then
+        exit 1
+    fi
 ); then
     printf 'FAIL: active turnstile was not selected exclusively\n' >&2
     rm -rf "$turnstile_test_root"
@@ -882,6 +890,10 @@ fi
 step "turnstile profile contracts"
 if ! grep -Fq 'manage_rundir = no' "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
     printf 'FAIL: Void setup does not configure turnstile for elogind\n' >&2
+    exit 1
+fi
+if ! grep -Fq "if elevate sh -c" "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
+    printf 'FAIL: Void service setup does not fail on elevation errors\n' >&2
     exit 1
 fi
 if ! grep -Fq 'turnstile-ready/conf' "$runtime_root/sdata/lib/functions.sh"; then

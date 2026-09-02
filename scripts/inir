@@ -2530,6 +2530,10 @@ show_logs() {
         exec env QS_DEBUG=1 QT_LOGGING_RULES= "$qs_bin" -p "$config_dir"
     fi
 
+    if is_using_runit_supervisor; then
+        exec sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
+    fi
+
     # --full decodes the ENTIRE qslog with no category filtering. Quickshell records
     # every message regardless of the process QT_LOGGING_RULES; the filter only hides
     # categories at decode time. Passing *=true surfaces everything that was logged,

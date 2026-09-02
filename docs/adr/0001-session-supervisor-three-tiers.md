@@ -20,7 +20,8 @@ predicate (ADR-0002), never by distro name:
    exit, giving session lifetime for free.
 
 Tiers 2 and 3 share the same `~/.config/service/inir/run` file. Only one
-supervisor may own that directory at a time.
+session tier may own that directory at a time. Turnstile's backend may itself
+run `runsvdir`; this is not the Niri fallback and does not create a second
+shell.
 
-Status: accepted for PR3.0 implementation; turnstile behavior remains pending
-PR3.1 VM validation.
+Status: accepted and VM validated through PR3.1.

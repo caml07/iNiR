@@ -412,27 +412,63 @@ The fresh install completed successfully at version `2.29.3`:
 - `grep -c 'BEGIN inir-runsvdir-fallback' ~/.config/niri/config.d/50-startup.kdl`
   returned `1`, confirming no duplicate startup block.
 
-This validates the PR3.0 installer and runsvdir fallback in the VM. One
-follow-up remains: a terminal launched inside that session reported
-`XDG_SESSION_TYPE=tty` and an empty `WAYLAND_DISPLAY`, despite Niri and
-QuickShell working. Diagnose environment propagation before PR3.1; do not
-reinterpret this as a supervisor failure.
+This validates the PR3.0 installer and runsvdir fallback in the VM.
+
+## PR3.1 VM checkpoint (2026-09-01)
+
+The `feat/void-turnstile-session` branch was installed from the canonical
+`/home/voidcaml/inir-src` checkout. The installer was run interactively so the
+root service and elogind configuration changes required explicit confirmation.
+
+The Void system services were active after enabling their `/var/service`
+symlinks:
+
+```text
+run: /var/service/dbus
+run: /var/service/elogind
+run: /var/service/polkitd
+run: /var/service/turnstiled
+```
+
+The resulting profile was verified as:
+
+```text
+/etc/turnstile/turnstiled.conf: manage_rundir = no
+~/.config/service/turnstile-ready/conf: core_services="dbus"
+~/.config/service/inir/run: exec chpst -e "$TURNSTILE_ENV_DIR" ... run --session
+```
+
+After the next tty login, turnstile created and supervised `dbus`, `inir`, and
+`turnstile-ready` under `~/.config/service`. The Niri startup file contained
+only the turnstile ownership comment and no `inir-runsvdir-fallback` block.
+The `runsvdir` process observed after login belongs to turnstile's runit
+backend, not Niri's fallback; exactly one supervisor owns the iNiR service.
+
+From Kitty in the Niri session, the environment was correct:
+
+```text
+WAYLAND_DISPLAY=wayland-1
+XDG_SESSION_TYPE=wayland
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+```
+
+The VM's SPICE agent channel and `spice-vdagentd` daemon were present, but
+`spice-vdagent` exits with status 1 because the session has no X11 `DISPLAY`.
+This is an X11-agent limitation in the Wayland-only Niri session and is not a
+turnstile or iNiR failure.
 
 ## What remains
 
-- Investigate Wayland environment propagation from the `dbus-run-session niri
-  --session` launch path (`XDG_SESSION_TYPE` and `WAYLAND_DISPLAY`).
 - PR3.0 validation is complete: installer, KDL injection, migrations,
   `scripts/inir` sv controls, service liveness and idempotency all passed.
-- PR3.1: enable turnstile + elogind profile — confirmed elevation, D-Bus user
-  service, envdir propagation, `manage_rundir=no`, remove runsvdir KDL block.
+- PR3.1 validation is complete: confirmed elevation, D-Bus user service,
+  envdir propagation, `manage_rundir = no`, and removal of the Niri runsvdir
+  block all passed.
 - PR3.2: non-systemd runtime adapters — UI/services zero systemctl calls.
 - PR3.3: optional systemd adapters — classify and degrade/adapt Awww, GameMode,
   Warp, captures.
 - Run shellcheck and `make test-local` before each PR.
 
-`make test-local` is currently blocked by the pre-existing
-`schema/wizard defaults: schema wallhaven tab` check. ShellCheck was not
-available in the host environment. No upstream PR has been opened; the Void
-port remains a fork progress branch until the complete VM integration gate
-passes.
+`make test-local` passed for PR3.1. ShellCheck was not available in the host
+environment. No upstream PR has been opened; the Void port remains a fork
+progress branch until the complete VM integration gate passes.

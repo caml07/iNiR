@@ -14,8 +14,8 @@ built against and will be revised after VM validation. Decisions: see
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
   musl libc; `seatd` without elogind; building ydotool from source.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
-  The completed graphics/session checkpoint is recorded in
-  `docs/VOID_VM_VALIDATION.md`.
+  The graphics, runsvdir fallback, and turnstile session checkpoints are
+  recorded in `docs/VOID_VM_VALIDATION.md`.
 
 ## How the port decides what to do
 
@@ -34,7 +34,7 @@ Void can run systemd; Arch can lack a user manager. See ADR-0002.
 Three tiers, decided by the predicate (ADR-0001):
 
 1. **systemd** (predicate holds) → `inir.service`, as on Arch.
-2. **turnstile** (`turnstiled` service running) → per-user service
+2. **turnstile** (`turnstiled` service active) → per-user service
    `~/.config/service/inir/run`:
    ```sh
    #!/bin/sh
@@ -45,14 +45,15 @@ Three tiers, decided by the predicate (ADR-0001):
      `~/.config/service/dbus/check` from turnstile examples,
      then add `dbus` to `core_services` in
      `~/.config/service/turnstile-ready/conf`.
-   - With elogind: `manage_rundir=no` in `/etc/turnstile/turnstiled.conf`.
+    - With elogind: `manage_rundir = no` in `/etc/turnstile/turnstiled.conf`.
    - Session env for services: `turnstile-update-runit-env VAR=value`, read
       with `exec chpst -e "$TURNSTILE_ENV_DIR" ...`.
 3. **runsvdir fallback** (zero system deps) → Niri spawns it:
    ```kdl
    spawn-sh-at-startup "exec runsvdir ~/.config/service"
    ```
-   Niri kills its spawns on exit; session env is inherited from Niri.
+    Niri kills its spawn on exit; session env is inherited from Niri. This is
+    distinct from the runsvdir process that turnstile's runit backend owns.
 
 Control: `sv restart|down|up ~/.config/service/inir` (non-systemd
 equivalent of `systemctl --user`). `inir logs` → `sv status` (journalctl
@@ -63,8 +64,8 @@ does not exist without systemd).
 - Supported session entry: `niri --session` (Void's `niri` package provides
   `/usr/bin/niri` with a desktop entry `Exec=/usr/bin/niri --session`; the
   `niri-session` wrapper was not present in the tested package).
-  It execs `niri --session` and wraps in `dbus-run-session` when
-  `DBUS_SESSION_BUS_ADDRESS` is unset (the turnstile path already has a bus).
+   Under the turnstile profile, start it after a normal tty login; turnstile
+   creates the user services and session D-Bus bus during login.
 - Manual `niri` launches are unsupported: doctor warns when the session
   lacks a D-Bus bus.
 - Env propagation without systemd: `dbus-update-activation-environment`
@@ -137,8 +138,8 @@ milestone with its own recipe (documented here, not yet built):
 `defaults/niri/config.d/50-startup.kdl` is the single source; setup injects
 and removes marked blocks per distro and predicate (ADR-0003). The template
 keeps the systemd environment command as an unmarked default; setup renders
-that command or the marked runsvdir block for the selected supervisor. It
-also handles an existing split `config.d/50-startup.kdl` or monolithic
+that command, the marked runsvdir block, or no startup block for turnstile.
+It also handles an existing split `config.d/50-startup.kdl` or monolithic
 `config.kdl`. Injection must be idempotent, and migration 021 must remove the
 runsvdir block when the predicate holds (no double shell on Void+systemd).
 
@@ -184,13 +185,15 @@ PR3 is split into four sequential PRs:
   not inject a second runsvdir supervisor; full turnstile configuration is
   PR3.1.
 - PR3.1 `feat/void-turnstile-session`: turnstile + elogind with confirmed elevation.
+  Complete and VM validated.
 - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
 - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 ## FAQ / gotchas
 
-- **Two shells after install**: a hand-written startup entry or migration
-  021 applied on Void. Remove the `spawn-*`/runsvdir lines.
+- **Two shells after install**: a hand-written startup entry, or both Niri and
+  turnstile owning `~/.config/service`. Remove hand-written
+  `spawn-*`/runsvdir lines and rerun setup so it selects one tier.
 - **Shell crashes and stays dead**: no supervisor (tier 3 requires the
   runsvdir entry; check `sv status ~/.config/service/inir`).
 - **`inir logs` fails**: journalctl is systemd-only; use `sv status` (+
@@ -200,6 +203,10 @@ PR3 is split into four sequential PRs:
   (`xbps-install -Sf quickshell` or local template rebuild).
 - **Suspend/hibernate**: `loginctl suspend` (elogind) replaces
   `systemctl suspend`; `acpid` is the alternative in the seatd profile.
+- **SPICE clipboard in a Wayland-only Niri session**: Void's
+  `spice-vdagent` requires an X11 `DISPLAY`. The SPICE channel and daemon can
+  be healthy while clipboard integration remains unavailable. This does not
+  affect iNiR or turnstile.
 
 ## Sources
 

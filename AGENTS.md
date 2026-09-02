@@ -2,10 +2,10 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `feat/void-runsvdir-supervisor` (base: upstream `prerelease`). PR2 is
-complete on the fork; PR3 is split into sequential PRs.
+on branch `feat/void-turnstile-session` (base: upstream `prerelease`). PR3 is
+split into sequential PRs.
 
-## Current progress (2026-08-31)
+## Current progress (2026-09-01)
 
 - PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
 - PR2 `feat/void-dependencies`: committed as `3444ccbd` and pushed to
@@ -26,7 +26,8 @@ complete on the fork; PR3 is split into sequential PRs.
 - PR3 is split into four sequential branches/PRs:
   - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile);
     **implementation and VM validation complete**, local tests pass.
-  - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation.
+  - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation;
+    **implementation and VM validation complete**.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
@@ -38,13 +39,16 @@ The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 - `fish-shell` had to be installed explicitly because Void names the package
   `fish-shell`, not `fish`. The dependency profile now installs it and maps the
   `fish` command to that package.
-- In the Niri session: `runsvdir /home/voidcaml/.config/service`, `runsv inir`,
-  `/usr/bin/qs -n ...` and `swayidle` were all running.
-- `sv status ~/.config/service/inir` reported `run:` for 1043 seconds; the
-  startup file contained exactly one `inir-runsvdir-fallback` block.
-- Remaining follow-up: the terminal environment reported `XDG_SESSION_TYPE=tty`
-  and an empty `WAYLAND_DISPLAY` even though Niri and QuickShell were working.
-  Investigate session environment propagation before PR3.1.
+- PR3.1 enabled `dbus`, `elogind`, `polkitd`, and `turnstiled` with confirmed
+  elevation; `manage_rundir = no` is set for elogind.
+- `~/.config/service/{dbus,inir,turnstile-ready}` are supervised by turnstile.
+  `inir/run` uses `chpst -e "$TURNSTILE_ENV_DIR"`; the Niri fallback KDL block
+  was removed. A turnstile backend `runsvdir` is expected and is not the Niri
+  fallback.
+- Kitty under Niri has `WAYLAND_DISPLAY=wayland-1`,
+  `XDG_SESSION_TYPE=wayland`, and a session D-Bus address.
+- SPICE clipboard is not supported in this Wayland-only VM session because
+  Void's `spice-vdagent` requires an X11 `DISPLAY`; it does not block the port.
 
 ## Where things are
 
@@ -85,11 +89,13 @@ restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
 - `services/deferred/PackageSearch.qml` — `xbps-query -Rs/-s`,
   `sudo xbps-install -S/--`, `sudo xbps-remove -Rns`.
 - `services/AppCatalog.qml` + `defaults/app-catalog.json` — `xbps` targets.
-- `sdata/subcmd-install/3.files.sh` — PR3.0 installs
-  `~/.config/service/inir/run` (exec launcher `run --session`) and injects the
-  runsvdir startup block. PR3.1 adds `~/.config/service/dbus/run` and
-  `dbus.check` from turnstile examples plus confirmed system-service enabling
-  (`ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/`).
+- `sdata/lib/functions.sh` — supervisor selection and turnstile user-service
+  rendering; detects active turnstile without requiring user access to its
+  system-service status.
+- `sdata/subcmd-install/2.setups.sh` — PR3.1 confirmed enabling of
+  `dbus`, `elogind`, `polkitd`, and `turnstiled`, plus `manage_rundir = no`.
+- `sdata/subcmd-install/3.files.sh` — delegates supervisor rendering to the
+  shared reconciler.
 - `scripts/inir` — `sv` branches in restart/kill/stop/status/logs when the
   predicate is false.
 - `sdata/lib/doctor.sh` — `xbps-query -L` repo check; no-session-bus

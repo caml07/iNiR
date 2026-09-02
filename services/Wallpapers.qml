@@ -57,8 +57,16 @@ Singleton {
 
         root.internalPreviewMonitor = String(monitorName ?? "")
         root.internalPreviewPath = normalizedPath
-        // No-op for videos, GIFs, and when awww is not running.
-        AwwwBackend.previewImage(normalizedPath, monitorName)
+        // Let QML observe the preview path first. For shader transitions this
+        // makes the outgoing overlay visible before awww switches the stable
+        // wallpaper underneath, eliminating the one-frame target flash.
+        Qt.callLater(() => {
+            if (root.internalPreviewPath !== normalizedPath
+                    || root.internalPreviewMonitor !== String(monitorName ?? ""))
+                return
+            // No-op for videos, GIFs, and when awww is not running.
+            AwwwBackend.previewImage(normalizedPath, monitorName)
+        })
     }
 
     // Restore whatever the config says without repainting through a different

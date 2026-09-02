@@ -17,7 +17,28 @@ Item {
     property bool mirroredStereo: true
     property real sensitivity: 1.0
     property real amplitude: 0.9
+    property real pulseStrength: 0.72
+    property real motionSpeed: 1.0
+    property real idleMotion: 0.16
     property real glowStrength: 0.45
+    // Extra render room prevents high-energy contours/halo from flattening
+    // against the component bounds. presentationScale sizes the organic body
+    // independently from the host rectangle; overscan only grows the texture.
+    property real overscan: 1.34
+    property real presentationScale: 1.0
+    property real baseRadius: 0.510
+    property bool stretchToHost: false
+    property real hollowAmount: 1.0
+    // presentationMode only changes the coordinate map. The Organic contour,
+    // spectrum response, pulse, palette, ring body and halo stay shared.
+    // 0 = radial Visualizer, 2 = rounded-card perimeter for Media Controls.
+    property real presentationMode: 0.0
+    property real edgeBaseRadius: 0.39
+    property vector2d edgeCardHalf: Qt.vector2d(0.72, 0.58)
+    property vector2d edgeReachHalf: edgeCardHalf
+    property real edgeCornerRadius: 0.12
+    property vector4d edgeReachScales: Qt.vector4d(1, 1, 1, 1)
+    property vector4d edgeDirections: Qt.vector4d(1, 1, 1, 1)
     property real reveal: 1.0
     readonly property real energy: root._energy
     readonly property real deformation: Math.max(
@@ -37,6 +58,7 @@ Item {
     property real _energy: 0
     property real _previousEnergy: 0
     property real _onset: 0
+    property real _pulse: 0
     property real _phase: 0
     property real _spin: 0
 
@@ -194,19 +216,31 @@ Item {
             root._energy = follow(root._energy, root._targetEnergy,
                 energyAttackRate, energyReleaseRate)
             const rise = Math.max(0, root._energy - root._previousEnergy)
-            root._onset = follow(root._onset, Math.min(1, rise * 6.5), 24, 4.2)
+            root._onset = follow(root._onset, Math.min(1, rise * 7.5), 28, 4.8)
+            // Pulse follows both sustained low-frequency energy and transients.
+            // It is deliberately quicker than the contour envelope so Organic
+            // feels musical instead of merely wobbling around the cover art.
+            const bassPulse = Math.max(root._bandsA.x, root._bandsA.y)
+            const pulseTarget = Math.min(1, bassPulse * 0.72 + root._energy * 0.42 + root._onset * 0.88)
+            root._pulse = follow(root._pulse, pulseTarget, 18, 5.2)
             root._previousEnergy = root._energy
-            root._phase = (root._phase + dt * (0.010 + root._onset * 0.024)) % 1
-            root._spin = (root._spin + dt * 0.005) % 6.28318530718
+            const speed = Math.max(0.2, Math.min(2.5, root.motionSpeed))
+            const idle = Math.max(0, Math.min(1, root.idleMotion))
+            root._phase = (root._phase + dt * speed
+                * (0.055 + idle * 0.035 + root._energy * 0.075 + root._onset * 0.12)) % 1
+            root._spin = (root._spin + dt * speed * (0.020 + idle * 0.025 + root._energy * 0.018)) % 6.28318530718
         }
     }
 
     ShaderEffect {
         id: blob
-        readonly property real span: Math.min(root.width, root.height)
+        readonly property real hostSpan: Math.min(root.width, root.height)
+        readonly property real span: hostSpan * Math.max(1.0, root.overscan)
 
-        width: span
-        height: span
+        width: root.stretchToHost
+            ? root.width * Math.max(1.0, root.overscan) : span
+        height: root.stretchToHost
+            ? root.height * Math.max(1.0, root.overscan) : span
         anchors.centerIn: parent
         visible: root.active && span > 2
 
@@ -214,10 +248,24 @@ Item {
         property real spin: root._spin
         property real energy: root._energy
         property real onset: root._onset
+        property real pulse: root._pulse
         property real amplitude: root.amplitude
         property real reveal: root.reveal
         property real deformationStrength: Math.max(0.25, Math.min(2.0, root.sensitivity))
-        property real glowStrength: Math.max(0, Math.min(1, root.glowStrength))
+        property real pulseStrength: Math.max(0, Math.min(1.5, root.pulseStrength))
+        property real idleMotion: Math.max(0, Math.min(1, root.idleMotion))
+        property real glowStrength: Math.max(0, Math.min(1.5, root.glowStrength))
+        property real presentationScale: Math.max(0.45, Math.min(1.35, root.presentationScale))
+        property real baseRadius: Math.max(0.20, Math.min(0.78, root.baseRadius))
+        property real hollowAmount: Math.max(0, Math.min(1, root.hollowAmount))
+        property real presentationMode: root.presentationMode
+        property real aspectRatio: Math.max(0.25, Math.min(8.0, width / Math.max(1, height)))
+        property real edgeBaseRadius: Math.max(0.0, Math.min(0.75, root.edgeBaseRadius))
+        property vector2d edgeCardHalf: root.edgeCardHalf
+        property vector2d edgeReachHalf: root.edgeReachHalf
+        property real edgeCornerRadius: Math.max(0.0, root.edgeCornerRadius)
+        property vector4d edgeReachScales: root.edgeReachScales
+        property vector4d edgeDirections: root.edgeDirections
         property vector4d bandsA: root._bandsA
         property vector4d bandsB: root._bandsB
         property vector4d bandsC: root._bandsC

@@ -900,6 +900,10 @@ if ! grep -Fq 'turnstile-ready/conf' "$runtime_root/sdata/lib/functions.sh"; the
     printf 'FAIL: Void setup does not configure turnstile-ready core services\n' >&2
     exit 1
 fi
+if ! grep -Fq 'Could not configure the iNiR supervisor' "$runtime_root/sdata/subcmd-install/3.files.sh"; then
+    printf 'FAIL: file installation does not propagate supervisor setup failures\n' >&2
+    exit 1
+fi
 
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"

@@ -363,7 +363,10 @@ esac
 # Render the startup supervisor and service after the Niri config has been installed.
 source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
 local _selected_supervisor
-_selected_supervisor="$(reconcile_inir_supervisor)"
+if ! _selected_supervisor="$(reconcile_inir_supervisor)"; then
+  log_error "Could not configure the iNiR supervisor"
+  return 1
+fi
 log_success "Startup: selected ${_selected_supervisor} supervisor"
 
 # Theming templates — defaults/ is the primary source (kept in sync with dots/)

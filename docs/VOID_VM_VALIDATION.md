@@ -464,7 +464,24 @@ turnstile or iNiR failure.
 - PR3.1 validation is complete: confirmed elevation, D-Bus user service,
   envdir propagation, `manage_rundir = no`, and removal of the Niri runsvdir
   block all passed.
-- PR3.2: non-systemd runtime adapters — UI/services zero systemctl calls.
+- PR3.2 implementation is complete on `feat/void-nonsystemd-runtime`; the VM
+  checkpoint is pending. Run the versioned checker over SSH from the host:
+
+  ```bash
+  ssh voidcaml@192.168.122.141 '
+  cd ~/inir-src && git fetch origin &&
+  git checkout feat/void-nonsystemd-runtime && git pull --ff-only &&
+  export XDG_RUNTIME_DIR=/run/user/$(id -u) &&
+  export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus &&
+  INIR_EXPECTED_COMMIT="$(git rev-parse origin/feat/void-nonsystemd-runtime)" \
+    ./scripts/check-void-pr32.sh
+  '
+  ```
+
+  The checker requires a false usable-systemd-user-manager predicate, a real
+  user bus, clean branch state, iNiR `sv` supervision, and supported
+  `loginctl` power verbs. It skips XEmbed service checks when
+  `xembedsniproxy` is not installed.
 - PR3.3: optional systemd adapters — classify and degrade/adapt Awww, GameMode,
   Warp, captures.
 - Run shellcheck and `make test-local` before each PR.

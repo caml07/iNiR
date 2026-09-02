@@ -32,7 +32,7 @@ Singleton {
         interval: 900
         repeat: false
         onTriggered: {
-            Quickshell.execDetached(["/usr/bin/loginctl", "hibernate"])
+            Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "hibernate"])
         }
     }
 
@@ -41,7 +41,7 @@ Singleton {
         interval: 600
         repeat: false
         onTriggered: {
-            Quickshell.execDetached(["/usr/bin/loginctl", "suspend"])
+            Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "suspend"])
         }
     }
 
@@ -86,7 +86,7 @@ Singleton {
             lock()
             _suspendTimer.restart()
         } else {
-            Quickshell.execDetached(["/usr/bin/loginctl", "suspend"])
+            Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "suspend"])
         }
     }
 
@@ -118,17 +118,17 @@ Singleton {
 
     function poweroff() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/loginctl", "poweroff"])
+        Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "poweroff"])
     }
 
     function reboot() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/loginctl", "reboot"])
+        Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "reboot"])
     }
 
     function rebootToFirmware() {
         closeAllWindows();
-        Quickshell.execDetached(["/usr/bin/loginctl", "reboot", "--firmware-setup"])
+        Quickshell.execDetached(["/usr/bin/loginctl", "--ignore-inhibitors", "reboot", "--firmware-setup"])
     }
 
     Connections {

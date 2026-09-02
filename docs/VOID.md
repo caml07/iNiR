@@ -189,8 +189,7 @@ PR3 is split into four sequential PRs:
 - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
   Runtime implementation is complete; VM validation is pending. XEmbed uses a
   runit user service so crashes are restarted by `runsv` instead of
-  `systemd-run`. Run `scripts/check-void-pr32.sh` from the active graphical
-  session for the read-only VM checkpoint.
+  `systemd-run`.
 - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 ## FAQ / gotchas
@@ -211,6 +210,30 @@ PR3 is split into four sequential PRs:
   `spice-vdagent` requires an X11 `DISPLAY`. The SPICE channel and daemon can
   be healthy while clipboard integration remains unavailable. This does not
   affect iNiR or turnstile.
+
+## PR3.2 VM checkpoint
+
+Keep `scripts/check-void-pr32.sh` as the repeatable, versioned validation
+contract. SSH is only the transport; export the graphical user's runtime and
+D-Bus address explicitly:
+
+```bash
+ssh voidcaml@192.168.122.141 '
+cd ~/inir-src &&
+git fetch origin &&
+git checkout feat/void-nonsystemd-runtime &&
+git pull --ff-only &&
+export XDG_RUNTIME_DIR=/run/user/$(id -u) &&
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus &&
+INIR_EXPECTED_COMMIT="$(git rev-parse origin/feat/void-nonsystemd-runtime)" \
+  ./scripts/check-void-pr32.sh
+'
+```
+
+The checker requires the false usable-systemd-user-manager predicate, a real
+session bus, `sv` supervision of iNiR, supported `loginctl` power verbs, and a
+clean expected branch. XEmbed is optional and is checked only when its binary
+is installed.
 
 ## Sources
 

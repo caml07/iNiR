@@ -2,10 +2,10 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `feat/void-turnstile-session` (base: upstream `prerelease`). PR3 is
+on branch `feat/void-nonsystemd-runtime` (base: upstream `prerelease`). PR3 is
 split into sequential PRs.
 
-## Current progress (2026-09-01)
+## Current progress (2026-09-02)
 
 - PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
 - PR2 `feat/void-dependencies`: committed as `3444ccbd` and pushed to
@@ -29,6 +29,9 @@ split into sequential PRs.
   - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation;
     **implementation and VM validation complete**.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
+    **Implementation complete; VM checkpoint pending.** Validate with the
+    versioned checker over SSH, explicitly exporting the graphical session's
+    `/run/user/$UID` and D-Bus address when needed.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
@@ -111,6 +114,8 @@ restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
   Arch (systemd) paths; Void branches only exercised in the VM.
 - Shellcheck on any touched `.sh` (repo uses bash 4+).
 - Idempotency: run the touched installer step twice, diff the second run.
+- Checks that can run over SSH are valid when `XDG_RUNTIME_DIR` and
+  `DBUS_SESSION_BUS_ADDRESS` point to the active graphical user's session.
 - No `spawn-*` inir entry added by hand anywhere; no `make install` in any
   XBPS template (it installs the systemd unit, `Makefile:54`).
 

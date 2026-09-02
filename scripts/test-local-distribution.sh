@@ -568,6 +568,8 @@ if ! grep -Fq 'service", "restart' "$memory_service" \
         || ! grep -Fq 'sv up' "$tray_service" \
         || ! grep -Fq 'xembed_service_dir' "$runtime_root/sdata/lib/functions.sh" \
         || ! grep -Fq 'chpst -e "\$TURNSTILE_ENV_DIR"' "$runtime_root/sdata/lib/functions.sh" \
+        || ! grep -Fq -- '--ignore-inhibitors' "$session_service" \
+        || ! grep -Fq -- '--ignore-inhibitors suspend' "$idle_service" \
         || grep -Fq 'systemctl", "suspend' "$session_service" \
         || grep -Fq 'systemctl suspend' "$idle_service" \
         || ! grep -Fq 'dbus-update-activation-environment' "$cursor_helper" \

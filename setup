@@ -475,8 +475,8 @@ show_setup_context_card() {
 show_help() {
     echo ""
     tui_hero_card "iNiR setup" \
-        "Install, sync, repair, inspect, and unfuck the shell without guessing which entrypoint owns what." \
-        "Use inir for daily runtime control. Use ./setup when you want the maintenance brain."
+        "Install, update, repair and inspect the shell without guessing which component owns what." \
+        "Use inir for everyday control. Use ./setup for installation, recovery and maintenance."
 
     tui_key_value "Usage:" "./setup [command] [options]"
     show_setup_context_card "Setup Overview"
@@ -1648,6 +1648,57 @@ run_logs() {
 }
 
 ###############################################################################
+# Install completion — useful next steps without making first-run feel like a log dump
+###############################################################################
+show_install_completion() {
+    local version distro package_manager host gpu ram compositor
+    version="$(get_repo_version)"
+    distro="${DETECTED_DISTRO:-${OS_PRETTY_NAME:-Linux}}"
+    package_manager="${DETECTED_PACKAGE_MANAGER:-$(get_package_manager 2>/dev/null || echo unknown)}"
+    host="${DETECTED_PORTABLE:-desktop}"
+    [[ "${DETECTED_VIRT:-none}" != "none" ]] && host+=" / ${DETECTED_VIRT} VM"
+    gpu="${DETECTED_GPU:-unknown}"
+    ram="${DETECTED_RAM_GIB:-?} GiB"
+    compositor="${DETECTED_DE:-${XDG_CURRENT_DESKTOP:-not detected}}"
+
+    tui_alert "success" "iNiR is ready" \
+        "Version ${version} is installed. You can start the shell now or begin with a clean Niri login."
+
+    tui_summary_card "This install" \
+        "Distro:${distro}" \
+        "Packages:${package_manager}" \
+        "Host:${host}" \
+        "GPU:${gpu}" \
+        "RAM:${ram}" \
+        "Session:${compositor}"
+
+    tui_section_start "Good next moves"
+    if [[ -n "${NIRI_SOCKET:-}" ]]; then
+        tui_list_item "Start/reload now: inir restart"
+    else
+        tui_list_item "Log out, choose Niri in your login screen, then sign back in"
+    fi
+    tui_list_item "Open Settings: inir settings"
+    tui_list_item "Check health: inir doctor"
+    tui_list_item "See exactly what is installed: inir status"
+    tui_section_end
+
+    tui_dim "If an experiment goes sideways later: ./setup rollback"
+}
+
+show_update_completion() {
+    local version="$1" commit="$2"
+    tui_alert "success" "Update applied" \
+        "iNiR ${version} (${commit}) is synced. The shell restart was requested when the session allowed it."
+
+    tui_section_start "If something looks off"
+    tui_list_item "Verify the result: inir status"
+    tui_list_item "Run diagnostics: inir doctor"
+    tui_list_item "Undo this update: ./setup rollback"
+    tui_section_end
+}
+
+###############################################################################
 # Install
 ###############################################################################
 run_install() {
@@ -1795,7 +1846,7 @@ run_install() {
     tui_task_finalize
 
     echo ""
-    tui_alert "success" "Installation complete" "Version $(get_repo_version) is ready.\nRun 'inir run' to start the shell, or log out and back in."
+    show_install_completion
 }
 
 ###############################################################################
@@ -2797,7 +2848,7 @@ run_update() {
     fi
 
     echo ""
-    tui_alert "success" "Update complete" "Version $repo_ver ($repo_commit) synced.\nRun './setup rollback' if something breaks."
+    show_update_completion "$repo_ver" "$repo_commit"
 }
 
 ###############################################################################

@@ -83,10 +83,11 @@ FocusScope {
 
     function applyPath(path: string): void {
         if (!path) return
-        // The real apply produces its own transition; don't restore first.
-        Wallpapers.clearWallpaperPreview()
         Wallpapers.applySelectionTarget(path, root.selectionTarget,
             Appearance.m3colors.darkmode, root.selectionMonitorName)
+        // Config now resolves to the same path as the preview, so dropping the
+        // transient owner cannot briefly expose the previously configured image.
+        Wallpapers.clearWallpaperPreview()
         GlobalStates.wallpaperLauncherOpen = false
     }
 

@@ -9,6 +9,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.functions
+import qs.modules.common.models
 import qs.modules.common.widgets
 import qs.modules.background.widgets
 
@@ -20,7 +21,8 @@ AbstractBackgroundWidget {
         placementStrategy: "free", preset: "default", vizType: "bars", waveOpacity: -1,
         paletteMode: "cava", barsOrigin: "bottom", waveMode: "fill",
         frequencyProfile: "flat", smoothing: 2, fillRatio: 90, barOpacity: 100,
-        organicSensitivity: 50, organicOpacity: 85, organicGlow: 45, organicCoverSize: 57,
+        organicSensitivity: 25, organicPulse: 150, organicMotionSpeed: 250, organicIdleMotion: 18,
+        organicOpacity: 100, organicGlow: 100, organicCoverSize: 51, organicRange: 20,
         barCount: 48, barSpacing: 2, barRadius: 2, barMinHeight: 1,
         lineWidth: 2, edgeInset: 0, edgeSoftness: 28, accentStrength: 70,
         contentWidth: 304, contentHeight: 104, dim: 0,
@@ -43,14 +45,21 @@ AbstractBackgroundWidget {
     readonly property int waveOpacity: Config.getNestedValue("background.widgets.visualizer.waveOpacity", -1)
     readonly property string paletteMode: Config.getNestedValue(
         "background.widgets.visualizer.paletteMode", "cava")
-    // Cava already owns its own palette. Show the shared widget-color presets
-    // only when this widget is actually consuming the semantic widget palette.
-    semanticPaletteQuickControls: root.paletteMode !== "cava"
+    // Album is artwork-owned, so the shared semantic palette editor is only
+    // relevant for the widget semantic color modes.
+    semanticPaletteQuickControls: root.paletteMode === "accent"
+        || root.paletteMode === "primary"
     readonly property var spectrumPalette: {
         if (root.paletteMode === "accent")
             return [root.widgetAccentVisible, root.widgetAccent2Visible, root.widgetAccent3Visible]
         if (root.paletteMode === "primary")
             return [root.widgetAccent]
+        if (root.paletteMode === "album") {
+            const colors = albumArtworkQuantizer?.colors ?? []
+            if (colors.length > 0)
+                return colors
+            return [root.widgetAccentVisible, root.widgetAccent2Visible, root.widgetAccent3Visible]
+        }
         return CavaTheme.visualizerColors
     }
     readonly property int smoothing: Config.getNestedValue(
@@ -59,25 +68,55 @@ AbstractBackgroundWidget {
         "background.widgets.visualizer.frequencyProfile", "flat")
     readonly property real accentStrength: Config.getNestedValue(
         "background.widgets.visualizer.accentStrength", 70) / 100
-    readonly property real organicSensitivity: Config.getNestedValue(
-        "background.widgets.visualizer.organicSensitivity", 50) / 100
+    readonly property real organicSensitivitySetting: Config.getNestedValue(
+        "background.widgets.visualizer.organicSensitivity", 25) / 100
+    // Keep the useful low end almost linear, then progressively compress the
+    // upper half. The raw 25-200 slider used to multiply deformation linearly,
+    // making 100-200 jump far more than the visual control implied.
+    readonly property real organicSensitivity: root.organicSensitivitySetting <= 0.4
+        ? root.organicSensitivitySetting
+        : 0.4 + 0.85 * (1 - Math.exp(-(root.organicSensitivitySetting - 0.4) * 1.4))
+    readonly property real organicPulse: Config.getNestedValue(
+        "background.widgets.visualizer.organicPulse", 150) / 100
+    readonly property real organicMotionSpeed: Config.getNestedValue(
+        "background.widgets.visualizer.organicMotionSpeed", 250) / 100
+    readonly property real organicIdleMotion: Config.getNestedValue(
+        "background.widgets.visualizer.organicIdleMotion", 18) / 100
     readonly property real organicOpacity: Config.getNestedValue(
-        "background.widgets.visualizer.organicOpacity", 85) / 100
+        "background.widgets.visualizer.organicOpacity", 100) / 100
     readonly property real organicGlow: Config.getNestedValue(
-        "background.widgets.visualizer.organicGlow", 45) / 100
+        "background.widgets.visualizer.organicGlow", 100) / 100
     readonly property real organicCoverSize: Config.getNestedValue(
-        "background.widgets.visualizer.organicCoverSize", 57) / 100
+        "background.widgets.visualizer.organicCoverSize", 51) / 100
+    readonly property real organicRange: Config.getNestedValue(
+        "background.widgets.visualizer.organicRange", 20) / 100
+    // The Organic texture renders larger than the widget so peaks have room.
+    // Compensate that overscan when cutting the centre hole: the inner edge
+    // should track the artwork itself, not an arbitrary shader-space radius.
+    readonly property real organicRenderOverscan: 1.34
+    // The original Organic kept roughly 0.075-0.08 radial units of body between
+    // the artwork edge and the resting outer contour. Derive the resting radius
+    // from the actual cover instead of letting a fixed blob radius make smaller
+    // covers look disproportionately thick.
+    readonly property real organicBaseRadius: Math.min(0.78,
+        root.organicCoverSize / root.organicRenderOverscan + 0.078)
+    // Let the Organic body continue underneath the artwork. Matching two
+    // antialiased edges exactly leaves a wallpaper-colored seam; underlapping
+    // the halo means the cover is always the visual owner of the centre edge.
+    readonly property real organicCoverUnderlap: 0.055
+    readonly property real organicHollowAmount: Math.max(0, Math.min(1,
+        ((root.organicCoverSize - root.organicCoverUnderlap)
+            / root.organicRenderOverscan) / 0.565))
 
     editPopoverContent: Component {
         ColumnLayout {
-            spacing: 8
+            implicitWidth: 400
+            spacing: 10
 
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3
                 columnSpacing: 4
-                rowSpacing: 4
-
                 Repeater {
                     model: [
                         { label: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
@@ -86,8 +125,10 @@ AbstractBackgroundWidget {
                     ]
                     SelectionGroupButton {
                         required property var modelData
+                        required property int index
                         Layout.fillWidth: true
-                        leftmost: true; rightmost: true
+                        leftmost: index === 0
+                        rightmost: index === 2
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
                         toggled: root.vizType === modelData.value
@@ -96,42 +137,132 @@ AbstractBackgroundWidget {
                 }
             }
 
-            StyledText {
-                text: Translation.tr("Palette")
-                color: Appearance.colors.colOnLayer2
-                font.pixelSize: Appearance.font.pixelSize.smaller
-            }
-
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 3
-                columnSpacing: 4
-                rowSpacing: 4
-
-                Repeater {
-                    model: [
-                        { label: Translation.tr("Cava"), icon: "palette", value: "cava" },
-                        { label: Translation.tr("Accent"), icon: "colors", value: "accent" },
-                        { label: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" }
-                    ]
-                    SelectionGroupButton {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        leftmost: true; rightmost: true
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 4
+            Repeater {
+                model: [
+                    { label: Translation.tr("Cava"), icon: "palette", value: "cava" },
+                    { label: Translation.tr("Accent"), icon: "colors", value: "accent" },
+                    { label: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" },
+                    { label: Translation.tr("Album"), icon: "album", value: "album" }
+                ]
+                SelectionGroupButton {
+                    required property var modelData
+                    required property int index
+                    leftmost: index === 0
+                    rightmost: index === 3
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
                         toggled: root.paletteMode === modelData.value
-                        onClicked: Config.setNestedValue(
-                            "background.widgets.visualizer.paletteMode", modelData.value)
+                        onClicked: Config.setNestedValue("background.widgets.visualizer.paletteMode", modelData.value)
                     }
                 }
             }
 
-            StyledText {
-                visible: root.vizType !== "organic"
-                text: Translation.tr("Shape")
-                color: Appearance.colors.colOnLayer2
-                font.pixelSize: Appearance.font.pixelSize.smaller
+            Rectangle {
+                visible: root.vizType === "organic"
+                Layout.fillWidth: true
+                implicitHeight: organicQuickGrid.implicitHeight + 24
+                radius: Appearance.rounding.small
+                color: Appearance.colors.colLayer2
+                border.width: 1
+                border.color: Appearance.colors.colOutlineVariant
+
+                GridLayout {
+                    id: organicQuickGrid
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    columns: 2
+                    columnSpacing: 16
+                    rowSpacing: 10
+
+                    component OrganicMetric: ColumnLayout {
+                        id: metric
+                        required property string labelText
+                        required property string configKey
+                        required property int minimum
+                        required property int maximum
+                        property int step: 5
+                        readonly property real currentValue: Number(
+                            Config.getNestedValue(metric.configKey, metric.minimum))
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        spacing: 2
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: metric.labelText
+                                color: Appearance.colors.colSubtext
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                elide: Text.ElideRight
+                            }
+                            StyledText {
+                                text: Math.round(metric.currentValue) + "%"
+                                color: Appearance.colors.colOnLayer2
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                font.family: Appearance.font.family.numbers
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        StyledSlider {
+                            Layout.fillWidth: true
+                            from: metric.minimum
+                            to: metric.maximum
+                            stepSize: metric.step
+                            configuration: StyledSlider.Configuration.XS
+                            stopIndicatorValues: []
+                            value: metric.currentValue
+                            tooltipContent: Math.round(value) + "%"
+                            onMoved: Config.setNestedValue(metric.configKey, Math.round(value))
+                        }
+                    }
+
+                    OrganicMetric {
+                        labelText: Translation.tr("Sensitivity")
+                        configKey: "background.widgets.visualizer.organicSensitivity"
+                        minimum: 25; maximum: 200
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Pulse")
+                        configKey: "background.widgets.visualizer.organicPulse"
+                        minimum: 0; maximum: 150
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Motion")
+                        configKey: "background.widgets.visualizer.organicMotionSpeed"
+                        minimum: 20; maximum: 250
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Cover")
+                        configKey: "background.widgets.visualizer.organicCoverSize"
+                        minimum: 30; maximum: 90; step: 1
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Glow")
+                        configKey: "background.widgets.visualizer.organicGlow"
+                        minimum: 0; maximum: 100
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Presence")
+                        configKey: "background.widgets.visualizer.organicOpacity"
+                        minimum: 10; maximum: 100
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Idle")
+                        configKey: "background.widgets.visualizer.organicIdleMotion"
+                        minimum: 0; maximum: 100
+                    }
+                    OrganicMetric {
+                        labelText: Translation.tr("Range")
+                        configKey: "background.widgets.visualizer.organicRange"
+                        minimum: 20; maximum: 100
+                    }
+                }
             }
 
             GridLayout {
@@ -139,8 +270,6 @@ AbstractBackgroundWidget {
                 Layout.fillWidth: true
                 columns: root.vizType === "bars" ? 4 : 3
                 columnSpacing: 4
-                rowSpacing: 4
-
                 Repeater {
                     model: root.vizType === "bars" ? [
                         { label: Translation.tr("Bottom"), icon: "vertical_align_bottom", value: "bottom" },
@@ -154,15 +283,15 @@ AbstractBackgroundWidget {
                     ]
                     SelectionGroupButton {
                         required property var modelData
+                        required property int index
                         Layout.fillWidth: true
-                        leftmost: true; rightmost: true
+                        leftmost: index === 0
+                        rightmost: index === (root.vizType === "bars" ? 3 : 2)
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
                         toggled: root.vizType === "bars"
-                            ? Config.getNestedValue(
-                                "background.widgets.visualizer.barsOrigin", "bottom") === modelData.value
-                            : Config.getNestedValue(
-                                "background.widgets.visualizer.waveMode", "fill") === modelData.value
+                            ? Config.getNestedValue("background.widgets.visualizer.barsOrigin", "bottom") === modelData.value
+                            : Config.getNestedValue("background.widgets.visualizer.waveMode", "fill") === modelData.value
                         onClicked: Config.setNestedValue(root.vizType === "bars"
                             ? "background.widgets.visualizer.barsOrigin"
                             : "background.widgets.visualizer.waveMode", modelData.value)
@@ -171,111 +300,42 @@ AbstractBackgroundWidget {
             }
 
             RowLayout {
+                visible: root.vizType !== "organic"
                 Layout.fillWidth: true
                 spacing: 8
-
                 StyledText {
                     Layout.fillWidth: true
-                    text: root.vizType === "bars" ? Translation.tr("Bar count")
-                        : root.vizType === "wave" ? Translation.tr("Wave opacity")
-                        : Translation.tr("Sensitivity")
-                    color: Appearance.colors.colOnLayer2
+                    text: root.vizType === "bars" ? Translation.tr("Bar count") : Translation.tr("Wave opacity")
+                    color: Appearance.colors.colSubtext
                     font.pixelSize: Appearance.font.pixelSize.smaller
                 }
-
                 StyledSpinBox {
                     visible: root.vizType === "bars"
                     from: 8; to: 128; stepSize: 4
                     value: Config.getNestedValue("background.widgets.visualizer.barCount", 48)
                     onValueModified: Config.setNestedValue("background.widgets.visualizer.barCount", value)
                 }
-
                 StyledSpinBox {
                     visible: root.vizType === "wave"
                     from: 5; to: 100; stepSize: 5
                     value: {
-                        const v = Config.getNestedValue("background.widgets.visualizer.waveOpacity", -1);
-                        return v >= 0 ? v : (Config.options?.appearance?.cava?.waveOpacity ?? 30);
+                        const v = Config.getNestedValue("background.widgets.visualizer.waveOpacity", -1)
+                        return v >= 0 ? v : (Config.options?.appearance?.cava?.waveOpacity ?? 30)
                     }
                     onValueModified: Config.setNestedValue("background.widgets.visualizer.waveOpacity", value)
-                }
-
-                StyledSpinBox {
-                    visible: root.vizType === "organic"
-                    from: 25; to: 200; stepSize: 5
-                    value: Math.round(root.organicSensitivity * 100)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.organicSensitivity", value)
-                }
-            }
-
-            GridLayout {
-                visible: root.vizType === "organic"
-                Layout.fillWidth: true
-                columns: 2
-                columnSpacing: 8
-                rowSpacing: 6
-
-                StyledText {
-                    text: Translation.tr("Motion range")
-                    color: Appearance.colors.colOnLayer2
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    from: 10; to: 100; stepSize: 5
-                    value: Config.getNestedValue("background.widgets.visualizer.fillRatio", 90)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.fillRatio", value)
-                }
-
-                StyledText {
-                    text: Translation.tr("Halo opacity")
-                    color: Appearance.colors.colOnLayer2
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    from: 10; to: 100; stepSize: 5
-                    value: Math.round(root.organicOpacity * 100)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.organicOpacity", value)
-                }
-
-                StyledText {
-                    text: Translation.tr("Glow")
-                    color: Appearance.colors.colOnLayer2
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    from: 0; to: 100; stepSize: 5
-                    value: Math.round(root.organicGlow * 100)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.organicGlow", value)
-                }
-
-                StyledText {
-                    text: Translation.tr("Cover size")
-                    color: Appearance.colors.colOnLayer2
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    from: 35; to: 75; stepSize: 1
-                    value: Math.round(root.organicCoverSize * 100)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.organicCoverSize", value)
                 }
             }
 
             RowLayout {
+                visible: root.vizType !== "organic"
                 Layout.fillWidth: true
                 spacing: 8
-
                 StyledText {
                     Layout.fillWidth: true
                     text: Translation.tr("Smoothing")
-                    color: Appearance.colors.colOnLayer2
+                    color: Appearance.colors.colSubtext
                     font.pixelSize: Appearance.font.pixelSize.smaller
                 }
-
                 StyledSpinBox {
                     from: 0; to: 8; stepSize: 1
                     value: Config.getNestedValue("background.widgets.visualizer.smoothing", 2)
@@ -292,10 +352,20 @@ AbstractBackgroundWidget {
     readonly property bool _organicPresent: root.visible && root.powerActive
         && root.vizType === "organic" && root._activePlayer !== null
     readonly property string _activeArt: organicArtworkResolver.displaySource
-        || MprisController.effectiveArtUrl(root._activePlayer)
     property string _organicDisplayedArt: ""
+    property string _organicDisplayedArtIdentity: ""
     property string _organicPendingArt: ""
+    property string _organicPendingArtIdentity: ""
     property real _organicReveal: 1
+    readonly property var _organicSilentPoints: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    function _organicArtIdentity(source: string): string {
+        const value = source ?? ""
+        let marker = value.indexOf("?inir_art=")
+        if (marker < 0)
+            marker = value.indexOf("&inir_art=")
+        return marker >= 0 ? value.slice(0, marker) : value
+    }
     readonly property color _organicPrimary: {
         const palette = root.spectrumPalette ?? []
         return palette.length > 0 ? palette[0] : root.widgetAccentVisible
@@ -317,24 +387,41 @@ AbstractBackgroundWidget {
 
     MediaArtworkResolver {
         id: organicArtworkResolver
-        sourceUrl: root.vizType === "organic"
+        sourceUrl: (root.vizType === "organic" || root.paletteMode === "album")
             ? MprisController.effectiveArtUrl(root._activePlayer) : ""
         title: root._activePlayer?.trackTitle ?? ""
         artist: root._activePlayer?.trackArtist ?? ""
         album: root._activePlayer?.trackAlbum ?? ""
     }
 
+    ColorQuantizer {
+        id: albumArtworkQuantizer
+        source: root.paletteMode === "album" ? organicArtworkResolver.displaySource : ""
+        depth: 2
+        rescaleSize: 24
+    }
+
     on_ActiveArtChanged: {
         const next = root._activeArt
+        if (next.length === 0)
+            return
+        const identity = root._organicArtIdentity(next)
         if (root._organicDisplayedArt.length === 0) {
+            root._organicDisplayedArt = next
+            root._organicDisplayedArtIdentity = identity
+            return
+        }
+        if (identity === root._organicDisplayedArtIdentity) {
             root._organicDisplayedArt = next
             return
         }
-        if (next.length === 0)
+        if (organicArtTransition.running
+                && identity === root._organicPendingArtIdentity) {
+            root._organicPendingArt = next
             return
-        if (next === root._organicDisplayedArt)
-            return
+        }
         root._organicPendingArt = next
+        root._organicPendingArtIdentity = identity
         organicArtTransition.restart()
     }
 
@@ -348,7 +435,10 @@ AbstractBackgroundWidget {
             easing.type: Easing.InCubic
         }
         ScriptAction {
-            script: root._organicDisplayedArt = root._organicPendingArt
+            script: {
+                root._organicDisplayedArt = root._organicPendingArt
+                root._organicDisplayedArtIdentity = root._organicPendingArtIdentity
+            }
         }
         NumberAnimation {
             target: root
@@ -394,13 +484,17 @@ AbstractBackgroundWidget {
     }
 
     // ── Visualizer rendering ─────────────────────────────────────
-    CavaSpectrum {
-        visible: root.vizType !== "organic"
+    AudioVisualizerLayer {
+        id: visualizerLayer
         anchors.fill: parent
         anchors.margins: Appearance.angelEverywhere || Appearance.inirEverywhere ? 4 : 0
-        points: cavaProcess.points
-        active: root._active && cavaProcess.audioSignalActive
-        threadedRendering: true
+        points: root.vizType === "organic"
+            ? (root._active && cavaProcess.audioSignalActive
+                ? cavaProcess.points : root._organicSilentPoints)
+            : cavaProcess.points
+        active: root.vizType === "organic"
+            ? root._organicPresent
+            : root._active && cavaProcess.audioSignalActive
         visualizerType: root.vizType
         normalizationCeiling: cavaProcess.normalizationCeiling
         spectrumColors: root.spectrumPalette
@@ -409,9 +503,9 @@ AbstractBackgroundWidget {
             ? (root.waveOpacity >= 0 ? root.waveOpacity
                 : (Config.options?.appearance?.cava?.waveOpacity ?? 30))
             : Config.getNestedValue("background.widgets.visualizer.barOpacity", 100)) / 100
-        fillRatio: Config.getNestedValue("background.widgets.visualizer.fillRatio", 90) / 100
-        pixelsPerBar: Math.max(3, (width + barSpacing)
-            / Math.max(4, Config.getNestedValue("background.widgets.visualizer.barCount", 48)))
+        fillRatio: root.vizType === "organic" ? root.organicRange
+            : Config.getNestedValue("background.widgets.visualizer.fillRatio", 90) / 100
+        barCount: Config.getNestedValue("background.widgets.visualizer.barCount", 48)
         barSpacing: Config.getNestedValue("background.widgets.visualizer.barSpacing", 2)
         barMinHeight: Config.getNestedValue("background.widgets.visualizer.barMinHeight", 1)
         barRadius: Config.getNestedValue("background.widgets.visualizer.barRadius", 2)
@@ -423,10 +517,15 @@ AbstractBackgroundWidget {
         edgeSoftness: Config.getNestedValue("background.widgets.visualizer.edgeSoftness", 28) / 100
         frequencyProfile: root.frequencyProfile
         accentStrength: root.accentStrength
-        topLeftRadius: cardBg.surfaceRadius
-        topRightRadius: cardBg.surfaceRadius
-        bottomLeftRadius: cardBg.surfaceRadius
-        bottomRightRadius: cardBg.surfaceRadius
+        organicSensitivity: root.organicSensitivity
+        organicPulse: root.organicPulse
+        organicMotionSpeed: root.organicMotionSpeed
+        organicIdleMotion: root.organicIdleMotion
+        organicOpacity: root.organicOpacity
+        organicGlow: root.organicGlow
+        organicOverscan: root.organicRenderOverscan
+        organicBaseRadius: root.organicBaseRadius
+        organicHollowAmount: root.organicHollowAmount
     }
 
     Item {
@@ -434,27 +533,6 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: Math.round(4 * root.scaleFactor)
         visible: root.vizType === "organic"
-
-        OrganicAudioBlob {
-            id: organicBlob
-            anchors.fill: parent
-            active: root._organicPresent
-            points: cavaProcess.points
-            normalizationCeiling: cavaProcess.normalizationCeiling
-            primaryColor: root._organicPrimary
-            secondaryColor: root._organicSecondary
-            tertiaryColor: root._organicTertiary
-            smoothing: root.smoothing
-            frequencyProfile: root.frequencyProfile
-            accentStrength: root.accentStrength
-            mirroredStereo: Config.options?.appearance?.cava?.stereo ?? true
-            sensitivity: root.organicSensitivity
-            opacity: root.organicOpacity
-            glowStrength: root.organicGlow
-            amplitude: Config.getNestedValue(
-                "background.widgets.visualizer.fillRatio", 90) / 100
-            reveal: root._organicReveal
-        }
 
         ClippingRectangle {
             id: organicArtwork

@@ -417,8 +417,8 @@ This validates the PR3.0 installer and runsvdir fallback in the VM.
 ## PR3.1 VM checkpoint (2026-09-01)
 
 The `feat/void-turnstile-session` branch was installed from the canonical
-`/home/voidcaml/inir-src` checkout. The installer was run interactively so the
-root service and elogind configuration changes required explicit confirmation.
+`/home/voidcaml/inir-src` checkout. The system-service symlinks and elogind
+configuration were then explicitly enabled with root confirmation.
 
 The Void system services were active after enabling their `/var/service`
 symlinks:

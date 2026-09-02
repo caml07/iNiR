@@ -487,8 +487,14 @@ turnstile or iNiR failure.
   clean checkout, `/run/user/1000`, and
   `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. All required checks
   passed; `xembedsniproxy` was not installed and was reported as optional.
-- PR3.3: optional systemd adapters — classify and degrade/adapt Awww, GameMode,
-  Warp, captures.
+- PR3.3: predicate-safe Awww, GameMode, clipboard, captures, and thumbnails;
+  add the official XBPS Awww provider and remove the undefined
+  `discover-overlay` integration. WARP provider/lifecycle validation belongs to
+  PR4 and the toggle must not issue a systemd command on Void meanwhile.
+- PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
+  `docs/VOID_CAPABILITIES.md`.
+- PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
+  sweep, clean VM installation, and the external-disk validation.
 - Run shellcheck and `make test-local` before each PR.
 
 `make test-local` passed for PR3.2. ShellCheck was not available in the host

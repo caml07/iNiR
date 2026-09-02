@@ -12,7 +12,8 @@ built against and will be revised after VM validation. Decisions: see
   activation is a separate, confirmed root step. An XBPS package is a
   separate milestone (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
-  musl libc; `seatd` without elogind; building ydotool from source.
+  musl libc and `seatd` without elogind. Ydotool is now part of the toolkit
+  parity work and requires a validated provider before V1 closes.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
@@ -102,9 +103,24 @@ Notes:
   `deps-map.sh` must say `void:quickshell`, not `void:COMPILE`.
 - `kf6-kirigami` / `kf6-syntax-highlighting` are needed only for the
   compile-from-source profile, not the base install.
-- `ydotool` is NOT packaged in Void; compiling it is a compatibility profile.
+- `ydotool` is not packaged in the current Void repositories. PR4 must provide
+  a pinned upstream build, runit service, permissions, and update path before
+  simulated paste is marked supported.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.
 - Repo sanity: `xbps-query -L` (doctor check).
+
+## Capability providers
+
+Void follows the same dependency-profile model as Arch. A selected profile is
+supported only when iNiR provisions, activates, operates, and verifies every
+capability it exposes. Provider resolution prefers official XBPS packages,
+then a maintained Flatpak, then a pinned upstream artifact with an update
+path. See ADR-0004 and `docs/VOID_CAPABILITIES.md`.
+
+`discover-overlay` is not a supported capability: the repository contains no
+provider, origin, install path, or documented user requirement for it. PR3.3
+removes its GameMode setting and process control instead of inventing a Void
+service.
 
 ## Package management UI (Updates / PackageSearch / AppCatalog)
 
@@ -152,20 +168,20 @@ not enough — without the user-manager socket, `systemctl --user` hangs for
 
 ## Development PR queue
 
-The Void port is delivered as small, non-stacked pull requests to
-`snowarch/inir:prerelease`. Each branch is created from the current
-`upstream/prerelease` only after its predecessor has merged. This keeps each
-review independently mergeable and prevents a queue of stale dependent PRs.
+The Void port targets `snowarch/inir:prerelease`. Existing development branches
+are cumulative on the fork so they can be exercised end to end; before an
+upstream pull request is opened, its review diff is rebuilt from the then-current
+`upstream/prerelease` after its predecessor merges.
 
 | Order | Branch | Scope | Required validation |
 |---|---|---|---|
 | 1 | `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch `make test-local`; predicate true on Arch and false in a Void non-systemd session. |
 | 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
-| 3 | `feat/void-runit-install` | Per-user runit service layout, idempotent Niri startup injection, and required system-service enablement. | Start iNiR through turnstile and the runsvdir fallback; rerun the installer step safely. |
-| 4 | `feat/void-lifecycle-controls` | Non-systemd `scripts/inir` controls and supervisor-transition migrations. | Exercise restart, kill, stop, status, and logs in the VM; retain Arch systemd behavior. |
-| 5 | `feat/void-runtime-session` | Predicate-gated runtime QML/helper paths: `sv`, `loginctl`, skipped `systemd-run`, GTK, and Niri behavior. | Exercise every changed action in Void and smoke-test its Arch path. |
+| 3 | `feat/void-runit-install` | Delivered as PR3.0-PR3.3: supervisors, lifecycle, session runtime, and optional runtime adapters. | Complete PR3.3 capability checks; retain all PR3.0-PR3.2 VM contracts. |
+| 4 | `feat/void-capability-providers` | System-backed capabilities: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. | Provision each selected provider twice and exercise its UI action and runit service. |
+| 5 | `feat/void-desktop-parity` | Flatpak/upstream desktop providers, themes, Mission Center, OCR languages, and remaining default parity. | No selected profile or default references an unavailable provider. |
 | 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
-| 7 | `feat/void-doctor-versioning` | Optional XBPS diagnostics and package-manager versioning, only if earlier phases expose a concrete need. | VM doctor checks and existing install-mode regression coverage. |
+| 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
 
 Documentation and VM observations stay on the fork's `docs/void` branch while
 the port is in development; they are not opened as a separate upstream PR.
@@ -214,7 +230,10 @@ PR3 is split into four sequential PRs:
   Implementation and VM validation are complete. XEmbed uses a runit user
   service so crashes are restarted by `runsv` instead of `systemd-run`; the
   service is optional when `xembedsniproxy` is not installed.
-- PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
+- PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww, GameMode,
+  clipboard, captures, and thumbnails; install the official Void Awww provider;
+  remove the undefined `discover-overlay` integration. WARP remains visible
+  but its supported provider and runit lifecycle are delivered in PR4.
 
 ## FAQ / gotchas
 

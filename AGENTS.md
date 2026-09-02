@@ -2,8 +2,9 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `feat/void-nonsystemd-runtime` (base: upstream `prerelease`). PR3 is
-split into sequential PRs.
+on branch `feat/void-nonsystemd-runtime` (base: upstream `prerelease`). The
+remaining roadmap and capability ledger are in `docs/VOID.md` and
+`docs/VOID_CAPABILITIES.md`.
 
 ## Current progress (2026-09-02)
 
@@ -33,7 +34,14 @@ split into sequential PRs.
     pass. The checker passed over SSH with the graphical session's
     `/run/user/1000` and D-Bus address exported explicitly. `xembedsniproxy`
     was absent and was correctly treated as optional.
-  - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
+  - PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww,
+    GameMode, clipboard, captures, and thumbnails; remove `discover-overlay`.
+    WARP stays visible while its provider and runit lifecycle move to PR4.
+- All implementation branches were merged forward with Snowarch
+  `upstream/prerelease` at `a288c291` (iNiR 2.30.0) on 2026-09-02.
+- PR4 now owns system capability providers (NetworkManager, BlueZ, ydotool,
+  WARP); PR5 owns desktop/provider parity; PR6 owns XBPS UI; PR7 is the
+  mandatory port-closure gate.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 
@@ -77,6 +85,15 @@ restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
 (→ `loginctl`), `apply-gtk-theme.sh:994`, `niri-config.py:1376,1441`,
 `scripts/test-local-distribution.sh:26-32,202-211`.
 
+## Capability rule
+
+**Provider, not hopeful detection.** A capability selected in the Void
+installer is supported only when provider, provisioning, activation, operation,
+and verification are complete (ADR-0004). Prefer XBPS, then Flatpak, then a
+pinned upstream provider. Do not leave a control enabled merely because a
+binary might exist. `discover-overlay` is removed because no provider or user
+requirement can be identified.
+
 ## Files to change (port)
 
 - `sdata/lib/deps-map.sh` — Void fixes: `void:quickshell` (repo, not
@@ -108,6 +125,8 @@ restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
   the predicate.
 - `sdata/lib/versioning.sh` — `package_manager: xbps` support for the
   future XBPS template.
+- `docs/VOID_CAPABILITIES.md` — delivery ledger for all user-selectable Void
+  capabilities; no row may be marked supported without a repeatable check.
 
 ## Verify (run before finishing any port task)
 

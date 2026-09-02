@@ -20,4 +20,5 @@ Paths it gates:
 Without the socket, `systemctl --user` can block for 10-30 seconds, so the
 socket check comes first and the probe is bounded.
 
-Status: accepted and extended through PR3.2 runtime adapters.
+Status: accepted and extended through PR3.2 runtime adapters. PR3.3 and the
+mandatory PR7 closure sweep own the remaining runtime and maintenance paths.

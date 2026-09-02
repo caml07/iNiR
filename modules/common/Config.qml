@@ -1348,8 +1348,23 @@ Singleton {
                         property bool locked: false
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property string playerPreset: "full" // "full", "compact", "minimal", "albumart", "visualizer", "classic", "lyrics", "lyricsSplit", "expandingLyrics"
-                        property string visualizerType: "wave" // "wave", "bars"
+                        property string visualizerType: "wave" // "wave", "bars", "organic"
                         property string visualizerPosition: "bottom" // "bottom", "top", "fill", "none"
+                        property string visualizerPaletteMode: "cava" // "cava", "accent", "player" (album-derived)
+                        property int visualizerOpacity: 55
+                        property int visualizerSmoothing: 2
+                        property string visualizerFrequencyProfile: "flat"
+                        property int visualizerAccentStrength: 70
+                        property int visualizerRange: 88
+                        property int visualizerBarCount: 32
+                        property int organicSensitivity: 35
+                        property int organicPulse: 150
+                        property int organicMotionSpeed: 250
+                        property int organicIdleMotion: 40
+                        property int organicGlow: 100
+                        property int organicOpacity: 100
+                        property int organicReach: 35 // 20-140, outward edge reach
+                        property int organicRange: 20 // 20-100, Organic deformation range
                         property bool lyricsExpanded: false
                         property real x: 240
                         property real y: 240
@@ -1372,15 +1387,19 @@ Singleton {
                         property string placementStrategy: "free"
                         property string vizType: "bars"
                         property string preset: "default" // legacy, kept for compat
-                        property string paletteMode: "cava" // "cava", "accent", "primary"
+                        property string paletteMode: "cava" // "cava", "accent", "primary", "album"
                         property string barsOrigin: "bottom" // "bottom", "top", "center", "mirror"
                         property string waveMode: "fill" // "fill", "line", "ribbon"
                         property string frequencyProfile: "flat" // "flat", "bass", "warm", "vocal", "treble", "smile"
                         property int smoothing: 2
-                        property int organicSensitivity: 50 // 25-200, Organic visualizer deformation gain
-                        property int organicOpacity: 85 // 10-100, Organic halo opacity
-                        property int organicGlow: 45 // 0-100, Organic outer glow
-                        property int organicCoverSize: 57 // 35-75, Organic cover size relative to widget span
+                        property int organicSensitivity: 25 // 25-200, Organic visualizer deformation gain
+                        property int organicPulse: 150 // 0-150, beat/bass expansion
+                        property int organicMotionSpeed: 250 // 20-250, contour animation speed
+                        property int organicIdleMotion: 18 // 0-100, ambient motion floor
+                        property int organicOpacity: 100 // 10-100, Organic halo opacity
+                        property int organicGlow: 100 // 0-100, Organic outer glow
+                        property int organicCoverSize: 51 // 30-90, Organic cover size relative to widget span
+                        property int organicRange: 20 // 20-100, Organic deformation range
                         property int fillRatio: 90
                         property int barOpacity: 100
                         property int waveOpacity: -1 // -1 = use global (appearance.cava.waveOpacity)

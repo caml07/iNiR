@@ -681,6 +681,10 @@ Scope {
             && !bgRoot.wallpaperIsVideo
             && !bgRoot.wallpaperSafetyTriggered
             && !bgRoot.backdropActive
+        readonly property bool internalShaderPreviewActive: bgRoot.internalShaderTransitionRequested
+            && Wallpapers.internalPreviewActive
+            && (!Wallpapers.internalPreviewMonitor
+                || Wallpapers.internalPreviewMonitor === bgRoot.monitorName)
 
         // awww reveal: when parallax is active and awww handles wallpaper,
         // instantly hide crossfader, let awww transition play, then fade back in.
@@ -1202,7 +1206,12 @@ Scope {
                 property real effectiveValueX: Math.max(0, Math.min(1, valueX))
                 property real effectiveValueY: Math.max(0, Math.min(1, valueY))
                 
-                readonly property bool useParallax: bgRoot.fillMode === "fill"
+                // Internal rendering and parallax geometry are separate concerns.
+                // Shader transitions temporarily move static wallpaper ownership into
+                // QML, but that must not make the wallpaper container adopt source-
+                // sized parallax geometry when parallax itself is disabled.
+                readonly property bool useParallax: bgRoot.dynamicParallaxRequested
+                    && bgRoot.fillMode === "fill"
                     && !bgRoot.wallpaperIsGif
                     && !bgRoot.wallpaperIsVideo
                     && !bgRoot.externalMainWallpaperActive
@@ -1308,10 +1317,14 @@ Scope {
                 // renderer and uses the user's transition settings.
                 WallpaperCrossfader {
                     id: wallpaper
+                    readonly property bool shaderOverlayHeld: bgRoot.internalShaderTransitionRequested
+                        && (wallpaper.shaderTransitionBusy
+                            || bgRoot.internalShaderPreviewActive
+                            || AwwwBackend.shaderHandoffPending)
                     anchors.fill: parent
                     visible: !blurLoader.active && !bgRoot.backdropActive && !bgRoot.wallpaperIsGif && !bgRoot.wallpaperIsVideo
                     opacity: (wallpaperContainer.showInternalStaticWallpaper
-                        || wallpaper.shaderTransitionBusy ? 1 : 0) * bgRoot._awwwRevealOpacity
+                        || wallpaper.shaderOverlayHeld ? 1 : 0) * bgRoot._awwwRevealOpacity
                     // The backdrop replaces the desktop wallpaper outright: this
                     // crossfader is hidden, blurAlwaysLoader is off, and the lock
                     // blur cannot see it either (an invisible child never reaches
@@ -1320,7 +1333,7 @@ Scope {
                     // an Image with a source decodes whether or not it is visible.
                     layer.enabled: wallpaperContainer.needsStaticTexture
                         && !wallpaperContainer.showInternalStaticWallpaper
-                        && !wallpaper.shaderTransitionBusy
+                        && !wallpaper.shaderOverlayHeld
                     source: (bgRoot.wallpaperSafetyTriggered || !wallpaperContainer.needsStaticTexture)
                         ? "" : bgRoot.wallpaperPath
                     // NEVER use crossfader transitions when awww is active — awww handles all transitions.
@@ -1335,16 +1348,6 @@ Scope {
                             : bgRoot.fillMode === "tile" ? Image.Tile
                             : bgRoot.fillMode === "center" ? Image.Pad
                             : Image.PreserveAspectCrop
-                    sourceSize {
-                        // Keep the decoded texture stable at output resolution. In
-                        // particular, do not shrink this after `magick identify`
-                        // discovers a low-resolution source: doing so makes Qt
-                        // re-decode the incoming wallpaper mid-transition and then
-                        // leaves the GPU enlarging a smaller texture. That produces
-                        // the visible flash/softening on carousel changes.
-                        width: Math.max(1, Math.ceil(bgRoot.screen.width * Math.max(1, bgRoot.devicePixelRatio ?? 1)))
-                        height: Math.max(1, Math.ceil(bgRoot.screen.height * Math.max(1, bgRoot.devicePixelRatio ?? 1)))
-                    }
 
                     onTransitionStarted: {
                         if (!bgRoot.dynamicParallaxRequested || !bgRoot.pauseParallaxDuringTransitions)

@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -27,7 +26,9 @@ Item {
     readonly property string glyphBottomLeft: root.digits.charAt(2)
     readonly property string glyphBottomRight: root.digits.charAt(3)
 
-    readonly property real fringeSize: root.vertical ? root.width * 0.026 : root.height * 0.03
+    // Keep the original composition geometry. The Pixel style deliberately
+    // overlaps large glyphs; changing these coordinates to chase rasterization
+    // artifacts visibly shifts the design.
     readonly property real tileW: root.vertical ? root.width * 0.66 : root.width * 0.30
     readonly property real tileH: root.vertical ? root.height * 0.66 : root.height * 0.9
     readonly property real glyphSize: root.vertical ? root.height * 0.66 : root.height * 0.85
@@ -45,22 +46,6 @@ Item {
     readonly property real colonDotSize: root.height * 0.2
     readonly property real colonGap: root.height * 0.04
 
-    function ringSamples(count: int, radius: real): var {
-        const points = [{ dx: 0, dy: 0 }]
-        for (let i = 0; i < count; ++i) {
-            const angle = i / count * Math.PI * 2
-            points.push({ dx: Math.cos(angle) * radius, dy: Math.sin(angle) * radius })
-        }
-        return points
-    }
-
-    readonly property var fringeSamples: root.ringSamples(16, root.fringeSize)
-
-    StyledDropShadow {
-        target: glyphStage
-        visible: root.showShadow && Appearance.effectsEnabled
-    }
-
     Item {
         id: glyphStage
         anchors.fill: parent
@@ -70,82 +55,43 @@ Item {
             height: root.tileH
             font.family: "Google Sans Flex"
             font.weight: 1000
-            font.bold: true
             font.pixelSize: root.glyphSize
             font.variableAxes: ({ "wght": 1000 })
+            // Pixel is intentionally Qt-rendered. Native/subpixel rasterization
+            // can show RGB fringes on these oversized overlapping glyphs.
+            renderType: Text.QtRendering
+            font.hintingPreference: Font.PreferDefaultHinting
+            style: root.showShadow ? Text.Raised : Text.Normal
+            styleColor: Appearance.colors.colShadow
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
 
-        Item {
-            id: tileAFace
-            anchors.fill: parent
-            visible: false
-            GlyphTile { x: root.pos0X; y: root.pos0Y; text: root.glyphTopLeft; color: root.softColor }
+        // Compose interlocking digits directly. The old alpha knockout left
+        // transparent antialiased seams between overlapping glyphs; those seams
+        // showed the wallpaper color and looked like chromatic/pixel glitches.
+        // Normal z-order keeps the same geometry without exposing the backdrop.
+        GlyphTile {
+            x: root.pos0X
+            y: root.pos0Y
+            text: root.glyphTopLeft
+            color: root.softColor
+            z: 0
         }
-        Item {
-            id: tileAPunch
-            anchors.fill: parent
-            visible: false
-            Repeater {
-                model: root.fringeSamples
-                Item {
-                    id: punchA
-                    required property var modelData
-                    anchors.fill: parent
-                    GlyphTile { x: root.pos1X + punchA.modelData.dx; y: root.pos1Y + punchA.modelData.dy; text: root.glyphTopRight; color: "black" }
-                    GlyphTile { x: root.pos2X + punchA.modelData.dx; y: root.pos2Y + punchA.modelData.dy; text: root.glyphBottomLeft; color: "black" }
-                    GlyphTile { x: root.pos3X + punchA.modelData.dx; y: root.pos3Y + punchA.modelData.dy; text: root.glyphBottomRight; color: "black" }
-                }
-            }
+        GlyphTile {
+            x: root.pos1X
+            y: root.pos1Y
+            text: root.glyphTopRight
+            color: root.boldColor
+            z: 1
         }
-        OpacityMask { anchors.fill: parent; source: tileAFace; maskSource: tileAPunch; invert: true; z: 0 }
-
-        Item {
-            id: tileBFace
-            anchors.fill: parent
-            visible: false
-            GlyphTile { x: root.pos1X; y: root.pos1Y; text: root.glyphTopRight; color: root.boldColor }
+        GlyphTile {
+            x: root.pos2X
+            y: root.pos2Y
+            text: root.glyphBottomLeft
+            color: root.boldColor
+            z: 2
         }
-        Item {
-            id: tileBPunch
-            anchors.fill: parent
-            visible: false
-            Repeater {
-                model: root.fringeSamples
-                Item {
-                    id: punchB
-                    required property var modelData
-                    anchors.fill: parent
-                    GlyphTile { x: root.pos2X + punchB.modelData.dx; y: root.pos2Y + punchB.modelData.dy; text: root.glyphBottomLeft; color: "black" }
-                    GlyphTile { x: root.pos3X + punchB.modelData.dx; y: root.pos3Y + punchB.modelData.dy; text: root.glyphBottomRight; color: "black" }
-                }
-            }
-        }
-        OpacityMask { anchors.fill: parent; source: tileBFace; maskSource: tileBPunch; invert: true; z: 1 }
-
-        Item {
-            id: tileCFace
-            anchors.fill: parent
-            visible: false
-            GlyphTile { x: root.pos2X; y: root.pos2Y; text: root.glyphBottomLeft; color: root.boldColor }
-        }
-        Item {
-            id: tileCPunch
-            anchors.fill: parent
-            visible: false
-            Repeater {
-                model: root.fringeSamples
-                Item {
-                    id: punchC
-                    required property var modelData
-                    anchors.fill: parent
-                    GlyphTile { x: root.pos3X + punchC.modelData.dx; y: root.pos3Y + punchC.modelData.dy; text: root.glyphBottomRight; color: "black" }
-                }
-            }
-        }
-        OpacityMask { anchors.fill: parent; source: tileCFace; maskSource: tileCPunch; invert: true; z: 2 }
-
         GlyphTile {
             x: root.pos3X
             y: root.pos3Y

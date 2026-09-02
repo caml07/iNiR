@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Japanese OCR study assistant**: Japanese region OCR can open a compact dictionary card beside the captured text and expand into a study view with the full OCR result, readings, romaji, readable definitions, deinflection, pitch/kanji data, on-demand translation, copy actions and optional Anki export. Jitendex installs and indexes in one click, then dictionary lookup works offline.
+- **Multilingual OCR onboarding**: OCR exposes English, Spanish, Russian, Japanese and Simplified/Traditional Chinese presets, including vertical Japanese/Chinese modes. Missing Tesseract language data can self-provision in the user data directory without requiring a manual sudo/package step.
+- **Japanese study resources**: Settings can download current Kaishi, Manabi and Niponismo Anki decks directly from their upstream releases, while advanced users can still import additional Yomitan dictionaries manually.
+
+### Changed
+
+- **OCR workflow and Settings**: text recognition now uses one configured language instead of combining every installed model, adapts Tesseract page segmentation and preprocessing to the selected region, remembers the Super+Shift+S snip action, and presents OCR/Japanese/translation/Anki setup as separate Material-oriented steps with technical options kept under Advanced.
+- **Calendar/task detail views**: Dashboard Calendar, Agenda and To Do retain their full-detail views; the right sidebar now exposes Calendar/Events/To Do expansion from each widget's own header instead of placing a changing control in the navigation rail.
+- **Cross-distro setup**: Fedora and Debian/Ubuntu prefer current distro packages and distro-native repair paths, with targeted source/Flatpak/COPR fallbacks only where required; Fedora now prefers the focused `scottames/awww` and `achno/gowall` COPRs before source builds, while Arch dependency tracking and repository-first installation paths were refreshed accordingly.
+
+### Fixed
+
+- **Japanese OCR matching and presentation**: Jitendex structured entries are rendered as human-readable senses, OCR-inserted spaces between Japanese glyphs are normalized, written forms/readings and common inflections are resolved, and useful multi-character terms are preferred over accidental one-kana matches. The popup now stays within screen bounds and keeps its footer/actions visible.
+- **Anki integration states**: iNiR distinguishes Anki missing, closed, AnkiConnect unavailable and connected states before enabling card export, and keeps endpoint/model/field configuration out of the normal path.
+- **Clipboard ownership**: Dock/Task View preview captures no longer replace the user's clipboard or enter cliphist image history; Dock refreshes are deferred away from click navigation, internal Niri screenshot notifications are suppressed, and screenshot/OCR clipboard owners run outside `inir.service` so shell restarts do not leave `wl-copy` processes behind.
+- **OCR repair and diagnostics**: Doctor checks required language models in addition to the Tesseract executable and routes repairs to the correct Arch, Fedora and Debian package names; OCR errors now report the actual missing-model/provisioning failure.
+- **Fedora/Debian dependency repair**: Doctor no longer treats missing command IDs, Arch package names or Flatpak IDs as native DNF/APT package names; awww, Gowall, Mission Center, SongRec, NetworkManager editor and related providers follow distro-appropriate install paths.
+- **Runtime polish**: expired notification image handles fall back to stable app icons, duplicate Python environment setup was removed, Arch's dependency tracker covers the normal feature bundles, and InnerTube can use iNiR's managed Python environment on Debian stable when `ytmusicapi` is unavailable as a distro package.
+
 ## [2.29.3] - 2026-08-25
 
 A polish release for Pill controls and surfaces, settings navigation, TUI app themes, and several runtime fixes including privileged graphical apps and audio feedback stability.

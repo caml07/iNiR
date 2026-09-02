@@ -38,11 +38,15 @@ Scope {
         readonly property string cornerName: cornerWidget.isTopLeft ? "topLeft"
             : cornerWidget.isTopRight ? "topRight"
             : cornerWidget.isBottomLeft ? "bottomLeft" : "bottomRight"
+        readonly property string outputName: cornerPanelWindow.screen?.name ?? ""
+        readonly property bool orbitConflictsWithNiriOverview: CompositorService.isNiri
+            && NiriService.isOverviewHotCornerActive(outputName, cornerName)
         readonly property bool shouldShowOrbitHotCorner: CompositorService.isNiri
             && (Config.options?.panelFamily ?? "ii") !== "waffle"
             && (Config.options?.orbit?.enable ?? true)
             && (Config.options?.orbit?.hotCornerEnable ?? true)
             && cornerName === orbitCorner
+            && !orbitConflictsWithNiriOverview
             && !fullscreen
         readonly property bool shouldShowSidebarCornerOpen: shouldShowCornerOpen
             && !shouldShowOrbitHotCorner
@@ -91,14 +95,18 @@ Scope {
             readonly property int cornerOpenHeight: Config.options?.sidebar?.cornerOpen?.cornerRegionHeight ?? 20
             readonly property int orbitHotCornerSize: Math.max(4, Math.min(40,
                 Config.options?.orbit?.hotCornerSize ?? 12))
+            readonly property int orbitHotCornerActivationDistance: Math.max(1, Math.min(32,
+                Config.options?.orbit?.hotCornerActivationDistance ?? 2))
+            readonly property int orbitHotCornerHitSize: Math.max(
+                orbitHotCornerSize, orbitHotCornerActivationDistance)
 
             implicitSize: roundingSize
             implicitWidth: Math.max(roundingSize,
                 cornerPanelWindow.shouldShowSidebarCornerOpen ? cornerOpenWidth : 0,
-                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerSize : 0)
+                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerHitSize : 0)
             implicitHeight: Math.max(roundingSize,
                 cornerPanelWindow.shouldShowSidebarCornerOpen ? cornerOpenHeight : 0,
-                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerSize : 0)
+                cornerPanelWindow.shouldShowOrbitHotCorner ? orbitHotCornerHitSize : 0)
 
             Loader {
                 id: orbitHotCornerLoader
@@ -112,8 +120,8 @@ Scope {
 
                 sourceComponent: MouseArea {
                     id: orbitHotCornerArea
-                    implicitWidth: cornerWidget.orbitHotCornerSize
-                    implicitHeight: cornerWidget.orbitHotCornerSize
+                    implicitWidth: cornerWidget.orbitHotCornerHitSize
+                    implicitHeight: cornerWidget.orbitHotCornerHitSize
                     hoverEnabled: true
                     property bool armed: true
                     property bool atCorner: false
@@ -127,8 +135,11 @@ Scope {
                     }
 
                     onPositionChanged: mouse => {
-                        const atX = cornerWidget.isRight ? mouse.x >= width - 2 : mouse.x <= 2
-                        const atY = cornerWidget.isTop ? mouse.y <= 2 : mouse.y >= height - 2
+                        const distance = cornerWidget.orbitHotCornerActivationDistance
+                        const atX = cornerWidget.isRight
+                            ? mouse.x >= width - distance : mouse.x <= distance
+                        const atY = cornerWidget.isTop
+                            ? mouse.y <= distance : mouse.y >= height - distance
                         atCorner = atX && atY
                         if (!atCorner) {
                             armed = true

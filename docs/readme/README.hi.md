@@ -273,6 +273,7 @@ inir repair                     # doctor + रीस्टार्ट + फ़�
 ## श्रेय
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — Hyprland के लिए मूल illogical-impulse
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — एक फ़ोर्क जिसे कभी-कभी सच में अच्छा आइडिया सूझ जाता है
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — इस शेल को चलाने वाला फ़्रेमवर्क
 - [**Niri**](https://github.com/YaLTeR/niri) — स्क्रॉलिंग टाइलिंग Wayland कंपोज़िटर
 

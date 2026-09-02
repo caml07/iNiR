@@ -190,13 +190,24 @@ _check_privilege_prereqs() {
 
 sync_launcher_from_repo() {
     local launcher_target="${XDG_BIN_HOME}/inir"
-    if [[ -f "${REPO_ROOT}/scripts/inir" ]]; then
-        mkdir -p "$XDG_BIN_HOME"
-        cp -f "${REPO_ROOT}/scripts/inir" "$launcher_target"
-        chmod +x "$launcher_target"
-        ensure_launcher_path_in_shells "$XDG_BIN_HOME"
-        printf '%s\n' "$launcher_target"
+    local launcher_source="${REPO_ROOT}/scripts/inir"
+    [[ -f "$launcher_source" ]] || return 1
+
+    mkdir -p "$XDG_BIN_HOME"
+
+    local source_real target_real
+    source_real="$(readlink -f "$launcher_source" 2>/dev/null || printf '%s' "$launcher_source")"
+    target_real="$(readlink -f "$launcher_target" 2>/dev/null || true)"
+    if [[ -z "$target_real" || "$source_real" != "$target_real" ]]; then
+        if [[ ! -f "$launcher_target" ]] || ! cmp -s "$launcher_source" "$launcher_target" 2>/dev/null; then
+            cp -f "$launcher_source" "$launcher_target"
+        fi
     fi
+
+    chmod +x "$launcher_source"
+    [[ "$source_real" == "$target_real" ]] || chmod +x "$launcher_target"
+    ensure_launcher_path_in_shells "$XDG_BIN_HOME"
+    printf '%s\n' "$launcher_target"
 }
 
 sync_user_inir_service_from_repo_if_present() {
@@ -208,6 +219,7 @@ sync_user_inir_service_from_repo_if_present() {
     local changed=false
 
     [[ -f "$service_asset" ]] || return 1
+    inir_user_service_is_masked && return 2
     [[ -f "$service_target" ]] || return 1
 
     mkdir -p "$service_target_dir"
@@ -258,6 +270,7 @@ ensure_user_inir_service_enabled() {
     fi
 
     local service_path="${XDG_CONFIG_HOME}/systemd/user/inir.service"
+    inir_user_service_is_masked && return 2
     if [[ ! -f "$service_path" ]]; then
         return 1
     fi
@@ -276,13 +289,41 @@ ensure_user_inir_service_enabled() {
     fi
 
     local wants_dir="${XDG_CONFIG_HOME}/systemd/user/${target}.wants"
+    local changed=false
     if [[ ! -e "$wants_dir/inir.service" ]]; then
-        mkdir -p "$wants_dir"
-        ln -sf "$service_path" "$wants_dir/inir.service"
+        mkdir -p "$wants_dir" || return 1
+        ln -sf "$service_path" "$wants_dir/inir.service" || return 1
+        changed=true
     fi
 
-    systemctl --user daemon-reload >/dev/null 2>&1 || true
-    return 0
+    if [[ "$changed" == true ]]; then
+        systemctl --user daemon-reload >/dev/null 2>&1 || return 1
+    fi
+    [[ -e "$wants_dir/inir.service" || -L "$wants_dir/inir.service" ]]
+}
+
+repair_update_owned_state() {
+    local include_repo_integration="${1:-true}"
+
+    if ! repair_legacy_quickshell_malloc_environment; then
+        tui_warn "Could not clean legacy Quickshell allocator environment"
+    elif [[ "${INIR_LEGACY_MALLOC_ENV_REPAIRED:-0}" -gt 0 ]]; then
+        tui_success "Removed legacy global Quickshell allocator tuning"
+    fi
+
+    if [[ "$include_repo_integration" == "true" ]]; then
+        sync_launcher_from_repo >/dev/null 2>&1 || tui_warn "Could not refresh the inir launcher"
+        if inir_user_service_is_masked; then
+            tui_warn "User inir.service is masked; leaving it unchanged (restore with: inir service install && inir service enable)"
+        else
+            if sync_user_inir_service_from_repo_if_present; then
+                tui_success "Refreshed user inir.service"
+            fi
+            if [[ -f "${XDG_CONFIG_HOME}/systemd/user/inir.service" ]]; then
+                ensure_user_inir_service_enabled >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
 }
 
 ###############################################################################
@@ -2184,12 +2225,18 @@ run_update() {
             fi
         fi
 
-        ensure_user_inir_service_enabled >/dev/null 2>&1 || true
-        # Only start inir if we're running under a supported compositor.
-        # WAYLAND_DISPLAY alone is not enough — KDE/GNOME set it too.
-        if [[ -n "${NIRI_SOCKET:-}" ]] || pgrep -x niri &>/dev/null || pgrep -x Hyprland &>/dev/null; then
-            systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
-            systemctl --user start inir.service >/dev/null 2>&1 || true
+        repair_update_owned_state false
+
+        if inir_user_service_is_masked; then
+            tui_warn "User inir.service is masked; package-managed update left it unchanged"
+        else
+            ensure_user_inir_service_enabled >/dev/null 2>&1 || true
+            # Only start inir if we're running under a supported compositor.
+            # WAYLAND_DISPLAY alone is not enough — KDE/GNOME set it too.
+            if [[ -n "${NIRI_SOCKET:-}" ]] || pgrep -x niri &>/dev/null || pgrep -x Hyprland &>/dev/null; then
+                systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
+                systemctl --user start inir.service >/dev/null 2>&1 || true
+            fi
         fi
 
         # Even on package-managed installs, refresh the shipped ii-pixel theme from
@@ -2311,6 +2358,7 @@ run_update() {
                     fi
                 fi
             fi
+            repair_update_owned_state true
             return 0
         else
             # Local repo ahead of installed - create snapshot
@@ -2539,37 +2587,49 @@ run_update() {
         fi
     fi
 
-    _step_phase_header 4 "Finalizing"
-    _service_refresh_status=1
-    if sync_user_inir_service_from_repo_if_present; then
-        _service_refresh_status=0
-    else
-        _service_refresh_status=$?
-    fi
-    if [[ $_service_refresh_status -eq 0 ]]; then
-        tui_success "Updated existing user inir.service"
-    fi
+    repair_update_owned_state false
 
-    ensure_user_inir_service_enabled >/dev/null 2>&1 || true
+    _step_phase_header 4 "Finalizing"
+    if inir_user_service_is_masked; then
+        tui_warn "User inir.service is masked; leaving it unchanged (restore with: inir service install && inir service enable)"
+    else
+        _service_refresh_status=1
+        if sync_user_inir_service_from_repo_if_present; then
+            _service_refresh_status=0
+        else
+            _service_refresh_status=$?
+        fi
+        if [[ $_service_refresh_status -eq 0 ]]; then
+            tui_success "Updated existing user inir.service"
+        fi
+
+        if ensure_user_inir_service_enabled; then
+            tui_success "User inir.service autostart verified"
+        else
+            tui_warn "Could not wire inir.service to the compositor — run 'inir service enable'"
+        fi
+    fi
 
     local niri_config="${XDG_CONFIG_HOME}/niri/config.kdl"
     local niri_startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
     local niri_binds_cfg="${XDG_CONFIG_HOME}/niri/config.d/70-binds.kdl"
     if [[ -f "$niri_config" && -x "${XDG_BIN_HOME}/inir" ]]; then
-        local launcher_target_escaped="${XDG_BIN_HOME}/inir"
-        launcher_target_escaped="${launcher_target_escaped//&/\\&}"
-        if [[ -f "$niri_binds_cfg" ]]; then
-            sed -i \
-                -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "'"${launcher_target_escaped}"'" "terminal"|' \
-                -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "'"${launcher_target_escaped}"'" "close-window"|' \
-                -e 's|spawn "inir" "|spawn "'"${launcher_target_escaped}"'" "|g' \
-                "$niri_binds_cfg"
+        if niri_can_resolve_launcher_dir "$XDG_BIN_HOME"; then
+            if [[ -f "$niri_binds_cfg" ]]; then
+                sed -i \
+                    -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "inir" "terminal"|' \
+                    -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "inir" "close-window"|' \
+                    -e 's|spawn "[^"]*/inir" "|spawn "inir" "|g' \
+                    "$niri_binds_cfg"
+            else
+                sed -i \
+                    -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "inir" "terminal"|' \
+                    -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "inir" "close-window"|' \
+                    -e 's|spawn "[^"]*/inir" "|spawn "inir" "|g' \
+                    "$niri_config"
+            fi
         else
-            sed -i \
-                -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "'"${launcher_target_escaped}"'" "terminal"|' \
-                -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "'"${launcher_target_escaped}"'" "close-window"|' \
-                -e 's|spawn "inir" "|spawn "'"${launcher_target_escaped}"'" "|g' \
-                "$niri_config"
+            tui_warn "Niri is still running without ${XDG_BIN_HOME} in PATH; preserving existing launcher paths until the next session"
         fi
     fi
 
@@ -2712,19 +2772,23 @@ run_update() {
     # Restart shell (only if we have access to the session)
     if [[ -n "$NIRI_SOCKET" ]] || [[ -n "$WAYLAND_DISPLAY" ]]; then
         _step_phase_start 7 "Restarting shell"
-        if command -v systemctl >/dev/null 2>&1 && systemctl --user cat inir.service >/dev/null 2>&1; then
+        if inir_user_service_is_masked; then
+            _step_phase_done "Shell restart skipped: inir.service is masked"
+        elif command -v systemctl >/dev/null 2>&1 && systemctl --user cat inir.service >/dev/null 2>&1; then
             nohup systemctl --user restart inir.service >/dev/null 2>&1 &
             disown
+            _step_phase_done "Shell restart triggered"
         elif [[ -x "${II_TARGET}/scripts/inir" ]]; then
             nohup bash "${II_TARGET}/scripts/inir" restart -c "${II_TARGET}" >/dev/null 2>&1 &
             disown
+            _step_phase_done "Shell restart triggered"
         else
             qs -p "${II_TARGET}" kill 2>/dev/null || true
             sleep 1
             nohup qs -p "${II_TARGET}" >/dev/null 2>&1 &
             disown
+            _step_phase_done "Shell restart triggered"
         fi
-        _step_phase_done "Shell restart triggered"
     else
         _step_phase_header 7 "Restarting shell"
         tui_warn "Not in graphical session - shell restart skipped"

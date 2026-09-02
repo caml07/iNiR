@@ -273,6 +273,7 @@ inir repair                     # doctor + 重启 + 过滤日志检查
 ## 致谢
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — 原始的 illogical-impulse（Hyprland 版）
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — 一个偶尔真能冒出好点子的分支
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — 驱动此 Shell 的框架
 - [**Niri**](https://github.com/YaLTeR/niri) — 滚动平铺式 Wayland 合成器
 

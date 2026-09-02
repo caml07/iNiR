@@ -162,7 +162,7 @@ case "${SKIP_QUICKSHELL}" in
       chmod +x "${INIR_LAUNCHER_PATH}"
       ensure_launcher_path_in_shells "${XDG_BIN_HOME}"
       log_success "Launcher installed"
-      log_success "Launcher path configured for interactive shells"
+      log_success "Launcher path configured for login and interactive shells"
     fi
 
     local _service_refresh_status=1
@@ -172,6 +172,12 @@ case "${SKIP_QUICKSHELL}" in
 
     if [[ -f "$_service_asset" ]]; then
       mkdir -p "$_service_dir"
+
+      if inir_user_service_is_masked; then
+        systemctl --user unmask inir.service >/dev/null 2>&1 || true
+        systemctl --user unmask --runtime inir.service >/dev/null 2>&1 || true
+        rm -f "$_service_target"
+      fi
 
       if [[ -f "$_service_target" ]]; then
         # Existing install: sync from repo template
@@ -207,10 +213,14 @@ case "${SKIP_QUICKSHELL}" in
 
       if [[ -n "$_comp_target" ]]; then
         local _wants_dir="${XDG_CONFIG_HOME}/systemd/user/${_comp_target}.wants"
-        mkdir -p "$_wants_dir"
-        ln -sf "${XDG_CONFIG_HOME}/systemd/user/inir.service" "$_wants_dir/inir.service"
-        systemctl --user daemon-reload >/dev/null 2>&1 || true
-        log_success "User inir.service enabled (wired to ${_comp_target})"
+        if mkdir -p "$_wants_dir" \
+            && ln -sf "${XDG_CONFIG_HOME}/systemd/user/inir.service" "$_wants_dir/inir.service" \
+            && systemctl --user daemon-reload >/dev/null 2>&1 \
+            && [[ -e "$_wants_dir/inir.service" || -L "$_wants_dir/inir.service" ]]; then
+          log_success "User inir.service enabled (wired to ${_comp_target})"
+        else
+          log_warning "Could not wire inir.service to ${_comp_target} — run 'inir service enable'"
+        fi
       else
         log_warning "No supported compositor detected (niri or Hyprland)"
         log_warning "inir.service not enabled — run 'inir service enable' from your compositor session"
@@ -331,14 +341,15 @@ case "${SKIP_NIRI}" in
         log_warning "Qt theme: qt6ct (plasma-integration not found — install it for proper Qt theming)"
       fi
 
-      _launcher_path_escaped="${INIR_LAUNCHER_PATH//&/\\&}"
-      sed -i \
-        -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "'"${_launcher_path_escaped}"'" "terminal"|' \
-        -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "'"${_launcher_path_escaped}"'" "close-window"|' \
-        "$NIRI_BINDS_TARGET"
-      sed -i \
-        -e 's|spawn "inir" "|spawn "'"${_launcher_path_escaped}"'" "|g' \
-        "$NIRI_BINDS_TARGET"
+      if niri_can_resolve_launcher_dir "$XDG_BIN_HOME"; then
+        sed -i \
+          -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/launch-terminal.sh\""|spawn "inir" "terminal"|' \
+          -e 's|spawn "bash" "-lc" "exec \"\$(inir path)/scripts/close-window.sh\""|spawn "inir" "close-window"|' \
+          -e 's|spawn "[^"]*/inir" "|spawn "inir" "|g' \
+          "$NIRI_BINDS_TARGET"
+      else
+        log_warning "Niri is still running without ${XDG_BIN_HOME} in PATH — preserving existing launcher paths until the next session"
+      fi
     fi
     ;;
 esac
@@ -620,6 +631,8 @@ fi
 if [[ "${SKIP_MIGRATIONS}" != "true" ]]; then
   run_migrations_auto
 fi
+
+repair_legacy_quickshell_malloc_environment || true
 
 #####################################################################################
 # Mark first run complete

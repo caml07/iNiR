@@ -1237,6 +1237,9 @@ Singleton {
                             property int spacing: 6
                             property string preset: "default"
                         }
+                        property JsonObject pixel: JsonObject {
+                            property string orientation: "horizontal" // "horizontal" | "vertical"
+                        }
                         property JsonObject quote: JsonObject {
                             property bool enable: false
                             property string text: ""
@@ -1295,6 +1298,8 @@ Singleton {
                         property string shape: "Cookie4Sided"
                         property string fitMode: "cover"
                         property int size: 220
+                        property int contentWidth: 0
+                        property int contentHeight: 0
                         property int dim: 0
                         property int widgetScale: 100
                         property int widgetOpacity: 100
@@ -1372,6 +1377,10 @@ Singleton {
                         property string waveMode: "fill" // "fill", "line", "ribbon"
                         property string frequencyProfile: "flat" // "flat", "bass", "warm", "vocal", "treble", "smile"
                         property int smoothing: 2
+                        property int organicSensitivity: 50 // 25-200, Organic visualizer deformation gain
+                        property int organicOpacity: 85 // 10-100, Organic halo opacity
+                        property int organicGlow: 45 // 0-100, Organic outer glow
+                        property int organicCoverSize: 57 // 35-75, Organic cover size relative to widget span
                         property int fillRatio: 90
                         property int barOpacity: 100
                         property int waveOpacity: -1 // -1 = use global (appearance.cava.waveOpacity)
@@ -1622,6 +1631,91 @@ Singleton {
                         property real y: 80
                     }
 
+                    property JsonObject monthCalendar: JsonObject {
+                        property bool enable: false
+                        property bool locked: false
+                        property string placementStrategy: "free"
+                        property int contentWidth: 300
+                        property int contentHeight: 340
+                        property int weekStart: 1 // 0 Sunday, 1 Monday
+                        property bool showAdjacentDays: true
+                        property int widgetScale: 100
+                        property int widgetOpacity: 100
+                        property bool showBackground: true
+                        property bool useBlur: false
+                        property bool showBorder: true
+                        property real backgroundOpacity: 0.14
+                        property real borderWidth: 1
+                        property real borderOpacity: 0.16
+                        property real cornerRadius: -1
+                        property string colorMode: "auto"
+                        property JsonObject palette: JsonObject {
+                            property string primary: "primary"
+                            property string secondary: "secondary"
+                            property string tertiary: "tertiary"
+                            property string signal: "signal"
+                            property string surface: "surface"
+                        }
+                        property int dim: 0
+                        property real x: 420
+                        property real y: 120
+                    }
+
+                    property JsonObject todo: JsonObject {
+                        property bool enable: false
+                        property bool locked: false
+                        property string placementStrategy: "free"
+                        property int contentWidth: 300
+                        property int contentHeight: 276
+                        property int widgetScale: 100
+                        property int widgetOpacity: 100
+                        property bool showBackground: true
+                        property bool useBlur: false
+                        property bool showBorder: true
+                        property real backgroundOpacity: 0.14
+                        property real borderWidth: 1
+                        property real borderOpacity: 0.16
+                        property real cornerRadius: -1
+                        property string colorMode: "auto"
+                        property JsonObject palette: JsonObject {
+                            property string primary: "primary"
+                            property string secondary: "secondary"
+                            property string tertiary: "tertiary"
+                            property string signal: "signal"
+                            property string surface: "surface"
+                        }
+                        property int dim: 0
+                        property real x: 120
+                        property real y: 180
+                    }
+
+                    property JsonObject timers: JsonObject {
+                        property bool enable: false
+                        property bool locked: false
+                        property string placementStrategy: "free"
+                        property bool vertical: false
+                        property int widgetScale: 100
+                        property int widgetOpacity: 100
+                        property bool showBackground: false
+                        property bool useBlur: false
+                        property bool showBorder: false
+                        property real backgroundOpacity: 0
+                        property real borderWidth: 0
+                        property real borderOpacity: 0.16
+                        property real cornerRadius: -1
+                        property string colorMode: "auto"
+                        property JsonObject palette: JsonObject {
+                            property string primary: "primary"
+                            property string secondary: "secondary"
+                            property string tertiary: "tertiary"
+                            property string signal: "signal"
+                            property string surface: "surface"
+                        }
+                        property int dim: 0
+                        property real x: 360
+                        property real y: 420
+                    }
+
                     property JsonObject uptime: JsonObject {
                         property bool enable: false
                         property bool locked: false
@@ -1805,7 +1899,7 @@ Singleton {
                 property JsonObject backdrop: JsonObject {
                     property bool enable: true
                     property bool hideWallpaper: false
-                    property string fillMode: "fill" // "fill", "fit"
+                    property string fillMode: "fill" // legacy persisted key; backdrop rendering always covers the output
                     property bool useMainWallpaper: true
                     property string wallpaperPath: ""
                     property string thumbnailPath: "" // Thumbnail for animated wallpapers (video/gif)
@@ -1862,7 +1956,9 @@ Singleton {
                 }
                 property JsonObject transition: JsonObject {
                     property bool enable: true
-                    property string type: "crossfade" // "crossfade" | "slide" | "zoom" | "blurFade"
+                    // awww-native names plus shared internal QML/shader transitions.
+                    // Shader assets are transient overlays; awww remains the final static renderer.
+                    property string type: "crossfade"
                     property string direction: "right"
                     property int duration: 800 // ms
                     property list<var> bezier: [0.54, 0.0, 0.34, 0.99]
@@ -2581,29 +2677,128 @@ Singleton {
 
             property JsonObject orbit: JsonObject {
                 property bool enable: true
+                property string stageMode: "stage" // "stage" | "orbital"
+                property bool backdropBlurEnable: true
+                property string backdropBlurMode: "" // "" | "shell" | "off"; legacy inherit/niri resolve to shell
+                property int backdropBlurStrength: 72
+                property int backdropBlurSaturation: 18
+                property int backdropBlurTint: 28
                 property bool hotCornerEnable: true
                 property string hotCorner: "topRight"
                 property int hotCornerSize: 12
+                property int hotCornerActivationDistance: 2
                 property int hotCornerDwellMs: 0
                 property int workspaceCount: 3
                 property int workspaceScalePercent: 27
                 property int maxPanelWidthPercent: 92
                 property int workspaceSpacing: 18
                 property int windowGap: 4
+                property string windowLabels: "hover" // "hover" | "always" | "off"
+                property bool windowLabelIcons: true
                 property int scrimDim: 35
                 property bool showWorkspaceNumbers: true
                 property bool balancedGrid: true
                 property bool closeOnSelect: true
+                property bool keyboardNavigation: true
                 property bool scrollNavigation: true
                 property int scrollSteps: 1
-                property string motionStyle: "spring"
+                property bool scrollSwitchWorkspace: true
+                property bool scrollWrapAround: false
+                property bool canvasScrubNavigation: true
+                property int canvasScrubThreshold: 96
+                property string userPresetJson: ""
+                property JsonObject studio: JsonObject {
+                    property string surfaceStyle: "ricelin" // "current" | "ricelin"
+                    property int widthPercent: 26
+                    property string density: "compact" // "compact" | "comfortable"
+                    property bool showDescriptions: true
+                }
+                property JsonObject presentation: JsonObject {
+                    property string preset: "adaptive" // "adaptive" | "soft" | "float" | "sweep" | "instant"
+                    property bool advanced: false
+                    property string entryStyle: "cascade" // "fade" | "drift" | "cascade" | "instant"
+                    property string direction: "top" // "center" | "top" | "bottom" | "left" | "right"
+                    property int distance: 92
+                    property int enterDurationMs: 300
+                    property int exitDurationMs: 220
+                    property int entryDelayMs: 64
+                    property int entryStaggerMs: 42
+                    property int shelfDelayMs: 72
+                    property int entryOpacityPercent: 0
+                }
+                property JsonObject navigationMotion: JsonObject {
+                    property string preset: "fluid" // "snappy" | "fluid" | "cinematic" | "instant" | "custom"
+                    property bool advanced: false
+                    property int durationMs: 320
+                    property string easing: "smooth" // "direct" | "smooth" | "linear"
+                }
                 property bool showTrail: true
                 property int trailItems: 5
                 property bool showStash: true
+                property bool showNewWorkspaceDrop: true
                 property string stashRestoreMode: "original"
+                property JsonObject orbital: JsonObject {
+                    property string layout: "orbit" // "orbit" | "horizon" | "gallery" | "deck" | "atlas"
+                    property int visibleWorkspaces: 5
+                    property int coreSizePercent: 48
+                    property int satelliteSizePercent: 42
+                    property int horizontalSpreadPercent: 82
+                    property int verticalSpreadPercent: 58
+                    property int depthPercent: 18
+                    property JsonObject surface: JsonObject {
+                        property string style: "current" // "current" | "ricelin"
+                        property bool outline: true
+                        property int outlineWidth: 1
+                        property int outlineOpacityPercent: 72
+                        property int frameInset: 5
+                        property string shadowMode: "core" // "off" | "core" | "all"
+                        property int shadowOpacityPercent: 72
+                        property int coreElevation: 2
+                        property int satelliteElevation: 1
+                        property int radiusPercent: 100
+                    }
+                    property JsonObject geometry: JsonObject {
+                        property bool advanced: false
+                        property int edgePadding: 10
+                        property int horizonGap: 12
+                        property int horizonInset: 24
+                        property int horizonVerticalBase: 8
+                        property int horizonVerticalRange: 26
+                        property int galleryBaseGap: 34
+                        property int galleryRowGap: 14
+                        property int deckBaseGap: 26
+                        property int deckStep: 44
+                        property int deckLiftStep: 24
+                        property int atlasGap: 14
+                        property int atlasColumns: 3
+                        property int atlasCoreBoostPercent: 10
+                        property int coreContentMargin: 9
+                        property int satelliteContentMargin: 6
+                    }
+                    property bool satellitePreviews: true
+                    property string satelliteClickAction: "select" // "select" | "enter"
+                    property bool showWorkspaceLabels: true
+                    property string workspaceLabelMode: "" // "" preserves legacy showWorkspaceLabels; index | name | workspace | full | off
+                    property bool showWorkspaceWallpaper: true
+                    property int workspaceWallpaperOpacity: 70
+                }
+                property JsonObject pocket: JsonObject {
+                    property string layout: "cards"
+                    property bool showPreviews: true
+                }
                 property JsonObject shelf: JsonObject {
                     property bool enable: true
+                    property bool showStudioButton: true
+                    property string layout: "islands" // "bar" | "islands" | "minimal"
+                    property string density: "comfortable" // "comfortable" | "compact" | "huge"
+                    property string labels: "auto" // "auto" | "always" | "icons"
+                    property string islandStyle: "material" // "material" | "ricelin"
+                    property int moduleSpacing: 7
+                    property int islandPadding: 8
+                    property string trailScope: "output" // "output" | "workspace"
+                    property string locatorLabel: "auto" // "auto" | "index" | "name"
                     property list<string> modules: ["locator", "trail", "niri", "actions", "stash"]
+                    property list<string> niriActions: ["maximize", "consume", "expel"]
                     property list<string> pinnedActions: ["open-clipboard", "toggle-tiling", "toggle-dashboard"]
                     property bool closeOnAction: true
                 }
@@ -2643,6 +2838,21 @@ Singleton {
                 // Remember the snip action/shape picked in the overlay toolbar,
                 // so the screenshot keybind reopens with the same choice.
                 property bool rememberSnipChoice: true
+                // Tesseract language expression. "auto" follows the session locale;
+                // explicit values may combine installed models with +.
+                property string ocrLanguage: "auto"
+                property JsonObject japaneseLookup: JsonObject {
+                    property bool enabled: true
+                    property string translationTarget: "auto" // auto follows UI/system locale; common targets: en, es
+                    property JsonObject anki: JsonObject {
+                        property bool enabled: false
+                        property string endpoint: "http://127.0.0.1:8765"
+                        property string deck: "Default"
+                        property string model: "Basic"
+                        property string frontField: "Front"
+                        property string backField: "Back"
+                    }
+                }
                 property int lastAction: 0 // SnipAction ordinal: 0 Shot, 1 Edit, 2 Search, 3 OCR (Record never persists)
                 property int lastMode: 0 // SelectionMode ordinal: 0 rectangle, 1 circle
                 property JsonObject targetRegions: JsonObject {
@@ -2769,6 +2979,10 @@ Singleton {
                     property bool allowNsfw: false
                     property string defaultProvider: "yandere"
                     property int limit: 20
+                    property JsonObject gelbooru: JsonObject {
+                        property string apiKey: ""
+                        property string userId: ""
+                    }
                     property JsonObject zerochan: JsonObject {
                         property string username: "[unset]"
                     }

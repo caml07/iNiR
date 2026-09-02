@@ -36,6 +36,65 @@ if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"
     printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
     exit 1
 fi
+if grep -q '^Environment=MALLOC_' "$service_unit" \
+        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
+        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then
+    printf 'FAIL: iNiR still overrides the glibc allocator at runtime\n' >&2
+    exit 1
+fi
+
+step "service mask handling"
+service_mask_root="$(mktemp -d)"
+mkdir -p "$service_mask_root/systemd/user" "$service_mask_root/bin"
+cat > "$service_mask_root/bin/systemctl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${INIR_TEST_SYSTEMCTL_STATE:-disabled}"
+SH
+chmod +x "$service_mask_root/bin/systemctl"
+ln -s /dev/null "$service_mask_root/systemd/user/inir.service"
+if ! (
+    export XDG_CONFIG_HOME="$service_mask_root"
+    export PATH="$service_mask_root/bin:$PATH"
+    source "$runtime_root/sdata/lib/functions.sh"
+    inir_user_service_is_masked
+); then
+    printf 'FAIL: user service mask is not detected\n' >&2
+    rm -rf "$service_mask_root"
+    exit 1
+fi
+rm -f "$service_mask_root/systemd/user/inir.service"
+printf '[Unit]\nDescription=test\n' > "$service_mask_root/systemd/user/inir.service"
+if (
+    export XDG_CONFIG_HOME="$service_mask_root"
+    export PATH="$service_mask_root/bin:$PATH"
+    source "$runtime_root/sdata/lib/functions.sh"
+    inir_user_service_is_masked
+); then
+    printf 'FAIL: regular user service is classified as masked\n' >&2
+    rm -rf "$service_mask_root"
+    exit 1
+fi
+if ! (
+    export XDG_CONFIG_HOME="$service_mask_root"
+    export PATH="$service_mask_root/bin:$PATH"
+    export INIR_TEST_SYSTEMCTL_STATE=masked-runtime
+    source "$runtime_root/sdata/lib/functions.sh"
+    inir_user_service_is_masked
+); then
+    printf 'FAIL: runtime user service mask is not detected\n' >&2
+    rm -rf "$service_mask_root"
+    exit 1
+fi
+rm -rf "$service_mask_root"
+if ! grep -Fq 'inir_user_service_is_masked && return 2' "$runtime_root/setup" \
+        || ! grep -Fq 'User inir.service is masked; leaving it unchanged' "$runtime_root/setup" \
+        || ! grep -Fq 'Shell restart skipped: inir.service is masked' "$runtime_root/setup" \
+        || ! grep -Fq 'User inir.service is masked' "$runtime_root/sdata/lib/doctor.sh" \
+        || ! grep -Fq 'systemctl --user unmask inir.service' "$runtime_root/sdata/subcmd-install/3.files.sh" \
+        || ! grep -Fq 'systemctl --user unmask --runtime inir.service' "$runtime_root/scripts/inir"; then
+    printf 'FAIL: install/update/doctor do not preserve the service mask contract\n' >&2
+    exit 1
+fi
 
 step "fresh install defaults"
 python3 - "$runtime_root" <<'PY'
@@ -79,7 +138,10 @@ schema_checks = {
     "schema dock not hover-only": "property bool hoverToReveal: false" in schema,
     "schema right sidebar full height": "property bool collapseEmptyNotifications: false" in schema,
     "schema left sidebar full height": "property bool collapseWidgetsTab: false" in schema,
-    "schema wallhaven tab": "property JsonObject wallhaven: JsonObject {\n                    // Enable/disable the Wallhaven tab in the left sidebar\n                    property bool enable: true" in schema,
+    # `wallhaven` is the compatibility key; the UI is now the generic
+    # Wallpapers tab. Assert the schema contract instead of a stale comment.
+    "schema wallhaven compatibility": "property JsonObject wallhaven: JsonObject {" in schema
+        and "property bool enable: true" in schema[schema.index("property JsonObject wallhaven: JsonObject {"):],
     "schema news tab": "property JsonObject news: JsonObject {\n                    property bool enable: true" in schema,
     "wizard applies initial profile": "root.applyProfile(root.selectedProfile)" in wizard,
     "wizard dock pinned": '"dock.pinnedOnStartup": true' in wizard,
@@ -102,13 +164,259 @@ if 'spawn "inir" "altSwitcher"' in binds:
 PY
 
 arch_installer="$runtime_root/sdata/dist-arch/install-deps.sh"
-if ! grep -Fq 'pacman -T "${depends[@]}"' "$arch_installer" \
-        || ! grep -Fq 'pacman -S $installflags "${missing_deps[@]}"' "$arch_installer"; then
-    printf 'FAIL: Arch PKGBUILD dependencies are not filtered through the local package database\n' >&2
+if ! grep -Fq 'pacman -T "${_all_official[@]}"' "$arch_installer" \
+        || ! grep -Fq 'pacman -S $installflags "${_repo_installable[@]}"' "$arch_installer"; then
+    printf 'FAIL: Arch package plan is not filtered through the local package database before the batched install\n' >&2
     exit 1
 fi
-if grep -Fq 'pacman -S $installflags "${depends[@]}"' "$arch_installer"; then
-    printf 'FAIL: Arch installer can still reinstall or downgrade satisfied PKGBUILD dependencies\n' >&2
+if grep -Fq 'pacman -S $installflags "${_all_official[@]}"' "$arch_installer"; then
+    printf 'FAIL: Arch installer can still reinstall or downgrade satisfied dependencies\n' >&2
+    exit 1
+fi
+
+fedora_installer="$runtime_root/sdata/dist-fedora/install-deps.sh"
+if ! grep -Fq 'fedora_quickshell_compatible' "$fedora_installer" \
+        || ! grep -Fq 'FEDORA_REPO_PKGS=' "$fedora_installer" \
+        || ! grep -Eq '^[[:space:]]+sddm$' "$fedora_installer"; then
+    printf 'FAIL: Fedora installer lost repository-first/version-aware package planning or SDDM\n' >&2
+    exit 1
+fi
+if grep -Fq 'rpmfusion-nonfree-release' "$fedora_installer"; then
+    printf 'FAIL: Fedora installer enables RPM Fusion Nonfree without an iNiR dependency requiring it\n' >&2
+    exit 1
+fi
+if grep -Fq '${cmd_to_pkg[$cmd]:-$cmd}' "$fedora_installer"; then
+    printf 'FAIL: Fedora Doctor repair can still pass unknown command IDs directly to dnf\n' >&2
+    exit 1
+fi
+for required in \
+    '[qalc]="qalculate"' \
+    '[nm-connection-editor]="nm-connection-editor"' \
+    'install_awww_fedora' \
+    'install_gowall_fedora' \
+    'install_missioncenter_fedora' \
+    'install_songrec_fedora'; do
+    if ! grep -Fq "$required" "$fedora_installer"; then
+        printf 'FAIL: Fedora dependency repair lost required route: %s\n' "$required" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq '[[ "${OS_GROUP_ID:-unknown}" == "arch" ]]' "$runtime_root/sdata/lib/doctor.sh"; then
+    printf 'FAIL: Doctor no longer scopes checkupdates to Arch\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'ocr-jpn:OCR Japanese data' "$runtime_root/sdata/lib/doctor.sh" \
+        || ! grep -Fq '[ocr-jpn]="tesseract-data-jpn"' "$arch_installer" \
+        || ! grep -Fq '[ocr-jpn]="tesseract-langpack-jpn"' "$fedora_installer"; then
+    printf 'FAIL: Doctor/installers no longer repair missing OCR language data\n' >&2
+    exit 1
+fi
+
+debian_installer="$runtime_root/sdata/dist-debian/install-deps.sh"
+if ! grep -Fq 'ensure_debian_backports' "$debian_installer" \
+        || ! grep -Fq 'ensure_debian_component "contrib"' "$debian_installer" \
+        || ! grep -Fq 'polkit-kde-agent-1' "$debian_installer"; then
+    printf 'FAIL: Debian installer lost backports/contrib/Trixie compatibility handling\n' >&2
+    exit 1
+fi
+if grep -Fq 'tui_info "Setting up Rust toolchain..."' "$debian_installer"; then
+    printf 'FAIL: Debian installer installs Rust unconditionally instead of only for source fallbacks\n' >&2
+    exit 1
+fi
+if ! grep -Fq '[ocr-jpn]="tesseract-ocr-jpn"' "$debian_installer"; then
+    printf 'FAIL: Debian Doctor repair lost Japanese OCR language mapping\n' >&2
+    exit 1
+fi
+
+# Super+Shift+S is the remembered unified snip entry point; Print remains direct.
+if ! grep -Fq 'Mod+Shift+S { spawn "inir" "region" "menu"; }' "$runtime_root/defaults/niri/config.d/70-binds.kdl" \
+        || [[ ! -x "$runtime_root/sdata/migrations/037-remembered-super-shift-s.sh" ]]; then
+    printf 'FAIL: remembered Super+Shift+S snip flow is incomplete\n' >&2
+    exit 1
+fi
+if grep -Fq '${cmd_to_pkg[$cmd]:-$cmd}' "$debian_installer"; then
+    printf 'FAIL: Debian Doctor repair can still pass unknown command IDs directly to apt\n' >&2
+    exit 1
+fi
+for required in \
+    '[qalc]="qalc"' \
+    '[nm-connection-editor]="network-manager-gnome"' \
+    'io.missioncenter.MissionCenter' \
+    'golang-go' \
+    'cargo install --root "$SONGREC_ROOT" songrec'; do
+    if ! grep -Fq "$required" "$debian_installer"; then
+        printf 'FAIL: Debian dependency repair/provider route missing: %s\n' "$required" >&2
+        exit 1
+    fi
+done
+
+ocr_runner="$runtime_root/scripts/ocr-runner.sh"
+region_selector="$runtime_root/modules/regionSelector/RegionSelection.qml"
+if [[ ! -x "$ocr_runner" ]] \
+        || ! grep -Fq 'property string ocrLanguage: "auto"' "$runtime_root/modules/common/Config.qml" \
+        || ! grep -Fq 'scripts/ocr-runner.sh' "$region_selector"; then
+    printf 'FAIL: multilingual OCR runtime/config wiring is incomplete\n' >&2
+    exit 1
+fi
+if grep -Fq 'tesseract --list-langs |' "$region_selector"; then
+    printf 'FAIL: region OCR still combines every installed Tesseract language\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'tessdata_fast/main/$lang.traineddata' "$ocr_runner" \
+        || ! grep -Fq 'cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast' "$ocr_runner" \
+        || ! grep -Fq 'INIR_TESSDATA_DIR' "$ocr_runner"; then
+    printf 'FAIL: OCR runtime lost user-space language provisioning fallback\n' >&2
+    exit 1
+fi
+if grep -F 'japaneseOcrProc.command' "$region_selector" | grep -Fq 'wl-copy'; then
+    printf 'FAIL: Japanese OCR stdout is still consumed by clipboard plumbing before lookup\n' >&2
+    exit 1
+fi
+clipboard_helper="$runtime_root/scripts/clipboard-copy.sh"
+if [[ ! -x "$clipboard_helper" ]] \
+        || ! grep -Fq 'systemd-run --user' "$clipboard_helper" \
+        || grep -R -Fq '/usr/bin/wl-copy' "$runtime_root/modules/regionSelector" \
+        || grep -R -Fq 'execDetached(["wl-copy"' "$runtime_root/modules/japaneseLookup"; then
+    printf 'FAIL: snipping clipboard ownership can leak wl-copy into inir.service\n' >&2
+    exit 1
+fi
+if grep -A30 -F 'Enable AnkiConnect button' "$runtime_root/modules/settings/ToolsConfig.qml" | grep -Fq 'GridLayout {'; then
+    printf 'FAIL: Anki settings reintroduced the MaterialTextField/GridLayout implicitWidth binding loop\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'anki-status' "$runtime_root/services/JapaneseDictionary.qml" \
+        || ! grep -Fq 'Anki Desktop not detected' "$runtime_root/services/JapaneseDictionary.qml" \
+        || ! grep -Fq 'Open Anki' "$runtime_root/modules/japaneseLookup/JapaneseLookup.qml" \
+        || ! grep -Fq 'cardContent.implicitHeight + 28' "$runtime_root/modules/japaneseLookup/JapaneseLookup.qml"; then
+    printf 'FAIL: Japanese lookup Anki health/footer sizing regression\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'showAdvancedOcr' "$runtime_root/modules/settings/ToolsConfig.qml" \
+        || ! grep -Fq 'showAdvancedAnki' "$runtime_root/modules/settings/ToolsConfig.qml" \
+        || ! grep -Fq 'Japanese study assistant' "$runtime_root/modules/settings/ToolsConfig.qml"; then
+    printf 'FAIL: OCR/Japanese Settings onboarding regressed into technical-first controls\n' >&2
+    exit 1
+fi
+sidebar_group="$runtime_root/modules/sidebarRight/BottomWidgetGroup.qml"
+if grep -A90 -F '// Navigation rail' "$sidebar_group" | grep -Fq 'open_in_full' \
+        || ! grep -Fq 'onRequestExpand: root.requestExpand("calendar")' "$sidebar_group" \
+        || ! grep -Fq 'onRequestExpand: root.requestExpand("events")' "$sidebar_group" \
+        || ! grep -Fq 'onRequestExpand: root.requestExpand("todo")' "$sidebar_group"; then
+    printf 'FAIL: right-sidebar organizer expansion leaked back into the navigation rail\n' >&2
+    exit 1
+fi
+for widget in calendar/CalendarWidget.qml events/EventsWidget.qml todo/TodoWidget.qml; do
+    grep -Fq 'signal requestExpand()' "$runtime_root/modules/sidebarRight/$widget" || {
+        printf 'FAIL: right-sidebar organizer widget lacks contextual expand action: %s\n' "$widget" >&2
+        exit 1
+    }
+done
+
+if ! grep -Fq 'japaneseLookupExpanded' "$runtime_root/modules/japaneseLookup/JapaneseLookup.qml" \
+        || ! grep -Fq 'translateCurrent' "$runtime_root/modules/japaneseLookup/JapaneseLookup.qml" \
+        || [[ ! -x "$runtime_root/scripts/translate-ocr.sh" ]] \
+        || [[ ! -x "$runtime_root/scripts/study-decks.py" ]]; then
+    printf 'FAIL: expandable Japanese lookup translation/study tools are incomplete\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- '--psm "$psm"' "$ocr_runner" \
+        || ! grep -Fq 'resize 200%' "$ocr_runner"; then
+    printf 'FAIL: OCR selection-aware segmentation/preprocessing regressed\n' >&2
+    exit 1
+fi
+python3 "$runtime_root/scripts/study-decks.py" list | grep -Fq '"kaishi"' || {
+    printf 'FAIL: study deck catalog is unavailable\n' >&2
+    exit 1
+}
+for pkg in tesseract-data-rus tesseract-data-jpn tesseract-data-jpn_vert tesseract-data-chi_sim tesseract-data-chi_tra; do
+    grep -Fq "$pkg" "$runtime_root/sdata/dist-arch/inir-screencapture/PKGBUILD" || {
+        printf 'FAIL: Arch screencapture bundle is missing OCR language package %s\n' "$pkg" >&2
+        exit 1
+    }
+done
+for pkg in tesseract-langpack-rus tesseract-langpack-jpn tesseract-langpack-jpn_vert tesseract-langpack-chi_sim tesseract-langpack-chi_tra; do
+    grep -Fq "$pkg" "$fedora_installer" || {
+        printf 'FAIL: Fedora installer is missing OCR language package %s\n' "$pkg" >&2
+        exit 1
+    }
+done
+for pkg in tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-jpn-vert tesseract-ocr-chi-sim tesseract-ocr-chi-tra; do
+    grep -Fq "$pkg" "$debian_installer" || {
+        printf 'FAIL: Debian installer is missing OCR language package %s\n' "$pkg" >&2
+        exit 1
+    }
+done
+
+jp_dictionary="$runtime_root/scripts/japanese-dictionary.py"
+if [[ ! -x "$jp_dictionary" ]]; then
+    printf 'FAIL: Japanese dictionary backend is missing or not executable\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'singleton JapaneseDictionary 1.0 JapaneseDictionary.qml' "$runtime_root/services/qmldir" \
+        || ! grep -Fq 'modules/japaneseLookup/JapaneseLookup.qml' "$runtime_root/shell.qml" \
+        || ! grep -Fq 'JapaneseDictionary.lookupText' "$runtime_root/modules/regionSelector/RegionSelection.qml" \
+        || ! grep -Fq 'Install Japanese dictionary (~37 MB)' "$runtime_root/modules/settings/ToolsConfig.qml"; then
+    printf 'FAIL: Japanese OCR dictionary UI/runtime wiring is incomplete\n' >&2
+    exit 1
+fi
+jp_installer="$runtime_root/scripts/install-japanese-dictionary.sh"
+if [[ ! -x "$jp_installer" ]] \
+        || ! grep -Fq 'releases/latest/download/jitendex-yomitan.zip' "$jp_installer" \
+        || ! grep -Fq 'JapaneseDictionary.installRecommended()' "$runtime_root/modules/japaneseLookup/JapaneseLookup.qml"; then
+    printf 'FAIL: one-click Jitendex onboarding is incomplete\n' >&2
+    exit 1
+fi
+python3 - "$jp_dictionary" <<'PYTEST'
+import json, subprocess, sys, tempfile, zipfile
+from pathlib import Path
+
+script = Path(sys.argv[1])
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td)
+    archive = root / "test.zip"
+    db = root / "dictionary.sqlite3"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("index.json", json.dumps({"title": "iNiR Test", "revision": "1", "format": 3}))
+        z.writestr("term_bank_1.json", json.dumps([
+            ["食べる", "たべる", "v1", "v1", 10, ["to eat"], 1, "common"],
+            ["高い", "たかい", "adj-i", "adj-i", 8, [{"type":"structured-content","content":{"tag":"ul","data":{"content":"glossary"},"content":{"tag":"li","content":"high; expensive"}}}], 2, "common"],
+            ["またね", "またね", "", "", 200, ["bye; see you later"], 3, "common"],
+            ["ま", "ま", "", "", 97, ["just; now"], 4, ""],
+            ["幾ら", "いくら", "", "", 200, ["how much"], 5, "common"],
+            ["いくら", "いくら", "", "", 99, ["salted salmon roe"], 6, ""],
+            ["何処", "どこ", "", "", 200, ["where"], 7, "common"]
+        ], ensure_ascii=False))
+        z.writestr("term_meta_bank_1.json", json.dumps([["食べる", "pitch", {"reading": "たべる", "pitches": [{"position": 2}]}]], ensure_ascii=False))
+        z.writestr("kanji_bank_1.json", json.dumps([["食", "ショク", "た.べる", "", ["eat"], {}]], ensure_ascii=False))
+    def run(*args):
+        proc = subprocess.run([sys.executable, str(script), "--db", str(db), *args], check=True, text=True, capture_output=True)
+        return json.loads(proc.stdout)
+    assert run("import", str(archive))["terms"] == 7
+    scanned = run("scan", "食べる猫")
+    assert scanned["matched"] == "食べる"
+    assert scanned["metadata"]["pitch"][0]["data"]["pitches"][0]["position"] == 2
+    polite = run("scan-smart", "食べました")
+    assert polite["matched"] == "食べる" and polite["surface"] == "食べました"
+    assert polite["reading"] == "たべる" and polite["romaji"] == "taberu"
+    adjective = run("scan-smart", "高かった")
+    assert adjective["matched"] == "高い"
+    assert adjective["terms"][0]["displayDefinitions"] == ["high; expensive"]
+    phrase = run("scan-smart", "• またね (Mata ne) — See you later")
+    assert phrase["surface"] == "またね" and phrase["terms"][0]["displayDefinitions"][0].startswith("bye")
+    spaced_phrase = run("scan-smart", "• ま た ね (Mata ne) — See you later")
+    assert spaced_phrase["surface"] == "またね"
+    price = run("scan-smart", "いくらですか (Ikura desu ka)")
+    assert price["surface"] == "いくら" and price["terms"][0]["expression"] == "幾ら"
+    where = run("scan-smart", "どこですか")
+    assert where["surface"] == "どこ" and where["terms"][0]["expression"] == "何処"
+    assert run("kanji", "食")["kanji"][0]["meanings"] == ["eat"]
+PYTEST
+
+python_setup_owners=$(grep -l 'v install-python-packages' \
+    "$runtime_root"/sdata/dist-*/install-deps.sh \
+    "$runtime_root/sdata/subcmd-install/3.files.sh" 2>/dev/null || true)
+if [[ "$python_setup_owners" != "$runtime_root/sdata/subcmd-install/3.files.sh" ]]; then
+    printf 'FAIL: Python environment setup has more than one install owner:\n%s\n' "$python_setup_owners" >&2
     exit 1
 fi
 
@@ -210,6 +518,106 @@ if ! grep -Fq 'vars_to_import+=("DISPLAY=$DISPLAY")' "$inir_launcher" \
         || ! grep -Fq 'for _xsock in /tmp/.X11-unix/X*' "$inir_launcher" \
         || ! grep -Fq 'systemctl --user set-environment "${vars_to_import[@]}"' "$inir_launcher"; then
     printf 'FAIL: session environment does not publish the XWayland DISPLAY to the user manager\n' >&2
+    exit 1
+fi
+if grep -Fq 'MALLOC_ARENA_MAX' "$shell_exec" \
+        || grep -Fq 'MALLOC_MMAP_THRESHOLD_' "$shell_exec"; then
+    printf 'FAIL: application launch policy still carries retired allocator handling\n' >&2
+    exit 1
+fi
+
+orbit_stage="$runtime_root/modules/overview/OrbitOrbitalStage.qml"
+orbit_stage_view="$runtime_root/modules/overview/OverviewNiriWidget.qml"
+orbit_studio="$runtime_root/modules/overview/OrbitStudio.qml"
+if ! grep -Fq 'z: isCore ? 100 : 20 + workspaceIndex * 0.01' "$orbit_stage" \
+        || [[ "$(grep -c 'NumberAnimation { duration: root.transitionDurationMs; easing.type: root.navigationEasingType }' "$orbit_stage")" -lt 5 ]]; then
+    printf 'FAIL: Orbit orbital navigation no longer tracks geometry/depth continuously\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'retainWhileLoading: true' "$orbit_stage" \
+        || ! grep -Fq 'retainWhileLoading: true' "$orbit_stage_view" \
+        || grep -Fq 'sourceSize.width: Math.max(1, Math.round(width * 2))' "$orbit_stage" \
+        || grep -Fq 'sourceSize.width: Math.max(1, Math.round(width * 2))' "$orbit_stage_view"; then
+    printf 'FAIL: Orbit preview decoding can reload during animated geometry changes\n' >&2
+    exit 1
+fi
+pill_notifs="$runtime_root/modules/pill/PillNotifs.qml"
+if ! grep -Fq 'image://qsimage/' "$pill_notifs"; then
+    printf 'FAIL: Pill notification history can reuse expired Quickshell image handles\n' >&2
+    exit 1
+fi
+
+preview_service="$runtime_root/services/WindowPreviewService.qml"
+preview_capture="$runtime_root/scripts/capture-windows.sh"
+if ! grep -Fq 'restore_saved_clipboard' "$preview_capture" \
+        || ! grep -A8 -F 'screenshot-window --id "$id"' "$preview_capture" | grep -Fq 'restore_saved_clipboard'; then
+    printf 'FAIL: window preview capture can leave Niri screenshot PNGs in the user clipboard\n' >&2
+    exit 1
+fi
+preview_image_store="$runtime_root/scripts/clipboard-image-store.sh"
+if [[ ! -x "$preview_image_store" ]] \
+        || ! grep -Fq 'inir-window-preview-capture-' "$preview_capture" \
+        || ! grep -Fq 'inir-window-preview-capture-' "$preview_image_store" \
+        || ! grep -Fq 'clipboard-image-store.sh' "$runtime_root/defaults/niri/config.d/50-startup.kdl"; then
+    printf 'FAIL: internal window previews can leak into cliphist image history\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'previewRefreshTimer' "$runtime_root/modules/dock/DockPreview.qml" \
+        || ! grep -Fq 'pendingPreviewIds' "$runtime_root/modules/dock/DockPreview.qml" \
+        || ! grep -Fq 'hoverDelayTimer.stop()' "$runtime_root/modules/dock/DockAppButton.qml"; then
+    printf 'FAIL: dock clicks can race window-preview capture and user paste\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'windowPreviewCaptureActive' "$runtime_root/services/Notifications.qml" \
+        || ! grep -Fq 'paste the image from the clipboard' "$runtime_root/services/Notifications.qml"; then
+    printf 'FAIL: internal Niri preview screenshot notifications are not suppressed safely\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'requestedWindowMaxAgeMs' "$preview_service" \
+        || ! grep -Fq 'markPreviewDirty(root.lastFocusedWindowId)' "$preview_service" \
+        || ! grep -Fq '"-printf", "%f\\t%T@\\n"' "$preview_service" \
+        || ! grep -Fq 'corePreviewFreshnessMs: 10000' "$orbit_stage" \
+        || ! grep -Fq 'satellitePreviewFreshnessMs: 45000' "$orbit_stage" \
+        || ! grep -Fq 'mipmap: false' "$orbit_stage" \
+        || ! grep -Fq 'max_concurrent=1' "$preview_capture"; then
+    printf 'FAIL: Orbit preview freshness/quality policy regressed\n' >&2
+    exit 1
+fi
+home_nix_module="$runtime_root/nix/home-module.nix"
+if ! grep -Fq 'path="$(command -v "$name" 2>/dev/null || true)"' "$preview_capture" \
+        || grep -Fq '[[ ! -x "$bin" ]]' "$preview_capture" \
+        || ! grep -Fq 'PATH = lib.makeBinPath ([ cfg.package ] ++ cfg.extraPackages);' "$home_nix_module"; then
+    printf 'FAIL: packaged Nix preview dependencies are not resolved through the service PATH\n' >&2
+    exit 1
+fi
+if grep -Fq 'NavigationFineControls { visible: !root.workspaceMode }' "$orbit_studio" \
+        || grep -Fq 'PresentationFineControls { visible: !root.workspaceMode }' "$orbit_studio"; then
+    printf 'FAIL: Orbit Studio Motion exposes advanced tuning in the primary workflow\n' >&2
+    exit 1
+fi
+
+terminal_launcher="$runtime_root/scripts/launch-terminal.sh"
+browser_launcher_block="$(sed -n '/^launch_configured_browser()/,/^}/p' "$inir_launcher")"
+if grep -Fq 'systemd-run --user --scope' "$terminal_launcher" \
+        || grep -Fq 'systemd-run --user --scope' <<< "$browser_launcher_block"; then
+    printf 'FAIL: Niri terminal/browser launchers create a redundant nested systemd scope\n' >&2
+    exit 1
+fi
+
+if [[ -e "$runtime_root/sdata/migrations/037-scope-quickshell-malloc-env.sh" ]]; then
+    printf 'FAIL: allocator cleanup was added as a second migration instead of update/doctor repair\n' >&2
+    exit 1
+fi
+
+migration_lib="$runtime_root/sdata/lib/migrations.sh"
+repair_lib="$runtime_root/sdata/lib/functions.sh"
+doctor_lib="$runtime_root/sdata/lib/doctor.sh"
+if ! grep -Fq '"014-malloc-arena-optimization"' "$migration_lib" \
+        || ! grep -Fq 'is_migration_retired "$migration_id" && return 1' "$migration_lib" \
+        || ! grep -Fq 'repair_legacy_quickshell_malloc_environment()' "$repair_lib" \
+        || ! grep -Fq 'repair_legacy_quickshell_malloc_environment' "$runtime_root/setup" \
+        || ! grep -Fq 'repair_legacy_quickshell_malloc_environment' "$doctor_lib"; then
+    printf 'FAIL: retired allocator migration is not repaired through install/update/doctor\n' >&2
     exit 1
 fi
 

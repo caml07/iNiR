@@ -359,7 +359,8 @@ ContentPage {
     readonly property var _paletteWidgetKeys: [
         "clock", "weather", "customImage", "imageConverter", "mediaControls",
         "visualizer", "systemMonitor", "battery", "notes", "japaneseTypography",
-        "calendarUpcoming", "uptime", "worldClock", "userCard", "mascot", "newsTicker"
+        "calendarUpcoming", "monthCalendar", "todo", "timers", "uptime", "worldClock",
+        "userCard", "mascot", "newsTicker"
     ]
 
     function _semanticRoleOptions(): var {
@@ -1560,6 +1561,9 @@ ContentPage {
                         { key: "battery", icon: "battery_full", label: Translation.tr("Battery"), def: false },
                         { key: "notes", icon: "sticky_note_2", label: Translation.tr("Notes"), def: false },
                         { key: "calendarUpcoming", icon: "event", label: Translation.tr("Events"), def: false },
+                        { key: "monthCalendar", icon: "calendar_month", label: Translation.tr("Calendar"), def: false },
+                        { key: "todo", icon: "checklist", label: Translation.tr("Todo"), def: false },
+                        { key: "timers", icon: "timer", label: Translation.tr("Timers"), def: false },
                         { key: "uptime", icon: "avg_pace", label: Translation.tr("Uptime"), def: false },
                         { key: "newsTicker", icon: "newspaper", label: Translation.tr("News"), def: false },
                         { key: "mascot", icon: "pets", label: Translation.tr("Mascot"), def: false },
@@ -1785,9 +1789,29 @@ ContentPage {
                         { displayName: Translation.tr("Digital"), icon: "timer", value: "digital" },
                         { displayName: Translation.tr("Android stacked"), icon: "android", value: "androidStacked" },
                         { displayName: Translation.tr("Cookie"), icon: "cookie", value: "cookie" },
+                        { displayName: Translation.tr("Pixel"), icon: "view_comfy_alt", value: "pixel" },
                     ]
                 }
             }
+            }
+
+            ContentSubsection {
+                visible: clockSection._clockStyle === "pixel"
+                title: Translation.tr("Pixel clock")
+
+                WidgetSettingRow {
+                    label: Translation.tr("Orientation")
+                    trailing: false
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        currentValue: Config.getNestedValue("background.widgets.clock.pixel.orientation", "horizontal")
+                        onSelected: newValue => Config.setNestedValue("background.widgets.clock.pixel.orientation", newValue)
+                        options: [
+                            { displayName: Translation.tr("Horizontal"), icon: "view_week", value: "horizontal" },
+                            { displayName: Translation.tr("Vertical"), icon: "view_agenda", value: "vertical" }
+                        ]
+                    }
+                }
             }
 
             ContentSubsection {
@@ -2200,6 +2224,7 @@ ContentPage {
 
             // ── Quote (digital + cookie) ──
             ContentSubsection {
+                visible: clockSection._clockStyle === "digital" || clockSection._clockStyle === "cookie"
                 title: Translation.tr("Quote")
 
                 SettingsSwitch {
@@ -2258,6 +2283,9 @@ ContentPage {
                                         "spacing": 6,
                                         "preset": "default"
                     },
+                    "pixel": {
+                                        "orientation": "horizontal"
+                    },
                     "dim": 70,
                     "fontFamily": "Space Grotesk",
                     "placementStrategy": "free",
@@ -2287,6 +2315,202 @@ ContentPage {
                     "locked": false
 })
             }
+            }
+        }
+    }
+
+    // ── Month Calendar ──────────────────────────────────────
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "time"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "time"
+                expanded: true
+                icon: "calendar_month"
+                title: Translation.tr("Month Calendar")
+
+                SettingsGroup {
+                    WidgetStateControls {
+                        configPath: "background.widgets.monthCalendar"
+                        configEntry: Config.getNestedValue("background.widgets.monthCalendar", ({}))
+                        defaultStrategy: "free"
+                    }
+                    ContentSubsection {
+                        title: Translation.tr("Calendar")
+                        WidgetSettingRow {
+                            label: Translation.tr("Week starts on")
+                            trailing: false
+                            ConfigSelectionArray {
+                                Layout.fillWidth: true
+                                currentValue: Config.getNestedValue("background.widgets.monthCalendar.weekStart", 1)
+                                onSelected: newValue => Config.setNestedValue("background.widgets.monthCalendar.weekStart", newValue)
+                                options: [
+                                    { displayName: Translation.tr("Monday"), icon: "calendar_view_week", value: 1 },
+                                    { displayName: Translation.tr("Sunday"), icon: "calendar_view_week", value: 0 }
+                                ]
+                            }
+                        }
+                        SettingsSwitch {
+                            buttonIcon: "date_range"
+                            text: Translation.tr("Show adjacent month days")
+                            autoToggle: false
+                            checked: Config.getNestedValue("background.widgets.monthCalendar.showAdjacentDays", true)
+                            onToggledByUser: checked => Config.setNestedValue("background.widgets.monthCalendar.showAdjacentDays", checked)
+                        }
+                    }
+                    ContentSubsection {
+                        title: Translation.tr("Dimensions")
+                        WidgetSettingRow {
+                            label: Translation.tr("Width")
+                            icon: "swap_horiz"
+                            StyledSpinBox {
+                                from: 252; to: 520; stepSize: 4
+                                value: Config.getNestedValue("background.widgets.monthCalendar.contentWidth", 300)
+                                onValueModified: Config.setNestedValue("background.widgets.monthCalendar.contentWidth", value)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Height")
+                            icon: "swap_vert"
+                            StyledSpinBox {
+                                from: 290; to: 620; stepSize: 4
+                                value: Config.getNestedValue("background.widgets.monthCalendar.contentHeight", 340)
+                                onValueModified: Config.setNestedValue("background.widgets.monthCalendar.contentHeight", value)
+                            }
+                        }
+                    }
+                    WidgetAppearanceControls {
+                        configPath: "background.widgets.monthCalendar"
+                        configEntry: Config.getNestedValue("background.widgets.monthCalendar", ({}))
+                        hasCardControls: true
+                    }
+                }
+
+                SettingsGroup {
+                    WidgetResetButton {
+                        configPath: "background.widgets.monthCalendar"
+                        defaults: ({
+                            placementStrategy: "free", contentWidth: 300, contentHeight: 340,
+                            weekStart: 1, showAdjacentDays: true, widgetScale: 100,
+                            widgetOpacity: 100, showBackground: true, useBlur: false,
+                            showBorder: true, backgroundOpacity: 0.14, borderWidth: 1,
+                            borderOpacity: 0.16, cornerRadius: -1, colorMode: "auto",
+                            dim: 0, locked: false, x: 420, y: 120
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Timers ──────────────────────────────────────────────
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "time"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "time"
+                expanded: true
+                icon: "timer"
+                title: Translation.tr("Timers")
+
+                SettingsGroup {
+                    WidgetStateControls {
+                        configPath: "background.widgets.timers"
+                        configEntry: Config.getNestedValue("background.widgets.timers", ({}))
+                        defaultStrategy: "free"
+                    }
+                    WidgetSettingRow {
+                        label: Translation.tr("Orientation")
+                        trailing: false
+                        ConfigSelectionArray {
+                            Layout.fillWidth: true
+                            currentValue: Config.getNestedValue("background.widgets.timers.vertical", false)
+                            onSelected: newValue => Config.setNestedValue("background.widgets.timers.vertical", newValue)
+                            options: [
+                                { displayName: Translation.tr("Horizontal"), icon: "view_week", value: false },
+                                { displayName: Translation.tr("Vertical"), icon: "view_agenda", value: true }
+                            ]
+                        }
+                    }
+                    WidgetAppearanceControls {
+                        configPath: "background.widgets.timers"
+                        configEntry: Config.getNestedValue("background.widgets.timers", ({}))
+                        hasCardControls: false
+                    }
+                }
+
+                SettingsGroup {
+                    WidgetResetButton {
+                        configPath: "background.widgets.timers"
+                        defaults: ({
+                            placementStrategy: "free", vertical: false, widgetScale: 100,
+                            widgetOpacity: 100, showBackground: false, useBlur: false,
+                            showBorder: false, backgroundOpacity: 0, borderWidth: 0,
+                            borderOpacity: 0.16, cornerRadius: -1, colorMode: "auto",
+                            dim: 0, locked: false, x: 360, y: 420
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Todo ────────────────────────────────────────────────
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "personal"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "personal"
+                expanded: true
+                icon: "checklist"
+                title: Translation.tr("Todo")
+
+                SettingsGroup {
+                    WidgetStateControls {
+                        configPath: "background.widgets.todo"
+                        configEntry: Config.getNestedValue("background.widgets.todo", ({}))
+                        defaultStrategy: "free"
+                    }
+                    ContentSubsection {
+                        title: Translation.tr("Dimensions")
+                        WidgetSettingRow {
+                            label: Translation.tr("Width")
+                            icon: "swap_horiz"
+                            StyledSpinBox {
+                                from: 240; to: 560; stepSize: 4
+                                value: Config.getNestedValue("background.widgets.todo.contentWidth", 300)
+                                onValueModified: Config.setNestedValue("background.widgets.todo.contentWidth", value)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Height")
+                            icon: "swap_vert"
+                            StyledSpinBox {
+                                from: 220; to: 720; stepSize: 4
+                                value: Config.getNestedValue("background.widgets.todo.contentHeight", 276)
+                                onValueModified: Config.setNestedValue("background.widgets.todo.contentHeight", value)
+                            }
+                        }
+                    }
+                    WidgetAppearanceControls {
+                        configPath: "background.widgets.todo"
+                        configEntry: Config.getNestedValue("background.widgets.todo", ({}))
+                        hasCardControls: true
+                    }
+                }
+
+                SettingsGroup {
+                    WidgetResetButton {
+                        configPath: "background.widgets.todo"
+                        defaults: ({
+                            placementStrategy: "free", contentWidth: 300, contentHeight: 276,
+                            widgetScale: 100, widgetOpacity: 100, showBackground: true,
+                            useBlur: false, showBorder: true, backgroundOpacity: 0.14,
+                            borderWidth: 1, borderOpacity: 0.16, cornerRadius: -1,
+                            colorMode: "auto", dim: 0, locked: false, x: 120, y: 180
+                        })
+                    }
+                }
             }
         }
     }
@@ -3619,6 +3843,7 @@ ContentPage {
                     options: [
                         { displayName: Translation.tr("Bars"), icon: "equalizer", value: "bars" },
                         { displayName: Translation.tr("Wave"), icon: "waves", value: "wave" },
+                        { displayName: Translation.tr("Organic"), icon: "bubble_chart", value: "organic" },
                     ]
                 }
 
@@ -3797,7 +4022,62 @@ ContentPage {
                     }
 
                     WidgetSettingRow {
-                        label: Translation.tr("Spectrum height (%)")
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Sensitivity")
+                        StyledSpinBox {
+                            from: 25; to: 200; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicSensitivity", 50)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicSensitivity", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Halo opacity (%)")
+                        StyledSpinBox {
+                            from: 10; to: 100; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicOpacity", 85)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicOpacity", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Glow (%)")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicGlow", 45)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicGlow", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Cover size (%)")
+                        StyledSpinBox {
+                            from: 35; to: 75; stepSize: 1
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicCoverSize", 57)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicCoverSize", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        label: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
+                            ? Translation.tr("Motion range (%)")
+                            : Translation.tr("Spectrum height (%)")
                         StyledSpinBox {
                             from: 10; to: 100; stepSize: 5
                             value: Config.getNestedValue(
@@ -3808,6 +4088,8 @@ ContentPage {
                     }
 
                     WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") !== "organic"
                         label: Translation.tr("Edge inset (px)")
                         StyledSpinBox {
                             from: 0; to: 32; stepSize: 1
@@ -3819,6 +4101,8 @@ ContentPage {
                     }
 
                     WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") !== "organic"
                         label: Translation.tr("Curve headroom (%)")
                         StyledSpinBox {
                             from: 0; to: 100; stepSize: 5
@@ -3888,6 +4172,10 @@ ContentPage {
                     "waveMode": "fill",
                     "frequencyProfile": "flat",
                     "smoothing": 2,
+                    "organicSensitivity": 50,
+                    "organicOpacity": 85,
+                    "organicGlow": 45,
+                    "organicCoverSize": 57,
                     "fillRatio": 90,
                     "barOpacity": 100,
                     "waveOpacity": -1,

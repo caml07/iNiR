@@ -54,12 +54,21 @@ Singleton {
     property string overviewMode: "default"
     property string overviewTargetOutput: ""
     property string overviewSearchPrefix: ""
+    property bool orbitPocketRequested: false
+    property bool orbitStudioRequested: false
+    property bool orbitLensRequested: false
+    property string orbitLensRequestedQuery: ""
+    property string orbitStageOverride: ""
+    property var orbitRuntimeStatus: ({ open: false })
+    signal orbitNavigateRequested(int direction)
     signal pillSurfaceCommand(string command, string surface)
     property bool altSwitcherOpen: false
     signal altSwitcherCommand(string command)
     property int activeContextMenuCount: 0
     property var activeContextMenu: null
     property bool clipboardOpen: false
+    // True only while iNiR asks Niri for internal window-preview frames.
+    property bool windowPreviewCaptureActive: false
     property bool settingsOverlayOpen: false
     property int settingsOverlayRequestedPage: -1 // Set before opening to navigate to a specific page
     property int settingsOverlayCurrentPage: -1 // Published by whichever overlay chrome is loaded
@@ -94,6 +103,14 @@ Singleton {
     }
 
     property bool regionSelectorOpen: false
+    property bool japaneseLookupOpen: false
+    property bool japaneseLookupExpanded: false
+    property var japaneseLookupResult: ({})
+    property string japaneseLookupScreen: ""
+    property real japaneseLookupX: 0
+    property real japaneseLookupY: 0
+    property real japaneseLookupWidth: 0
+    property real japaneseLookupHeight: 0
     property var regionSelectorAction: 0
     property var regionSelectorMode: 0
     // Explicit screenshot callers must remain deterministic. The dedicated
@@ -331,6 +348,12 @@ Singleton {
 
     function closeOverview(): void {
         overviewOpen = false
+        orbitPocketRequested = false
+        orbitStudioRequested = false
+        orbitLensRequested = false
+        orbitLensRequestedQuery = ""
+        orbitStageOverride = ""
+        orbitRuntimeStatus = ({ open: false })
     }
 
     function toggleOverview(outputName): void {
@@ -342,12 +365,41 @@ Singleton {
     }
 
     function openOrbit(outputName): void {
-        if (!(Config.options?.orbit?.enable ?? true))
+        if (!CompositorService.isNiri || !(Config.options?.orbit?.enable ?? true))
             return
         overviewMode = "orbit"
         overviewSearchPrefix = ""
         overviewTargetOutput = root.resolveOutputName(outputName, [])
         overviewOpen = true
+    }
+
+    function openOrbitView(outputName, view: string): void {
+        if (!CompositorService.isNiri || !(Config.options?.orbit?.enable ?? true))
+            return
+        orbitStageOverride = view === "orbital" ? "orbital" : "stage"
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitPocket(outputName): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitPocketRequested = true
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitStudio(outputName): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitStudioRequested = true
+        root.openOrbit(outputName)
+    }
+
+    function openOrbitLens(outputName, query: string): void {
+        if (!CompositorService.isNiri)
+            return
+        orbitLensRequestedQuery = query
+        orbitLensRequested = true
+        root.openOrbit(outputName)
     }
 
     function toggleOrbit(outputName): void {
@@ -356,6 +408,14 @@ Singleton {
             root.closeOverview()
         else
             root.openOrbit(resolved)
+    }
+
+    function toggleOrbitStageView(): void {
+        if (!overviewOpen || overviewMode !== "orbit")
+            return
+        const configured = Config.options?.orbit?.stageMode === "orbital" ? "orbital" : "stage"
+        const current = orbitStageOverride.length > 0 ? orbitStageOverride : configured
+        orbitStageOverride = current === "orbital" ? "stage" : "orbital"
     }
 
     function openTaskView(outputName): void { root.openOrbit(outputName) }

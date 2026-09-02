@@ -54,7 +54,7 @@ Singleton {
         if (Quickshell.env("QS_DEBUG") === "1") console.log("[InnerTube]", ...args);
     }
 
-    readonly property string _script: Directories.scriptPath + "/innertube.py"
+    readonly property string _runner: Directories.scriptPath + "/innertube-runtime.sh"
 
     Component.onCompleted: {
         // P0-13: feature-gated singleton must short-circuit when disabled.
@@ -69,7 +69,7 @@ Singleton {
     // ---- ping (availability probe) ----
     Process {
         id: _pingProc
-        command: ["python3", root._script, "ping"]
+        command: [root._runner, "ping"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -95,7 +95,7 @@ Singleton {
         root.loggingIn = true;
         root.loginUserCode = "";
         root.loginVerificationUrl = "";
-        _loginReqProc.exec(["python3", root._script, "oauth-request"]);
+        _loginReqProc.exec([root._runner, "oauth-request"]);
     }
     function cancelLogin(): void {
         root.loggingIn = false;
@@ -103,7 +103,7 @@ Singleton {
         root.loginUserCode = "";
     }
     function logout(): void {
-        _logoutProc.exec(["python3", root._script, "logout"]);
+        _logoutProc.exec([root._runner, "logout"]);
     }
 
     // ---- cookie connect (reuse the logged-in browser's YouTube session) ----
@@ -114,21 +114,21 @@ Singleton {
         if (root.connecting) return;
         root.connecting = true;
         root.connectError = "";
-        _connectProc.exec(["python3", root._script, "connect", browser || "auto"]);
+        _connectProc.exec([root._runner, "connect", browser || "auto"]);
     }
     // Manual fallback: import a cookies.txt exported via the reliable incognito method.
     function connectManual(path): void {
         if (root.connecting || !path) return;
         root.connecting = true;
         root.connectError = "";
-        _connectProc.exec(["python3", root._script, "connect-manual", path]);
+        _connectProc.exec([root._runner, "connect-manual", path]);
     }
     function disconnect(): void {
-        _disconnectProc.exec(["python3", root._script, "disconnect"]);
+        _disconnectProc.exec([root._runner, "disconnect"]);
     }
     // Enumerate installed browsers + system default for the account picker.
     function detectBrowsers(): void {
-        _detectProc.exec(["python3", root._script, "detect-browsers"]);
+        _detectProc.exec([root._runner, "detect-browsers"]);
     }
     Process {
         id: _detectProc
@@ -204,7 +204,7 @@ Singleton {
     Timer {
         id: _loginPollTimer
         repeat: true
-        onTriggered: if (root.loggingIn && root._loginDeviceCode) _loginPollProc.exec(["python3", root._script, "oauth-poll", root._loginDeviceCode])
+        onTriggered: if (root.loggingIn && root._loginDeviceCode) _loginPollProc.exec([root._runner, "oauth-poll", root._loginDeviceCode])
     }
     Process {
         id: _loginPollProc
@@ -234,7 +234,7 @@ Singleton {
     // ---- auth status (reuses iNiR OAuth; re-probe when login state changes) ----
     function refreshAuth(): void {
         if (!root.available) return;
-        _authProc.exec(["python3", root._script, "auth-status"]);
+        _authProc.exec([root._runner, "auth-status"]);
     }
     Process {
         id: _authProc
@@ -294,7 +294,7 @@ Singleton {
         if (!query || !root.available) return;
         root.error = "";
         root.searching = true;
-        _searchProc.exec(["python3", root._script, "search", query, filter || "songs"]);
+        _searchProc.exec([root._runner, "search", query, filter || "songs"]);
     }
     Process {
         id: _searchProc
@@ -307,7 +307,7 @@ Singleton {
         root.error = "";
         root.radioLoading = true;
         root.radioLyricsId = "";
-        _radioProc.exec(["python3", root._script, "radio", videoId]);
+        _radioProc.exec([root._runner, "radio", videoId]);
     }
     Process {
         id: _radioProc
@@ -321,7 +321,7 @@ Singleton {
         if (!playlistId || !root.available) return;
         root.error = "";
         root.browseLoading = true;
-        _playlistProc.exec(["python3", root._script, "playlist", playlistId]);
+        _playlistProc.exec([root._runner, "playlist", playlistId]);
     }
     Process {
         id: _playlistProc
@@ -335,7 +335,7 @@ Singleton {
         root.error = "";
         root.libraryLoading = true;
         root._libraryRequestKind = kind;
-        _libraryProc.exec(["python3", root._script, "library", kind]);
+        _libraryProc.exec([root._runner, "library", kind]);
     }
     Process {
         id: _libraryProc
@@ -360,7 +360,7 @@ Singleton {
     // ---- rating ----
     function rateSong(videoId, liked): void {
         if (!videoId || !root.available || !root.authenticated) return;
-        _rateProc.exec(["python3", root._script, "rate", videoId, liked ? "LIKE" : "INDIFFERENT"]);
+        _rateProc.exec([root._runner, "rate", videoId, liked ? "LIKE" : "INDIFFERENT"]);
     }
     Process {
         id: _rateProc
@@ -379,7 +379,7 @@ Singleton {
         if (!root.available) return;
         root.error = "";
         root.homeLoading = true;
-        _homeProc.exec(["python3", root._script, "home"]);
+        _homeProc.exec([root._runner, "home"]);
     }
     Process {
         id: _homeProc
@@ -400,7 +400,7 @@ Singleton {
         if (!browseId || !root.available) return;
         root.error = "";
         root.browseLoading = true;
-        _artistProc.exec(["python3", root._script, "artist", browseId]);
+        _artistProc.exec([root._runner, "artist", browseId]);
     }
     Process {
         id: _artistProc
@@ -421,7 +421,7 @@ Singleton {
         if (!browseId || !root.available) return;
         root.error = "";
         root.browseLoading = true;
-        _albumProc.exec(["python3", root._script, "album", browseId]);
+        _albumProc.exec([root._runner, "album", browseId]);
     }
     Process {
         id: _albumProc
@@ -441,7 +441,7 @@ Singleton {
     function loadLyrics(videoId, title, artist, duration): void {
         if (!videoId || !root.available) return;
         root.lyrics = ({});   // drop the previous song's lyrics immediately, even if the new fetch fails
-        _lyricsProc.exec(["python3", root._script, "lyrics", videoId,
+        _lyricsProc.exec([root._runner, "lyrics", videoId,
                           title || "", artist || "", String(Math.round(duration || 0))]);
     }
     Process {

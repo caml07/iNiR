@@ -136,7 +136,7 @@ complete -c inir -n '__fish_seen_subcommand_from osdVolume osd-volume' -a 'trigg
 complete -c inir -n '__fish_seen_subcommand_from osk' -a 'toggle close open'
 complete -c inir -n '__fish_seen_subcommand_from overlay' -a 'toggle'
 complete -c inir -n '__fish_seen_subcommand_from overview' -a 'toggle close open toggleReleaseInterrupt clipboardToggle actionOpen'
-complete -c inir -n '__fish_seen_subcommand_from orbit' -a 'toggle close open'
+complete -c inir -n '__fish_seen_subcommand_from orbit' -a 'toggle close open pocket studio find stage orbital next previous status toggleView'
 complete -c inir -n '__fish_seen_subcommand_from packageSearch package-search' -a 'search results'
 complete -c inir -n '__fish_seen_subcommand_from panelFamily panel-family' -a 'cycle set'
 complete -c inir -n '__fish_seen_subcommand_from region' -a 'screenshot search googleLens ocr record recordWithSound'

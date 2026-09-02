@@ -398,12 +398,17 @@ Singleton {
         persistenceSupported: true
 
         onNotification: (notification) => {
-            // Filter out niri screenshot notifications (TaskView preview captures)
-            if (notification.appName === "niri" &&
-                (notification.summary?.toLowerCase().includes("screenshot") ||
-                 notification.body?.toLowerCase().includes("screenshot"))) {
-                return;
-            }
+            // Niri's screenshot-window IPC always emits a desktop notification, even
+            // when iNiR only asked it for an internal preview cache frame. Match the
+            // stable message signature rather than appName (which differs across
+            // packaging/desktop integration), and suppress it only during an internal
+            // preview capture so real user screenshots keep their notification.
+            const summaryLower = String(notification.summary ?? "").toLowerCase()
+            const bodyLower = String(notification.body ?? "").toLowerCase()
+            const niriScreenshotNotice = summaryLower.includes("screenshot captured")
+                && bodyLower.includes("paste the image from the clipboard")
+            if (GlobalStates.windowPreviewCaptureActive && niriScreenshotNotice)
+                return
 
             if (!_ingressAllowed(notification)) {
                 return;

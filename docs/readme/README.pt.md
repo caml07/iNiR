@@ -273,6 +273,7 @@ Veja [CONTRIBUTING.md](../../CONTRIBUTING.md) para setup de desenvolvimento, pad
 ## Créditos
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — illogical-impulse original para Hyprland
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — um fork que de vez em quando tem uma ideia realmente boa
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — o framework que alimenta este shell
 - [**Niri**](https://github.com/YaLTeR/niri) — o compositor Wayland de tiling com scroll
 

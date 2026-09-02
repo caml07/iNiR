@@ -288,7 +288,8 @@ ${end_marker}
 "
   local shell_file=""
 
-  for shell_file in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
+  for shell_file in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc" \
+                    "$HOME/.zprofile" "$HOME/.zshrc"; do
     touch "$shell_file"
     sed -i "/${marker}/,/${end_marker}/d" "$shell_file" 2>/dev/null || true
     printf '%s\n' "$sh_block" >> "$shell_file"
@@ -301,6 +302,38 @@ if not contains -- "${launcher_dir}" \$PATH
     set -gx PATH "${launcher_dir}" \$PATH
 end
 EOF
+
+  if command -v systemctl >/dev/null 2>&1; then
+    local manager_path
+    manager_path="$(systemctl --user show-environment 2>/dev/null \
+      | sed -n 's/^PATH=//p' | head -1)"
+    if [[ -n "$manager_path" ]]; then
+      case ":${manager_path}:" in
+        *":${launcher_dir}:"*) ;;
+        *) systemctl --user set-environment "PATH=${launcher_dir}:${manager_path}" 2>/dev/null || true ;;
+      esac
+    fi
+  fi
+}
+
+function niri_can_resolve_launcher_dir(){
+  local launcher_dir="$1"
+  local niri_pid=""
+  local niri_path=""
+
+  command -v pgrep >/dev/null 2>&1 || return 1
+  niri_pid="$(pgrep -xo niri 2>/dev/null || true)"
+  [[ -n "$niri_pid" ]] || return 0
+  [[ -r "/proc/${niri_pid}/environ" ]] || return 1
+
+  niri_path="$(tr '\0' '\n' < "/proc/${niri_pid}/environ" \
+    | sed -n 's/^PATH=//p' | head -1)"
+  [[ -n "$niri_path" ]] || return 1
+
+  case ":${niri_path}:" in
+    *":${launcher_dir}:"*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 function backup_clashing_targets(){
@@ -375,4 +408,65 @@ function can_elevate() {
   else
     return 1  # No way to elevate
   fi
+}
+
+inir_user_service_is_masked() {
+  local service_path="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/inir.service"
+  local state
+
+  if [[ -L "$service_path" ]] && [[ "$(readlink -f "$service_path" 2>/dev/null || true)" == "/dev/null" ]]; then
+    return 0
+  fi
+
+  command -v systemctl >/dev/null 2>&1 || return 1
+  state="$(systemctl --user is-enabled inir.service 2>/dev/null || true)"
+  [[ "$state" == "masked" || "$state" == "masked-runtime" ]]
+}
+
+repair_legacy_quickshell_malloc_environment() {
+  local conf="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/quickshell-mem.conf"
+  local repaired=0
+  local legacy_owned=false
+
+  INIR_LEGACY_MALLOC_ENV_REPAIRED=0
+
+  if [[ -f "$conf" ]] && grep -Eq \
+      '^[[:space:]]*MALLOC_ARENA_MAX=2[[:space:]]*$|^[[:space:]]*MALLOC_MMAP_THRESHOLD_=131072[[:space:]]*$' \
+      "$conf" 2>/dev/null; then
+    legacy_owned=true
+    local tmp="${conf}.inir-repair.$$"
+
+    if ! grep -Ev \
+        '^[[:space:]]*MALLOC_ARENA_MAX=2[[:space:]]*$|^[[:space:]]*MALLOC_MMAP_THRESHOLD_=131072[[:space:]]*$|^# Quickshell/iNiR memory optimization[[:space:]]*$|^# Prevents glibc malloc arenas from retaining freed wallpaper textures\.[[:space:]]*$|^# See: scripts/quickshell-env\.sh for details\.[[:space:]]*$' \
+        "$conf" > "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+
+    if grep -q '[^[:space:]]' "$tmp" 2>/dev/null; then
+      mv "$tmp" "$conf"
+    else
+      rm -f "$tmp" "$conf"
+    fi
+    repaired=1
+  fi
+
+  if $legacy_owned; then
+    [[ "${MALLOC_ARENA_MAX:-}" == "2" ]] && unset MALLOC_ARENA_MAX
+    [[ "${MALLOC_MMAP_THRESHOLD_:-}" == "131072" ]] && unset MALLOC_MMAP_THRESHOLD_
+
+    if command -v systemctl >/dev/null 2>&1; then
+      local manager_env=""
+      manager_env="$(systemctl --user show-environment 2>/dev/null || true)"
+      if grep -qx 'MALLOC_ARENA_MAX=2' <<< "$manager_env"; then
+        systemctl --user unset-environment MALLOC_ARENA_MAX >/dev/null 2>&1 || true
+      fi
+      if grep -qx 'MALLOC_MMAP_THRESHOLD_=131072' <<< "$manager_env"; then
+        systemctl --user unset-environment MALLOC_MMAP_THRESHOLD_ >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  INIR_LEGACY_MALLOC_ENV_REPAIRED=$repaired
+  return 0
 }

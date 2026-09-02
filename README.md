@@ -223,7 +223,7 @@ sudo make install       # system-wide instead of your home
 ./setup rollback        # undo the last update
 ```
 
-**Distros:** Arch gets the automated installer. Everything else installs by hand, the [package list](https://github.com/snowarch/inir/wiki/PACKAGES) tells you what you need.
+**Distros:** Arch is the primary target. Fedora and Debian/Ubuntu also have automated dependency paths with distro-repository-first fallbacks; other distributions use the generic guidance in the [package list](https://github.com/snowarch/inir/wiki/PACKAGES).
 
 ---
 
@@ -288,6 +288,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code patterns, and
 ## Credits
 
 - [**end-4**](https://github.com/end-4/dots-hyprland): illogical-impulse, the Hyprland dots iNiR forked from
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC): a fork that occasionally has a genuinely good idea
 - [**Gakuseei**](https://github.com/Gakuseei): [Ricelin](https://github.com/Gakuseei/Ricelin), where the pill bar and the washi and flame look come from
 - [**Quickshell**](https://quickshell.outfoxxed.me/): the framework this runs on
 - [**Niri**](https://github.com/YaLTeR/niri): the compositor it's built for

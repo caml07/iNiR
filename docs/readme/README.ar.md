@@ -287,6 +287,7 @@ inir repair                     # doctor + إعادة تشغيل + فحص سجل
 ## الشكر والتقدير
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — illogical-impulse الأصلي لـ Hyprland
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — تفريعة تخرج أحيانًا بفكرة جيدة فعلًا
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — الإطار الذي يشغّل هذه الواجهة
 - [**Niri**](https://github.com/YaLTeR/niri) — مُركّب Wayland للتبليط بالتمرير
 

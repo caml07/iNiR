@@ -273,6 +273,7 @@ inir repair                     # doctor + перезапуск + проверк
 ## Благодарности
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — оригинальный illogical-impulse для Hyprland
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — форк, у которого иногда бывают действительно хорошие идеи
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — фреймворк, на котором работает этот шелл
 - [**Niri**](https://github.com/YaLTeR/niri) — скроллинговый тайлинговый Wayland-композитор
 

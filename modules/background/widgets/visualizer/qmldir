@@ -1,2 +1,3 @@
 module qs.modules.background.widgets.visualizer
+OrganicAudioBlob 1.0 OrganicAudioBlob.qml
 VisualizerWidget 1.0 VisualizerWidget.qml

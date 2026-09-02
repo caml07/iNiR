@@ -273,6 +273,7 @@ issue を開く前に [LIMITATIONS.md](../LIMITATIONS.md) を確認してくだ�
 ## クレジット
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — Hyprland 向けオリジナル illogical-impulse
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — たまに本当にいいアイデアを出すフォーク
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — このシェルを動かすフレームワーク
 - [**Niri**](https://github.com/YaLTeR/niri) — スクロール式タイリング Wayland コンポジター
 

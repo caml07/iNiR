@@ -84,7 +84,6 @@ check_dependencies() {
         "playerctl:playerctl"
         "notify-send:libnotify"
         "flock:util-linux"
-        "go:go"
         "wlsunset:wlsunset"
         "easyeffects:EasyEffects"
         "uv:uv"
@@ -101,7 +100,6 @@ check_dependencies() {
         "blueman-manager:Blueman"
         "gowall:gowall"
         "kwriteconfig6:KConfig"
-        "checkupdates:pacman-contrib"
         "ddcutil:ddcutil"
         "missioncenter:mission-center"
         "nm-connection-editor:nm-connection-editor"
@@ -113,6 +111,13 @@ check_dependencies() {
         "trans:translate-shell"
     )
 
+    # Arch's update service uses checkupdates from pacman-contrib. Other
+    # distros have their own package managers, so treating it as a universal
+    # runtime dependency creates a permanently-failing Doctor result.
+    if [[ "${OS_GROUP_ID:-unknown}" == "arch" ]]; then
+        cmds+=("checkupdates:pacman-contrib")
+    fi
+
     # Check required commands
     for item in "${cmds[@]}"; do
         local cmd="${item%%:*}"
@@ -120,6 +125,41 @@ check_dependencies() {
         if ! command -v "$cmd" &>/dev/null; then
             missing+=("$name")
             missing_cmds+=("$cmd")
+        fi
+    done
+
+    # Tesseract itself can be installed while the language data iNiR exposes in
+    # Settings is absent. Treat those models as first-class dependencies so an
+    # existing install can be repaired instead of failing every OCR attempt.
+    local tesseract_langs=""
+    if command -v tesseract &>/dev/null; then
+        tesseract_langs="$(tesseract --list-langs 2>/dev/null | tail -n +2)"
+        local inir_tessdata="${XDG_DATA_HOME:-$HOME/.local/share}/inir/tessdata"
+        if [[ -d "$inir_tessdata" ]]; then
+            local cached_model
+            for cached_model in "$inir_tessdata"/*.traineddata; do
+                [[ -e "$cached_model" ]] || continue
+                tesseract_langs+=$'\n'"$(basename "$cached_model" .traineddata)"
+            done
+        fi
+    fi
+    local ocr_models=(
+        "eng:ocr-eng:OCR English data"
+        "spa:ocr-spa:OCR Spanish data"
+        "rus:ocr-rus:OCR Russian data"
+        "jpn:ocr-jpn:OCR Japanese data"
+        "jpn_vert:ocr-jpn-vert:OCR Japanese vertical data"
+        "chi_sim:ocr-chi-sim:OCR Simplified Chinese data"
+        "chi_sim_vert:ocr-chi-sim-vert:OCR Simplified Chinese vertical data"
+        "chi_tra:ocr-chi-tra:OCR Traditional Chinese data"
+        "chi_tra_vert:ocr-chi-tra-vert:OCR Traditional Chinese vertical data"
+    )
+    local ocr_spec ocr_lang ocr_id ocr_name
+    for ocr_spec in "${ocr_models[@]}"; do
+        IFS=: read -r ocr_lang ocr_id ocr_name <<<"$ocr_spec"
+        if ! grep -Fxq "$ocr_lang" <<<"$tesseract_langs"; then
+            missing+=("$ocr_name")
+            missing_cmds+=("$ocr_id")
         fi
     done
     
@@ -599,7 +639,7 @@ check_fonts() {
         for font in "${missing_critical[@]}" "${missing_important[@]}"; do
             case "$font" in
                 "Material Symbols Rounded")
-                    _try_install_font_package "ttf-material-symbols-variable-git" "Material Symbols Rounded" && ((fixed++)) || true ;;
+                    _try_install_font_package "ttf-material-symbols-variable" "Material Symbols Rounded" && ((fixed++)) || true ;;
                 "JetBrainsMono Nerd Font")
                     _try_install_font_package "ttf-jetbrains-mono-nerd" "JetBrainsMono Nerd Font" && ((fixed++)) || true ;;
                 "Roboto Flex")
@@ -837,6 +877,12 @@ check_service_unit_health() {
     installed_strategy="$(get_installed_update_strategy)"
     service_path="${XDG_CONFIG_HOME}/systemd/user/inir.service"
     expected_target="$(doctor_detect_compositor_service 2>/dev/null || true)"
+
+    if inir_user_service_is_masked; then
+        doctor_fail "User inir.service is masked"
+        echo -e "    ${STY_FAINT}Run: inir service install && inir service enable${STY_RST}"
+        return 0
+    fi
 
     if [[ ! -f "$service_path" ]]; then
         if [[ "$installed_strategy" == "package-manager" ]]; then
@@ -1400,6 +1446,13 @@ check_wallpaper_health() {
 check_environment_vars() {
     local venv_path="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/.venv"
     local fixed=0
+    local legacy_malloc_repaired=0
+
+    if repair_legacy_quickshell_malloc_environment; then
+        legacy_malloc_repaired="${INIR_LEGACY_MALLOC_ENV_REPAIRED:-0}"
+    else
+        doctor_fail "Could not clean legacy Quickshell allocator environment"
+    fi
     
     # Check bash — look for INIR_VENV (canonical) or ILLOGICAL_IMPULSE_VIRTUAL_ENV (legacy)
     if [[ -f "$HOME/.bashrc" ]] && ! grep -q "INIR_VENV" "$HOME/.bashrc" 2>/dev/null; then
@@ -1437,6 +1490,10 @@ ZEOF
         ((fixed++)) || true
     fi
     
+    if [[ $legacy_malloc_repaired -gt 0 ]]; then
+        doctor_fix "Removed legacy global Quickshell allocator tuning"
+    fi
+
     if [[ $fixed -gt 0 ]]; then
         doctor_fix "Added environment variables to $fixed shell profile(s)"
     else

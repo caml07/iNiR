@@ -37,6 +37,18 @@ Item {
 
     // ── Internal state ─────────────────────────────────────────────────
     property bool _transitioning: false
+    readonly property var shaderTransitionTypes: [
+        "circlePit", "circleSelect", "magic", "Doom", "Peel", "transition",
+        "pixelate", "stripes", "crt", "dissolve", "glitch", "ripple", "shatter",
+        "inirMelt", "inirVeil", "inirFracture", "inirInk", "inirPrism"
+    ]
+    readonly property bool shaderTransitionRequested: isShaderTransitionType(transitionType)
+        || String(transitionType ?? "") === "shaderRandom"
+    readonly property bool transitionBusy: _transitioning
+        || internal.pendingSource !== "" || internal.loadingSource !== ""
+    readonly property bool shaderTransitionBusy: shaderTransitionRequested && transitionBusy
+    property string _activeShader: ""
+    readonly property bool _shaderRenderActive: _transitioning && _activeShader !== ""
     readonly property bool _canTransition: enableTransitions && Appearance.animationsEnabled && _normalizedTransitionType(transitionType) !== "none"
     readonly property string _effectiveType: _canTransition ? _normalizedTransitionType(transitionType) : "none"
     readonly property real _zoomEnterFrom: 1.12
@@ -103,6 +115,19 @@ Item {
 
     function _clamp01(value: real): real {
         return Math.max(0, Math.min(1, value))
+    }
+
+    function isShaderTransitionType(rawType): bool {
+        return shaderTransitionTypes.indexOf(String(rawType ?? "")) >= 0
+    }
+
+    function _resolvedShaderName(): string {
+        const raw = String(transitionType ?? "")
+        if (raw === "shaderRandom") {
+            const index = Math.floor(Math.random() * shaderTransitionTypes.length)
+            return shaderTransitionTypes[Math.max(0, Math.min(shaderTransitionTypes.length - 1, index))]
+        }
+        return isShaderTransitionType(raw) ? raw : ""
     }
 
     function _normalizedTransitionType(rawType: string): string {
@@ -322,6 +347,7 @@ Item {
             if (pendingSource === "" || pendingSource === displayedSource)
                 return
 
+            root._activeShader = root.shaderTransitionRequested ? root._resolvedShaderName() : ""
             root._transitioning = true
             root._transitionWidthSnapshot = Math.max(1, root.width)
             root._transitionHeightSnapshot = Math.max(1, root.height)
@@ -359,6 +385,7 @@ Item {
             internal.inactiveImage().source = ""
         }
 
+        _activeShader = ""
         transitionFinished()
         if (internal.pendingSource !== "" && internal.pendingSource !== internal.displayedSource)
             internal.loadPending()
@@ -381,6 +408,10 @@ Item {
     function _slotOpacity(slotIndex: int): real {
         if (!_transitioning)
             return internal.activeIndex === slotIndex ? 1 : 0
+
+        if (_shaderRenderActive)
+            return internal.transitionFromIndex === slotIndex
+                || internal.transitionToIndex === slotIndex ? 1 : 0
 
         const progress = _clamp01(transitionState.progress)
         const isFrom = internal.transitionFromIndex === slotIndex
@@ -408,6 +439,8 @@ Item {
 
     function _slotX(slotIndex: int): real {
         if (!_transitioning)
+            return 0
+        if (_shaderRenderActive)
             return 0
 
         const progress = _clamp01(transitionState.progress)
@@ -446,6 +479,8 @@ Item {
 
     function _slotY(slotIndex: int): real {
         if (!_transitioning)
+            return 0
+        if (_shaderRenderActive)
             return 0
 
         const progress = _clamp01(transitionState.progress)
@@ -494,6 +529,9 @@ Item {
                 return internal.activeIndex === slotIndex ? 1 : _zoomEnterFrom
             return 1
         }
+
+        if (_shaderRenderActive)
+            return 1
 
         const progress = _clamp01(transitionState.progress)
         const isFrom = internal.transitionFromIndex === slotIndex
@@ -588,6 +626,7 @@ Item {
         height: root._slotWrapperHeight(0)
         clip: root._slotClipEnabled(0)
         visible: root._slotVisible(0)
+        opacity: root._shaderRenderActive ? 0 : 1
         z: root._slotZ(0)
 
         Image {
@@ -633,6 +672,7 @@ Item {
         height: root._slotWrapperHeight(1)
         clip: root._slotClipEnabled(1)
         visible: root._slotVisible(1)
+        opacity: root._shaderRenderActive ? 0 : 1
         z: root._slotZ(1)
 
         Image {
@@ -667,6 +707,43 @@ Item {
                 blur: root._slotBlur(1)
                 blurMax: 64
             }
+        }
+    }
+
+
+    ShaderEffect {
+        id: shaderTransition
+        anchors.fill: parent
+        z: 20
+        visible: root._shaderRenderActive
+
+        property var fromImage: internal.transitionFromIndex === 0 ? img0 : img1
+        property var toImage: internal.transitionToIndex === 0 ? img0 : img1
+        // Qt's default fragment shader is active while no transition QSB is
+        // selected and expects a sampler named `source`. Keep it bound to the
+        // outgoing image so the idle ShaderEffect is valid too; transition QSBs
+        // use their own fromImage/toImage or source1/source2 samplers.
+        property var source: fromImage
+        property var source1: fromImage
+        property var source2: toImage
+        property real time: 0
+        property real progress: root._clamp01(transitionState.progress)
+        property real aspectX: width / Math.max(1, height)
+        property real aspectY: 1
+        property vector2d aspectRatio: Qt.vector2d(aspectX, aspectY)
+        property vector2d origin: Qt.vector2d(0.5, 0.5)
+
+        fragmentShader: root._activeShader !== ""
+            ? Qt.resolvedUrl("wallpaperTransitions/" + root._activeShader + ".frag.qsb")
+            : ""
+
+        onVisibleChanged: if (!visible) time = 0
+
+        Timer {
+            interval: 16
+            repeat: true
+            running: shaderTransition.visible
+            onTriggered: shaderTransition.time += interval / 1000
         }
     }
 

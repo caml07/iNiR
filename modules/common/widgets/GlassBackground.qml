@@ -40,6 +40,8 @@ Rectangle {
         ? Appearance.effectsEnabled
         : (Appearance.blurBackendFor("panels", Appearance.blurTopology.unsupported) === "wallpaper"
             && root.wallpaperBackdropEnabled)
+    readonly property bool backdropReady: !root.useWallpaperBackdrop
+        || blurredWallpaper.status === Image.Ready
     
     color: root.useWallpaperBackdrop ? "transparent"
         : root.inirEverywhere ? root.inirColor

@@ -256,9 +256,21 @@ install-python-packages(){
   fi
 
   if [[ -f "$requirements_file" ]]; then
+    local system_python
+    system_python="$(command -v python3 2>/dev/null || true)"
     source "$venv_dir/bin/activate"
     x uv pip install -r "$requirements_file"
+    # InnerTube normally uses distro-provided ytmusicapi so Arch/Fedora/Ubuntu
+    # stay entirely on their configured mirrors. Debian stable does not package
+    # it yet; install a venv copy only when system Python cannot import it.
+    if { [[ -z "$system_python" ]] || ! "$system_python" -c 'import ytmusicapi' >/dev/null 2>&1; } \
+        && ! "$venv_dir/bin/python" -c 'import ytmusicapi' >/dev/null 2>&1; then
+      log_info "System ytmusicapi unavailable — installing iNiR venv fallback..."
+      uv pip install --python "$venv_dir/bin/python" ytmusicapi || \
+        log_warning "Could not install ytmusicapi fallback — InnerTube browsing may be unavailable"
+    fi
     deactivate
+    unset system_python
   else
     log_warning "requirements.txt not found"
   fi

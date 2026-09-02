@@ -434,7 +434,7 @@
                 "pauseOnGameMode": true,
                 "pauseOnFullscreen": true,
                 "pauseWhenWindowsPresent": false,
-                "showPausedEffect": true
+                "showPausedEffect": false
             },
             "clock": {
                 "cookie": {
@@ -1381,6 +1381,10 @@
         "workspaceSpacing": 5
     },
     "orbit": {
+        "backdropBlurMode": "shell",
+        "backdropBlurSaturation": 18,
+        "backdropBlurStrength": 72,
+        "backdropBlurTint": 28,
         "balancedGrid": true,
         "closeOnSelect": true,
         "enable": true,
@@ -1388,11 +1392,40 @@
         "hotCornerDwellMs": 0,
         "hotCornerEnable": true,
         "hotCornerSize": 12,
+        "hotCornerActivationDistance": 2,
         "maxPanelWidthPercent": 92,
-        "motionStyle": "spring",
+        "studio": {
+            "density": "compact",
+            "showDescriptions": true,
+            "surfaceStyle": "ricelin",
+            "widthPercent": 26
+        },
+        "presentation": {
+            "advanced": false,
+            "direction": "top",
+            "distance": 92,
+            "enterDurationMs": 300,
+            "entryDelayMs": 64,
+            "entryOpacityPercent": 0,
+            "entryStaggerMs": 42,
+            "entryStyle": "cascade",
+            "exitDurationMs": 220,
+            "preset": "adaptive",
+            "shelfDelayMs": 72
+        },
+        "navigationMotion": {
+            "advanced": false,
+            "durationMs": 320,
+            "easing": "smooth",
+            "preset": "fluid"
+        },
         "scrimDim": 35,
+        "canvasScrubNavigation": true,
+        "canvasScrubThreshold": 96,
         "scrollNavigation": true,
         "scrollSteps": 1,
+        "scrollSwitchWorkspace": true,
+        "scrollWrapAround": false,
         "showStash": true,
         "showTrail": true,
         "showWorkspaceNumbers": true,
@@ -1441,6 +1474,19 @@
     },
     "regionSelector": {
         "rememberSnipChoice": true,
+        "ocrLanguage": "auto",
+        "japaneseLookup": {
+            "enabled": true,
+            "translationTarget": "auto",
+            "anki": {
+                "enabled": false,
+                "endpoint": "http://127.0.0.1:8765",
+                "deck": "Default",
+                "model": "Basic",
+                "frontField": "Front",
+                "backField": "Back"
+            }
+        },
         "lastAction": 0,
         "lastMode": 0,
         "circle": {
@@ -1514,6 +1560,10 @@
         "booru": {
             "allowNsfw": false,
             "defaultProvider": "yandere",
+            "gelbooru": {
+                "apiKey": "",
+                "userId": ""
+            },
             "downloadPath": {
                 "sfw": "",
                 "nsfw": ""

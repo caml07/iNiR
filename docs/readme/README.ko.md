@@ -273,6 +273,7 @@ inir repair                     # doctor + 재시작 + 필터링된 로그 확�
 ## 크레딧
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — Hyprland용 오리지널 illogical-impulse
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — 가끔은 정말 좋은 아이디어를 내는 포크
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — 이 셸을 구동하는 프레임워크
 - [**Niri**](https://github.com/YaLTeR/niri) — 스크롤링 타일링 Wayland 컴포지터
 

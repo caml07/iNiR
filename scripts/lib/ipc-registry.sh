@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 4c84576f3a708194
+# IPC.md hash: ad3bc64cdc20439b
 # Targets: 61
 
 declare -gA IPC_TARGET_DESC=(
@@ -162,7 +162,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [minimize]="minimize minimizeId restore restoreOriginal"
   [mpris]="pauseAll playPause previous next"
   [notifications]="test clearAll toggleSilent"
-  [orbit]="toggle close open"
+  [orbit]="toggle close open pocket studio find stage orbital next previous status toggleView"
   [osd]="trigger"
   [osdVolume]="trigger hide toggle"
   [osk]="toggle close open"
@@ -323,6 +323,15 @@ declare -gA IPC_FUNCTION_DESC=(
   ["orbit:toggle"]="Open/close Orbit"
   ["orbit:close"]="Close Orbit if it is active"
   ["orbit:open"]="Open Orbit on the focused output"
+  ["orbit:pocket"]="Open Orbit directly into Pocket"
+  ["orbit:studio"]="Open Orbit directly into the live Studio editor"
+  ["orbit:find"]="Open Orbit Focus Lens and filter session windows by app or title"
+  ["orbit:stage"]="Open Orbit in the classic Stage view for this session"
+  ["orbit:orbital"]="Open Orbit in the Orbital workspace view for this session"
+  ["orbit:next"]="Switch Niri to the next workspace while Orbit stays open"
+  ["orbit:previous"]="Switch Niri to the previous workspace while Orbit stays open"
+  ["orbit:status"]="Print the effective Orbit runtime state used by diagnostics and visual audits"
+  ["orbit:toggleView"]="Switch the open Orbit session between Stage and Orbital"
   ["osd:trigger"]="Show the OSD indicator"
   ["osdVolume:trigger"]="Show volume OSD"
   ["osdVolume:hide"]="Hide volume OSD"
@@ -491,6 +500,7 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["minimize:minimizeId"]="<windowId>"
   ["minimize:restore"]="<windowId>"
   ["minimize:restoreOriginal"]="<windowId>"
+  ["orbit:find"]="<query>"
   ["packageSearch:search"]="<query>"
   ["panelFamily:set"]="<family>"
   ["pill:open"]="<surface>"

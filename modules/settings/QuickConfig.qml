@@ -19,7 +19,7 @@ ContentPage {
     property string activeSection: "wallpaper"
     property string captureFolderTarget: "recordings"
     readonly property string effectiveRecordingPath: {
-        const configured = Config.options?.screenRecord?.savePath ?? ""
+        const configured = String(Config.getNestedValue("screenRecord.savePath", ""))
         return configured.length > 0 ? configured : Directories.videosPath
     }
     readonly property string effectiveScreenshotPath: Directories.screenshotsPath
@@ -1715,16 +1715,6 @@ ContentPage {
                         ]
                     }
 
-                    SettingsSwitch {
-                        visible: Config.options?.background?.backdrop?.hideWallpaper ?? false
-                        buttonIcon: "fit_screen"
-                        text: Translation.tr("Show entire backdrop")
-                        checked: (Config.options?.background?.backdrop?.fillMode ?? "fill") === "fit"
-                        onCheckedChanged: Config.setNestedValue("background.backdrop.fillMode", checked ? "fit" : "fill")
-                        StyledToolTip {
-                            text: Translation.tr("Fit the full backdrop inside the screen instead of cropping it. Bars may appear when the image aspect ratio differs from the display.")
-                        }
-                    }
                 }
             }
         }

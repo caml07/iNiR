@@ -78,7 +78,7 @@ AbstractBackgroundWidget {
                         { label: Translation.tr("CPU"), icon: "memory", key: "showCpu", active: root.showCpu },
                         { label: Translation.tr("RAM"), icon: "storage", key: "showMemory", active: root.showMemory },
                         { label: Translation.tr("GPU"), icon: "developer_board", key: "showGpu", active: root.showGpu },
-                        { label: Translation.tr("Temp"), icon: "thermostat", key: "showTemp", active: root.showTemp },
+                        { label: Translation.tr("CPU temp"), icon: "thermostat", key: "showTemp", active: root.showTemp },
                         { label: Translation.tr("GPU temp"), icon: "device_thermostat", key: "showGpuTemp", active: root.showGpuTemp },
                         { label: Translation.tr("Disk"), icon: "hard_drive", key: "showDisk", active: root.showDisk }
                     ]
@@ -119,7 +119,7 @@ AbstractBackgroundWidget {
         if (root.showCpu) items.push({ icon: "memory", label: Translation.tr("CPU"), key: "cpu" });
         if (root.showMemory) items.push({ icon: "storage", label: Translation.tr("RAM"), key: "mem" });
         if (root.showGpu) items.push({ icon: "developer_board", label: Translation.tr("GPU"), key: "gpu" });
-        if (root.showTemp) items.push({ icon: "thermostat", label: Translation.tr("Temp"), key: "temp" });
+        if (root.showTemp) items.push({ icon: "thermostat", label: Translation.tr("CPU temp"), key: "temp" });
         if (root.showGpuTemp) items.push({ icon: "device_thermostat", label: Translation.tr("GPU temp"), key: "gpuTemp" });
         if (root.showDisk) items.push({ icon: "hard_drive", label: Translation.tr("Disk"), key: "disk" });
         return items;
@@ -131,7 +131,7 @@ AbstractBackgroundWidget {
             case "cpu": return ResourceUsage.cpuUsage;
             case "mem": return ResourceUsage.memoryUsedPercentage;
             case "gpu": return ResourceUsage.gpuUsage;
-            case "temp": return ResourceUsage.tempPercentage;
+            case "temp": return Math.min(ResourceUsage.cpuTemp / 100, 1.0);
             case "gpuTemp": return ResourceUsage.gpuTempPercentage;
             case "disk": return ResourceUsage.diskUsedPercentage;
             default: return 0;
@@ -151,7 +151,7 @@ AbstractBackgroundWidget {
     }
 
     function _getDisplayText(key: string): string {
-        if (key === "temp") return ResourceUsage.maxTemp + "°C";
+        if (key === "temp") return ResourceUsage.cpuTemp + "°C";
         if (key === "gpuTemp") return ResourceUsage.gpuTemp + "°C";
         return Math.round(root._getValue(key) * 100) + "%";
     }
@@ -554,7 +554,7 @@ AbstractBackgroundWidget {
                     // Percentage/value inside the ring
                     StyledText {
                         anchors.centerIn: parent
-                        text: ringCol.modelData.key === "temp" ? ResourceUsage.maxTemp + "°"
+                        text: ringCol.modelData.key === "temp" ? ResourceUsage.cpuTemp + "°"
                             : ringCol.modelData.key === "gpuTemp" ? ResourceUsage.gpuTemp + "°"
                             : Math.round(ringCol._animatedValue * 100)
                         color: ringCol._liveColor

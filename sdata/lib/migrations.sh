@@ -29,6 +29,21 @@ fi
 MIGRATIONS_STATE_FILE="${_inir_config_dir}/migrations.json"
 MIGRATIONS_BACKUP_DIR="${_inir_config_dir}/backups"
 
+# Historical migrations whose side effects are no longer part of the product.
+# Keep their files for upgrade history, but never execute them again.
+RETIRED_MIGRATIONS=(
+    "014-malloc-arena-optimization"
+)
+
+is_migration_retired() {
+    local migration_id="$1"
+    local retired
+    for retired in "${RETIRED_MIGRATIONS[@]}"; do
+        [[ "$migration_id" == "$retired" ]] && return 0
+    done
+    return 1
+}
+
 #####################################################################################
 # Migration State Management
 #####################################################################################
@@ -144,6 +159,8 @@ list_available_migrations() {
 # Check if a migration is actually needed (runs the check function)
 is_migration_needed() {
     local migration_id="$1"
+
+    is_migration_retired "$migration_id" && return 1
     
     load_migration "$migration_id" 2>/dev/null || return 1
     
@@ -250,6 +267,12 @@ apply_migration() {
     local force="${2:-false}"
     
     load_migration "$migration_id" || return 1
+
+    if is_migration_retired "$migration_id"; then
+        mark_migration_applied "$migration_id"
+        tui_check_skip "Retired migration: $MIGRATION_TITLE"
+        return 0
+    fi
     
     # Check if already applied
     if is_migration_applied "$migration_id" && [[ "$force" != "true" ]]; then

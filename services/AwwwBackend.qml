@@ -184,6 +184,15 @@ Singleton {
         return ["none", "simple", "fade", "left", "right", "top", "bottom", "wipe", "wave", "grow", "center", "any", "outer", "random"].includes(String(type ?? ""))
     }
 
+    function isInternalShaderTransitionType(type): bool {
+        return [
+            "circlePit", "circleSelect", "magic", "Doom", "Peel", "transition",
+            "pixelate", "stripes", "crt", "dissolve", "glitch", "ripple",
+            "shatter", "inirMelt", "inirVeil", "inirFracture", "inirInk",
+            "inirPrism", "shaderRandom"
+        ].includes(String(type ?? ""))
+    }
+
     function normalizedAwwwTransitionType(type, directionValue = transitionDirection): string {
         const rawType = String(type ?? "crossfade")
         if (isAwwwNativeTransitionType(rawType))
@@ -207,6 +216,11 @@ Singleton {
 
     function _mappedTransitionType(): string {
         if (!transitionsEnabled)
+            return "none"
+        // Shader transitions are drawn by the shared in-shell crossfader as a
+        // transient overlay. awww still receives the final wallpaper, but must
+        // switch it instantly underneath instead of running a second effect.
+        if (isInternalShaderTransitionType(transitionType))
             return "none"
         return normalizedAwwwTransitionType(transitionType, transitionDirection)
     }

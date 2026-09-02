@@ -273,6 +273,7 @@ Vedi [CONTRIBUTING.md](../../CONTRIBUTING.md) per la configurazione dell'ambient
 ## Crediti
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — illogical-impulse originale per Hyprland
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — un fork che ogni tanto ha un’idea davvero buona
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — il framework che alimenta questa shell
 - [**Niri**](https://github.com/YaLTeR/niri) — il compositor Wayland a tiling con scorrimento
 

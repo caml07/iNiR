@@ -85,6 +85,15 @@ Niri-only Material session navigator for the ii family. Orbit presents nearby wo
 | `toggle` | Open/close Orbit |
 | `open` | Open Orbit on the focused output |
 | `close` | Close Orbit if it is active |
+| `pocket` | Open Orbit directly into Pocket |
+| `studio` | Open Orbit directly into the live Studio editor |
+| `find` | Open Orbit Focus Lens and filter session windows by app or title |
+| `stage` | Open Orbit in the classic Stage view for this session |
+| `orbital` | Open Orbit in the Orbital workspace view for this session |
+| `next` | Switch Niri to the next workspace while Orbit stays open |
+| `previous` | Switch Niri to the previous workspace while Orbit stays open |
+| `status` | Print the effective Orbit runtime state used by diagnostics and visual audits |
+| `toggleView` | Switch the open Orbit session between Stage and Orbital |
 
 ---
 

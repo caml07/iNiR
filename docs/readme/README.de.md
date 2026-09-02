@@ -273,6 +273,7 @@ Siehe [CONTRIBUTING.md](../../CONTRIBUTING.md) für Entwicklungseinrichtung, Cod
 ## Danksagungen
 
 - [**end-4**](https://github.com/end-4/dots-hyprland) — Original illogical-impulse für Hyprland
+- [**pctrade/end4-pC**](https://github.com/pctrade/end4-pC) — ein Fork, der gelegentlich wirklich gute Ideen hat
 - [**Quickshell**](https://quickshell.outfoxxed.me/) — das Framework hinter dieser Shell
 - [**Niri**](https://github.com/YaLTeR/niri) — der scrollende Tiling-Wayland-Compositor
 

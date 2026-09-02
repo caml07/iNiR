@@ -2838,6 +2838,12 @@ install_user_service() {
 
     mkdir -p "$systemd_user_dir"
     mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}"
+    local service_state
+    service_state="$(systemctl --user is-enabled inir.service 2>/dev/null || true)"
+    if [[ "$service_state" == "masked" || "$service_state" == "masked-runtime" ]]; then
+        systemctl --user unmask inir.service >/dev/null 2>&1 || true
+        systemctl --user unmask --runtime inir.service >/dev/null 2>&1 || true
+    fi
     tmp_file="${XDG_CACHE_HOME:-$HOME/.cache}/inir.service.$$"
     local escaped_launcher="${launcher_path//&/\\&}"
     sed -e "s|^ExecStart=.*|ExecStart=${escaped_launcher} run --session|" \

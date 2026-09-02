@@ -464,8 +464,9 @@ turnstile or iNiR failure.
 - PR3.1 validation is complete: confirmed elevation, D-Bus user service,
   envdir propagation, `manage_rundir = no`, and removal of the Niri runsvdir
   block all passed.
-- PR3.2 implementation is complete on `feat/void-nonsystemd-runtime`; the VM
-  checkpoint is pending. Run the versioned checker over SSH from the host:
+- PR3.2 implementation and VM validation are complete on
+  `feat/void-nonsystemd-runtime` (2026-09-02). The versioned checker passed over
+  SSH from the host:
 
   ```bash
   ssh voidcaml@192.168.122.141 '
@@ -482,10 +483,14 @@ turnstile or iNiR failure.
   user bus, clean branch state, iNiR `sv` supervision, and supported
   `loginctl` power verbs. It skips XEmbed service checks when
   `xembedsniproxy` is not installed.
+- Observed result: branch `feat/void-nonsystemd-runtime`, commit `a5ca5d7e`,
+  clean checkout, `/run/user/1000`, and
+  `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. All required checks
+  passed; `xembedsniproxy` was not installed and was reported as optional.
 - PR3.3: optional systemd adapters — classify and degrade/adapt Awww, GameMode,
   Warp, captures.
 - Run shellcheck and `make test-local` before each PR.
 
-`make test-local` passed for PR3.1. ShellCheck was not available in the host
+`make test-local` passed for PR3.2. ShellCheck was not available in the host
 environment. No upstream PR has been opened; the Void port remains a fork
-progress branch until the complete VM integration gate passes.
+progress branch while PR3.3 is developed.

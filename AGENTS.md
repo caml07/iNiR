@@ -29,9 +29,10 @@ split into sequential PRs.
   - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation;
     **implementation and VM validation complete**.
   - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
-    **Implementation complete; VM checkpoint pending.** Validate with the
-    versioned checker over SSH, explicitly exporting the graphical session's
-    `/run/user/$UID` and D-Bus address when needed.
+    **Implementation and VM validation complete** on 2026-09-02; local tests
+    pass. The checker passed over SSH with the graphical session's
+    `/run/user/1000` and D-Bus address exported explicitly. `xembedsniproxy`
+    was absent and was correctly treated as optional.
   - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.

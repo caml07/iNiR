@@ -187,9 +187,9 @@ PR3 is split into four sequential PRs:
 - PR3.1 `feat/void-turnstile-session`: turnstile + elogind with confirmed elevation.
   Complete and VM validated.
 - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
-  Runtime implementation is complete; VM validation is pending. XEmbed uses a
-  runit user service so crashes are restarted by `runsv` instead of
-  `systemd-run`.
+  Implementation and VM validation are complete. XEmbed uses a runit user
+  service so crashes are restarted by `runsv` instead of `systemd-run`; the
+  service is optional when `xembedsniproxy` is not installed.
 - PR3.3 `feat/void-optional-systemd-adapters`: Awww, GameMode, Warp, captures — degrade or adapt.
 
 ## FAQ / gotchas

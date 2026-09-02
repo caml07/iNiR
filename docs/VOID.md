@@ -150,6 +150,30 @@ no-ops when the predicate is false (their `command -v systemctl` check is
 not enough — without the user-manager socket, `systemctl --user` hangs for
 10-30s).
 
+## Development PR queue
+
+The Void port is delivered as small, non-stacked pull requests to
+`snowarch/inir:prerelease`. Each branch is created from the current
+`upstream/prerelease` only after its predecessor has merged. This keeps each
+review independently mergeable and prevents a queue of stale dependent PRs.
+
+| Order | Branch | Scope | Required validation |
+|---|---|---|---|
+| 1 | `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch `make test-local`; predicate true on Arch and false in a Void non-systemd session. |
+| 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
+| 3 | `feat/void-runit-install` | Per-user runit service layout, idempotent Niri startup injection, and required system-service enablement. | Start iNiR through turnstile and the runsvdir fallback; rerun the installer step safely. |
+| 4 | `feat/void-lifecycle-controls` | Non-systemd `scripts/inir` controls and supervisor-transition migrations. | Exercise restart, kill, stop, status, and logs in the VM; retain Arch systemd behavior. |
+| 5 | `feat/void-runtime-session` | Predicate-gated runtime QML/helper paths: `sv`, `loginctl`, skipped `systemd-run`, GTK, and Niri behavior. | Exercise every changed action in Void and smoke-test its Arch path. |
+| 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
+| 7 | `feat/void-doctor-versioning` | Optional XBPS diagnostics and package-manager versioning, only if earlier phases expose a concrete need. | VM doctor checks and existing install-mode regression coverage. |
+
+Documentation and VM observations stay on the fork's `docs/void` branch while
+the port is in development; they are not opened as a separate upstream PR.
+The final integration gate is a clean Void installation on an external disk:
+clone the fork at the merged implementation commit, run iNiR's normal one-line
+installer, and record the exact commands and observations in
+`docs/VOID_VM_VALIDATION.md`.
+
 ## VM validation
 
 The detailed 2026-08-29, 2026-08-30 and 2026-08-31 VM execution log is in

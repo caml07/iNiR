@@ -22,6 +22,9 @@ Singleton {
     readonly property bool transitionsEnabled: Config.options?.background?.transition?.enable ?? true
     readonly property string transitionType: Config.options?.background?.transition?.type ?? "crossfade"
     readonly property string transitionDirection: Config.options?.background?.transition?.direction ?? "right"
+    readonly property bool internalShaderTransitionActive: transitionsEnabled
+        && Appearance.animationsEnabled
+        && root.isInternalShaderTransitionType(transitionType)
     readonly property string fillMode: Config.options?.background?.fillMode ?? "fill"
     readonly property bool animationEnabled: Config.options?.background?.enableAnimation ?? true
     readonly property string panelFamily: Config.options?.panelFamily ?? "ii"
@@ -42,6 +45,10 @@ Singleton {
     property bool warnedMissing: false
     property bool stoppedForNoOutputs: false
     property bool _queuedStopAfterApply: false
+    // Internal shaders are only a transient QML overlay. While a configured
+    // target is being painted underneath, keep that overlay alive so it never
+    // reveals the previous awww image at the end of the effect.
+    property bool shaderHandoffPending: false
 
     readonly property bool available: clientAvailable && daemonAvailable
     readonly property bool active: enabled && available
@@ -229,7 +236,9 @@ Singleton {
         if (!transitionsEnabled)
             return 255
         const mappedType = _mappedTransitionType()
-        return mappedType === "simple" || mappedType === "fade" || mappedType === "none"
+        if (mappedType === "none")
+            return 255
+        return mappedType === "simple" || mappedType === "fade"
             ? Math.max(1, simpleStep)
             : Math.max(1, spatialStep)
     }
@@ -464,6 +473,7 @@ Singleton {
 
             if (shouldStopAfterApply) {
                 root._queuedStopAfterApply = false
+                root.shaderHandoffPending = false
                 if (!stopProc.running)
                     stopProc.running = true
                 return
@@ -477,7 +487,11 @@ Singleton {
                 applyProc.command = queuedCommand
                 applyProc._pendingSignature = queuedSignature
                 applyProc.running = true
+                return
             }
+
+            if (exitCode === 0)
+                root.shaderHandoffPending = false
         }
     }
 
@@ -502,6 +516,7 @@ Singleton {
             root.lastSyncSignature = ""
             root.lastError = ""
             root.stoppedForNoOutputs = true
+            root.shaderHandoffPending = false
             root._drainPreviewQueue()
         }
     }
@@ -514,14 +529,26 @@ Singleton {
 
     onEnabledChanged: syncDebounce.restart()
     onAvailableChanged: syncDebounce.restart()
-    onGlobalWallpaperPathChanged: syncDebounce.restart()
+    onGlobalWallpaperPathChanged: {
+        if (root.internalShaderTransitionActive)
+            root.shaderHandoffPending = true
+        syncDebounce.restart()
+    }
     onPanelFamilyChanged: syncDebounce.restart()
     onWaffleUsesMainWallpaperChanged: syncDebounce.restart()
     onWaffleWallpaperPathChanged: syncDebounce.restart()
-    onEffectivePerMonitorChanged: syncDebounce.restart()
+    onEffectivePerMonitorChanged: {
+        if (root.internalShaderTransitionActive)
+            root.shaderHandoffPending = true
+        syncDebounce.restart()
+    }
     onMultiMonitorEnabledChanged: syncDebounce.restart()
     onHideMainWallpaperChanged: syncDebounce.restart()
-    onTransitionTypeChanged: syncDebounce.restart()
+    onTransitionTypeChanged: {
+        if (!root.internalShaderTransitionActive)
+            root.shaderHandoffPending = false
+        syncDebounce.restart()
+    }
     onTransitionDirectionChanged: syncDebounce.restart()
     onTransitionsEnabledChanged: syncDebounce.restart()
     onTransitionDurationMsChanged: syncDebounce.restart()

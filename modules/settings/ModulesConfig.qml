@@ -72,6 +72,15 @@ ContentPage {
 
     property string activeSection: "panels"
 
+    function activateSettingsSearchSection(section: string): bool {
+        const label = String(section || "").toLowerCase().trim()
+        if (label === "modules" || label === "optional") {
+            modulesPage.activeSection = "modules"
+            return true
+        }
+        return false
+    }
+
     SettingsTaskNavigator {
         icon: "extension"
         title: Translation.tr("Modules")
@@ -715,6 +724,14 @@ ContentPage {
                 checked: false
                 enabled: false
                 StyledToolTip { text: Translation.tr("Gaming crosshair overlay for games without built-in crosshair") }
+            }
+
+            SettingsSwitch {
+                buttonIcon: "graphic_eq"
+                text: Translation.tr("EasyEffects Equalizer")
+                checked: modulesPage.isPanelEnabled("iiEqualizer")
+                onCheckedChanged: modulesPage.setPanelEnabled("iiEqualizer", checked)
+                StyledToolTip { text: Translation.tr("Load the native 10-band EasyEffects equalizer and its shell integration. Disabled means the equalizer panel and IPC owner are not constructed.") }
             }
         }
     }

@@ -45,7 +45,13 @@ Item {
     function _sourceFor(index) {
         if (index < 0 || index >= pages.length)
             return ""
-        return pages[index]?.component ?? ""
+        const source = pages[index]?.component ?? ""
+        // Quickshell's qs: VFS currently prevents Qt's QML disk cache from
+        // caching Loader documents. Keep imports on qs:, but load these
+        // already-resolved local page files as file:// so Qt can reuse .qmlc.
+        if (source.startsWith("/"))
+            return "file://" + source
+        return source
     }
 
     function _loaderFor(index) {

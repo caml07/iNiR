@@ -15,6 +15,7 @@ layout(std140, binding = 0) uniform buf {
     float reveal;
     float deformationStrength;
     float pulseStrength;
+    float compression;
     float idleMotion;
     float glowStrength;
     float presentationScale;
@@ -73,13 +74,24 @@ float sample12(vec4 a, vec4 b, vec4 c, int index) {
     return c[i - 8];
 }
 
-float angularSpectrum(float angle, vec4 a, vec4 b, vec4 c) {
+float angularSpectrum(float angle, vec4 a, vec4 b, vec4 c,
+        float compression) {
     float position = fract(angle / TAU + 0.5) * 12.0;
     int base = int(floor(position));
     float blend = smoothstep(0.0, 1.0, fract(position));
     float current = sample12(a, b, c, base);
     float next = sample12(a, b, c, base + 1);
-    return mix(current, next, blend);
+    float continuousSpectrum = mix(current, next, blend);
+
+    // Compression is spatial rather than audio-level compression. Increase
+    // local contrast without cutting the continuous angular field into fixed
+    // sectors: weak regions settle inward while active regions keep a broad,
+    // smooth shoulder into their neighbours.
+    float amount = clamp(compression, 0.0, 1.0);
+    float compressionFloor = amount * 0.38;
+    float focusedSpectrum = smoothstep(
+        compressionFloor, 1.0, continuousSpectrum);
+    return mix(continuousSpectrum, focusedSpectrum, amount * 0.82);
 }
 
 void main() {
@@ -137,8 +149,11 @@ void main() {
     float organic = smoothstep(0.27, 0.73, mix(n1, n2, 0.34));
 
     float angle = atan(rotatedDir.y, rotatedDir.x);
-    float liveSpectrum = angularSpectrum(angle, ubuf.bandsA, ubuf.bandsB, ubuf.bandsC);
-    float peakSpectrum = angularSpectrum(angle, ubuf.peaksA, ubuf.peaksB, ubuf.peaksC);
+    float spatialCompression = clamp(ubuf.compression, 0.0, 1.0);
+    float liveSpectrum = angularSpectrum(angle, ubuf.bandsA, ubuf.bandsB,
+        ubuf.bandsC, spatialCompression);
+    float peakSpectrum = angularSpectrum(angle, ubuf.peaksA, ubuf.peaksB,
+        ubuf.peaksC, spatialCompression);
     float spectrum = mix(liveSpectrum, peakSpectrum, 0.18);
     float shapedSpectrum = pow(clamp(spectrum, 0.0, 1.0), 0.72);
 
@@ -149,11 +164,19 @@ void main() {
         + shapedSpectrum * 0.115 * motionScale) * ubuf.presentationScale;
     spectrumPush += ubuf.onset * (0.040 + shapedSpectrum * 0.110)
         * motionScale * ubuf.presentationScale;
+    float localActivity = smoothstep(0.10, 0.82, shapedSpectrum);
+    spectrumPush += spatialCompression * localActivity
+        * (ubuf.pulse * ubuf.pulseStrength * 0.024
+            + ubuf.onset * ubuf.pulseStrength * 0.014)
+        * motionScale * ubuf.presentationScale;
+    spectrumPush *= mix(1.0, 0.86 + organic * 0.26,
+        spatialCompression);
     spectrumPush = clamp(spectrumPush, -0.055, 0.285);
 
     float breath = sin(t * 0.82) * (0.004 + ubuf.idleMotion * 0.010);
     float pulsePush = (ubuf.pulse * ubuf.pulseStrength * 0.058
-        + ubuf.onset * ubuf.pulseStrength * 0.020) * ubuf.presentationScale;
+        + ubuf.onset * ubuf.pulseStrength * 0.020)
+        * mix(1.0, 0.58, spatialCompression) * ubuf.presentationScale;
     float baseRadius = (ubuf.baseRadius + breath + pulsePush) * ubuf.presentationScale;
     float contour = (organic - 0.5) * (0.030 + 0.028 * ubuf.energy
         + ubuf.idleMotion * 0.016) * ubuf.presentationScale;

@@ -276,6 +276,27 @@ Singleton {
         return String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "")
     }
 
+    function _notificationBlocked(notification): bool {
+        const blocked = Config.options?.notifications?.blockedApps ?? []
+        if (!blocked || blocked.length === 0)
+            return false
+
+        const appName = root._normalizeAppKey(notification?.appName)
+        // appName is the notification protocol's application identity. Fall
+        // back to appIcon only for senders that omit it; matching icon paths in
+        // addition to a valid name would make generic tokens overly broad.
+        const candidates = appName.length > 0
+            ? [appName]
+            : [root._normalizeAppKey(notification?.appIcon)].filter(value => value.length > 0)
+        if (candidates.length === 0)
+            return false
+
+        return blocked.some(value => {
+            const token = root._normalizeAppKey(value)
+            return token.length > 0 && candidates.some(candidate => candidate.includes(token))
+        })
+    }
+
     // App names whose group has at least one notification matching the query,
     // in the same order as appNameList. Empty query returns everything.
     function appNamesMatching(query): var {
@@ -408,6 +429,11 @@ Singleton {
             const niriScreenshotNotice = summaryLower.includes("screenshot captured")
                 && bodyLower.includes("paste the image from the clipboard")
             if (GlobalStates.windowPreviewCaptureActive && niriScreenshotNotice)
+                return
+
+            // User app filters are an ingress policy: blocked notifications never
+            // enter history, unread state, sound playback or popup presentation.
+            if (root._notificationBlocked(notification))
                 return
 
             if (!_ingressAllowed(notification)) {

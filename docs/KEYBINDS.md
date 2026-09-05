@@ -160,6 +160,7 @@ All media/volume/brightness keys are routed through iNiR IPC for OSD feedback.
 | `Mod+Alt+N` / `Mod+Shift+N` | Next track (keyboard) |
 | `Mod+Alt+P` / `Mod+Shift+B` | Previous track (keyboard) |
 | `Mod+Shift+M` | Toggle mute (keyboard) |
+| `Ctrl+Alt+F` | EasyEffects Equalizer (enable it first in Settings → Modules → Optional) |
 
 ---
 

@@ -150,6 +150,9 @@ Item {
         anchors.fill: parent
         visible: root._backdropActive
         wallpaperBackdropEnabled: root._backdropActive
+        // Transparent dialects must still be readable if the configured
+        // wallpaper disappears or has not decoded yet.
+        fallbackColor: root._solidFill
         blurStrength: 1
         saturationStrength: 0.2
         auroraTransparency: Appearance.aurora.popupTransparentize

@@ -31,6 +31,35 @@ Singleton {
     property bool sidebarRightOpen: false
     property string sidebarRightTargetOutput: ""
     property bool mediaControlsOpen: false
+    property bool equalizerOpen: false
+    property string equalizerTargetOutput: ""
+    readonly property bool equalizerEnabled: (Config.options?.enabledPanels ?? []).includes("iiEqualizer")
+
+    function openEqualizer(outputName: string): void {
+        if (!root.equalizerEnabled)
+            return
+        const requested = String(outputName ?? "")
+        equalizerTargetOutput = requested.length > 0
+            ? requested
+            : String(root.focusedScreen?.name ?? root.primaryScreen?.name ?? "")
+        equalizerOpen = true
+    }
+
+    function closeEqualizer(): void {
+        equalizerOpen = false
+    }
+
+    function toggleEqualizer(outputName: string): void {
+        if (!root.equalizerEnabled) {
+            closeEqualizer()
+            return
+        }
+        if (equalizerOpen) {
+            closeEqualizer()
+            return
+        }
+        openEqualizer(outputName)
+    }
     property bool osdBrightnessOpen: false
     property bool osdVolumeOpen: false
     property bool osdMicOpen: false

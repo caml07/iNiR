@@ -164,11 +164,11 @@ Scope {
             readonly property real reservedH: Math.max(0, restHeight + topGapPx - 12 * (1 - root.appGap) * s)
 
             /**
-             * Same per-screen fullscreen focus check as Pill.fsCovered: in niri
-             * a fullscreen window only covers the monitor while it is the
-             * focused tile. Scrolling to another window in the same workspace
-             * unfocuses the fullscreen game without changing its size, so
-             * GameMode.active stays true but the pill is no longer hidden.
+             * Same per-screen fullscreen ownership check as Pill.fsCovered: in
+             * niri a fullscreen-sized tile only covers the monitor while it is
+             * the active tile of that output's active workspace. Scrolling to
+             * another tile leaves the old window fullscreen-sized but visible
+             * coverage has ended.
              * The reserve band must then give the pill its full rest height,
              * not the thin game-face height.
              */
@@ -176,40 +176,33 @@ Scope {
             readonly property bool fsCovered: {
                 if (!CompositorService.isNiri)
                     return GameMode.hasAnyFullscreenWindow;
-                const wins = NiriService.windows ?? [];
-                for (const w of wins) {
-                    const ws = NiriService.workspaces?.[w.workspace_id];
-                    if (!(ws?.is_active ?? false))
-                        continue;
-                    if (screenName.length > 0 && ws.output !== screenName)
-                        continue;
-                    if (!w.is_focused)
-                        continue;
-                    if (GameMode.isWindowFullscreen(w))
-                        return true;
-                }
-                return false;
+                return GameMode.hasFullscreenOnOutput(screenName);
             }
             /** Game-face height only when the pill is actually hidden by a
-             * focused fullscreen window, or Game Mode was manually engaged. */
+             * covering fullscreen window, or Game Mode was manually engaged. */
             readonly property bool useGameZone: GameMode.manuallyActivated || fsCovered
-            readonly property bool autoHideEnabled: (Config.options?.bar?.autoHide?.enable ?? false)
-                && !useGameZone
             readonly property bool autoHideShown: root.autoHideShownByScreen[screenName] ?? false
+            // Game Mode changes the pill's visual face, not the compositor's
+            // usable desktop. Changing exclusiveZone from the normal pill band
+            // to gameBarH on every fullscreen transition made Niri relayout
+            // normal windows underneath it and could feed a noisy fullscreen
+            // detect/relayout cycle. Preserve the normal reservation contract;
+            // fullscreen windows ignore it anyway, while non-fullscreen windows
+            // no longer jump when Game Mode toggles.
+            readonly property real normalExclusiveZone: (Config.options?.bar?.autoHide?.enable ?? false)
+                ? ((Config.options?.bar?.autoHide?.pushWindows ?? false) && autoHideShown ? reservedH : 0)
+                : root.floatOverWindows ? 0 : reservedH
 
             screen: modelData
             visible: !GlobalStates.widgetEditMode
             color: "transparent"
             exclusionMode: ExclusionMode.Normal
             exclusiveZone: GlobalStates.widgetEditMode ? 0
-                : useGameZone ? gameBarH
-                : autoHideEnabled
-                    ? ((Config.options?.bar?.autoHide?.pushWindows ?? false) && autoHideShown ? reservedH : 0)
-                    : root.floatOverWindows ? 0 : reservedH
+                : normalExclusiveZone
             aboveWindows: true
 
             anchors { top: true; left: true; right: true }
-            implicitHeight: useGameZone ? gameBarH : reservedH
+            implicitHeight: Math.max(useGameZone ? gameBarH : reservedH, normalExclusiveZone)
 
             mask: emptyReserve
             Region { id: emptyReserve }

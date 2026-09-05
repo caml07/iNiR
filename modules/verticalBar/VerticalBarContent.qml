@@ -81,6 +81,39 @@ Item { // Bar content region
     readonly property bool auroraEverywhere: Appearance.auroraEverywhere
     readonly property bool zzzEverywhere: Appearance.zzzEverywhere
     readonly property bool gameModeMinimal: Appearance.gameModeMinimal
+    readonly property bool barSpectrumAudioPlaying: MprisController.isPlaying || YtMusic.isPlaying
+    readonly property bool barSpectrumOutputEnabled:
+        (Config.options?.bar?.visualizer?.multiMonitorMode ?? "primary") === "all"
+        || Quickshell.screens.length <= 1
+        || String(root.screen?.name ?? "") === String(GlobalStates.primaryScreen?.name ?? "")
+    readonly property bool barSpectrumConfigured: (Config.options?.bar?.visualizer?.enable ?? false)
+        && (Config.options?.bar?.showBackground ?? true)
+        && root.barSpectrumOutputEnabled
+        && !root.gameModeMinimal
+        && root.visible
+    readonly property bool barSpectrumProcessWanted: root.barSpectrumConfigured
+        && root.barSpectrumAudioPlaying
+    readonly property bool barSpectrumVisible: root.barSpectrumConfigured
+        && verticalBarCava.audioSignalActive
+    readonly property real barSpectrumFillRatio: Math.max(0.1,
+        Math.min(1, Config.options?.bar?.visualizer?.height ?? 0.6))
+    readonly property real barSpectrumOpacity: Math.max(0,
+        Math.min(1, Config.options?.bar?.visualizer?.opacity ?? 0.35))
+    readonly property string barSpectrumType: Config.options?.bar?.visualizer?.type ?? "bars"
+    readonly property real barSpectrumDensity: Math.max(4, Config.options?.bar?.visualizer?.density ?? 12)
+    readonly property real barSpectrumGap: Math.max(0, Config.options?.bar?.visualizer?.gap ?? 2)
+    readonly property int barSpectrumSmoothing: Math.max(0, Config.options?.bar?.visualizer?.smoothing ?? 2)
+    readonly property string barSpectrumWaveMode: Config.options?.bar?.visualizer?.waveMode ?? "fill"
+    readonly property real barSpectrumLineWidth: Math.max(1, Config.options?.bar?.visualizer?.lineWidth ?? 2)
+    readonly property real barSpectrumEdgeInset: Math.max(0, Config.options?.bar?.visualizer?.edgeInset ?? 0)
+    readonly property real barSpectrumEdgeSoftness: Math.max(0,
+        Math.min(1, (Config.options?.bar?.visualizer?.edgeSoftness ?? 28) / 100))
+    readonly property string barSpectrumFrequencyProfile: Config.options?.bar?.visualizer?.frequencyProfile ?? "flat"
+    readonly property real barSpectrumAccentStrength: Math.max(0,
+        Math.min(1, (Config.options?.bar?.visualizer?.accentStrength ?? 70) / 100))
+    readonly property color barSpectrumColor: root.inirEverywhere ? Appearance.inir.colPrimary
+        : root.zzzEverywhere ? Appearance.zzz.accent
+        : Appearance.colors.colPrimary
 
     readonly property string barAppearance: Config.options?.bar?.appearanceStyle ?? "classic"
     readonly property bool isIslands: root.barAppearance === "islands"
@@ -206,6 +239,50 @@ Item { // Bar content region
         }
     }
 
+    // Keep the vertical bar on the same visualizer contract as horizontal bars.
+    // Organic is especially well suited to this narrow, tall host.
+    CavaProcess {
+        id: verticalBarCava
+        active: root.barSpectrumProcessWanted
+        // Samples follow the long axis of the vertical host; the renderer is
+        // rotated below, so its local width corresponds to screen height.
+        sampleCount: Math.max(50, Math.round(Math.max(1, root.height) / root.barSpectrumDensity))
+    }
+
+    AudioVisualizerLayer {
+        // Cava's renderer is horizontal. Rotate the complete presentation so
+        // bars/waves follow the vertical bar's long axis on either screen edge.
+        anchors.centerIn: barBackground
+        width: root.barSpectrumType === "organic" ? barBackground.width : barBackground.height
+        height: root.barSpectrumType === "organic" ? barBackground.height : barBackground.width
+        rotation: root.barSpectrumType === "organic" ? 0 : (root.barOnRight ? 90 : -90)
+        active: root.barSpectrumVisible && !root.isIslands
+        points: active ? verticalBarCava.points : []
+        normalizationCeiling: active ? verticalBarCava.normalizationCeiling : 100
+        visualizerType: root.barSpectrumType
+        spectrumOpacity: root.barSpectrumOpacity
+        spectrumColor: root.barSpectrumColor
+        barCount: Math.max(4, Math.round(root.height / Math.max(4, root.barSpectrumDensity)))
+        barSpacing: root.barSpectrumGap
+        smoothing: root.barSpectrumSmoothing
+        fillRatio: root.barSpectrumFillRatio
+        waveMode: root.barSpectrumWaveMode
+        lineWidth: root.barSpectrumLineWidth
+        edgeInset: root.barSpectrumEdgeInset
+        edgeSoftness: root.barSpectrumEdgeSoftness
+        frequencyProfile: root.barSpectrumFrequencyProfile
+        accentStrength: root.barSpectrumAccentStrength
+        reverseFrequency: root.barOnRight
+        topLeftRadius: root.barOnRight ? barBackground.topRightRadius : barBackground.bottomLeftRadius
+        topRightRadius: root.barOnRight ? barBackground.bottomRightRadius : barBackground.topLeftRadius
+        bottomLeftRadius: root.barOnRight ? barBackground.topLeftRadius : barBackground.bottomRightRadius
+        bottomRightRadius: root.barOnRight ? barBackground.bottomLeftRadius : barBackground.topRightRadius
+        organicEdgeAura: true
+        organicSensitivity: 0.62
+        organicGlow: 0.38
+        organicOpacity: root.barSpectrumOpacity
+    }
+
     // Aurora/Angel blur layer — rendered as sibling of barBackground so the blur
     // is applied over the full screen-sized wallpaper image (not the narrow
     // clipped bar region). Placed right after barBackground in z-order so it
@@ -272,7 +349,11 @@ Item { // Bar content region
         anchors.top: parent.top
         implicitHeight: topSectionColumnLayout.implicitHeight
         implicitWidth: Appearance.sizes.baseVerticalBarWidth
-        height: (root.height - middleSection.height) / 2
+        // Edge sections own their natural height. The old symmetric
+        // `(root.height - middle.height) / 2` split assumed top and bottom had
+        // identical demand, which breaks as soon as tray/indicators or UI scale
+        // make the bottom section taller.
+        height: Math.min(root.height, implicitHeight)
         width: Appearance.sizes.verticalBarWidth
 
         onScrollDown: root.brightnessMonitor.setBrightness(root.brightnessMonitor.brightness - 0.05)
@@ -303,15 +384,42 @@ Item { // Bar content region
         }
     }
 
-    Column { // Middle section
-        id: middleSection
-        anchors.centerIn: parent
-        spacing: 4
+    Item {
+        id: middleHost
+        anchors {
+            top: barTopSectionMouseArea.bottom
+            bottom: barBottomSectionMouseArea.top
+            left: parent.left
+            right: parent.right
+        }
+
+        Column { // Middle section
+            id: middleSection
+            anchors.centerIn: parent
+            spacing: 4
 
         // When taskbar is active: clock/date moves up to where resources was
         Bar.BarGroup {
             id: clockGroupTop
             vertical: true
+            screen: root.screen
+            nativeBlurActive: root.nativeBlurActive
+            spectrumEnabled: root.barSpectrumVisible
+            spectrumPoints: root.barSpectrumVisible ? verticalBarCava.points : []
+            spectrumCeiling: root.barSpectrumVisible ? verticalBarCava.normalizationCeiling : 100
+            spectrumType: root.barSpectrumType
+            spectrumOpacity: root.barSpectrumOpacity
+            spectrumFillRatio: root.barSpectrumFillRatio
+            spectrumDensity: root.barSpectrumDensity
+            spectrumGap: root.barSpectrumGap
+            spectrumSmoothing: root.barSpectrumSmoothing
+            spectrumWaveMode: root.barSpectrumWaveMode
+            spectrumLineWidth: root.barSpectrumLineWidth
+            spectrumEdgeInset: root.barSpectrumEdgeInset
+            spectrumEdgeSoftness: root.barSpectrumEdgeSoftness
+            spectrumFrequencyProfile: root.barSpectrumFrequencyProfile
+            spectrumAccentStrength: root.barSpectrumAccentStrength
+            spectrumDomain: root
             padding: 8
             visible: Config.options?.bar?.modules?.taskbar ?? false
 
@@ -341,6 +449,24 @@ Item { // Bar content region
         Bar.BarGroup {
             id: resourcesGroup
             vertical: true
+            screen: root.screen
+            nativeBlurActive: root.nativeBlurActive
+            spectrumEnabled: root.barSpectrumVisible
+            spectrumPoints: root.barSpectrumVisible ? verticalBarCava.points : []
+            spectrumCeiling: root.barSpectrumVisible ? verticalBarCava.normalizationCeiling : 100
+            spectrumType: root.barSpectrumType
+            spectrumOpacity: root.barSpectrumOpacity
+            spectrumFillRatio: root.barSpectrumFillRatio
+            spectrumDensity: root.barSpectrumDensity
+            spectrumGap: root.barSpectrumGap
+            spectrumSmoothing: root.barSpectrumSmoothing
+            spectrumWaveMode: root.barSpectrumWaveMode
+            spectrumLineWidth: root.barSpectrumLineWidth
+            spectrumEdgeInset: root.barSpectrumEdgeInset
+            spectrumEdgeSoftness: root.barSpectrumEdgeSoftness
+            spectrumFrequencyProfile: root.barSpectrumFrequencyProfile
+            spectrumAccentStrength: root.barSpectrumAccentStrength
+            spectrumDomain: root
             padding: 8
             // Hide resources when taskbar is active to free vertical space
             visible: !(Config.options?.bar?.modules?.taskbar ?? false)
@@ -364,6 +490,24 @@ Item { // Bar content region
         Bar.BarGroup {
             id: middleCenterGroup
             vertical: true
+            screen: root.screen
+            nativeBlurActive: root.nativeBlurActive
+            spectrumEnabled: root.barSpectrumVisible
+            spectrumPoints: root.barSpectrumVisible ? verticalBarCava.points : []
+            spectrumCeiling: root.barSpectrumVisible ? verticalBarCava.normalizationCeiling : 100
+            spectrumType: root.barSpectrumType
+            spectrumOpacity: root.barSpectrumOpacity
+            spectrumFillRatio: root.barSpectrumFillRatio
+            spectrumDensity: root.barSpectrumDensity
+            spectrumGap: root.barSpectrumGap
+            spectrumSmoothing: root.barSpectrumSmoothing
+            spectrumWaveMode: root.barSpectrumWaveMode
+            spectrumLineWidth: root.barSpectrumLineWidth
+            spectrumEdgeInset: root.barSpectrumEdgeInset
+            spectrumEdgeSoftness: root.barSpectrumEdgeSoftness
+            spectrumFrequencyProfile: root.barSpectrumFrequencyProfile
+            spectrumAccentStrength: root.barSpectrumAccentStrength
+            spectrumDomain: root
             padding: 6
 
             Bar.Workspaces {
@@ -391,6 +535,24 @@ Item { // Bar content region
         Bar.BarGroup {
             id: taskbarGroup
             vertical: true
+            screen: root.screen
+            nativeBlurActive: root.nativeBlurActive
+            spectrumEnabled: root.barSpectrumVisible
+            spectrumPoints: root.barSpectrumVisible ? verticalBarCava.points : []
+            spectrumCeiling: root.barSpectrumVisible ? verticalBarCava.normalizationCeiling : 100
+            spectrumType: root.barSpectrumType
+            spectrumOpacity: root.barSpectrumOpacity
+            spectrumFillRatio: root.barSpectrumFillRatio
+            spectrumDensity: root.barSpectrumDensity
+            spectrumGap: root.barSpectrumGap
+            spectrumSmoothing: root.barSpectrumSmoothing
+            spectrumWaveMode: root.barSpectrumWaveMode
+            spectrumLineWidth: root.barSpectrumLineWidth
+            spectrumEdgeInset: root.barSpectrumEdgeInset
+            spectrumEdgeSoftness: root.barSpectrumEdgeSoftness
+            spectrumFrequencyProfile: root.barSpectrumFrequencyProfile
+            spectrumAccentStrength: root.barSpectrumAccentStrength
+            spectrumDomain: root
             padding: 4
             visible: Config.options?.bar?.modules?.taskbar ?? false
 
@@ -399,12 +561,13 @@ Item { // Bar content region
                 parentWindow: root.QsWindow.window
                 Layout.fillWidth: true
                 Layout.fillHeight: false
-                maximumHeight: Math.max(80, root.height
+                // `middleHost` already excludes the natural top/bottom edge
+                // sections, so only subtract the fixed middle widgets here.
+                maximumHeight: Math.max(24, middleHost.height
                     - (clockGroupTop.visible ? clockGroupTop.height : 0)
                     - middleCenterGroup.height
                     - (clockGroup.visible ? clockGroup.height : 0)
-                    - middleSection.spacing * 6
-                    - 140)
+                    - middleSection.spacing * 6)
             }
         }
 
@@ -416,6 +579,24 @@ Item { // Bar content region
         Bar.BarGroup {
             id: clockGroup
             vertical: true
+            screen: root.screen
+            nativeBlurActive: root.nativeBlurActive
+            spectrumEnabled: root.barSpectrumVisible
+            spectrumPoints: root.barSpectrumVisible ? verticalBarCava.points : []
+            spectrumCeiling: root.barSpectrumVisible ? verticalBarCava.normalizationCeiling : 100
+            spectrumType: root.barSpectrumType
+            spectrumOpacity: root.barSpectrumOpacity
+            spectrumFillRatio: root.barSpectrumFillRatio
+            spectrumDensity: root.barSpectrumDensity
+            spectrumGap: root.barSpectrumGap
+            spectrumSmoothing: root.barSpectrumSmoothing
+            spectrumWaveMode: root.barSpectrumWaveMode
+            spectrumLineWidth: root.barSpectrumLineWidth
+            spectrumEdgeInset: root.barSpectrumEdgeInset
+            spectrumEdgeSoftness: root.barSpectrumEdgeSoftness
+            spectrumFrequencyProfile: root.barSpectrumFrequencyProfile
+            spectrumAccentStrength: root.barSpectrumAccentStrength
+            spectrumDomain: root
             padding: 8
             visible: !(Config.options?.bar?.modules?.taskbar ?? false)
             
@@ -442,6 +623,7 @@ Item { // Bar content region
             }
             
         }
+        }
     }
 
     FocusedScrollMouseArea { // Bottom section | scroll to change volume
@@ -454,7 +636,7 @@ Item { // Bar content region
         }
         implicitWidth: Appearance.sizes.baseVerticalBarWidth
         implicitHeight: bottomSectionColumnLayout.implicitHeight
-        height: (root.height - middleSection.height) / 2
+        height: Math.min(root.height, implicitHeight)
         width: Appearance.sizes.verticalBarWidth
         
         onScrollDown: Audio.decrementVolume();

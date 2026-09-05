@@ -72,7 +72,7 @@
             "glass": true,
             "glassBlur": 1
         },
-        "iiMotionProfile": "classic",
+        "iiMotionProfile": "contextual",
         "regalia": {
             "glass": true,
             "glassBlur": 0.72,
@@ -136,7 +136,8 @@
             "barWidth": 2,
             "barSpacing": 1,
             "stereo": true,
-            "waveOpacity": 30
+            "waveOpacity": 30,
+            "blockedApps": []
         },
         "palette": {
             "type": "auto",
@@ -412,6 +413,10 @@
                 "transitionFps": 60,
                 "simpleStep": 5,
                 "spatialStep": 30
+            },
+            "web": {
+                "source": "",
+                "interactive": false
             }
         },
         "transition": {
@@ -534,6 +539,7 @@
                 "visualizerBarCount": 32,
                 "organicSensitivity": 35,
                 "organicPulse": 150,
+                "organicCompression": 0,
                 "organicMotionSpeed": 250,
                 "organicIdleMotion": 40,
                 "organicGlow": 100,
@@ -562,6 +568,7 @@
                 "waveOpacity": -1,
                 "organicSensitivity": 25,
                 "organicPulse": 150,
+                "organicCompression": 0,
                 "organicMotionSpeed": 250,
                 "organicIdleMotion": 18,
                 "organicOpacity": 100,
@@ -923,7 +930,7 @@
         "borderless": true,
         "bottom": false,
         "cornerStyle": 1,
-        "appearanceStyle": "classic",
+        "appearanceStyle": "m3",
         "customRounding": -1,
         "floatStyleShadow": true,
         "height": 40,
@@ -1112,7 +1119,7 @@
         "separatePinnedFromRunning": true,
         "enableDragReorder": true,
         "notificationBadge": true,
-        "style": "panel"
+        "style": "m3"
     },
     "controlPanel": {
         "keepLoaded": false,
@@ -1162,7 +1169,7 @@
     "settingsUi": {
         "overlayMode": true,
         "overlayStyle": "rail",
-        "easyMode": true,
+        "easyMode": false,
         "categories": "",
         "chromeLayout": "",
         "overlayAppearance": {
@@ -1261,7 +1268,7 @@
             "enable": true,
             "intervalMinutes": 25,
             "size": 150,
-            "visibleSeconds": 8,
+            "visibleSeconds": 5,
             "slideMs": 400,
             "musicRequireArtist": true,
             "events": {
@@ -1354,6 +1361,7 @@
         },
         "position": "topRight",
         "screenList": [],
+        "blockedApps": [],
         "timeout": 3000,
         "timeoutCritical": 0,
         "timeoutLow": 5000,
@@ -1737,9 +1745,9 @@
         },
         "ytmusic": {
             "enable": false,
-            "autoConnect": true,
+            "autoConnect": false,
             "hideSyncBanner": false,
-            "browser": "firefox",
+            "browser": "",
             "cookiesPath": "",
             "useManualCookies": false,
             "connected": false,
@@ -1993,7 +2001,7 @@
     },
     "hotspot": {
         "ssid": "iNiR Hotspot",
-        "password": "inirhotspot",
+        "password": "",
         "band": "bg"
     },
     "keyboardIndicators": {
@@ -2065,7 +2073,9 @@
     "welcomeWizard": {
         "completed": false,
         "skipped": false,
-        "profile": "balanced"
+        "profile": "balanced",
+        "stylePreset": "material-flow",
+        "performancePreset": "balanced"
     },
     "waffles": {
         "settings": {

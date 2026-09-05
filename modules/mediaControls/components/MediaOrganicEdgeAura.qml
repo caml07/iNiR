@@ -101,6 +101,8 @@ Item {
                 "background.widgets.mediaControls.organicSensitivity", 35) / 100
             organicPulse: Config.getNestedValue(
                 "background.widgets.mediaControls.organicPulse", 150) / 100
+            organicCompression: Config.getNestedValue(
+                "background.widgets.mediaControls.organicCompression", 0) / 100
             organicMotionSpeed: Config.getNestedValue(
                 "background.widgets.mediaControls.organicMotionSpeed", 250) / 100
             organicIdleMotion: Config.getNestedValue(

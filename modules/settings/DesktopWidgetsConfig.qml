@@ -3877,6 +3877,14 @@ ContentPage {
                         }
                     }
                     WidgetSettingRow {
+                        label: Translation.tr("Compression")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue("background.widgets.mediaControls.organicCompression", 0)
+                            onValueModified: Config.setNestedValue("background.widgets.mediaControls.organicCompression", value)
+                        }
+                    }
+                    WidgetSettingRow {
                         label: Translation.tr("Motion speed")
                         StyledSpinBox {
                             from: 20; to: 250; stepSize: 5
@@ -3952,6 +3960,7 @@ ContentPage {
                     "visualizerBarCount": 32,
                     "organicSensitivity": 35,
                     "organicPulse": 150,
+                    "organicCompression": 0,
                     "organicMotionSpeed": 250,
                     "organicIdleMotion": 40,
                     "organicGlow": 100,
@@ -4262,6 +4271,19 @@ ContentPage {
                     WidgetSettingRow {
                         visible: Config.getNestedValue(
                             "background.widgets.visualizer.vizType", "bars") === "organic"
+                        label: Translation.tr("Compression (%)")
+                        StyledSpinBox {
+                            from: 0; to: 100; stepSize: 5
+                            value: Config.getNestedValue(
+                                "background.widgets.visualizer.organicCompression", 0)
+                            onValueModified: Config.setNestedValue(
+                                "background.widgets.visualizer.organicCompression", value)
+                        }
+                    }
+
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue(
+                            "background.widgets.visualizer.vizType", "bars") === "organic"
                         label: Translation.tr("Motion speed (%)")
                         StyledSpinBox {
                             from: 20; to: 250; stepSize: 5
@@ -4440,6 +4462,7 @@ ContentPage {
                     "smoothing": 2,
                     "organicSensitivity": 25,
                     "organicPulse": 150,
+                    "organicCompression": 0,
                     "organicMotionSpeed": 250,
                     "organicIdleMotion": 18,
                     "organicOpacity": 100,

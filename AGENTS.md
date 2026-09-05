@@ -9,7 +9,7 @@ remaining roadmap and capability ledger are in `docs/VOID.md` and
 ## Current progress (2026-09-05)
 
 - PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
-- PR2 `feat/void-dependencies`: committed as `3444ccbd` and pushed to
+- PR2 `feat/void-dependencies`: tip `59b6366d`, pushed to
   `origin/feat/void-dependencies`. **Fixed**: added `rsync`, `base-devel`,
   `pkg-config`, `cairo-devel`, `python3-devel`, `glib-devel`,
   `gobject-introspection`, `python3-gobject-devel`, `libffi-devel` to base
@@ -88,8 +88,8 @@ gate on `command -v systemctl` or on distro name. Applies to:
 installer (unit vs runit service), migrations 021/022, `scripts/inir`
 restart/kill/stop/status/logs, `MemoryPressureService.qml` (→ `sv restart`),
 `TrayService.qml` (skip `systemd-run`), `Session.qml`/`Idle.qml`
-(→ `loginctl`), `apply-gtk-theme.sh:994`, `niri-config.py:1376,1441`,
-`scripts/test-local-distribution.sh:26-32,202-211`.
+(→ `loginctl`), `apply-gtk-theme.sh:1110`, `niri-config.py:1727,1738`,
+`scripts/test-local-distribution.sh`.
 
 ## Capability rule
 
@@ -118,7 +118,9 @@ requirement can be identified.
 - `services/AppCatalog.qml` + `defaults/app-catalog.json` — `xbps` targets.
 - `sdata/lib/functions.sh` — supervisor selection and turnstile user-service
   rendering; detects active turnstile without requiring user access to its
-  system-service status.
+  system-service status. Also owns `reconcile_audio_user_services`
+  (`pipewire`, `wireplumber`, `pipewire-pulse` user services for
+  non-systemd supervisors).
 - `sdata/subcmd-install/2.setups.sh` — PR3.1 confirmed enabling of
   `dbus`, `elogind`, `polkitd`, and `turnstiled`, plus `manage_rundir = no`.
 - `sdata/subcmd-install/3.files.sh` — delegates supervisor rendering to the
@@ -129,6 +131,9 @@ requirement can be identified.
   warning; `--fix-abi` Void case.
 - `scripts/test-local-distribution.sh` — systemd invariants conditional on
   the predicate.
+- `scripts/check-void-pr33.sh` — repeatable live-VM contract for PR3.3
+  (providers, predicate, `discover-overlay` removal, WARP guard, audio
+  user services, `pactl`).
 - `sdata/lib/versioning.sh` — `package_manager: xbps` support for the
   future XBPS template.
 - `docs/VOID_CAPABILITIES.md` — delivery ledger for all user-selectable Void

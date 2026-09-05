@@ -19,8 +19,9 @@ specification in `docs/VOID.md`.
   `voidlinux.qcow2` -> `voidlinux.1788039290` ->
   `voidlinux.1788039614` -> `voidlinux.void-niri-quickshell-installed` ->
   `voidlinux.void-niri-session-baseline`.
-- Network: libvirt `default` network, VirtIO NIC, guest address observed as
-  `192.168.122.141`.
+- Network: libvirt `default` network, VirtIO NIC, guest address DHCP-assigned
+  (observed as `192.168.122.141` in August, `192.168.122.140` on 2026-09-05;
+  confirm with `virsh --connect qemu:///system domifaddr voidlinux`).
 - Display: SPICE with host GL render node
   `/dev/dri/by-path/pci-0000:00:02.0-render`.
 
@@ -469,7 +470,7 @@ turnstile or iNiR failure.
   SSH from the host:
 
   ```bash
-  ssh voidcaml@192.168.122.141 '
+  ssh voidcaml@192.168.122.140 '
   cd ~/inir-src && git fetch origin &&
   git checkout feat/void-nonsystemd-runtime && git pull --ff-only &&
   export XDG_RUNTIME_DIR=/run/user/$(id -u) &&

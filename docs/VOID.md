@@ -60,6 +60,12 @@ Control: `sv restart|down|up ~/.config/service/inir` (non-systemd
 equivalent of `systemctl --user`). `inir logs` → `sv status` (journalctl
 does not exist without systemd).
 
+Audio under non-systemd supervisors is also supervised per user:
+`~/.config/service/{pipewire,wireplumber,pipewire-pulse}/run`, rendered by
+`reconcile_audio_user_services` with `chpst -e "$TURNSTILE_ENV_DIR"` under
+turnstile. Only services carrying `# Managed by iNiR.` are touched; user-owned
+services are preserved, and the systemd tier removes the owned ones.
+
 ## Session
 
 - Supported session entry: `niri --session` (Void's `niri` package provides
@@ -94,7 +100,8 @@ Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
 `uv` (repo), `NetworkManager`, `pipewire`, `wl-clipboard`, `cliphist`,
-`grim`, `slurp`, `swappy`, `swayidle`, `swaylock`, `gum`, `dunst`, fonts, etc.
+`grim`, `slurp`, `swappy`, `swayidle`, `swaylock`, `gum`, `dunst`, `jq`,
+`awww` (official XBPS wallpaper backend), fonts, etc.
 
 Notes:
 
@@ -261,7 +268,7 @@ contract. SSH is only the transport; export the graphical user's runtime and
 D-Bus address explicitly:
 
 ```bash
-ssh voidcaml@192.168.122.141 '
+ssh voidcaml@192.168.122.140 '
 cd ~/inir-src &&
 git fetch origin &&
 git checkout feat/void-nonsystemd-runtime &&

@@ -23,8 +23,18 @@ SOURCE = TRANSLATIONS / "en_US.json"
 LOCALE_RE = re.compile(r"^[A-Za-z]{2,3}_[A-Za-z]{2,3}$")
 MARKDOWN_URL_RE = re.compile(r"\]\([^\n)]*https?://[^\n)]*\)")
 URL_RE = re.compile(r"https?://[^\s)]+")
-TOKEN_RE = re.compile(r"%[1-9]\d?|%n|\{\d+\}|<[^<>]+>")
+TOKEN_RE = re.compile(r"%[1-9]\d?(?!\d)|%n|\{\d+\}|<[^<>]+>")
+COMMENT_MARKER_RE = re.compile(r"/\*[^*]*\*/")
+KEEP_MARKER = "/*keep*/"
 WORD_RE = re.compile(r"[A-Za-z]{3,}")
+SOURCE_TRANSLATION_PATTERNS = [
+    re.compile(r'Translation\.tr\s*\(\s*(["\'])(((?!\1)[^\\]|\\.)*)(\1)\s*\)', re.MULTILINE | re.DOTALL),
+    re.compile(r'Translation\.tr\s*\(\s*`([^`]*(?:\\.[^`]*)*?)`\s*\)', re.MULTILINE | re.DOTALL),
+]
+SOURCE_IGNORED_DIRS = {
+    ".git", ".agents", ".agents-backups", ".cache", "node_modules",
+    "build", "dist", "__pycache__",
+}
 
 
 def load_json(path: Path) -> dict[str, str]:
@@ -63,6 +73,35 @@ def placeholders(text: str) -> list[str]:
     return sorted(TOKEN_RE.findall(without_urls))
 
 
+def translation_placeholders_match(source: str, target: str) -> bool:
+    """Compare Qt placeholders while allowing locale-native percent notation.
+
+    English writes literal percentages as ``50%`` while locales such as Turkish
+    conventionally write ``%50``. A raw ``%50`` token is otherwise
+    indistinguishable from a Qt positional placeholder, so only suppress it
+    when the canonical source proves that exact number is a literal percentage.
+    """
+    source_tokens = placeholders(source)
+    target_without_urls = MARKDOWN_URL_RE.sub("]()", target)
+    target_without_urls = URL_RE.sub("", target_without_urls)
+    literal_percent_values = set(re.findall(r"(?<![%\d])(\d{1,3})%(?!\d)", source))
+    for value in literal_percent_values:
+        target_without_urls = re.sub(rf"%{re.escape(value)}(?!\d)", "", target_without_urls)
+    target_tokens = sorted(TOKEN_RE.findall(target_without_urls))
+    return source_tokens == target_tokens
+
+
+def url_errors(source: str, target: str) -> list[str]:
+    """Require literal URLs to survive localization byte-for-byte."""
+    source_urls = URL_RE.findall(source)
+    target_urls = URL_RE.findall(target)
+    missing: list[str] = []
+    for url in source_urls:
+        if target_urls.count(url) < source_urls.count(url):
+            missing.append(url)
+    return sorted(set(missing))
+
+
 def load_config() -> tuple[set[str], list[re.Pattern[str]]]:
     glossary = json.loads((L10N / "glossary.json").read_text(encoding="utf-8"))
     exact = {
@@ -91,9 +130,52 @@ def protected_term_errors(
     missing: list[str] = []
     for term in sorted(protected_terms, key=lambda value: (-len(value), value)):
         pattern = term_pattern(term)
-        if pattern.search(source) and not pattern.search(target):
+        source_count = len(pattern.findall(source))
+        target_count = len(pattern.findall(target))
+        required_count = source_count if term in {"awww", "AWWW"} else min(source_count, 1)
+        if required_count > target_count:
             missing.append(term)
     return missing
+
+
+def marker_errors(target: str) -> list[str]:
+    """Return translated/internal comment markers that would leak into the UI."""
+    return sorted({
+        marker
+        for marker in COMMENT_MARKER_RE.findall(target)
+        if marker != KEEP_MARKER
+    })
+
+
+def semantic_term_errors(locale: str, source: str, target: str) -> list[str]:
+    """Reject known technically-wrong literal translations for locale-specific UI terms."""
+    source_lower = source.casefold()
+    target_lower = target.casefold()
+    errors: list[str] = []
+    checks_by_locale = {
+        "es_AR": (
+            (r"\bshell\b", ("concha", "carcasa", "caparazón"), "shell"),
+            (r"\bdock\b", ("muelle",), "Dock"),
+            (r"\bcommits?\b", ("confirmación", "confirmaciones"), "commit"),
+            (r"\bcheckout\b", ("compra", "caja"), "checkout"),
+        ),
+        "de_DE": (
+            (r"\bwallpapers?\b", ("tapete", "tapeten"), "wallpaper"),
+            (r"\bdashboard\b", ("armaturenbrett",), "dashboard"),
+        ),
+        "ar_SA": (
+            (r"\bwallpapers?\b", ("ورق جدران",), "wallpaper"),
+            (r"\bdashboard\b", ("لوحة القيادة",), "dashboard"),
+        ),
+        "uk_UA": (
+            (r"\bdashboard\b", ("приладова панель",), "dashboard"),
+        ),
+    }
+    checks = checks_by_locale.get(locale, ())
+    for source_pattern, forbidden, label in checks:
+        if re.search(source_pattern, source_lower) and any(word in target_lower for word in forbidden):
+            errors.append(label)
+    return errors
 
 
 def should_preserve(
@@ -119,6 +201,78 @@ def suspicious(
     if should_preserve(source, exact, patterns):
         return False
     return bool(WORD_RE.search(source))
+
+
+def _decode_source_literal(text: str) -> str:
+    try:
+        if "\\u" in text or "\\x" in text:
+            return bytes(text, "utf-8").decode("unicode_escape").strip()
+    except UnicodeDecodeError:
+        pass
+    return (
+        text.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\r", "\r")
+        .replace('\\"', '"')
+        .replace("\\'", "'")
+        .replace("\\f", "\f")
+        .replace("\\b", "\b")
+        .replace("\\\\", "\\")
+        .strip()
+    )
+
+
+def source_translation_keys() -> set[str]:
+    keys: set[str] = set()
+    for suffix in ("*.qml", "*.js"):
+        for path in ROOT.rglob(suffix):
+            relative = path.relative_to(ROOT)
+            if any(part in SOURCE_IGNORED_DIRS for part in relative.parts[:-1]):
+                continue
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            for pattern in SOURCE_TRANSLATION_PATTERNS:
+                for match in pattern.findall(content):
+                    if isinstance(match, tuple):
+                        text = match[1] if len(match) >= 3 else (match[0] if match else "")
+                    else:
+                        text = match
+                    decoded = _decode_source_literal(text)
+                    if decoded:
+                        keys.add(decoded)
+    return keys
+
+
+def build_source_report() -> dict[str, Any]:
+    catalog = load_json(SOURCE)
+    live = source_translation_keys()
+    catalog_keys = set(catalog)
+    return {
+        "sourceLiteralKeys": len(live),
+        "catalogKeys": len(catalog_keys),
+        "missingFromCatalog": sorted(live - catalog_keys),
+        # Catalog-only entries can be legitimate dynamic/runtime keys. Report them
+        # for maintenance, but only missing live literals fail this coverage gate.
+        "catalogOnly": sorted(catalog_keys - live),
+    }
+
+
+def audit_source(as_json: bool) -> int:
+    report = build_source_report()
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(f"source literals: {report['sourceLiteralKeys']}")
+        print(f"canonical keys: {report['catalogKeys']}")
+        print(f"missing from canonical: {len(report['missingFromCatalog'])}")
+        print(f"catalog-only/dynamic candidates: {len(report['catalogOnly'])}")
+        for key in report["missingFromCatalog"][:20]:
+            print(f"  missing: {key}")
+        if len(report["missingFromCatalog"]) > 20:
+            print(f"  ... and {len(report['missingFromCatalog']) - 20} more")
+    return 0 if not report["missingFromCatalog"] else 1
 
 
 def source_locations(text: str, limit: int = 5) -> list[str]:
@@ -148,12 +302,27 @@ def build_report(locale: str) -> dict[str, Any]:
 
     placeholder_errors = [
         key for key in common_keys
-        if placeholders(source[key]) != placeholders(target[key])
+        if not translation_placeholders_match(source[key], target[key])
     ]
+    invalid_urls = {
+        key: errors
+        for key in common_keys
+        if (errors := url_errors(source[key], target[key]))
+    }
+    internal_marker_errors = {
+        key: errors
+        for key in common_keys
+        if (errors := marker_errors(target[key]))
+    }
     protected_errors = {
         key: missing
         for key in common_keys
         if (missing := protected_term_errors(source[key], target[key], exact))
+    }
+    semantic_errors = {
+        key: errors
+        for key in common_keys
+        if (errors := semantic_term_errors(locale, source[key], target[key]))
     }
     suspect = [
         key for key in common_keys
@@ -166,7 +335,10 @@ def build_report(locale: str) -> dict[str, Any]:
         "missing": sorted(set(source) - set(target)),
         "extra": sorted(set(target) - set(source)),
         "placeholderErrors": sorted(placeholder_errors),
+        "urlErrors": dict(sorted(invalid_urls.items())),
+        "markerErrors": dict(sorted(internal_marker_errors.items())),
         "protectedTermErrors": dict(sorted(protected_errors.items())),
+        "semanticTermErrors": dict(sorted(semantic_errors.items())),
         "suspectedUntranslated": sorted(suspect),
     }
 
@@ -176,6 +348,10 @@ def report_is_structurally_valid(report: dict[str, Any]) -> bool:
         report["missing"]
         or report["extra"]
         or report["placeholderErrors"]
+        or report["urlErrors"]
+        or report["markerErrors"]
+        or report["protectedTermErrors"]
+        or report["semanticTermErrors"]
     )
 
 
@@ -184,7 +360,10 @@ def print_report(report: dict[str, Any]) -> None:
     print(f"  missing: {len(report['missing'])}")
     print(f"  extra: {len(report['extra'])}")
     print(f"  placeholder errors: {len(report['placeholderErrors'])}")
-    print(f"  protected term warnings: {len(report['protectedTermErrors'])}")
+    print(f"  URL errors: {len(report['urlErrors'])}")
+    print(f"  internal marker errors: {len(report['markerErrors'])}")
+    print(f"  protected term errors: {len(report['protectedTermErrors'])}")
+    print(f"  semantic term errors: {len(report['semanticTermErrors'])}")
     print(f"  suspected untranslated: {len(report['suspectedUntranslated'])}")
 
 
@@ -210,6 +389,28 @@ def audit_all(as_json: bool) -> int:
     return 0 if all(report_is_structurally_valid(report) for report in reports) else 1
 
 
+def audit_guides(as_json: bool) -> int:
+    guides = json.loads((L10N / "locale-guides.json").read_text(encoding="utf-8"))
+    if not isinstance(guides, dict):
+        raise ValueError("locale-guides.json must contain an object")
+    locales = set(available_locales())
+    guide_locales = {key for key, value in guides.items() if isinstance(key, str) and isinstance(value, str) and value.strip()}
+    report = {
+        "missingGuides": sorted(locales - guide_locales),
+        "staleGuides": sorted(guide_locales - locales),
+    }
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(f"missing locale guides: {len(report['missingGuides'])}")
+        for locale in report["missingGuides"]:
+            print(f"  missing: {locale}")
+        print(f"stale locale guides: {len(report['staleGuides'])}")
+        for locale in report["staleGuides"]:
+            print(f"  stale: {locale}")
+    return 0 if not report["missingGuides"] and not report["staleGuides"] else 1
+
+
 def extract(locale: str, output: Path, limit: int) -> int:
     source = load_json(SOURCE)
     target = load_json(locale_path(locale))
@@ -231,6 +432,7 @@ def extract(locale: str, output: Path, limit: int) -> int:
             "Translate only the value in translated.",
             "Keep key and source unchanged.",
             "Preserve placeholders, commands, paths, markup and product names.",
+            "Never translate internal /*keep*/ markers; omit the marker from translated prose or keep it exactly as /*keep*/.",
             "Use concise natural desktop UI language, not literal machine translation.",
         ],
         "entries": [
@@ -284,12 +486,27 @@ def apply_batch(batch_path: Path) -> int:
             raise ValueError(f"source changed for {key!r}; regenerate the batch")
         if not isinstance(translated, str) or not translated.strip():
             continue
-        if placeholders(source) != placeholders(translated):
+        if not translation_placeholders_match(source, translated):
             raise ValueError(f"placeholder or markup mismatch for {key!r}")
+        invalid_urls = url_errors(source, translated)
+        if invalid_urls:
+            raise ValueError(
+                f"URL mismatch for {key!r}: {', '.join(invalid_urls)}"
+            )
+        bad_markers = marker_errors(translated)
+        if bad_markers:
+            raise ValueError(
+                f"internal marker mismatch for {key!r}: {', '.join(bad_markers)}"
+            )
         missing_terms = protected_term_errors(source, translated, protected_terms)
         if missing_terms:
             raise ValueError(
                 f"protected term mismatch for {key!r}: {', '.join(missing_terms)}"
+            )
+        semantic_errors = semantic_term_errors(locale, source, translated)
+        if semantic_errors:
+            raise ValueError(
+                f"semantic term mismatch for {key!r}: {', '.join(semantic_errors)}"
             )
         updates[key] = translated
 
@@ -324,6 +541,18 @@ def main() -> int:
     )
     audit_all_parser.add_argument("--json", action="store_true", dest="as_json")
 
+    audit_source_parser = sub.add_parser(
+        "audit-source",
+        help="validate literal Translation.tr source coverage in the canonical English catalog",
+    )
+    audit_source_parser.add_argument("--json", action="store_true", dest="as_json")
+
+    audit_guides_parser = sub.add_parser(
+        "audit-guides",
+        help="validate that every supported runtime locale has one review guide",
+    )
+    audit_guides_parser.add_argument("--json", action="store_true", dest="as_json")
+
     extract_parser = sub.add_parser("extract", help="create a contextual review batch")
     extract_parser.add_argument("locale")
     extract_parser.add_argument("output", type=Path)
@@ -337,6 +566,10 @@ def main() -> int:
         return audit(args.locale, args.as_json, args.strict_terms)
     if args.command == "audit-all":
         return audit_all(args.as_json)
+    if args.command == "audit-source":
+        return audit_source(args.as_json)
+    if args.command == "audit-guides":
+        return audit_guides(args.as_json)
     if args.command == "extract":
         return extract(args.locale, args.output, args.limit)
     if args.command == "apply":

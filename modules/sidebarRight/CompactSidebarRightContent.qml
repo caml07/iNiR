@@ -1829,7 +1829,7 @@ Item {
             const wins = NiriService.windows || []
             for (let i = 0; i < wins.length; i++) {
                 const w = wins[i]
-                if (w.title === "illogical-impulse Settings" && w.app_id === "org.quickshell") {
+                if (w.title === "Settings — iNiR" && w.app_id === "org.quickshell") {
                     GlobalStates.sidebarRightOpen = false
                     Qt.callLater(() => NiriService.focusWindow(w.id))
                     return

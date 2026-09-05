@@ -614,9 +614,9 @@ DEBIAN_AUDIO_PKGS=(
   libdbusmenu-gtk3-4
   pavucontrol
   easyeffects
+  lsp-plugins-lv2
   mpv
   yt-dlp
-  python3-ytmusicapi
   socat
 )
 

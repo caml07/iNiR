@@ -11,12 +11,14 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import qs.modules.common.models
 import qs.services
+import qs.services.deferred
 import "root:"
 
 Item {
     id: root
     required property MprisPlayer player
     required property list<real> visualizerPoints
+    property string outputName: ""
     property real radius: Appearance.angelEverywhere ? Appearance.angel.roundingNormal : Appearance.rounding.large
     // Track-change slide direction: +1 next/forward (new content enters from the
     // right), -1 previous (enters from the left). Set by the prev/next handlers
@@ -321,23 +323,61 @@ Item {
                 Layout.fillHeight: true
                 spacing: 4
 
-                // Title
-                StyledText {
+                // Title + equalizer entry point
+                RowLayout {
                     Layout.fillWidth: true
-                    text: StringUtils.cleanMusicTitle(root.isYtMusicPlayer ? YtMusic.currentTitle : root.player?.trackTitle) || "—"
-                    font.pixelSize: Appearance.font.pixelSize.large
-                    font.weight: Appearance.zzzEverywhere ? Font.Black : Font.Medium
-                    font.italic: Appearance.zzzEverywhere
-                    color: Appearance.zzzEverywhere ? Appearance.zzz.ink
-                        : Appearance.inirEverywhere ? root.inirText : (blendedColors?.colOnLayer0 ?? Appearance.colors.colOnLayer0)
-                    Behavior on color {
-                        enabled: Appearance.animationsEnabled
-                        ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+                    spacing: 6
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: StringUtils.cleanMusicTitle(root.isYtMusicPlayer ? YtMusic.currentTitle : root.player?.trackTitle) || "—"
+                        font.pixelSize: Appearance.font.pixelSize.large
+                        font.weight: Appearance.zzzEverywhere ? Font.Black : Font.Medium
+                        font.italic: Appearance.zzzEverywhere
+                        color: Appearance.zzzEverywhere ? Appearance.zzz.ink
+                            : Appearance.inirEverywhere ? root.inirText : (blendedColors?.colOnLayer0 ?? Appearance.colors.colOnLayer0)
+                        Behavior on color {
+                            enabled: Appearance.animationsEnabled
+                            ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+                        }
+                        elide: Text.ElideRight
+                        animateChange: true
+                        animationDistanceX: root.slideDirection * 8
+                        animationDistanceY: 0
                     }
-                    elide: Text.ElideRight
-                    animateChange: true
-                    animationDistanceX: root.slideDirection * 8
-                    animationDistanceY: 0
+
+                    RippleButton {
+                        implicitWidth: 30
+                        implicitHeight: 30
+                        visible: EasyEffects.available
+                            && (Config.options?.panelFamily ?? "ii") === "ii"
+                            && (Config.options?.enabledPanels ?? []).includes("iiEqualizer")
+                        buttonRadius: Appearance.rounding.full
+                        colBackground: "transparent"
+                        colBackgroundHover: Appearance.zzzEverywhere ? Appearance.zzz.paperAlt
+                            : Appearance.inirEverywhere ? Appearance.inir.colLayer2Hover
+                            : Appearance.auroraEverywhere ? Appearance.aurora.colSubSurface
+                            : Appearance.colors.colLayer1Hover
+                        colRipple: Appearance.zzzEverywhere ? ColorUtils.applyAlpha(Appearance.zzz.accent, 0.28)
+                            : Appearance.inirEverywhere ? Appearance.inir.colLayer2Active
+                            : Appearance.colors.colLayer1Active
+                        onClicked: {
+                            GlobalStates.mediaControlsOpen = false
+                            GlobalStates.openEqualizer(root.outputName)
+                        }
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "graphic_eq"
+                            iconSize: 19
+                            fill: 1
+                            color: Appearance.regaliaEverywhere ? Appearance.regalia.hardwarePrimary
+                                : Appearance.zzzEverywhere ? Appearance.zzz.accent
+                                : Appearance.angelEverywhere ? Appearance.angel.colPrimary
+                                : Appearance.inirEverywhere ? Appearance.inir.colPrimary
+                                : Appearance.colors.colPrimary
+                        }
+                        StyledToolTip { text: Translation.tr("Equalizer") }
+                    }
                 }
 
                 // Artist

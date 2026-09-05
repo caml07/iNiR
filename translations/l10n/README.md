@@ -7,11 +7,13 @@ The localization helper does not call a translation service. It prepares context
 ## Audit locales
 
 ```bash
+python3 translations/tools/l10n.py audit-guides
+python3 translations/tools/l10n.py audit-source
 python3 translations/tools/l10n.py audit-all
-python3 translations/tools/l10n.py audit es_AR --strict-terms
+python3 translations/tools/l10n.py audit es_AR
 ```
 
-The repository gate checks key parity plus placeholders and markup for every locale. A focused audit also reports untranslated values and protected product-name drift; `--strict-terms` turns those product-name warnings into errors for an actively reviewed locale. Commands, paths, codecs and common acronyms are excluded through `glossary.json`.
+The repository gate requires one writing guide for every supported locale, source coverage in canonical `en_US.json`, locale key parity, placeholders/markup, protected product names and locale-specific semantic terminology guards. Suspected untranslated values are reported for review but are not automatically errors because product names and established technical terms can legitimately remain unchanged. Commands, paths, codecs and common acronyms are excluded through `glossary.json`.
 
 ## Prepare a review batch
 

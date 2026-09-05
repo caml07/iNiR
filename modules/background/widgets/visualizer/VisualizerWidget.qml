@@ -23,6 +23,7 @@ AbstractBackgroundWidget {
         frequencyProfile: "flat", smoothing: 2, fillRatio: 90, barOpacity: 100,
         organicSensitivity: 25, organicPulse: 150, organicMotionSpeed: 250, organicIdleMotion: 18,
         organicOpacity: 100, organicGlow: 100, organicCoverSize: 51, organicRange: 20,
+        organicCompression: 0,
         barCount: 48, barSpacing: 2, barRadius: 2, barMinHeight: 1,
         lineWidth: 2, edgeInset: 0, edgeSoftness: 28, accentStrength: 70,
         contentWidth: 304, contentHeight: 104, dim: 0,
@@ -78,6 +79,8 @@ AbstractBackgroundWidget {
         : 0.4 + 0.85 * (1 - Math.exp(-(root.organicSensitivitySetting - 0.4) * 1.4))
     readonly property real organicPulse: Config.getNestedValue(
         "background.widgets.visualizer.organicPulse", 150) / 100
+    readonly property real organicCompression: Config.getNestedValue(
+        "background.widgets.visualizer.organicCompression", 0) / 100
     readonly property real organicMotionSpeed: Config.getNestedValue(
         "background.widgets.visualizer.organicMotionSpeed", 250) / 100
     readonly property real organicIdleMotion: Config.getNestedValue(
@@ -110,8 +113,18 @@ AbstractBackgroundWidget {
 
     editPopoverContent: Component {
         ColumnLayout {
-            implicitWidth: 400
+            id: visualizerQuickRoot
+            implicitWidth: 360
+            readonly property bool narrow: width < 300
             spacing: 10
+
+            StyledText {
+                Layout.alignment: Qt.AlignHCenter
+                text: Translation.tr("Visualizer")
+                color: Appearance.colors.colOnLayer2
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                font.weight: Font.DemiBold
+            }
 
             GridLayout {
                 Layout.fillWidth: true
@@ -137,55 +150,62 @@ AbstractBackgroundWidget {
                 }
             }
 
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 4
-            Repeater {
-                model: [
-                    { label: Translation.tr("Cava"), icon: "palette", value: "cava" },
-                    { label: Translation.tr("Accent"), icon: "colors", value: "accent" },
-                    { label: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" },
-                    { label: Translation.tr("Album"), icon: "album", value: "album" }
-                ]
-                SelectionGroupButton {
-                    required property var modelData
-                    required property int index
-                    leftmost: index === 0
-                    rightmost: index === 3
-                        buttonIcon: modelData.icon
-                        buttonText: modelData.label
-                        toggled: root.paletteMode === modelData.value
-                        onClicked: Config.setNestedValue("background.widgets.visualizer.paletteMode", modelData.value)
-                    }
-                }
-            }
-
             Rectangle {
-                visible: root.vizType === "organic"
                 Layout.fillWidth: true
-                implicitHeight: organicQuickGrid.implicitHeight + 24
+                implicitHeight: visualizerTuning.implicitHeight + 20
                 radius: Appearance.rounding.small
                 color: Appearance.colors.colLayer2
                 border.width: 1
                 border.color: Appearance.colors.colOutlineVariant
 
-                GridLayout {
-                    id: organicQuickGrid
+                ColumnLayout {
+                    id: visualizerTuning
                     anchors.fill: parent
-                    anchors.margins: 12
-                    columns: 2
-                    columnSpacing: 16
-                    rowSpacing: 10
+                    anchors.margins: 10
+                    spacing: 8
 
-                    component OrganicMetric: ColumnLayout {
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: visualizerQuickRoot.narrow ? 2 : 4
+                        columnSpacing: 6
+                        rowSpacing: 6
+                        Repeater {
+                            model: [
+                                { label: Translation.tr("Cava"), icon: "palette", value: "cava" },
+                                { label: Translation.tr("Accent"), icon: "colors", value: "accent" },
+                                { label: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" },
+                                { label: Translation.tr("Album"), icon: "album", value: "album" }
+                            ]
+                            SelectionGroupButton {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                leftmost: true
+                                rightmost: true
+                                horizontalPadding: 6
+                                buttonIcon: modelData.icon
+                                buttonText: modelData.label
+                                toggled: root.paletteMode === modelData.value
+                                onClicked: Config.setNestedValue(
+                                    "background.widgets.visualizer.paletteMode", modelData.value)
+                            }
+                        }
+                    }
+
+                    component VisualizerMetric: ColumnLayout {
                         id: metric
                         required property string labelText
                         required property string configKey
                         required property int minimum
                         required property int maximum
                         property int step: 5
-                        readonly property real currentValue: Number(
-                            Config.getNestedValue(metric.configKey, metric.minimum))
+                        property real fallback: minimum
+                        property string suffix: "%"
+                        readonly property real currentValue: {
+                            const stored = Number(Config.getNestedValue(
+                                metric.configKey, metric.fallback))
+                            return stored >= metric.minimum ? stored : metric.fallback
+                        }
                         Layout.fillWidth: true
                         Layout.minimumWidth: 0
                         spacing: 2
@@ -201,7 +221,7 @@ AbstractBackgroundWidget {
                                 elide: Text.ElideRight
                             }
                             StyledText {
-                                text: Math.round(metric.currentValue) + "%"
+                                text: Math.round(metric.currentValue) + metric.suffix
                                 color: Appearance.colors.colOnLayer2
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 font.family: Appearance.font.family.numbers
@@ -217,130 +237,99 @@ AbstractBackgroundWidget {
                             configuration: StyledSlider.Configuration.XS
                             stopIndicatorValues: []
                             value: metric.currentValue
-                            tooltipContent: Math.round(value) + "%"
+                            tooltipContent: Math.round(value) + metric.suffix
                             onMoved: Config.setNestedValue(metric.configKey, Math.round(value))
                         }
                     }
 
-                    OrganicMetric {
-                        labelText: Translation.tr("Sensitivity")
-                        configKey: "background.widgets.visualizer.organicSensitivity"
-                        minimum: 25; maximum: 200
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Pulse")
-                        configKey: "background.widgets.visualizer.organicPulse"
-                        minimum: 0; maximum: 150
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Motion")
-                        configKey: "background.widgets.visualizer.organicMotionSpeed"
-                        minimum: 20; maximum: 250
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Cover")
-                        configKey: "background.widgets.visualizer.organicCoverSize"
-                        minimum: 30; maximum: 90; step: 1
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Glow")
-                        configKey: "background.widgets.visualizer.organicGlow"
-                        minimum: 0; maximum: 100
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Presence")
-                        configKey: "background.widgets.visualizer.organicOpacity"
-                        minimum: 10; maximum: 100
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Idle")
-                        configKey: "background.widgets.visualizer.organicIdleMotion"
-                        minimum: 0; maximum: 100
-                    }
-                    OrganicMetric {
-                        labelText: Translation.tr("Range")
-                        configKey: "background.widgets.visualizer.organicRange"
-                        minimum: 20; maximum: 100
-                    }
-                }
-            }
-
-            GridLayout {
-                visible: root.vizType !== "organic"
-                Layout.fillWidth: true
-                columns: root.vizType === "bars" ? 4 : 3
-                columnSpacing: 4
-                Repeater {
-                    model: root.vizType === "bars" ? [
-                        { label: Translation.tr("Bottom"), icon: "vertical_align_bottom", value: "bottom" },
-                        { label: Translation.tr("Top"), icon: "vertical_align_top", value: "top" },
-                        { label: Translation.tr("Center"), icon: "center_focus_strong", value: "center" },
-                        { label: Translation.tr("Mirror"), icon: "unfold_more", value: "mirror" }
-                    ] : [
-                        { label: Translation.tr("Fill"), icon: "waves", value: "fill" },
-                        { label: Translation.tr("Line"), icon: "line_weight", value: "line" },
-                        { label: Translation.tr("Ribbon"), icon: "unfold_more", value: "ribbon" }
-                    ]
-                    SelectionGroupButton {
-                        required property var modelData
-                        required property int index
+                    GridLayout {
+                        visible: root.vizType !== "organic"
                         Layout.fillWidth: true
-                        leftmost: index === 0
-                        rightmost: index === (root.vizType === "bars" ? 3 : 2)
-                        buttonIcon: modelData.icon
-                        buttonText: modelData.label
-                        toggled: root.vizType === "bars"
-                            ? Config.getNestedValue("background.widgets.visualizer.barsOrigin", "bottom") === modelData.value
-                            : Config.getNestedValue("background.widgets.visualizer.waveMode", "fill") === modelData.value
-                        onClicked: Config.setNestedValue(root.vizType === "bars"
-                            ? "background.widgets.visualizer.barsOrigin"
-                            : "background.widgets.visualizer.waveMode", modelData.value)
+                        columns: root.vizType === "bars" && !visualizerQuickRoot.narrow ? 4 : 3
+                        columnSpacing: 4
+                        rowSpacing: 4
+                        Repeater {
+                            model: root.vizType === "bars" ? [
+                                { label: Translation.tr("Bottom"), icon: "vertical_align_bottom", value: "bottom" },
+                                { label: Translation.tr("Top"), icon: "vertical_align_top", value: "top" },
+                                { label: Translation.tr("Center"), icon: "center_focus_strong", value: "center" },
+                                { label: Translation.tr("Mirror"), icon: "unfold_more", value: "mirror" }
+                            ] : [
+                                { label: Translation.tr("Fill"), icon: "waves", value: "fill" },
+                                { label: Translation.tr("Line"), icon: "line_weight", value: "line" },
+                                { label: Translation.tr("Ribbon"), icon: "unfold_more", value: "ribbon" }
+                            ]
+                            SelectionGroupButton {
+                                required property var modelData
+                                required property int index
+                                readonly property int groupColumns: root.vizType === "bars"
+                                    && !visualizerQuickRoot.narrow ? 4 : 3
+                                readonly property int optionCount: root.vizType === "bars" ? 4 : 3
+                                Layout.fillWidth: true
+                                leftmost: index % groupColumns === 0
+                                rightmost: index % groupColumns === groupColumns - 1
+                                    || index === optionCount - 1
+                                horizontalPadding: 6
+                                buttonIcon: modelData.icon
+                                buttonText: modelData.label
+                                toggled: root.vizType === "bars"
+                                    ? Config.getNestedValue("background.widgets.visualizer.barsOrigin", "bottom") === modelData.value
+                                    : Config.getNestedValue("background.widgets.visualizer.waveMode", "fill") === modelData.value
+                                onClicked: Config.setNestedValue(root.vizType === "bars"
+                                    ? "background.widgets.visualizer.barsOrigin"
+                                    : "background.widgets.visualizer.waveMode", modelData.value)
+                            }
+                        }
                     }
-                }
-            }
 
-            RowLayout {
-                visible: root.vizType !== "organic"
-                Layout.fillWidth: true
-                spacing: 8
-                StyledText {
-                    Layout.fillWidth: true
-                    text: root.vizType === "bars" ? Translation.tr("Bar count") : Translation.tr("Wave opacity")
-                    color: Appearance.colors.colSubtext
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    visible: root.vizType === "bars"
-                    from: 8; to: 128; stepSize: 4
-                    value: Config.getNestedValue("background.widgets.visualizer.barCount", 48)
-                    onValueModified: Config.setNestedValue("background.widgets.visualizer.barCount", value)
-                }
-                StyledSpinBox {
-                    visible: root.vizType === "wave"
-                    from: 5; to: 100; stepSize: 5
-                    value: {
-                        const v = Config.getNestedValue("background.widgets.visualizer.waveOpacity", -1)
-                        return v >= 0 ? v : (Config.options?.appearance?.cava?.waveOpacity ?? 30)
+                    GridLayout {
+                        visible: root.vizType !== "organic"
+                        Layout.fillWidth: true
+                        columns: root.quickControlsWide ? 4
+                            : visualizerQuickRoot.narrow ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 4
+
+                        VisualizerMetric {
+                            labelText: root.vizType === "bars"
+                                ? Translation.tr("Bar count") : Translation.tr("Wave opacity")
+                            configKey: root.vizType === "bars"
+                                ? "background.widgets.visualizer.barCount"
+                                : "background.widgets.visualizer.waveOpacity"
+                            minimum: root.vizType === "bars" ? 8 : 5
+                            maximum: root.vizType === "bars" ? 128 : 100
+                            step: root.vizType === "bars" ? 4 : 5
+                            fallback: root.vizType === "bars" ? 48
+                                : (Config.options?.appearance?.cava?.waveOpacity ?? 30)
+                            suffix: root.vizType === "bars" ? "" : "%"
+                        }
+                        VisualizerMetric {
+                            labelText: Translation.tr("Smoothing")
+                            configKey: "background.widgets.visualizer.smoothing"
+                            minimum: 0; maximum: 8; step: 1
+                            fallback: 2
+                            suffix: ""
+                        }
                     }
-                    onValueModified: Config.setNestedValue("background.widgets.visualizer.waveOpacity", value)
-                }
-            }
 
-            RowLayout {
-                visible: root.vizType !== "organic"
-                Layout.fillWidth: true
-                spacing: 8
-                StyledText {
-                    Layout.fillWidth: true
-                    text: Translation.tr("Smoothing")
-                    color: Appearance.colors.colSubtext
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                }
-                StyledSpinBox {
-                    from: 0; to: 8; stepSize: 1
-                    value: Config.getNestedValue("background.widgets.visualizer.smoothing", 2)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.visualizer.smoothing", value)
+                    GridLayout {
+                        visible: root.vizType === "organic"
+                        Layout.fillWidth: true
+                        columns: root.quickControlsWide ? 4
+                            : visualizerQuickRoot.narrow ? 1 : 2
+                        columnSpacing: 16
+                        rowSpacing: 4
+
+                        VisualizerMetric { labelText: Translation.tr("Sensitivity"); configKey: "background.widgets.visualizer.organicSensitivity"; minimum: 25; maximum: 200 }
+                        VisualizerMetric { labelText: Translation.tr("Pulse"); configKey: "background.widgets.visualizer.organicPulse"; minimum: 0; maximum: 150 }
+                        VisualizerMetric { labelText: Translation.tr("Compression"); configKey: "background.widgets.visualizer.organicCompression"; minimum: 0; maximum: 100 }
+                        VisualizerMetric { labelText: Translation.tr("Motion"); configKey: "background.widgets.visualizer.organicMotionSpeed"; minimum: 20; maximum: 250 }
+                        VisualizerMetric { labelText: Translation.tr("Cover"); configKey: "background.widgets.visualizer.organicCoverSize"; minimum: 30; maximum: 90; step: 1 }
+                        VisualizerMetric { labelText: Translation.tr("Glow"); configKey: "background.widgets.visualizer.organicGlow"; minimum: 0; maximum: 100 }
+                        VisualizerMetric { labelText: Translation.tr("Presence"); configKey: "background.widgets.visualizer.organicOpacity"; minimum: 10; maximum: 100 }
+                        VisualizerMetric { labelText: Translation.tr("Idle"); configKey: "background.widgets.visualizer.organicIdleMotion"; minimum: 0; maximum: 100 }
+                        VisualizerMetric { labelText: Translation.tr("Range"); configKey: "background.widgets.visualizer.organicRange"; minimum: 20; maximum: 100 }
+                    }
                 }
             }
         }
@@ -519,6 +508,7 @@ AbstractBackgroundWidget {
         accentStrength: root.accentStrength
         organicSensitivity: root.organicSensitivity
         organicPulse: root.organicPulse
+        organicCompression: root.organicCompression
         organicMotionSpeed: root.organicMotionSpeed
         organicIdleMotion: root.organicIdleMotion
         organicOpacity: root.organicOpacity

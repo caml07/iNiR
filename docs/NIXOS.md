@@ -75,7 +75,7 @@ Then import the iNiR module in your NixOS configuration:
 }
 ```
 
-`programs.inir.service.compositor = "niri"` creates the user unit wiring under `niri.service.wants/inir.service`. It does not wire iNiR to `graphical-session.target`, so it will not auto-start under KDE, GNOME, or other desktop sessions.
+`programs.inir.service.compositor = "niri"` creates the user unit wiring under `niri.service.wants/inir.service`. The unit waits for `niri.service` readiness, inherits Niri's published `DISPLAY`/Wayland environment, and stays ahead of XDG desktop autostart so the tray watcher is ready before applications register. It is not wired to `graphical-session.target`, so it will not auto-start under KDE, GNOME, or other desktop sessions.
 
 `extraPackages = [ config.programs.niri.package ];` puts the same `niri` client binary used by your compositor on iNiR's runtime `PATH`, so features that call `niri msg` use the matching package.
 
@@ -85,6 +85,13 @@ Recorder runtime dependencies are provided by the iNiR package itself, including
 `wf-recorder`, `slurp`, `xdg-user-dirs`, `xdg-utils`, PipeWire/Pulse tooling, and
 FFmpeg when available in nixpkgs. They do not need to be duplicated in
 `programs.inir.extraPackages`.
+
+EasyEffects remains an opt-in audio feature. To use the native iNiR equalizer on NixOS,
+make EasyEffects visible to the iNiR service, for example with
+`programs.inir.extraPackages = [ pkgs.easyeffects ];` in addition to your compositor package.
+The nixpkgs EasyEffects wrapper owns its plugin search path; iNiR only verifies that the LSP
+Equalizer is actually available at runtime. The equalizer controls the existing EasyEffects
+pipeline and does not add or replace effects on its own.
 
 For useful default shortcuts, merge iNiR actions into `programs.niri.settings.binds`:
 
@@ -159,16 +166,6 @@ programs.inir.package = inputs.inir.packages.${pkgs.system}.inir-with-mascot;
 `packages.<system>.inir-mascot` remains available as the standalone art pack for
 custom package composition. Both outputs use the same pinned mascot release.
 
-## Hyprland
-
-Hyprland users can wire the service to the UWSM unit:
-
-```nix
-programs.inir.service.compositor = "hyprland";
-```
-
-This creates `wayland-wm@Hyprland.service.wants/inir.service`.
-
 ## Manual service wiring
 
 To create the service but avoid auto-start wiring:
@@ -177,7 +174,7 @@ To create the service but avoid auto-start wiring:
 programs.inir.service.compositor = null;
 ```
 
-Then start it manually:
+Then start it manually while a managed Niri session is active:
 
 ```bash
 systemctl --user start inir.service

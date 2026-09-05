@@ -165,44 +165,40 @@ cp_file(){
   realpath -se "$dst" >> "${INSTALLED_LISTFILE}"
 }
 
-# Never distributed. The payload is copied one directory at a time, so every
-# pattern here is matched against a path relative to that directory — an entry
-# like 'assets/images/mascot/*.png' would never fire while copying assets/.
-# Bare names match at any depth; each one below is unique across the payload.
-RUNTIME_EXCLUDES=(
-  # Agent harness
-  --exclude='AGENTS.md' --exclude='CLAUDE.md' --exclude='CODEX.md' --exclude='PI.md'
-  --exclude='codemap.md' --exclude='.mcp.json' --exclude='opencode.json'
-  --exclude='skills-lock.json'
-  --exclude='.agents/' --exclude='.claude/' --exclude='.codex/' --exclude='.factory/'
-  --exclude='.opencode/' --exclude='.codebase-memory/' --exclude='.impeccable/'
-  --exclude='.pi-subagents/'
-  # Maintainer and development tooling. Anchored with a leading slash so these
-  # common names only ever match at the top of a payload directory, never a
-  # future modules/…/tools/ that has every right to ship.
-  --exclude='/agents/' --exclude='/tools/' --exclude='/l10n/'
-  --exclude='/release.sh' --exclude='/wiki-sync.sh' --exclude='/verify-docs.sh'
-  --exclude='/qml-check.fish' --exclude='/test-local-distribution.sh'
-  --exclude='/test-mascot-pack-flow.sh'
-  # Local art work files — the manifest always ships, the art does not
-  --exclude='graphify-out/'
-  --exclude='images/mascot/*.png' --exclude='images/mascot/*.gif'
-  --exclude='images/mascot/frames/' --exclude='images/mascot/PROMPTS.md'
+# Generate rsync exclusions from the same policy used by package delivery and manifests.
+# Resolve relative paths against the source checkout, not the copied directory's basename.
+INIR_PAYLOAD_TOOL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runtime-payload.py"
+_runtime_rsync() {
+  local source_path payload_root relative filters
+  source_path="$(realpath -e -- "$1")" || return
+  payload_root="$(cd "$(dirname "$INIR_PAYLOAD_TOOL")/../.." && pwd)" || return
+  relative="${source_path#"$payload_root"/}"
+  [[ "$relative" != "$source_path" ]] || { echo "Install source is outside repository" >&2; return 1; }
+  filters="$(python3 "$INIR_PAYLOAD_TOOL" filters --root "$payload_root" --subdir "$relative")" || return
+  local -a exclusions
+  mapfile -t exclusions <<< "$filters"
+  local target="$2"
+  shift 2
+  rsync -a "${exclusions[@]}" "$@" "$source_path/" "$target/"
+}
+
+rsync_dir() (
+  set -o pipefail
+  x mkdir -p "$2"
+  local dest
+  dest="$(realpath -se -- "$2")" || return
+  x mkdir -p "$(dirname "${INSTALLED_LISTFILE}")"
+  _runtime_rsync "$1" "$2" --out-format='%i %n' | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
 )
 
-rsync_dir(){
+rsync_dir__sync() (
+  set -o pipefail
   x mkdir -p "$2"
-  local dest="$(realpath -se $2)"
-  x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
-  rsync -a "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
-}
-
-rsync_dir__sync(){
-  x mkdir -p "$2"
-  local dest="$(realpath -se $2)"
-  x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
-  rsync -a --delete "${RUNTIME_EXCLUDES[@]}" --out-format='%i %n' "$1"/ "$2"/ | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
-}
+  local dest
+  dest="$(realpath -se -- "$2")" || return
+  x mkdir -p "$(dirname "${INSTALLED_LISTFILE}")"
+  _runtime_rsync "$1" "$2" --delete --out-format='%i %n' | awk -v d="$dest" '$1 ~ /^>/{ sub(/^[^ ]+ /,""); printf d "/" $0 "\n" }' >> "${INSTALLED_LISTFILE}"
+)
 
 function install_file(){
   local s="$1"
@@ -426,19 +422,22 @@ inir_user_service_is_masked() {
 repair_legacy_quickshell_malloc_environment() {
   local conf="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/quickshell-mem.conf"
   local repaired=0
-  local legacy_owned=false
 
   INIR_LEGACY_MALLOC_ENV_REPAIRED=0
+  INIR_LEGACY_MALLOC_ENV_CURRENT_PROCESS=0
 
   if [[ -f "$conf" ]] && grep -Eq \
       '^[[:space:]]*MALLOC_ARENA_MAX=2[[:space:]]*$|^[[:space:]]*MALLOC_MMAP_THRESHOLD_=131072[[:space:]]*$' \
       "$conf" 2>/dev/null; then
-    legacy_owned=true
     local tmp="${conf}.inir-repair.$$"
 
-    if ! grep -Ev \
+    local filter_rc=0
+    grep -Ev \
         '^[[:space:]]*MALLOC_ARENA_MAX=2[[:space:]]*$|^[[:space:]]*MALLOC_MMAP_THRESHOLD_=131072[[:space:]]*$|^# Quickshell/iNiR memory optimization[[:space:]]*$|^# Prevents glibc malloc arenas from retaining freed wallpaper textures\.[[:space:]]*$|^# See: scripts/quickshell-env\.sh for details\.[[:space:]]*$' \
-        "$conf" > "$tmp"; then
+        "$conf" > "$tmp" || filter_rc=$?
+    # grep returns 1 when every line matched the removal filter. That is the
+    # expected "delete the now-empty legacy file" case, not a read/filter error.
+    if [[ "$filter_rc" -gt 1 ]]; then
       rm -f "$tmp"
       return 1
     fi
@@ -448,21 +447,35 @@ repair_legacy_quickshell_malloc_environment() {
     else
       rm -f "$tmp" "$conf"
     fi
-    repaired=1
+    ((repaired++)) || true
   fi
 
-  if $legacy_owned; then
-    [[ "${MALLOC_ARENA_MAX:-}" == "2" ]] && unset MALLOC_ARENA_MAX
-    [[ "${MALLOC_MMAP_THRESHOLD_:-}" == "131072" ]] && unset MALLOC_MMAP_THRESHOLD_
+  # The environment.d file can already be gone while the user manager still
+  # carries values imported earlier in the login session.  Cleanup must not be
+  # gated on finding the file or Doctor reports success while future services
+  # keep inheriting the retired allocator policy.
+  if [[ "${MALLOC_ARENA_MAX:-}" == "2" ]]; then
+    unset MALLOC_ARENA_MAX
+    INIR_LEGACY_MALLOC_ENV_CURRENT_PROCESS=1
+    ((repaired++)) || true
+  fi
+  if [[ "${MALLOC_MMAP_THRESHOLD_:-}" == "131072" ]]; then
+    unset MALLOC_MMAP_THRESHOLD_
+    INIR_LEGACY_MALLOC_ENV_CURRENT_PROCESS=1
+    ((repaired++)) || true
+  fi
 
-    if command -v systemctl >/dev/null 2>&1; then
-      local manager_env=""
-      manager_env="$(systemctl --user show-environment 2>/dev/null || true)"
-      if grep -qx 'MALLOC_ARENA_MAX=2' <<< "$manager_env"; then
-        systemctl --user unset-environment MALLOC_ARENA_MAX >/dev/null 2>&1 || true
+  if command -v systemctl >/dev/null 2>&1; then
+    local manager_env=""
+    manager_env="$(systemctl --user show-environment 2>/dev/null || true)"
+    if grep -qx 'MALLOC_ARENA_MAX=2' <<< "$manager_env"; then
+      if systemctl --user unset-environment MALLOC_ARENA_MAX >/dev/null 2>&1; then
+        ((repaired++)) || true
       fi
-      if grep -qx 'MALLOC_MMAP_THRESHOLD_=131072' <<< "$manager_env"; then
-        systemctl --user unset-environment MALLOC_MMAP_THRESHOLD_ >/dev/null 2>&1 || true
+    fi
+    if grep -qx 'MALLOC_MMAP_THRESHOLD_=131072' <<< "$manager_env"; then
+      if systemctl --user unset-environment MALLOC_MMAP_THRESHOLD_ >/dev/null 2>&1; then
+        ((repaired++)) || true
       fi
     fi
   fi

@@ -2,8 +2,8 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: ad3bc64cdc20439b
-# Targets: 61
+# IPC.md hash: b4a4806b9812ec75
+# Targets: 62
 
 declare -gA IPC_TARGET_DESC=(
   [ai]="Shared multi-provider AI service. It supports Gemini, OpenAI-compatible chat and Responses APIs, Mistral and Anthropic; live provider catalogs are normalized into capability-aware model records. Catalog visibility is separate from execution readiness, so public model lists remain browseable without pretending an API key exists. OpenCode Zen and Go resolve their current model lists and per-model API routes dynamically. Normal shell tools use typed actions and approval cards, while arbitrary commands are isolated in Advanced mode."
@@ -23,6 +23,7 @@ declare -gA IPC_TARGET_DESC=(
   [customWidgets]="Custom widget management. Create, list, reload, and remove user-installed widgets from \`~/.config/inir/widgets/\`."
   [dashboard]="Centered welcome hub panel (ii family): greeting, clock, notifications, media, weather, calendar, todo, system usage and GitHub activity."
   [dev]="Development navigation for loading lazy surfaces and internal views without automating pointer or keyboard input. Destination identifiers are stable and returned as JSON by \`list\`."
+  [equalizer]="Open the ii-family EasyEffects output equalizer. The integration is optional and disabled until you enable it. Run \`inir settings\`, then go to **Modules → Optional → EasyEffects Equalizer** and enable the switch. While it is disabled the IPC target is intentionally not constructed. On a fresh empty EasyEffects output pipeline, iNiR bootstraps a neutral 10-band \`iNiR Equalizer\` preset. Existing non-empty effect chains are never replaced automatically."
   [gamemode]="Performance mode for gaming. Auto-detects fullscreen apps and disables animations/effects. Can also be toggled manually for those stubborn games that don't go fullscreen properly."
   [globalActions]="Command palette / action registry. Search and execute shell actions from scripts or keybinds."
   [keyboard]="Keyboard layout switching (Niri only). Cycles through configured keyboard layouts and queries layout info."
@@ -87,6 +88,7 @@ declare -gA IPC_TARGET_FAMILY=(
   [customWidgets]="waffle"
   [dashboard]="shared"
   [dev]="shared"
+  [equalizer]="ii"
   [gamemode]="shared"
   [globalActions]="shared"
   [keyboard]="shared"
@@ -151,10 +153,11 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [customWidgets]="reload list create remove"
   [dashboard]="toggle close open"
   [dev]="list open close current"
+  [equalizer]="toggle close open refresh ensure status setBand preset configure"
   [gamemode]="toggle activate deactivate status"
   [globalActions]="run runWithArgs list search open"
   [keyboard]="switchLayout switchLayoutPrevious getCurrentLayout getLayouts"
-  [lock]="activate deactivate status focus"
+  [lock]="activate prepareSleep deactivate status focus"
   [mascot]="poke status setVoice romp chase hideSeek tidy appear appearContextual appearWithLine hide"
   [mascotMood]="set current"
   [mediaControls]="toggle close open"
@@ -271,6 +274,15 @@ declare -gA IPC_FUNCTION_DESC=(
   ["dev:open"]="Open a destination by semantic identifier"
   ["dev:close"]="Close development-opened surfaces and clear the request"
   ["dev:current"]="Return the current destination or \`closed\`"
+  ["equalizer:toggle"]="Open/close equalizer"
+  ["equalizer:close"]="Hide equalizer"
+  ["equalizer:open"]="Show equalizer"
+  ["equalizer:refresh"]="Refresh EasyEffects equalizer state"
+  ["equalizer:ensure"]="Ensure Equalizer control is available; bootstraps a neutral Equalizer only when the output pipeline is empty"
+  ["equalizer:status"]="Return current equalizer state as JSON"
+  ["equalizer:setBand"]="Set one 0-based band gain in dB"
+  ["equalizer:preset"]="Apply one built-in EQ preset"
+  ["equalizer:configure"]="Convert the active Equalizer to the iNiR 10-band layout"
   ["gamemode:toggle"]="Toggle gamemode on/off"
   ["gamemode:activate"]="Force enable gamemode"
   ["gamemode:deactivate"]="Force disable gamemode"
@@ -285,8 +297,9 @@ declare -gA IPC_FUNCTION_DESC=(
   ["keyboard:getCurrentLayout"]="Get the current layout name"
   ["keyboard:getLayouts"]="Get all configured layout names (JSON array)"
   ["lock:activate"]="Lock the screen"
+  ["lock:prepareSleep"]="Suspend handshake: activate immediately and wait until the compositor confirms the session lock is secure"
   ["lock:deactivate"]="Cancel lock and mark screen unlocked"
-  ["lock:status"]="Return lock state (\`locked\`, \`activating\`, or \`unlocked\`)"
+  ["lock:status"]="Return lock state (\`secure\`, \`locked\`, \`activating\`, or \`unlocked\`)"
   ["lock:focus"]="Refocus the lock screen input"
   ["mascot:poke"]="Ask her to peek from a random edge with a random pose"
   ["mascot:status"]="Return JSON diagnostics for mood, configured/effective voice, companion state and non-sensitive Screen Time counters"
@@ -488,6 +501,8 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["customWidgets:create"]="<name>"
   ["customWidgets:remove"]="<widgetId>"
   ["dev:open"]="<destination>"
+  ["equalizer:setBand"]="<index> <gain>"
+  ["equalizer:preset"]="<name>"
   ["globalActions:run"]="<actionId>"
   ["globalActions:runWithArgs"]="<actionId> <args>"
   ["globalActions:list"]="<category>"
@@ -527,6 +542,7 @@ bind "Alt+Shift+Tab" { spawn "inir" "altSwitcher" "previous"; }'
   [cheatsheet]='bind "Super+Slash" { spawn "inir" "cheatsheet" "toggle"; }'
   [clipboard]='bind "Super+V" repeat=false { spawn "inir" "clipboard" "toggle"; }'
   [closeConfirm]='bind "Mod+Q" repeat=false { spawn "inir" "close-window"; }'
+  [equalizer]='bind "Ctrl+Alt+F" { spawn "inir" "equalizer" "toggle"; }'
   [gamemode]='bind "Super+F12" { spawn "inir" "gamemode" "toggle"; }'
   [globalActions]='bind "Super+Slash" { spawn "inir" "globalActions" "open"; }
 bind "Super+M" { spawn "inir" "globalActions" "run" "toggle-mute"; }'
@@ -553,9 +569,9 @@ bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; 
   [ytmusic]='bind "Mod+M+Space" { spawn "inir" "ytmusic" "playPause"; }'
 )
 
-IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
+IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev equalizer gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
 IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
-IPC_II_TARGETS=()
+IPC_II_TARGETS=(equalizer)
 IPC_WAFFLE_TARGETS=(autostart customWidgets osd recordingOsd search wactionCenter waffleAltSwitcher wbar widgetpower wnotificationCenter wwidgets)
 
 declare -gA IPC_KEBAB_ALIASES=(

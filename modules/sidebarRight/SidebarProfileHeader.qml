@@ -288,6 +288,16 @@ Item {
             anchors.leftMargin: root._contentPadding
             y: root._avatarTop
 
+            HoverHandler {
+                id: avatarAccountHover
+                cursorShape: Qt.PointingHandCursor
+            }
+
+            TapHandler {
+                gesturePolicy: TapHandler.WithinBounds
+                onTapped: AppLauncher.launch("manageUser")
+            }
+
             CookieFace {
                 anchors.fill: parent
                 visible: root._cookie
@@ -356,6 +366,11 @@ Item {
                     iconSize: 22
                     color: root._colAccent
                 }
+            }
+
+            StyledToolTip {
+                text: Translation.tr("Manage my account")
+                extraVisibleCondition: avatarAccountHover.hovered
             }
         }
 

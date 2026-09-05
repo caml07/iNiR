@@ -27,8 +27,6 @@ Singleton {
     property var detectedBrowsers: []    // [{id,name,kind,profile}] installed browsers with a cookie store
     property string defaultBrowser: ""   // system default web browser id, if detected
     property string connectedBrowser: "" // which browser the active session came from ("manual" for imports)
-    property bool _autoConnectTried: false
-    readonly property bool autoConnectEnabled: Config.options?.sidebar?.ytmusic?.autoConnect ?? true
 
     // Per-surface results (InnerTune screens map onto these).
     property var searchResults: []
@@ -49,6 +47,7 @@ Singleton {
     property bool libraryLoading: false
     property string error: ""
     property string _libraryRequestKind: ""
+    property bool _initialized: false
 
     function _log(...args): void {
         if (Quickshell.env("QS_DEBUG") === "1") console.log("[InnerTube]", ...args);
@@ -56,15 +55,26 @@ Singleton {
 
     readonly property string _runner: Directories.scriptPath + "/innertube-runtime.sh"
 
-    Component.onCompleted: {
-        // P0-13: feature-gated singleton must short-circuit when disabled.
-        if (!root.enabled) {
-            root.ready = true;
-            return;
-        }
+    function ensureInitialized(): void {
+        if (root._initialized || !root.enabled) return;
+        root._initialized = true;
         _pingProc.running = true;
-        root.ready = true;
     }
+
+    function retryAvailability(): void {
+        if (!root.enabled || _pingProc.running) return;
+        root.error = "";
+        _pingProc.running = true;
+    }
+
+    Component.onCompleted: {
+        root.ready = true;
+        root.ensureInitialized();
+    }
+
+    // Config loads asynchronously. The feature can still be false when this
+    // singleton is constructed even though it is enabled in the persisted config.
+    onEnabledChanged: if (root.enabled) root.ensureInitialized()
 
     // ---- ping (availability probe) ----
     Process {
@@ -178,7 +188,6 @@ Singleton {
                 root.connectedBrowser = "";
                 root.libraryPages = {};
                 root.libraryLoaded = {};
-                root._autoConnectTried = true; // don't auto-heal after an explicit disconnect
                 Config.setNestedValue("sidebar.ytmusic.connected", false);
             }
         }
@@ -247,23 +256,12 @@ Singleton {
                     root.accountName = d.account || "";
                     root.accountAvatar = d.avatar || "";
                     if (root.authenticated) {
-                        // Arm auto-heal: once a session validated, remember it so a future launch
-                        // with stale stored cookies silently re-extracts instead of logging out.
                         if (!(Config.options?.sidebar?.ytmusic?.connected ?? false))
                             Config.setNestedValue("sidebar.ytmusic.connected", true);
                     }
                     if (!root.authenticated) {
                         root.libraryPages = {};
                         root.libraryLoaded = {};
-                        // Auto-heal once on launch: if the user connected before (connected=true)
-                        // but the stored cookies went stale, silently re-extract a fresh session
-                        // from the saved browser. Fresh installs (connected=false) wait for the user.
-                        const wasConnected = Config.options?.sidebar?.ytmusic?.connected ?? false;
-                        if (wasConnected && root.autoConnectEnabled && !root._autoConnectTried && !root.connecting) {
-                            root._autoConnectTried = true;
-                            const saved = Config.options?.sidebar?.ytmusic?.browser ?? "";
-                            root.connect(saved || "auto");
-                        }
                     }
                     // Refresh personalized home once we transition to signed-in.
                     if (root.authenticated && !was) root.loadHome();

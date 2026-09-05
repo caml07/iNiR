@@ -450,7 +450,7 @@ ApplicationWindow {
 
     visible: true
     onClosing: Qt.quit()
-    title: "illogical-impulse Settings"
+    title: "Settings — iNiR"
 
     Component.onCompleted: {
         Quickshell.watchFiles = false
@@ -628,8 +628,26 @@ ApplicationWindow {
                     spacing: 9
 
                     Item {
+                        id: settingsAvatarButton
                         Layout.preferredWidth: 36
                         Layout.preferredHeight: 36
+
+                        HoverHandler {
+                            id: settingsAvatarHover
+                            enabled: !root.navEditMode
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        TapHandler {
+                            enabled: !root.navEditMode
+                            gesturePolicy: TapHandler.WithinBounds
+                            onTapped: root.openSearchResult({
+                                pageIndex: 23,
+                                label: Translation.tr("Profile picture"),
+                                section: "right",
+                                isSection: true
+                            })
+                        }
 
                         Rectangle {
                             anchors.fill: parent
@@ -688,6 +706,29 @@ ApplicationWindow {
                             text: "person"
                             iconSize: 18
                             color: Appearance.colors.colPrimary
+                        }
+
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            width: 15
+                            height: 15
+                            radius: width / 2
+                            color: Appearance.colors.colPrimaryContainer
+                            border.width: 1
+                            border.color: Appearance.colors.colPrimary
+                            opacity: settingsAvatarHover.hovered && !root.navEditMode ? 1 : 0
+                            scale: opacity > 0 ? 1 : 0.7
+
+                            Behavior on opacity { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+                            Behavior on scale { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "edit"
+                                iconSize: 10
+                                color: Appearance.colors.colOnPrimaryContainer
+                            }
                         }
                     }
 

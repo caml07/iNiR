@@ -8,8 +8,12 @@
 
 # ── AI tooling (local development only; never distributed) ───
 AGENTS.md
+AGENTS.override.md
+SKILL.md
+PROMPTS.md
 **/AGENTS.md
 .agents/
+.agents-backups/
 **/.agents/
 CODEX.md
 PI.md
@@ -26,6 +30,7 @@ session-*.md
 # AI tool directories
 .design-system/
 .codex/
+.crush/
 .pi/
 .cortexkit/
 .factory/

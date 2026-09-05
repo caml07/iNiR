@@ -43,7 +43,10 @@ Rectangle {
     readonly property bool backdropReady: !root.useWallpaperBackdrop
         || blurredWallpaper.status === Image.Ready
     
-    color: root.useWallpaperBackdrop ? "transparent"
+    // Never expose a raw transparent hole while the wallpaper is loading or
+    // unavailable. Consumers can provide a solid style base as fallback; once
+    // the backdrop is ready this becomes transparent and the glass stack takes over.
+    color: root.useWallpaperBackdrop && root.backdropReady ? "transparent"
         : root.inirEverywhere ? root.inirColor
         : root.fallbackColor
     

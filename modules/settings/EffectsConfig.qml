@@ -48,10 +48,21 @@ ContentPage {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Appearance.sizes.spacingMedium
-                MaterialSymbol { text: "auto_awesome"; iconSize: Appearance.font.pixelSize.larger }
-                StyledText { Layout.fillWidth: true; text: Translation.tr("Default blur backend") }
+                MaterialSymbol {
+                    text: "auto_awesome"
+                    iconSize: Appearance.font.pixelSize.larger
+                    color: Appearance.colors.colPrimary
+                }
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    text: Translation.tr("Default blur backend")
+                    wrapMode: Text.Wrap
+                }
                 StyledComboBox {
-                    Layout.preferredWidth: 210
+                    // Keep the selector readable at the Settings minimum width
+                    // while letting it breathe in the normal window size.
+                    Layout.preferredWidth: Math.min(210, Math.max(140, root.width * 0.38))
                     model: root.backendOptions
                     textRole: "displayName"
                     currentIndex: Math.max(0, root.backendOptions.findIndex(o => o.value === (Config.options?.performance?.blurBackend ?? "auto")))
@@ -81,10 +92,19 @@ ContentPage {
                     required property var modelData
                     Layout.fillWidth: true
                     spacing: Appearance.sizes.spacingMedium
-                    MaterialSymbol { text: modelData.icon; iconSize: Appearance.font.pixelSize.larger }
-                    StyledText { Layout.fillWidth: true; text: modelData.label }
+                    MaterialSymbol {
+                        text: modelData.icon
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: Appearance.colors.colPrimary
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        text: modelData.label
+                        wrapMode: Text.Wrap
+                    }
                     StyledComboBox {
-                        Layout.preferredWidth: 210
+                        Layout.preferredWidth: Math.min(210, Math.max(140, root.width * 0.38))
                         readonly property var options: [{ displayName: Translation.tr("Inherit"), value: "inherit" }].concat(root.backendOptions)
                         model: options
                         textRole: "displayName"

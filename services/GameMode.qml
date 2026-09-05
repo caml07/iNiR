@@ -52,21 +52,14 @@ Singleton {
     // True if ANY window in ANY workspace is fullscreen (for toast suppression)
     readonly property bool hasAnyFullscreenWindow: checkAnyFullscreenWindow()
 
-    // True only when a fullscreen window sits on an ACTIVE workspace, i.e. is
-    // actually visible right now. A fullscreen-sized window parked on a
-    // background workspace (an RDP session, a paused game) keeps
-    // hasAnyFullscreenWindow true, but must not mute desktop companions that
-    // only ever appear over the workspace the user is looking at.
+    // True only when a fullscreen window actually owns an active viewport.
+    // `window.is_focused` is global and therefore insufficient on multi-output
+    // sessions: a fullscreen tile can remain the active tile on an unfocused
+    // monitor. NiriService tracks `active_window_id` per workspace, which is the
+    // correct per-output owner signal.
     readonly property bool hasVisibleFullscreenWindow: {
         if (!CompositorService.isNiri) return hasAnyFullscreenWindow
-        const windows = NiriService.windows
-        if (!Array.isArray(windows)) return false
-        for (let i = 0; i < windows.length; i++) {
-            if (!isWindowFullscreen(windows[i])) continue
-            const ws = NiriService.workspaces[windows[i].workspace_id]
-            if (ws?.is_active) return true
-        }
-        return false
+        return hasFullscreenOnOutput("")
     }
     
     // Suppress niri reload toast briefly after GameMode changes
@@ -190,6 +183,15 @@ Singleton {
             const ws = NiriService.workspaces?.[w.workspace_id]
             if (!(ws?.is_active ?? false)) continue
             if (outputName.length > 0 && ws.output !== outputName) continue
+            // Prefer the workspace-local active tile. Fall back to global focus
+            // only while NiriService has not received an active-window event
+            // for this workspace yet.
+            const activeWindowId = ws.active_window_id
+            if (activeWindowId !== undefined && activeWindowId !== null) {
+                if (activeWindowId !== w.id) continue
+            } else if (!w.is_focused) {
+                continue
+            }
             if (isWindowFullscreen(w)) return true
         }
         return false

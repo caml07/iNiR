@@ -56,17 +56,20 @@ Item {
     readonly property real _spectrumX: {
         const geometryDependency = root.x + root.y + root.width + root.height
             + (root.parent?.x ?? 0) + (root.parent?.width ?? 0)
-        if (!root.spectrumDomain || !(root.spectrumDomain.width > 0))
+        if (!root.spectrumDomain || !(root._spectrumSpan > 0))
             return 0
-        return root.mapToItem(root.spectrumDomain, 0, 0).x
+        const position = root.mapToItem(root.spectrumDomain, 0, 0)
+        return root.vertical ? position.y : position.x
     }
+    readonly property real _spectrumSpan: root.vertical
+        ? (root.spectrumDomain?.height ?? 0) : (root.spectrumDomain?.width ?? 0)
     readonly property real _spectrumStartRatio: !root.spectrumDomain
         ? 0
-        : Math.max(0, Math.min(1, root._spectrumX / root.spectrumDomain.width))
+        : Math.max(0, Math.min(1, root._spectrumX / Math.max(1, root._spectrumSpan)))
     readonly property real _spectrumEndRatio: !root.spectrumDomain
         ? 1
         : Math.max(root._spectrumStartRatio,
-            Math.min(1, (root._spectrumX + root.width) / root.spectrumDomain.width))
+            Math.min(1, (root._spectrumX + (root.vertical ? root.height : root.width)) / Math.max(1, root._spectrumSpan)))
 
     // El fondo de cada grupo de la barra ahora sale del molde compartido
     // (PanelSurface) en vez de dibujarse a mano. Misma pinta que antes, pero
@@ -110,8 +113,13 @@ Item {
         screen: root.screen
         compactShadow: !root.vertical
 
-        CavaSpectrum {
-            anchors.fill: parent
+        AudioVisualizerLayer {
+            anchors.centerIn: parent
+            width: root.vertical && root.spectrumType !== "organic"
+                ? islandSurface.height : islandSurface.width
+            height: root.vertical && root.spectrumType !== "organic"
+                ? islandSurface.width : islandSurface.height
+            rotation: root.vertical && root.spectrumType !== "organic" ? 90 : 0
             active: root.spectrumEnabled && islandSurface.visible
             threadedRendering: true
             points: active ? root.spectrumPoints : []
@@ -132,6 +140,14 @@ Item {
             edgeSoftness: root.spectrumEdgeSoftness
             frequencyProfile: root.spectrumFrequencyProfile
             accentStrength: root.spectrumAccentStrength
+            organicSensitivity: 0.62
+            organicPulse: 0.72
+            organicMotionSpeed: 0.9
+            organicIdleMotion: 0.18
+            organicGlow: 0.38
+            organicOpacity: root.spectrumOpacity
+            organicEdgeAura: true
+            organicBaseRadius: 0.42
             topLeftRadius: islandSurface.radius
             topRightRadius: islandSurface.radius
             bottomLeftRadius: islandSurface.radius

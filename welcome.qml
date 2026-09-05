@@ -35,8 +35,12 @@ Scope {
     property var focusedScreen: GlobalStates.primaryScreen
 
     readonly property string selectedProfile: Config.options?.welcomeWizard?.profile ?? "balanced"
+    readonly property string selectedStylePreset: Config.options?.welcomeWizard?.stylePreset ?? "material-flow"
+    readonly property string selectedPerformancePreset: Config.options?.welcomeWizard?.performancePreset ?? "balanced"
     property bool profileCustomized: false
     property bool initialProfileApplied: false
+    property bool initialStyleApplied: false
+    property bool initialPerformanceApplied: false
     readonly property bool firstRunSetup: !(Config.options?.welcomeWizard?.completed ?? false)
         && !(Config.options?.welcomeWizard?.skipped ?? false)
 
@@ -53,6 +57,170 @@ Scope {
         : selectedProfile === "full"
             ? Translation.tr("Best if you want to see everything iNiR can do on day one.")
             : Translation.tr("Best for most people. This is what a fresh install ships.")
+
+    readonly property var stylePresets: [
+        {
+            id: "material-flow", name: Translation.tr("Flow"), icon: "category",
+            globalStyle: "material",
+            description: Translation.tr("Material colors with the dedicated M3 bar, M3 dock and contextual motion. Familiar, but no longer generic."),
+            values: {
+                "appearance.iiMotionProfile": "contextual",
+                "bar.appearanceStyle": "m3",
+                "bar.m3.borderless": "separated",
+                "bar.m3.cornerStyle": 3,
+                "bar.m3.showBackground": true,
+                "bar.showBackground": true,
+                "bar.opacity": 1.0,
+                "dock.style": "m3",
+                "dock.showBackground": true,
+                "sidebar.style": "panel"
+            }
+        },
+        {
+            id: "expressive", name: Translation.tr("Expressive"), icon: "interests",
+            globalStyle: "cookie",
+            description: Translation.tr("Organic Material Expressive shapes, joined M3 groups and a pill dock. Playful without becoming noisy."),
+            values: {
+                "appearance.iiMotionProfile": "contextual",
+                "bar.appearanceStyle": "m3",
+                "bar.m3.borderless": "pills",
+                "bar.m3.cornerStyle": 3,
+                "bar.m3.showBackground": true,
+                "bar.showBackground": true,
+                "bar.opacity": 1.0,
+                "dock.style": "pill",
+                "dock.showBackground": true,
+                "sidebar.style": "panel"
+            }
+        },
+        {
+            id: "aurora-islands", name: Translation.tr("Glass"), icon: "blur_on",
+            globalStyle: "aurora",
+            description: Translation.tr("Aurora glass with separate bar, dock and sidebar islands. Best with the Medium graphics budget."),
+            values: {
+                "appearance.iiMotionProfile": "contextual",
+                "bar.appearanceStyle": "islands",
+                "bar.showBackground": true,
+                "bar.opacity": 1.0,
+                "dock.style": "island",
+                "dock.showBackground": true,
+                "sidebar.style": "island"
+            }
+        },
+        {
+            id: "inir-terminal", name: "iNiR", icon: "terminal",
+            globalStyle: "inir",
+            description: Translation.tr("The shell's technical terminal language with a framed bar and restrained panel dock. Dense, sharp and deliberate."),
+            values: {
+                "appearance.iiMotionProfile": "classic",
+                "bar.appearanceStyle": "frame",
+                "bar.showBackground": true,
+                "bar.opacity": 1.0,
+                "dock.style": "panel",
+                "dock.showBackground": true,
+                "sidebar.style": "panel"
+            }
+        },
+        {
+            id: "zzz-street", name: "ZZZ", icon: "bolt",
+            globalStyle: "zzz",
+            description: Translation.tr("Poster-like ZZZ surfaces with the classic bar chassis and panel dock so the graphic skin stays in control."),
+            values: {
+                "appearance.iiMotionProfile": "classic",
+                "bar.appearanceStyle": "classic",
+                "bar.showBackground": true,
+                "bar.opacity": 1.0,
+                "dock.style": "panel",
+                "dock.showBackground": true,
+                "sidebar.style": "panel"
+            }
+        }
+    ]
+
+    readonly property var performancePresets: [
+        {
+            id: "minimum", name: Translation.tr("Low-end"), icon: "energy_savings_leaf",
+            description: Translation.tr("Maximum savings for very weak GPUs or battery-first systems: effects and motion are disabled, while Style default stays remembered for when you turn them back on."),
+            values: {
+                "performance.lowPower": true,
+                "performance.reduceAnimations": true,
+                "performance.blurBackend": "auto",
+                "performance.compositorBlur": false,
+                "performance.blurAreas.bar": "inherit",
+                "performance.blurAreas.dock": "inherit",
+                "performance.blurAreas.panels": "inherit",
+                "performance.blurAreas.islands": "inherit",
+                "performance.blurAreas.widgets": "inherit"
+            }
+        },
+        {
+            id: "efficient", name: Translation.tr("Low-end styled"), icon: "speed",
+            description: Translation.tr("Keeps full motion and each style's intended wallpaper glass, but avoids compositor blur. The low-end choice when you still want iNiR to look like iNiR."),
+            values: {
+                "performance.lowPower": false,
+                "performance.reduceAnimations": false,
+                "performance.blurBackend": "auto",
+                "performance.compositorBlur": false,
+                "performance.blurAreas.bar": "inherit",
+                "performance.blurAreas.dock": "inherit",
+                "performance.blurAreas.panels": "inherit",
+                "performance.blurAreas.islands": "inherit",
+                "performance.blurAreas.widgets": "inherit"
+            }
+        },
+        {
+            id: "balanced", name: Translation.tr("Medium"), icon: "tune",
+            description: Translation.tr("Medium hardware and up: each style gets its intended effects and blur policy, with game mode still able to cut them automatically."),
+            values: {
+                "performance.lowPower": false,
+                "performance.reduceAnimations": false,
+                "performance.blurBackend": "auto",
+                "performance.compositorBlur": true,
+                "performance.blurAreas.bar": "inherit",
+                "performance.blurAreas.dock": "inherit",
+                "performance.blurAreas.panels": "inherit",
+                "performance.blurAreas.islands": "inherit",
+                "performance.blurAreas.widgets": "inherit"
+            }
+        }
+    ]
+
+    function presetById(list: var, id: string): var {
+        return list.find(preset => preset.id === id) ?? list[0]
+    }
+
+    function valuesMatch(values: var): bool {
+        const keys = Object.keys(values ?? {})
+        for (const key of keys) {
+            const current = Config.getNestedValue(key, undefined)
+            if (JSON.stringify(current) !== JSON.stringify(values[key]))
+                return false
+        }
+        return true
+    }
+
+    function stylePresetMatches(id: string): bool {
+        const preset = root.presetById(root.stylePresets, id)
+        return (Config.options?.appearance?.globalStyle ?? "material") === preset.globalStyle
+            && root.valuesMatch(preset.values)
+    }
+
+    function performancePresetMatches(id: string): bool {
+        return root.valuesMatch(root.presetById(root.performancePresets, id).values)
+    }
+
+    readonly property string effectiveStylePreset: root.stylePresetMatches(root.selectedStylePreset)
+        ? root.selectedStylePreset : "custom"
+    readonly property string effectivePerformancePreset: root.performancePresetMatches(root.selectedPerformancePreset)
+        ? root.selectedPerformancePreset : "custom"
+    readonly property var currentStylePreset: root.presetById(root.stylePresets, root.selectedStylePreset)
+    readonly property var currentPerformancePreset: root.presetById(root.performancePresets, root.selectedPerformancePreset)
+    readonly property string currentStylePresetDescription: root.effectiveStylePreset === "custom"
+        ? Translation.tr("Custom combination. Pick a preset to realign the global style, bar, dock, sidebars and motion in one action.")
+        : root.currentStylePreset.description
+    readonly property string currentPerformancePresetDescription: root.effectivePerformancePreset === "custom"
+        ? Translation.tr("Custom graphics policy. Pick a budget to reset effects, motion and blur together.")
+        : root.currentPerformancePreset.description
 
     // Every starting profile prepares shared services and the Material II
     // family. Waffle keeps its independent `waffles.*` configuration intact,
@@ -74,7 +242,6 @@ Scope {
         "sounds.notifications": true,
         "gameMode.autoDetect": true,
         "audio.protection.enable": true,
-        "performance.reduceAnimations": false,
         "sidebar.collapseEmptyNotifications": false,
         "sidebar.collapseWidgetsTab": false,
         "sidebar.right.headerBanner": "wallpaper",
@@ -100,6 +267,10 @@ Scope {
                 "bar.modules.resources": false,
                 "bar.modules.utilButtons": false,
                 "bar.modules.media": false,
+                "bar.m3.layoutMode": "custom",
+                "bar.m3.layouts.leftLayout": ["workspaces"],
+                "bar.m3.layouts.middleLayout": ["docktoPanel"],
+                "bar.m3.layouts.rightLayout": ["systemIcons", "clockWidget"],
                 "sidebar.news.enable": false,
                 "sidebar.wallhaven.enable": false,
                 "sidebar.tools.enable": false,
@@ -134,6 +305,10 @@ Scope {
                 "bar.modules.resources": true,
                 "bar.modules.utilButtons": true,
                 "bar.modules.media": true,
+                "bar.m3.layoutMode": "showcase",
+                "bar.m3.layouts.leftLayout": ["media", "workspaces"],
+                "bar.m3.layouts.middleLayout": ["visualizer", "docktoPanel", "visualizer"],
+                "bar.m3.layouts.rightLayout": ["utilButtons", "systemIcons", "weatherBar", "clockWidget"],
                 "sidebar.news.enable": true,
                 "sidebar.wallhaven.enable": true,
                 "sidebar.tools.enable": true,
@@ -184,6 +359,10 @@ Scope {
             "bar.modules.resources": true,
             "bar.modules.utilButtons": true,
             "bar.modules.media": true,
+            "bar.m3.layoutMode": "compact",
+            "bar.m3.layouts.leftLayout": ["media", "workspaces"],
+            "bar.m3.layouts.middleLayout": ["docktoPanel"],
+            "bar.m3.layouts.rightLayout": ["utilButtons", "systemIcons", "weatherBar", "clockWidget"],
             "sidebar.news.enable": true,
             "sidebar.wallhaven.enable": true,
             "sidebar.tools.enable": false,
@@ -231,16 +410,43 @@ Scope {
         root.profileCustomized = false
     }
 
+    function applyStylePreset(id: string): void {
+        const preset = root.presetById(root.stylePresets, id)
+        ThemeService.setGlobalStyle(preset.globalStyle)
+        Config.setNestedValues(Object.assign({}, preset.values, {
+            "welcomeWizard.stylePreset": preset.id
+        }))
+    }
+
+    function applyPerformancePreset(id: string): void {
+        const preset = root.presetById(root.performancePresets, id)
+        Config.setNestedValues(Object.assign({}, preset.values, {
+            "welcomeWizard.performancePreset": preset.id
+        }))
+    }
+
     function setProfileFeature(path: string, value: var): void {
         root.profileCustomized = true
         Config.setNestedValue(path, value)
     }
 
     onCurrentStepChanged: {
-        if (root.currentStep !== 1 || root.initialProfileApplied || !root.firstRunSetup)
+        if (!root.firstRunSetup)
             return
-        root.initialProfileApplied = true
-        root.applyProfile(root.selectedProfile)
+        if (root.currentStep === 1) {
+            if (!root.initialProfileApplied) {
+                root.initialProfileApplied = true
+                root.applyProfile(root.selectedProfile)
+            }
+            if (!root.initialPerformanceApplied) {
+                root.initialPerformanceApplied = true
+                root.applyPerformancePreset(root.selectedPerformancePreset)
+            }
+        }
+        if (root.currentStep === 2 && !root.initialStyleApplied) {
+            root.initialStyleApplied = true
+            root.applyStylePreset(root.selectedStylePreset)
+        }
     }
 
     // ─── Entry/exit animation state (gate pattern) ───
@@ -1081,20 +1287,6 @@ Scope {
                                     ? Appearance.colors.colOnPrimaryContainer
                                     : Appearance.colors.colOnSurface
                             }
-                            Rectangle {
-                                visible: !easyCard.selected
-                                implicitWidth: easyRecommendedLabel.implicitWidth + 12
-                                implicitHeight: easyRecommendedLabel.implicitHeight + 4
-                                radius: height / 2
-                                color: Appearance.colors.colPrimaryContainer
-                                StyledText {
-                                    id: easyRecommendedLabel
-                                    anchors.centerIn: parent
-                                    text: Translation.tr("Recommended")
-                                    font.pixelSize: Appearance.font.pixelSize.smallest
-                                    color: Appearance.colors.colOnPrimaryContainer
-                                }
-                            }
                             MaterialSymbol {
                                 visible: easyCard.selected
                                 text: "check_circle"
@@ -1169,6 +1361,23 @@ Scope {
                                     ? Appearance.colors.colOnPrimaryContainer
                                     : Appearance.colors.colOnSurface
                             }
+                            Rectangle {
+                                implicitWidth: advancedDefaultLabel.implicitWidth + 12
+                                implicitHeight: advancedDefaultLabel.implicitHeight + 4
+                                radius: height / 2
+                                color: advancedCard.selected
+                                    ? Appearance.colors.colPrimary
+                                    : Appearance.colors.colPrimaryContainer
+                                StyledText {
+                                    id: advancedDefaultLabel
+                                    anchors.centerIn: parent
+                                    text: Translation.tr("Default")
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    color: advancedCard.selected
+                                        ? Appearance.colors.colOnPrimary
+                                        : Appearance.colors.colOnPrimaryContainer
+                                }
+                            }
                             MaterialSymbol {
                                 visible: advancedCard.selected
                                 text: "check_circle"
@@ -1211,6 +1420,59 @@ Scope {
             id: themeColumn
             width: parent.width
             spacing: 16
+
+        SettingsGroup {
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignHCenter
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    MaterialSymbol { text: "auto_awesome"; iconSize: 20; color: Appearance.colors.colPrimary }
+                    StyledText { text: Translation.tr("Curated look"); font.pixelSize: Appearance.font.pixelSize.normal }
+                    Item { Layout.fillWidth: true }
+                    StyledText {
+                        text: root.effectiveStylePreset === "custom"
+                            ? Translation.tr("Custom") : root.currentStylePreset.name
+                        font.pixelSize: Appearance.font.pixelSize.smallest
+                        color: Appearance.colors.colPrimary
+                    }
+                }
+
+                ConfigSelectionArray {
+                    Layout.fillWidth: true
+                    currentValue: root.effectiveStylePreset
+                    onSelected: value => root.applyStylePreset(value)
+                    options: root.stylePresets.map(preset => ({
+                        displayName: preset.name,
+                        icon: preset.icon,
+                        value: preset.id
+                    }))
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: root.currentStylePresetDescription
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Translation.tr("These presets coordinate the shell's major surfaces. Wallpaper colors, light/dark mode and later fine tuning stay independent.")
+                    color: Appearance.colors.colSubtext
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    opacity: 0.8
+                }
+            }
+        }
 
         // Light/Dark toggle
         SettingsGroup {
@@ -1263,7 +1525,11 @@ Scope {
                                  : style === "cards" ? Translation.tr("Rounded Cards")
                                  : style === "aurora" ? Translation.tr("Glass & Blur")
                                  : style === "angel" ? Translation.tr("Neo-Brutalism Glass")
-                                 : Translation.tr("Terminal Style")
+                                 : style === "inir" ? Translation.tr("Terminal Style")
+                                 : style === "cookie" ? Translation.tr("Organic & Expressive")
+                                 : style === "zzz" ? Translation.tr("Urban Graphic")
+                                 : style === "regalia" ? Translation.tr("Engineered Luxury")
+                                 : Translation.tr("Custom")
                         }
                         color: Appearance.colors.colSubtext
                         font.pixelSize: Appearance.font.pixelSize.smaller
@@ -1274,7 +1540,7 @@ Scope {
                     Layout.fillWidth: true
                     currentValue: Config.options?.appearance?.globalStyle ?? "material"
                     onSelected: newValue => {
-                        Config.setNestedValue("appearance.globalStyle", newValue)
+                        ThemeService.setGlobalStyle(newValue)
                     }
                     options: [
                         { displayName: "Material", icon: "dashboard", value: "material" },
@@ -1286,7 +1552,7 @@ Scope {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Translation.tr("More experimental styles remain available in Settings.")
+                    text: Translation.tr("More advanced styles and editors remain available in Settings.")
                     color: Appearance.colors.colSubtext
                     font.pixelSize: Appearance.font.pixelSize.smallest
                     horizontalAlignment: Text.AlignHCenter
@@ -1767,6 +2033,54 @@ Scope {
                 }
             }
 
+            SettingsGroup {
+                Layout.fillWidth: true
+                Layout.maximumWidth: 600
+                Layout.alignment: Qt.AlignHCenter
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol { text: "speed"; iconSize: 20; color: Appearance.colors.colPrimary }
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: Translation.tr("Graphics budget")
+                            font.pixelSize: Appearance.font.pixelSize.normal
+                            font.weight: Font.Medium
+                        }
+                        StyledText {
+                            text: root.effectivePerformancePreset === "custom"
+                                ? Translation.tr("Custom") : root.currentPerformancePreset.name
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colPrimary
+                        }
+                    }
+
+                    ConfigSelectionArray {
+                        Layout.fillWidth: true
+                        currentValue: root.effectivePerformancePreset
+                        onSelected: value => root.applyPerformancePreset(value)
+                        options: root.performancePresets.map(preset => ({
+                            displayName: preset.name,
+                            icon: preset.icon,
+                            value: preset.id
+                        }))
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: root.currentPerformancePresetDescription
+                        color: Appearance.colors.colSubtext
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Layout.maximumWidth: 600
@@ -1821,7 +2135,7 @@ Scope {
                         text: Translation.tr("Reduce animations")
                         description: Translation.tr("Calmer motion and less graphics work on slower hardware.")
                         checked: Config.options?.performance?.reduceAnimations ?? false
-                        onToggledByUser: checked => root.setProfileFeature("performance.reduceAnimations", checked)
+                        onToggledByUser: checked => Config.setNestedValue("performance.reduceAnimations", checked)
                     }
                     ConfigSwitch {
                         buttonIcon: "hearing"

@@ -12,7 +12,7 @@ The service connects to your compositor via a wants link:
 ~/.config/systemd/user/niri.service.wants/inir.service
 ```
 
-When niri starts, systemd starts iNiR. When niri stops, iNiR stops. Manage the link with:
+When Niri starts, `inir.service` waits for the `Type=notify` compositor service to report ready, so it inherits Niri's authoritative `DISPLAY`, `WAYLAND_DISPLAY` and `NIRI_SOCKET`. When Niri stops, iNiR stops. Manage the link with:
 
 ```bash
 inir service enable     # create wants link

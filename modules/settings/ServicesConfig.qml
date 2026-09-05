@@ -579,6 +579,7 @@ ContentPage {
                                         return Translation.tr("Updating…")
                                     }
                                     if (ShellUpdates.isChecking) return Translation.tr("Checking for updates…")
+                                    if (ShellUpdates.repoDiverged) return Translation.tr("Repository history changed")
                                     if (ShellUpdates.hasUpdate) return Translation.tr("Update available")
                                     if (ShellUpdates.managedExternally) return "Managed externally"
                                     if (ShellUpdates.lastError.length > 0) return Translation.tr("Error")
@@ -598,7 +599,10 @@ ContentPage {
 
                             StyledText {
                                 visible: ShellUpdates.hasUpdate
-                                text: Translation.tr("%1 commit(s) behind on %2").arg(ShellUpdates.commitsBehind).arg(ShellUpdates.currentBranch || "main")
+                                text: ShellUpdates.repoDiverged
+                                    ? Translation.tr("%1 local and %2 remote commit(s) differ on %3. Update can safely recover a clean published checkout.")
+                                        .arg(ShellUpdates.commitsAhead).arg(ShellUpdates.commitsBehind).arg(ShellUpdates.currentBranch || "main")
+                                    : Translation.tr("%1 commit(s) behind on %2").arg(ShellUpdates.commitsBehind).arg(ShellUpdates.currentBranch || "main")
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 color: Appearance.colors.colSubtext
                             }
@@ -856,7 +860,7 @@ ContentPage {
                                 ? (ShellUpdates.updateStepMessage.length > 0
                                     ? Translation.tr(ShellUpdates.updateStepMessage) + "…"
                                     : Translation.tr("Updating…"))
-                                : Translation.tr("Update Now")
+                                : (ShellUpdates.repoDiverged ? Translation.tr("Repair & Update") : Translation.tr("Update Now"))
                             font {
                                 pixelSize: Appearance.font.pixelSize.smaller
                                 weight: Font.DemiBold

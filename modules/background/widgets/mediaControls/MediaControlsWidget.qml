@@ -27,7 +27,7 @@ AbstractBackgroundWidget {
         visualizerAccentStrength: 70, visualizerRange: 88, visualizerBarCount: 32,
         organicSensitivity: 35, organicPulse: 150, organicMotionSpeed: 250,
         organicIdleMotion: 40, organicGlow: 100, organicOpacity: 100,
-        organicReach: 35, organicRange: 20,
+        organicReach: 35, organicRange: 20, organicCompression: 0,
         lyricsExpanded: false,
         widgetScale: 100, widgetOpacity: 100, colorMode: "auto", dim: 0,
         x: 240, y: 240
@@ -172,7 +172,9 @@ AbstractBackgroundWidget {
 
     editPopoverContent: Component {
         ColumnLayout {
+            id: mediaQuickRoot
             implicitWidth: 360
+            readonly property bool narrow: width < 300
             spacing: 10
 
             StyledText {
@@ -185,7 +187,7 @@ AbstractBackgroundWidget {
 
             GridLayout {
                 Layout.fillWidth: true
-                columns: 3
+                columns: root.quickControlsWide ? 5 : 3
                 columnSpacing: 4
                 rowSpacing: 4
                 Repeater {
@@ -204,8 +206,11 @@ AbstractBackgroundWidget {
                         required property var modelData
                         required property int index
                         Layout.fillWidth: true
-                        leftmost: index % 3 === 0
-                        rightmost: index % 3 === 2
+                        readonly property int groupColumns:
+                            root.quickControlsWide ? 5 : 3
+                        leftmost: index % groupColumns === 0
+                        rightmost: index % groupColumns === groupColumns - 1
+                            || index === 8
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
                         toggled: root.selectedPreset === modelData.value
@@ -277,6 +282,7 @@ AbstractBackgroundWidget {
                     }
 
                     RowLayout {
+                        Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 0
                         Repeater {
@@ -288,7 +294,7 @@ AbstractBackgroundWidget {
                             SelectionGroupButton {
                                 required property var modelData
                                 required property int index
-                                Layout.preferredWidth: 96
+                                Layout.fillWidth: true
                                 leftmost: index === 0
                                 rightmost: index === 2
                                 horizontalPadding: 8
@@ -446,7 +452,8 @@ AbstractBackgroundWidget {
                     GridLayout {
                         visible: root.vizType === "organic"
                         Layout.fillWidth: true
-                        columns: 2
+                        columns: root.quickControlsWide ? 4
+                            : mediaQuickRoot.narrow ? 1 : 2
                         columnSpacing: 16
                         rowSpacing: 4
 
@@ -464,6 +471,11 @@ AbstractBackgroundWidget {
                             labelText: Translation.tr("Sensitivity")
                             configKey: "background.widgets.mediaControls.organicSensitivity"
                             minimum: 25; maximum: 200
+                        }
+                        MediaVizMetric {
+                            labelText: Translation.tr("Compression")
+                            configKey: "background.widgets.mediaControls.organicCompression"
+                            minimum: 0; maximum: 100
                         }
                         MediaVizMetric {
                             labelText: Translation.tr("Glow")

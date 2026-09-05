@@ -107,7 +107,8 @@ depends=(
   mpv
   mpv-mpris
   yt-dlp
-  python-ytmusicapi
+  yt-dlp-ejs
+  deno
   socat
 
   #--- Theming ---

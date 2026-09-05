@@ -29,18 +29,15 @@ bash -n \
 step "session tray ordering"
 # This check is conditional on the usable systemd user manager predicate (ADR-0002).
 # The service unit is part of the systemd path implementation.
+service_unit="$runtime_root/assets/systemd/inir.service"
 if has_usable_systemd_user_manager; then
-    service_unit="$runtime_root/assets/systemd/inir.service"
     if ! grep -qx 'Type=dbus' "$service_unit" \
             || ! grep -qx 'BusName=org.kde.StatusNotifierWatcher' "$service_unit" \
-            || ! grep -qx 'Before=graphical-session.target' "$service_unit" \
-            || grep -qx 'After=graphical-session.target' "$service_unit" \
-            || grep -qx 'Requisite=graphical-session.target' "$service_unit"; then
-        printf 'FAIL: inir.service does not gate XDG autostart on the tray watcher\n' >&2
-        exit 1
-    fi
-    if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"; then
-        printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
+            || ! grep -qx 'PartOf=niri.service' "$service_unit" \
+            || ! grep -qx 'Requisite=niri.service' "$service_unit" \
+            || ! grep -qx 'After=niri.service' "$service_unit" \
+            || ! grep -qx 'Before=xdg-desktop-autostart.target' "$service_unit"; then
+        printf 'FAIL: inir.service is not ordered behind Niri and ahead of XDG autostart\n' >&2
         exit 1
     fi
     # MALLOC check for systemd service unit
@@ -59,6 +56,62 @@ else
         exit 1
     fi
 fi
+if grep -Fq '/tmp/.X11-unix/X' "$runtime_root/scripts/inir" \
+        || grep -Fq '/tmp/.X11-unix/X' "$runtime_root/modules/common/functions/ShellExec.qml" \
+        || grep -Fq 'niri.wayland-*.sock' "$runtime_root/scripts/inir"; then
+    printf 'FAIL: iNiR still guesses compositor-owned DISPLAY/NIRI_SOCKET from filesystem sockets\n' >&2
+    exit 1
+fi
+session_migration="$runtime_root/sdata/migrations/040-niri-session-environment-lifecycle.sh"
+if [[ ! -f "$session_migration" ]] \
+        || ! grep -Fq 'MIGRATION_SESSION_IMPACT=true' "$session_migration" \
+        || ! grep -Fq 'show_session_impact_notices' "$runtime_root/setup" \
+        || ! grep -Fq 'record_migration_session_impact' "$runtime_root/sdata/lib/migrations.sh"; then
+    printf 'FAIL: session-level lifecycle updates no longer emit a one-shot restart advisory\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"; then
+    printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
+    exit 1
+fi
+if grep -q '^Environment=MALLOC_' "$service_unit" \
+        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
+        || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then
+    printf 'FAIL: iNiR still overrides the glibc allocator at runtime\n' >&2
+    exit 1
+fi
+
+step "suspend lock handshake"
+lock_owner="$runtime_root/modules/lock/Lock.qml"
+idle_owner="$runtime_root/services/Idle.qml"
+if ! grep -Fq 'function prepareSleep(): string' "$lock_owner" \
+        || ! grep -Fq 'return lock.secure ? "secure" : "locking";' "$lock_owner"; then
+    printf 'FAIL: lock before-sleep path does not expose compositor-confirmed secure state\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'lock prepareSleep' "$idle_owner" \
+        || grep -Eq 'before-sleep.*lock activate' "$idle_owner"; then
+    printf 'FAIL: swayidle before-sleep does not wait for the secure lock handshake\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'Lock did not become secure before sleep' "$runtime_root/scripts/inir"; then
+    printf 'FAIL: launcher does not wait for WlSessionLock secure before returning to swayidle\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'Lock IPC was unavailable before sleep and no fallback could secure the session' "$runtime_root/scripts/inir" \
+        || ! grep -Fq '"$swaylock_bin" -f -c 1a1a2e' "$runtime_root/scripts/inir"; then
+    printf 'FAIL: before-sleep does not fail closed when the Quickshell lock target is unavailable\n' >&2
+    exit 1
+fi
+for lock_surface in \
+        "$runtime_root/modules/lock/LockSurface.qml" \
+        "$runtime_root/modules/waffle/lock/WaffleLockSurface.qml" \
+        "$runtime_root/modules/waffle/lock/WaffleLockSurfaceSafe.qml"; do
+    if grep -Fq 'readonly property int imgStatus: avatarImage.status' "$lock_surface"; then
+        printf 'FAIL: lock avatar retry still mutates its source from a synchronous status binding: %s\n' "$lock_surface" >&2
+        exit 1
+    fi
+done
 
 step "service mask handling"
 service_mask_root="$(mktemp -d)"
@@ -113,6 +166,173 @@ if ! grep -Fq 'inir_user_service_is_masked && return 2' "$runtime_root/setup" \
     exit 1
 fi
 
+step "maintenance help is non-destructive"
+setup_update_help="$($runtime_root/setup update --help)"
+inir_update_help="$($runtime_root/scripts/inir update --help)"
+if ! grep -Fq -- '--realign' <<< "$setup_update_help" \
+        || ! grep -Fq -- '--realign' <<< "$inir_update_help" \
+        || grep -Fq 'Checking for updates' <<< "$setup_update_help" \
+        || grep -Fq 'Checking for updates' <<< "$inir_update_help"; then
+    printf 'FAIL: update --help can enter the maintenance workflow or hides recovery options\n' >&2
+    exit 1
+fi
+
+step "legacy allocator repair"
+allocator_root="$(mktemp -d)"
+mkdir -p "$allocator_root/xdg/environment.d" "$allocator_root/bin"
+cat > "$allocator_root/bin/systemctl" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-} ${2:-}" in
+    "--user show-environment")
+        cat "${INIR_TEST_MANAGER_ENV:?}"
+        ;;
+    "--user unset-environment")
+        key="${3:?}"
+        grep -v "^${key}=" "${INIR_TEST_MANAGER_ENV:?}" > "${INIR_TEST_MANAGER_ENV}.tmp" || true
+        mv "${INIR_TEST_MANAGER_ENV}.tmp" "${INIR_TEST_MANAGER_ENV}"
+        ;;
+    *) exit 1 ;;
+esac
+SH
+chmod +x "$allocator_root/bin/systemctl"
+cat > "$allocator_root/xdg/environment.d/quickshell-mem.conf" <<'EOF'
+# Quickshell/iNiR memory optimization
+# Prevents glibc malloc arenas from retaining freed wallpaper textures.
+# See: scripts/quickshell-env.sh for details.
+MALLOC_ARENA_MAX=2
+MALLOC_MMAP_THRESHOLD_=131072
+EOF
+printf 'MALLOC_ARENA_MAX=2\nMALLOC_MMAP_THRESHOLD_=131072\n' > "$allocator_root/manager-env"
+if ! (
+    export XDG_CONFIG_HOME="$allocator_root/xdg"
+    export PATH="$allocator_root/bin:$PATH"
+    export INIR_TEST_MANAGER_ENV="$allocator_root/manager-env"
+    export MALLOC_ARENA_MAX=2 MALLOC_MMAP_THRESHOLD_=131072
+    source "$runtime_root/sdata/lib/functions.sh"
+    repair_legacy_quickshell_malloc_environment
+    [[ ! -e "$allocator_root/xdg/environment.d/quickshell-mem.conf" ]]
+    [[ -z "${MALLOC_ARENA_MAX:-}" && -z "${MALLOC_MMAP_THRESHOLD_:-}" ]]
+    [[ ! -s "$allocator_root/manager-env" ]]
+    [[ "${INIR_LEGACY_MALLOC_ENV_REPAIRED:-0}" -ge 5 ]]
+); then
+    printf 'FAIL: legacy Quickshell allocator repair does not clean file, process and user-manager state\n' >&2
+    rm -rf "$allocator_root"
+    exit 1
+fi
+cat > "$allocator_root/xdg/environment.d/quickshell-mem.conf" <<'EOF'
+MALLOC_ARENA_MAX=8
+MALLOC_MMAP_THRESHOLD_=262144
+EOF
+cp "$allocator_root/xdg/environment.d/quickshell-mem.conf" "$allocator_root/manager-env"
+allocator_before="$(sha256sum "$allocator_root/xdg/environment.d/quickshell-mem.conf" | cut -d' ' -f1)"
+if ! (
+    export XDG_CONFIG_HOME="$allocator_root/xdg"
+    export PATH="$allocator_root/bin:$PATH"
+    export INIR_TEST_MANAGER_ENV="$allocator_root/manager-env"
+    export MALLOC_ARENA_MAX=8 MALLOC_MMAP_THRESHOLD_=262144
+    source "$runtime_root/sdata/lib/functions.sh"
+    repair_legacy_quickshell_malloc_environment
+    [[ "${INIR_LEGACY_MALLOC_ENV_REPAIRED:-0}" -eq 0 ]]
+    [[ "${MALLOC_ARENA_MAX:-}" == 8 && "${MALLOC_MMAP_THRESHOLD_:-}" == 262144 ]]
+); then
+    printf 'FAIL: allocator repair modified custom user allocator values\n' >&2
+    rm -rf "$allocator_root"
+    exit 1
+fi
+allocator_after="$(sha256sum "$allocator_root/xdg/environment.d/quickshell-mem.conf" | cut -d' ' -f1)"
+if [[ "$allocator_before" != "$allocator_after" ]]; then
+    printf 'FAIL: allocator repair rewrote custom environment.d values\n' >&2
+    rm -rf "$allocator_root"
+    exit 1
+fi
+rm -rf "$allocator_root"
+
+step "update status path ownership"
+if ! grep -Fq '_write_update_status() {' "$runtime_root/setup" \
+        || ! grep -Fq 'mkdir -p "$status_dir"' "$runtime_root/setup" \
+        || grep -Fq 'echo "success" > "$_update_status_file"' "$runtime_root/setup"; then
+    printf 'FAIL: setup update status writes can fail before the shell creates its state directory\n' >&2
+    exit 1
+fi
+
+step "rewritten remote recovery"
+rewrite_root="$(mktemp -d)"
+remote_repo="$rewrite_root/origin.git"
+seed_repo="$rewrite_root/seed"
+clean_repo="$rewrite_root/clean"
+local_repo="$rewrite_root/local"
+git -c init.defaultBranch=main init --bare -q "$remote_repo"
+git -c init.defaultBranch=main init -q "$seed_repo"
+git -C "$seed_repo" config user.email test@inir.invalid
+git -C "$seed_repo" config user.name 'iNiR test'
+printf 'A\n' > "$seed_repo/history.txt"
+git -C "$seed_repo" add history.txt
+git -C "$seed_repo" commit -qm A
+git -C "$seed_repo" remote add origin "$remote_repo"
+git -C "$seed_repo" push -qu origin main
+printf 'B\n' >> "$seed_repo/history.txt"
+git -C "$seed_repo" commit -qam B
+old_published_tip="$(git -C "$seed_repo" rev-parse HEAD)"
+git -C "$seed_repo" push -qu origin main
+git clone -q "$remote_repo" "$clean_repo"
+git clone -q "$remote_repo" "$local_repo"
+git -C "$local_repo" config user.email test@inir.invalid
+git -C "$local_repo" config user.name 'iNiR test'
+printf 'local\n' >> "$local_repo/history.txt"
+git -C "$local_repo" commit -qam local
+local_tip="$(git -C "$local_repo" rev-parse HEAD)"
+git -C "$seed_repo" reset -q --hard HEAD~1
+printf 'C\n' >> "$seed_repo/history.txt"
+git -C "$seed_repo" commit -qam C
+git -C "$seed_repo" push -q --force origin main
+git -C "$clean_repo" fetch -q origin
+git -C "$local_repo" fetch -q origin
+if ! (
+    export XDG_CONFIG_HOME="$rewrite_root/xdg-clean"
+    export XDG_STATE_HOME="$rewrite_root/state-clean"
+    REPO_ROOT="$clean_repo"
+    source "$runtime_root/sdata/lib/snapshots.sh"
+    is_upstream_rewrite_divergence main
+    realign_repo_to_remote main
+    [[ "$(git -C "$clean_repo" rev-parse HEAD)" == "$(git -C "$clean_repo" rev-parse origin/main)" ]]
+    [[ -n "${INIR_REPO_RECOVERY_REF:-}" ]]
+    [[ "$(git -C "$clean_repo" rev-parse "$INIR_REPO_RECOVERY_REF")" == "$old_published_tip" ]]
+); then
+    printf 'FAIL: clean checkout cannot recover safely from a recorded upstream rewrite\n' >&2
+    rm -rf "$rewrite_root"
+    exit 1
+fi
+if (
+    export XDG_CONFIG_HOME="$rewrite_root/xdg-local"
+    export XDG_STATE_HOME="$rewrite_root/state-local"
+    REPO_ROOT="$local_repo"
+    source "$runtime_root/sdata/lib/snapshots.sh"
+    realign_repo_to_remote main
+); then
+    printf 'FAIL: --realign can reset a clean checkout containing local commits\n' >&2
+    rm -rf "$rewrite_root"
+    exit 1
+fi
+if [[ "$(git -C "$local_repo" rev-parse HEAD)" != "$local_tip" ]]; then
+    printf 'FAIL: rejected --realign changed the local-commit checkout\n' >&2
+    rm -rf "$rewrite_root"
+    exit 1
+fi
+printf 'dirty\n' >> "$clean_repo/history.txt"
+if (
+    export XDG_CONFIG_HOME="$rewrite_root/xdg-dirty"
+    export XDG_STATE_HOME="$rewrite_root/state-dirty"
+    REPO_ROOT="$clean_repo"
+    source "$runtime_root/sdata/lib/snapshots.sh"
+    realign_repo_to_remote main
+); then
+    printf 'FAIL: --realign can reset a dirty checkout\n' >&2
+    rm -rf "$rewrite_root"
+    exit 1
+fi
+rm -rf "$rewrite_root"
+
 step "fresh install defaults"
 python3 - "$runtime_root" <<'PY'
 import json
@@ -128,6 +348,11 @@ wizard = (root / "welcome.qml").read_text(encoding="utf-8")
 checks = {
     "settings rail": config["settingsUi"]["overlayStyle"] == "rail",
     "balanced profile": config["welcomeWizard"]["profile"] == "balanced",
+    "fresh Material Flow preset": config["welcomeWizard"]["stylePreset"] == "material-flow",
+    "fresh balanced graphics budget": config["welcomeWizard"]["performancePreset"] == "balanced",
+    "fresh contextual motion": config["appearance"]["iiMotionProfile"] == "contextual",
+    "fresh M3 bar": config["bar"]["appearanceStyle"] == "m3",
+    "fresh M3 dock": config["dock"]["style"] == "m3",
     "iNiR Alt+Tab opt-in": config["modules"]["altSwitcher"] is False,
     "dock enabled": config["dock"]["enable"] is True,
     "dock pinned": config["dock"]["pinnedOnStartup"] is True,
@@ -138,6 +363,7 @@ checks = {
     "news tab": config["sidebar"]["news"]["enable"] is True,
     "controls widget": config["sidebar"]["widgets"]["controls"] is True,
     "status widget": config["sidebar"]["widgets"]["status"] is True,
+    "no shared hotspot password": config["hotspot"]["password"] == "",
 }
 failed = [name for name, passed in checks.items() if not passed]
 if failed:
@@ -145,6 +371,13 @@ if failed:
 
 schema_checks = {
     "schema settings rail": 'property string overlayStyle: "rail"' in schema,
+    "schema contextual motion": 'property string iiMotionProfile: "contextual"' in schema,
+    "schema M3 bar": 'property string appearanceStyle: "m3"' in schema,
+    "schema M3 dock": 'property string style: "m3"' in schema.split(
+        "property JsonObject dock: JsonObject {", 1)[1].split(
+        "property JsonObject controlPanel: JsonObject {", 1)[0],
+    "schema fresh style preset": 'property string stylePreset: "material-flow"' in schema,
+    "schema fresh graphics budget": 'property string performancePreset: "balanced"' in schema,
     "schema iNiR Alt+Tab opt-in": "property bool altSwitcher: false" in schema.split(
         "property JsonObject modules: JsonObject {", 1)[1].split(
         "property JsonObject appearance: JsonObject {", 1)[0],
@@ -161,6 +394,31 @@ schema_checks = {
         and "property bool enable: true" in schema[schema.index("property JsonObject wallhaven: JsonObject {"):],
     "schema news tab": "property JsonObject news: JsonObject {\n                    property bool enable: true" in schema,
     "wizard applies initial profile": "root.applyProfile(root.selectedProfile)" in wizard,
+    "wizard applies initial style": "root.applyStylePreset(root.selectedStylePreset)" in wizard,
+    "wizard applies initial graphics budget": "root.applyPerformancePreset(root.selectedPerformancePreset)" in wizard,
+    "wizard style catalog": all(preset in wizard for preset in [
+        'id: "material-flow"', 'id: "expressive"', 'id: "aurora-islands"', 'id: "inir-terminal"', 'id: "zzz-street"'
+    ]),
+    "wizard graphics catalog": all(preset in wizard for preset in [
+        'id: "minimum"', 'id: "efficient"', 'id: "balanced"'
+    ]),
+    "wizard graphics labels distinguish hardware budget from composition profile": all(label in wizard for label in [
+        'id: "minimum", name: Translation.tr("Low-end")',
+        'id: "efficient", name: Translation.tr("Low-end styled")',
+        'id: "balanced", name: Translation.tr("Medium")'
+    ]),
+    "wizard graphics budgets preserve style-default blur policy": (
+        wizard.split("readonly property var performancePresets:", 1)[1]
+            .split("function presetById", 1)[0]
+            .count('"performance.blurBackend": "auto"') == 3
+        and '"performance.blurBackend": "off"' not in wizard.split(
+            "readonly property var performancePresets:", 1)[1].split("function presetById", 1)[0]
+    ),
+    "wizard low-end tiers keep distinct master/compositor policy": all(fragment in wizard for fragment in [
+        '"performance.lowPower": true',
+        '"performance.compositorBlur": false',
+        '"performance.compositorBlur": true'
+    ]),
     "wizard dock pinned": '"dock.pinnedOnStartup": true' in wizard,
     "wizard dock not hover-only": '"dock.hoverToReveal": false' in wizard,
     "wizard right sidebar full height": '"sidebar.collapseEmptyNotifications": false' in wizard,
@@ -178,7 +436,31 @@ if 'Alt+Tab { next-window; }' not in binds or 'Alt+Shift+Tab { previous-window; 
     raise SystemExit("FAIL: native Niri Alt+Tab bindings are missing")
 if 'spawn "inir" "altSwitcher"' in binds:
     raise SystemExit("FAIL: fresh-install Alt+Tab invokes the iNiR switcher")
+if 'Ctrl+Alt+F { spawn "inir" "equalizer" "toggle"; }' not in binds:
+    raise SystemExit("FAIL: fresh-install EasyEffects Equalizer binding is missing")
+if 'Ctrl+Alt+E { spawn "inir" "equalizer" "toggle"; }' in binds:
+    raise SystemExit("FAIL: fresh-install Equalizer binding regressed to the old Ctrl+Alt+E chord")
 PY
+if ! grep -Fq '/dev/urandom' "$runtime_root/sdata/subcmd-install/3.files.sh" \
+        || grep -R -Fq 'inirhotspot' "$runtime_root/defaults" "$runtime_root/modules"; then
+    printf 'FAIL: fresh installs do not generate a unique hotspot password\n' >&2
+    exit 1
+fi
+
+equalizer_helper="$runtime_root/scripts/audio/easyeffects-eq.sh"
+equalizer_service="$runtime_root/services/deferred/EasyEffects.qml"
+equalizer_owner="$runtime_root/modules/ii/ShellIiPanelsImpl.qml"
+if grep -Fq 'equalizer:0:' "$equalizer_helper" \
+        || grep -Fq 'get_last_loaded_preset:output' "$equalizer_helper" \
+        || ! grep -Fq 'find_equalizer_instance()' "$equalizer_helper" \
+        || ! grep -Fq 'output_pipeline_is_empty()' "$equalizer_helper" \
+        || ! grep -Fq "load_preset:output:iNiR Equalizer" "$equalizer_helper" \
+        || ! grep -Fq '"instanceId":%s' "$equalizer_helper" \
+        || ! grep -Fq 'property int equalizerInstanceId: -1' "$equalizer_service" \
+        || ! grep -Fq 'Component.onCompleted: EasyEffects.ensureEqualizer()' "$equalizer_owner"; then
+    printf 'FAIL: EasyEffects Equalizer can regress to instance #0, unsafe preset restore, or lose fresh-pipeline bootstrap\n' >&2
+    exit 1
+fi
 
 arch_installer="$runtime_root/sdata/dist-arch/install-deps.sh"
 if ! grep -Fq 'pacman -T "${_all_official[@]}"' "$arch_installer" \
@@ -454,6 +736,186 @@ if [[ "$python_setup_owners" != "$runtime_root/sdata/subcmd-install/3.files.sh" 
     exit 1
 fi
 
+step "YT Music distribution contract"
+for requirements in "$runtime_root/sdata/uv/requirements.in" "$runtime_root/sdata/uv/requirements.txt"; do
+    grep -Fq 'ytmusicapi>=1.12.0' "$requirements" || {
+        printf 'FAIL: managed Python runtime does not own ytmusicapi in %s\n' "$requirements" >&2
+        exit 1
+    }
+    grep -Fq 'yt-dlp[default,secretstorage]' "$requirements" || {
+        printf 'FAIL: managed Python runtime lacks Chromium cookie-loader support in %s\n' "$requirements" >&2
+        exit 1
+    }
+done
+
+grep -Fq 'v ensure-ytmusic-js-runtime' "$runtime_root/sdata/subcmd-install/3.files.sh" || {
+    printf 'FAIL: fresh install does not provision the YT Music JS runtime\n' >&2
+    exit 1
+}
+grep -Fq 'ensure-ytmusic-js-runtime' "$runtime_root/setup" || {
+    printf 'FAIL: update path does not repair the YT Music JS runtime\n' >&2
+    exit 1
+}
+grep -Fq 'YT Music JS runtime unavailable' "$runtime_root/sdata/lib/doctor.sh" || {
+    printf 'FAIL: doctor does not validate/repair the YT Music JS runtime\n' >&2
+    exit 1
+}
+
+if grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-fedora/install-deps.sh" \
+        || grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-debian/install-deps.sh"; then
+    printf 'FAIL: setup-managed Fedora/Debian still depend on a distro ytmusicapi package\n' >&2
+    exit 1
+fi
+for dependency in deno yt-dlp-ejs; do
+    grep -Eq "^[[:space:]]*${dependency}[[:space:]]*$" "$runtime_root/sdata/dist-arch/inir-audio/PKGBUILD" || {
+        printf 'FAIL: Arch audio bundle lacks %s\n' "$dependency" >&2
+        exit 1
+    }
+done
+for dependency in deno python-ytmusicapi yt-dlp yt-dlp-ejs; do
+    grep -Eq "^[[:space:]]*depends = ${dependency}$" "$runtime_root/distro/arch/inir-meta/.SRCINFO" || {
+        printf 'FAIL: packaged Arch meta lacks %s\n' "$dependency" >&2
+        exit 1
+    }
+done
+if ! grep -Fq 'ps.ytmusicapi' "$runtime_root/nix/package.nix" \
+        || ! grep -Fq 'ps.yt-dlp' "$runtime_root/nix/package.nix" \
+        || ! grep -Fq 'ps.secretstorage' "$runtime_root/nix/package.nix" \
+        || ! grep -Eq '^[[:space:]]+deno$' "$runtime_root/nix/package.nix" \
+        || ! grep -Eq '^[[:space:]]+yt-dlp$' "$runtime_root/nix/package.nix"; then
+    printf 'FAIL: Nix runtime does not provide the complete YT Music runtime\n' >&2
+    exit 1
+fi
+
+ytmusic_service="$runtime_root/services/YtMusic.qml"
+if grep -Eq '/usr/bin/(yt-dlp|mpv)|js-runtimes=node' "$ytmusic_service" \
+        || ! grep -Fq '"--js-runtimes", "deno"' "$ytmusic_service" \
+        || ! grep -Fq 'command -v deno' "$ytmusic_service"; then
+    printf 'FAIL: YT Music runtime still assumes Arch paths or the obsolete Node JS contract\n' >&2
+    exit 1
+fi
+grep -Fq 'pkg="${pkg%%[*}"' "$runtime_root/sdata/lib/doctor.sh" || {
+    printf 'FAIL: doctor does not normalize Python requirement extras\n' >&2
+    exit 1
+}
+grep -Fq 'yt-dlp-runtime.sh' "$ytmusic_service" || {
+    printf 'FAIL: YT Music does not select the managed yt-dlp runtime\n' >&2
+    exit 1
+}
+if grep -Fq 'Install python-ytmusicapi' "$runtime_root/modules/sidebarLeft/innertune/InnerTuneHome.qml" \
+        || grep -Fq 'Reconnect account on launch' "$runtime_root/modules/settings/SidebarsConfig.qml"; then
+    printf 'FAIL: YT Music UI still exposes manual Python install or implicit browser reconnect\n' >&2
+    exit 1
+fi
+
+python3 - "$runtime_root/scripts/ytmusic_auth.py" <<'PYTEST'
+import hashlib
+import importlib.util
+import pathlib
+import sqlite3
+import sys
+import tempfile
+import os
+
+script = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("inir_ytmusic_auth_test", script)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+assert "~/.config/mozilla/firefox" in module.FIREFOX_FORKS["firefox"]
+
+with tempfile.TemporaryDirectory(prefix="inir-yt-cookie-fixture-") as tmp:
+    profile = pathlib.Path(tmp) / "profile"
+    profile.mkdir()
+    database = profile / "cookies.sqlite"
+    con = sqlite3.connect(database)
+    con.execute(
+        "CREATE TABLE moz_cookies (host TEXT, path TEXT, isSecure INTEGER, expiry INTEGER, "
+        "name TEXT, value TEXT, originAttributes TEXT)"
+    )
+    con.executemany(
+        "INSERT INTO moz_cookies VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            (".youtube.com", "/", 1, 4102444800, "SAPISID", "fixture-sapisid", ""),
+            (".youtube.com", "/", 1, 4102444800, "LOGIN_INFO", "fixture-login", ""),
+            (".youtube.com", "/", 1, 4102444800, "__Secure-3PSID", "fixture-psid", ""),
+        ],
+    )
+    con.commit()
+    con.close()
+
+    before = hashlib.sha256(database.read_bytes()).hexdigest()
+    output = pathlib.Path(tmp) / "yt-cookies.txt"
+    ok, error = module.extract_firefox_direct(str(profile), str(output))
+    after = hashlib.sha256(database.read_bytes()).hexdigest()
+    assert ok, error
+    assert before == after, "browser cookie DB was modified"
+    exported = output.read_text()
+    assert "SAPISID" in exported and "LOGIN_INFO" in exported
+    assert output.stat().st_mode & 0o777 == 0o600
+
+with tempfile.TemporaryDirectory(prefix="inir-chromium-profile-fixture-") as tmp:
+    previous_home = os.environ.get("HOME")
+    os.environ["HOME"] = tmp
+    try:
+        base = pathlib.Path(tmp) / ".config/google-chrome"
+        profile = base / "Profile 7"
+        profile.mkdir(parents=True)
+        (profile / "Cookies").touch()
+        (base / "Local State").write_text('{"profile":{"last_used":"Profile 7"}}')
+        assert module.find_chrome_profile("chrome") == str(profile)
+    finally:
+        if previous_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = previous_home
+PYTEST
+
+python3 - "$runtime_root/scripts/innertube.py" <<'PYTEST'
+import importlib.util
+import pathlib
+import tempfile
+import sys
+
+script = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("inir_innertube_transaction_test", script)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+with tempfile.TemporaryDirectory(prefix="inir-yt-transaction-fixture-") as tmp:
+    module._CFG_DIR = tmp
+    module.YTCOOKIE_PATH = str(pathlib.Path(tmp) / "yt-cookies.txt")
+    canonical = pathlib.Path(module.YTCOOKIE_PATH)
+    canonical.write_text("previous-valid-session")
+    canonical.chmod(0o600)
+
+    probe_called = False
+    module._run_auth_helper = lambda args, candidate: False
+    def should_not_probe(*args, **kwargs):
+        nonlocal_probe[0] = True
+        return True, "wrong", ""
+    nonlocal_probe = [False]
+    module._account_probe = should_not_probe
+    assert module._extract_and_probe("signed-out", attempts=1) == (False, "", "")
+    assert not nonlocal_probe[0]
+    assert canonical.read_text() == "previous-valid-session"
+
+    def extract_candidate(args, candidate):
+        pathlib.Path(candidate).write_text("candidate-session")
+        pathlib.Path(candidate).chmod(0o600)
+        return True
+    def probe_candidate(path, allow_oauth=True):
+        assert path != module.YTCOOKIE_PATH
+        assert allow_oauth is False
+        assert pathlib.Path(path).read_text() == "candidate-session"
+        return True, "Fixture account", ""
+    module._run_auth_helper = extract_candidate
+    module._account_probe = probe_candidate
+    assert module._extract_and_probe("signed-in", attempts=1)[0]
+    assert canonical.read_text() == "candidate-session"
+    assert canonical.stat().st_mode & 0o777 == 0o600
+PYTEST
+
 step "runtime payload manifests"
 while IFS= read -r runtime_file; do
     [[ -n "$runtime_file" ]] || continue
@@ -483,30 +945,6 @@ if ! grep -qx 'assets' "$runtime_root/sdata/runtime-payload-dirs.txt"; then
     printf 'FAIL: assets is absent from runtime-payload-dirs.txt\n' >&2
     exit 1
 fi
-if grep -q -- "--exclude='assets/images/mascot/manifest.json'" "$runtime_root/sdata/lib/functions.sh"; then
-    printf 'FAIL: repo-copy sync excludes the mascot runtime manifest\n' >&2
-    exit 1
-fi
-# Payload directories are copied one at a time, so these are relative to
-# assets/ — an 'assets/…' prefix here never matches and the art ships.
-for local_mascot_path in \
-    "images/mascot/*.png" \
-    "images/mascot/*.gif" \
-    "images/mascot/frames/" \
-    "images/mascot/PROMPTS.md"; do
-    if ! grep -Fq -- "--exclude='$local_mascot_path'" "$runtime_root/sdata/lib/functions.sh"; then
-        printf 'FAIL: repo-copy sync can leak local mascot artifact: %s\n' "$local_mascot_path" >&2
-        exit 1
-    fi
-done
-if ! grep -q "inir-mascot-.*\\.png" "$runtime_root/Makefile" \
-        || ! grep -q "inir-mascot-.*\\.gif" "$runtime_root/Makefile" \
-        || ! grep -q 'PROMPTS.md' "$runtime_root/Makefile" \
-        || ! grep -q 'assets/images/mascot/frames' "$runtime_root/Makefile"; then
-    printf 'FAIL: make install does not strip local mascot art/tooling\n' >&2
-    exit 1
-fi
-
 step "mascot pack install and repair"
 bash "$runtime_root/scripts/test-mascot-pack-flow.sh"
 
@@ -555,6 +993,24 @@ if [[ -d "$runtime_root/distro/arch" ]]; then
 fi
 
 step "release polish guards"
+config_qml="$runtime_root/modules/common/Config.qml"
+if ! grep -Fq 'property var _pendingMutations: ({})' "$config_qml" \
+        || ! grep -Fq 'property bool _rebasingExternalChange: false' "$config_qml" \
+        || ! grep -Fq 'root._reapplyPendingMutations();' "$config_qml" \
+        || ! sed -n '/function flushWrites()/,/^    }/p' "$config_qml" | grep -Fq 'root._pendingMutations = ({})' \
+        || ! grep -Fq 'fileWriteTimer.running || Object.keys(root._pendingMutations ?? {}).length > 0' "$config_qml"; then
+    printf 'FAIL: cross-process Config writes can regress to stale full-file mirror overwrites\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'property list<string> blockedApps: []' "$config_qml" \
+        || grep -Fq 'property list<string> allowedApps:' "$config_qml" \
+        || ! grep -Fq 'cfgBlockedAppsJson' "$runtime_root/services/deferred/CavaService.qml" \
+        || ! grep -Fq -- '--blocked-apps-json' "$runtime_root/scripts/cava/resolve_audio_source.py" \
+        || grep -Fq -- '--allowed-apps-json' "$runtime_root/scripts/cava/resolve_audio_source.py" \
+        || [[ ! -x "$runtime_root/sdata/migrations/041-visualizer-app-filter-semantics.sh" ]]; then
+    printf 'FAIL: visualizer App Filters can regress from exclusion semantics back to an allowlist\n' >&2
+    exit 1
+fi
 if ! grep -Fq 'message="$(_tui_expand_newlines "${3:-}")"' "$runtime_root/sdata/lib/tui.sh"; then
     printf 'FAIL: TUI alerts can regress to rendering literal \n sequences\n' >&2
     exit 1
@@ -606,8 +1062,14 @@ for media_preset in Full Compact Minimal AlbumArt Visualizer Classic Lyrics Lyri
 done
 
 organic_shader="$runtime_root/modules/common/widgets/OrganicAudioBlob.frag"
+organic_blob="$runtime_root/modules/common/widgets/OrganicAudioBlob.qml"
 visualizer_widget="$runtime_root/modules/background/widgets/visualizer/VisualizerWidget.qml"
 visualizer_settings="$runtime_root/modules/settings/DesktopWidgetsConfig.qml"
+bar_content="$runtime_root/modules/bar/BarContent.qml"
+bar_group="$runtime_root/modules/bar/BarGroup.qml"
+m3_bar_content="$runtime_root/modules/barM3/BarContent.qml"
+pill_spectrum="$runtime_root/modules/pill/PillSpectrumWings.qml"
+vertical_bar_content="$runtime_root/modules/verticalBar/VerticalBarContent.qml"
 if ! grep -Fq 'bool edgeMode = ubuf.presentationMode > 1.5' "$organic_shader" \
         || ! grep -Fq 'edgeDirections' "$organic_shader" \
         || ! grep -Fq 'edgeReachHalf' "$organic_shader" \
@@ -643,6 +1105,21 @@ if ! grep -Fq 'bool edgeMode = ubuf.presentationMode > 1.5' "$organic_shader" \
         || grep -Fq 'background.widgets.mediaControls.visualizerRange' "$media_edge" \
         || grep -Fq 'background.widgets.visualizer.' "$media_edge" \
         || grep -Fq 'background.widgets.visualizer.organic' "$media_widget" \
+        || ! grep -Fq 'property bool organicEdgeAura: false' "$audio_layer" \
+        || ! grep -Fq 'component EdgeOrganicField: Item' "$audio_layer" \
+        || ! grep -Fq 'presentationMode: 2.0' "$audio_layer" \
+        || ! grep -Fq 'root.clipSegments?.length' "$audio_layer" \
+        || ! grep -Fq 'Math.min(64.0, width / Math.max(1, height))' "$organic_blob" \
+        || ! grep -Fq 'organicEdgeAura: true' "$bar_content" \
+        || ! grep -Fq 'organicEdgeAura: true' "$bar_group" \
+        || ! grep -Fq 'organicEdgeAura: true' "$m3_bar_content" \
+        || ! grep -Fq 'id: organicPillAura' "$pill_spectrum" \
+        || ! grep -Fq 'organicEdgeAura: true' "$vertical_bar_content" \
+        || ! grep -Fq 'organicAuraAllowance' "$runtime_root/modules/bar/Bar.qml" \
+        || ! grep -Fq 'organicAuraAllowance' "$runtime_root/modules/barM3/M3Bar.qml" \
+        || ! grep -Fq 'organicAuraAllowance' "$runtime_root/modules/verticalBar/VerticalBar.qml" \
+        || grep -Fq 'bool lineMode' "$organic_shader" \
+        || grep -Fq 'float linearSpectrum(' "$organic_shader" \
         || ! grep -Fq 'background.widgets.mediaControls.organicSensitivity' "$visualizer_settings" \
         || ! grep -Fq 'background.widgets.mediaControls.organicPulse' "$visualizer_settings" \
         || ! grep -Fq 'background.widgets.mediaControls.organicGlow' "$visualizer_settings" \
@@ -667,7 +1144,7 @@ if ! grep -Fq 'bool edgeMode = ubuf.presentationMode > 1.5' "$organic_shader" \
         || ! grep -Fq 'root.paletteMode === "album"' "$visualizer_widget" \
         || ! grep -Fq 'id: albumArtworkQuantizer' "$visualizer_widget" \
         || ! grep -Fq 'organicSensitivitySetting <= 0.4' "$visualizer_widget" \
-        || ! grep -Fq 'text: Translation.tr("Smoothing")' "$visualizer_widget" \
+        || ! grep -Fq 'labelText: Translation.tr("Smoothing")' "$visualizer_widget" \
         || ! grep -Fq 'background.widgets.visualizer.smoothing' "$visualizer_widget" \
         || grep -Fq 'background.widgets.mediaControls.' "$visualizer_widget" \
         || ! grep -Fq 'Idle motion' "$visualizer_settings"; then
@@ -699,6 +1176,35 @@ if [[ ! -s "$organic_qsb" ]] \
     printf 'FAIL: Organic visualizer pulse renderer/shader asset is missing\n' >&2
     exit 1
 fi
+
+step "visualizer app filter semantics"
+python3 - "$runtime_root/scripts/cava/resolve_audio_source.py" <<'PY'
+import importlib.util
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("inir_resolve_audio_source_test", path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+def node(name, app_name, app_id, binary):
+    return module.SinkInput(1, "", name, "1", "", "", app_name, app_id, binary, False)
+
+checks = [
+    ("firefox blocks firefox", node("Firefox", "Firefox", "org.mozilla.firefox", "firefox"), ["firefox"], True),
+    ("firefox does not block zen", node("zen", "Zen", "app.zen-browser.zen", "zen"), ["firefox"], False),
+    ("chromium does not block generic electron", node("SomeElectron", "Some App", "com.example.app", "electron"), ["chromium"], False),
+    ("desktop id blocks firefox", node("Firefox", "Firefox", "", "firefox"), ["org.mozilla.firefox"], True),
+    ("chrome desktop id blocks chrome", node("Google Chrome", "Google Chrome", "", "google-chrome-stable"), ["com.google.Chrome"], True),
+]
+
+failed = [name for name, stream, blocked, expected in checks
+          if module._matches_blocked(stream, blocked) is not expected]
+if failed:
+    raise SystemExit("visualizer blocklist matcher failed: " + ", ".join(failed))
+PY
 
 step "launcher resolution"
 bash "$launcher" path >/dev/null
@@ -820,28 +1326,105 @@ if ! grep -Fq 'systemd_user_manager_usable' "$shell_exec" \
     exit 1
 fi
 
+# A repo-copy update must replace an inherited/stale symlink with a real file;
+# `cp -f source symlink` follows the link and only overwrites its old target.
+# Conversely repo-link must always converge back to the live repo symlink.
+launcher_sync_root="$(mktemp -d)"
+mkdir -p "$launcher_sync_root/home/.local/bin" "$launcher_sync_root/old"
+printf '#!/bin/sh\nprintf OLD\\n\n' > "$launcher_sync_root/old/inir"
+chmod +x "$launcher_sync_root/old/inir"
+ln -s "$launcher_sync_root/old/inir" "$launcher_sync_root/home/.local/bin/inir"
+launcher_sync_function="$(sed -n '/^sync_launcher_from_repo() {/,/^}/p' "$runtime_root/setup")"
+if ! TEST_HOME="$launcher_sync_root/home" TEST_REPO="$runtime_root" \
+        TEST_FUNCTION="$launcher_sync_function" bash -c '
+    set -e
+    export HOME="$TEST_HOME"
+    export XDG_BIN_HOME="$HOME/.local/bin"
+    export REPO_ROOT="$TEST_REPO"
+    get_installed_install_mode() { printf repo-copy; }
+    get_install_mode() { printf repo-copy; }
+    ensure_launcher_path_in_shells() { :; }
+    eval "$TEST_FUNCTION"
+    sync_launcher_from_repo >/dev/null
+    [[ ! -L "$XDG_BIN_HOME/inir" ]]
+    cmp -s "$REPO_ROOT/scripts/inir" "$XDG_BIN_HOME/inir"
+    grep -Fq OLD "$TEST_HOME/../old/inir"
+
+    printf stale-copy > "$XDG_BIN_HOME/inir"
+    get_installed_install_mode() { printf repo-link; }
+    get_install_mode() { printf repo-link; }
+    sync_launcher_from_repo >/dev/null
+    [[ -L "$XDG_BIN_HOME/inir" ]]
+    [[ "$(readlink -f "$XDG_BIN_HOME/inir")" == "$(readlink -f "$REPO_ROOT/scripts/inir")" ]]
+'; then
+    rm -rf "$launcher_sync_root"
+    printf 'FAIL: setup launcher sync does not converge repo-copy/repo-link topology\n' >&2
+    exit 1
+fi
+rm -rf "$launcher_sync_root"
+
 step "application launch environment"
-# XWayland is not guaranteed to own :0. Preserve live DISPLAY discovery and validation.
-# These checks are conditional on the usable systemd user manager predicate (ADR-0002).
-# In the reference implementation (systemd path), the predicate holds.
+# Niri owns DISPLAY/WAYLAND_DISPLAY/NIRI_SOCKET. App launches may refresh from
+# the live user-manager snapshot, but must never infer compositor sockets.
 shell_exec="$runtime_root/modules/common/functions/ShellExec.qml"
 inir_launcher="$runtime_root/scripts/inir"
-if has_usable_systemd_user_manager; then
-    if ! grep -Fq 'systemctl --user show-environment' "$shell_exec" \
-            || ! grep -Fq '_manager_display="$(manager_value DISPLAY)"' "$shell_exec" \
-            || ! grep -Fq 'valid_display "$DISPLAY"' "$shell_exec" \
-            || ! grep -Fq 'for _x in /tmp/.X11-unix/X*' "$shell_exec"; then
-        printf 'FAIL: application launches do not recover the live XWayland DISPLAY environment\n' >&2
-        exit 1
-    fi
-    if ! grep -Fq 'vars_to_import+=("DISPLAY=$DISPLAY")' "$inir_launcher" \
-            || ! grep -Fq 'for _xsock in /tmp/.X11-unix/X*' "$inir_launcher" \
-            || ! grep -Fq 'systemctl --user set-environment "${vars_to_import[@]}"' "$inir_launcher"; then
-        printf 'FAIL: session environment does not publish the XWayland DISPLAY to the user manager\n' >&2
-        exit 1
-    fi
-else
-    printf 'SKIP: systemd user manager predicate false — skipping systemd-specific environment checks\n'
+if ! grep -Fq 'systemctl --user show-environment' "$shell_exec" \
+        || ! grep -Fq 'for _var in DISPLAY WAYLAND_DISPLAY NIRI_SOCKET' "$shell_exec" \
+        || ! grep -Fq 'QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE' "$shell_exec" \
+        || ! grep -Fq 'apply_niri_app_environment' "$inir_launcher" \
+        || ! grep -Fq 'config.d/40-environment.kdl' "$inir_launcher" \
+        || grep -Fq '/tmp/.X11-unix/X' "$shell_exec" \
+        || grep -Fq 'valid_display()' "$shell_exec"; then
+    printf 'FAIL: application launches do not preserve Niri-owned graphical session environment\n' >&2
+    exit 1
+fi
+
+# The supervised shell starts from systemd rather than as a direct Niri child.
+# Exercise the launcher-side KDL mirror with no user-manager Qt variables so
+# app policy still comes from Niri's effective environment config.
+niri_env_root="$(mktemp -d)"
+mkdir -p "$niri_env_root/niri/config.d"
+cat > "$niri_env_root/niri/config.kdl" <<'EOF'
+include "config.d/40-environment.kdl"
+EOF
+cat > "$niri_env_root/niri/config.d/40-environment.kdl" <<'EOF'
+environment {
+    XDG_MENU_PREFIX "plasma-"
+    QT_QPA_PLATFORM "wayland"
+    QT_QPA_PLATFORMTHEME "kde"
+    QT_STYLE_OVERRIDE "Darkly"
+    ELECTRON_OZONE_PLATFORM_HINT "auto"
+}
+EOF
+niri_env_functions="$({
+    sed -n '/^_niri_app_environment_file() {/,/^}/p' "$inir_launcher"
+    sed -n '/^_niri_app_environment_value() {/,/^}/p' "$inir_launcher"
+    sed -n '/^apply_niri_app_environment() {/,/^}/p' "$inir_launcher"
+})"
+if ! TEST_XDG_CONFIG_HOME="$niri_env_root" TEST_FUNCTIONS="$niri_env_functions" bash -c '
+    set -e
+    export XDG_CONFIG_HOME="$TEST_XDG_CONFIG_HOME"
+    unset QT_QPA_PLATFORM QT_QPA_PLATFORMTHEME QT_STYLE_OVERRIDE ELECTRON_OZONE_PLATFORM_HINT XDG_MENU_PREFIX
+    eval "$TEST_FUNCTIONS"
+    apply_niri_app_environment
+    [[ "$QT_QPA_PLATFORM" == wayland ]]
+    [[ "$QT_QPA_PLATFORMTHEME" == kde ]]
+    [[ "$QT_STYLE_OVERRIDE" == Darkly ]]
+    [[ "$ELECTRON_OZONE_PLATFORM_HINT" == auto ]]
+    [[ "$XDG_MENU_PREFIX" == plasma- ]]
+'; then
+    rm -rf "$niri_env_root"
+    printf 'FAIL: supervised launcher does not mirror Niri app environment\n' >&2
+    exit 1
+fi
+rm -rf "$niri_env_root"
+
+if ! grep -Fq 'for _qs_var in WAYLAND_DISPLAY NIRI_SOCKET DISPLAY' "$inir_launcher" \
+        || grep -Fq '/tmp/.X11-unix/X' "$inir_launcher" \
+        || grep -Fq 'niri.wayland-*.sock' "$inir_launcher" \
+        || grep -Fq 'systemctl --user set-environment "${vars_to_import[@]}"' "$inir_launcher"; then
+    printf 'FAIL: launcher still manufactures or republishes compositor-owned session variables\n' >&2
+    exit 1
 fi
 files_stage="$runtime_root/sdata/subcmd-install/3.files.sh"
 startup_kdl="$runtime_root/defaults/niri/config.d/50-startup.kdl"
@@ -860,6 +1443,18 @@ fi
 if grep -Fq 'MALLOC_ARENA_MAX' "$shell_exec" \
         || grep -Fq 'MALLOC_MMAP_THRESHOLD_' "$shell_exec"; then
     printf 'FAIL: application launch policy still carries retired allocator handling\n' >&2
+    exit 1
+fi
+
+# Generic distro setup must key off the platform-theme plugin itself, not the
+# presence of a full Plasma desktop. Niri users commonly install
+# plasma-integration standalone.
+package_installers="$runtime_root/sdata/lib/package-installers.sh"
+doctor_lib="$runtime_root/sdata/lib/doctor.sh"
+if ! grep -Fq 'KDEPlasmaPlatformTheme6.so' "$package_installers" \
+        || ! grep -Fq 'config.d/40-environment.kdl' "$doctor_lib" \
+        || ! grep -Fq 'KDEPlasmaPlatformTheme6.so' "$inir_launcher"; then
+    printf 'FAIL: Qt theming setup/doctor does not support standalone plasma-integration with modular Niri config\n' >&2
     exit 1
 fi
 
@@ -1168,6 +1763,13 @@ rm -rf "$turnstile_test_root"
 
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
+deps_map="$runtime_root/sdata/lib/deps-map.sh"
+for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do
+    if ! grep -Fq "$mapping" "$deps_map"; then
+        printf 'FAIL: Void dependency map missing %s\n' "$mapping" >&2
+        exit 1
+    fi
+done
 for pkg in rsync base-devel pkg-config cairo-devel python3-devel glib-devel gobject-introspection python3-gobject-devel libffi-devel; do
     if ! grep -q "^[[:space:]]*$pkg$" "$void_deps"; then
         printf 'FAIL: Void base packages missing %s\n' "$pkg" >&2
@@ -1232,96 +1834,7 @@ if [[ "$run_runtime" == true ]]; then
     bash "$launcher" ipc shellUpdate diagnose >/dev/null
 fi
 
-step "agent artifact leak guard"
-# The source tree legitimately has AGENTS.md/CLAUDE.md in payload dirs.
-# Distribution stripping removes them post-copy. Validate the stripping
-# contracts exist so no install path can miss them.
-leak_guard=0
-agent_files=(AGENTS.md CLAUDE.md CODEX.md PI.md codemap.md .mcp.json opencode.json skills-lock.json)
-agent_dirs=(.claude .factory .opencode .codex .agents .codebase-memory .impeccable .pi-subagents)
-
-# Makefile must strip agent files after cp -a
-for agent_file in "${agent_files[@]}"; do
-    if ! grep -q -- "-name $agent_file" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s\n' "$agent_file" >&2
-        leak_guard=1
-    fi
-done
-for agent_dir in "${agent_dirs[@]}"; do
-    if ! grep -q -- "-name $agent_dir" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s/\n' "$agent_dir" >&2
-        leak_guard=1
-    fi
-done
-if ! grep -q -- '-delete' "$runtime_root/Makefile" 2>/dev/null; then
-    printf 'LEAK GUARD: Makefile missing agent-file strip after payload copy\n' >&2
-    leak_guard=1
-fi
-# rsync-based install (sdata/lib/functions.sh) must exclude agent files
-if [[ -f "$runtime_root/sdata/lib/functions.sh" ]]; then
-    for agent_file in "${agent_files[@]}"; do
-        [[ "$agent_file" == .mcp.json || "$agent_file" == opencode.json ]] && continue
-        if ! grep -q -- "--exclude='$agent_file'" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-            printf 'LEAK GUARD: sdata/lib/functions.sh missing %s rsync exclude\n' "$agent_file" >&2
-            leak_guard=1
-        fi
-    done
-    for agent_dir in "${agent_dirs[@]}"; do
-        if ! grep -q -- "--exclude='$agent_dir/'" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-            printf 'LEAK GUARD: sdata/lib/functions.sh missing %s/ rsync exclude\n' "$agent_dir" >&2
-            leak_guard=1
-        fi
-    done
-fi
-# Agent-only directories must not appear in payload manifests
-for agent_dir in "${agent_dirs[@]}"; do
-    if grep -qx "$agent_dir" "$runtime_root/sdata/runtime-payload-dirs.txt" 2>/dev/null; then
-        printf 'LEAK: %s listed in runtime-payload-dirs.txt\n' "$agent_dir" >&2
-        leak_guard=1
-    fi
-done
-for agent_file in "${agent_files[@]}"; do
-    if grep -qx "$agent_file" "$runtime_root/sdata/runtime-root-files.txt" 2>/dev/null; then
-        printf 'LEAK: %s listed in runtime-root-files.txt\n' "$agent_file" >&2
-        leak_guard=1
-    fi
-done
-# Maintainer and development tooling must be stripped by both install paths.
-dev_tooling_files=(release.sh wiki-sync.sh verify-docs.sh qml-check.fish
-    test-local-distribution.sh test-mascot-pack-flow.sh)
-dev_tooling_dirs=(agents tools l10n)
-for tool in "${dev_tooling_files[@]}" "${dev_tooling_dirs[@]}"; do
-    pattern="--exclude='/$tool'"
-    [[ " ${dev_tooling_dirs[*]} " == *" $tool "* ]] && pattern="--exclude='/$tool/'"
-    if ! grep -q -- "$pattern" "$runtime_root/sdata/lib/functions.sh" 2>/dev/null; then
-        printf 'LEAK GUARD: sdata/lib/functions.sh missing %s rsync exclude\n' "$tool" >&2
-        leak_guard=1
-    fi
-    if ! grep -q -- "/$tool" "$runtime_root/Makefile" 2>/dev/null; then
-        printf 'LEAK GUARD: Makefile missing strip for %s\n' "$tool" >&2
-        leak_guard=1
-    fi
-done
-
-for pkgbuild in "$runtime_root/distro/arch/inir-shell/PKGBUILD" "$runtime_root/distro/arch/inir-shell-git/PKGBUILD"; do
-    [[ -f "$pkgbuild" ]] || continue
-    for agent_file in "${agent_files[@]}"; do
-        if ! grep -q -- "-name $agent_file" "$pkgbuild" 2>/dev/null; then
-            printf 'LEAK GUARD: %s missing strip for %s\n' "$(basename "$(dirname "$pkgbuild")")/PKGBUILD" "$agent_file" >&2
-            leak_guard=1
-        fi
-    done
-    for agent_dir in "${agent_dirs[@]}"; do
-        if ! grep -q -- "-name $agent_dir" "$pkgbuild" 2>/dev/null; then
-            printf 'LEAK GUARD: %s missing strip for %s/\n' "$(basename "$(dirname "$pkgbuild")")/PKGBUILD" "$agent_dir" >&2
-            leak_guard=1
-        fi
-    done
-done
-
-if [[ "$leak_guard" -eq 1 ]]; then
-    printf 'FAIL: agent artifact distribution guard failed\n' >&2
-    exit 1
-fi
+step "installed payload boundaries"
+python3 "$runtime_root/scripts/test-runtime-payload.py"
 
 printf '\nAll local distribution checks passed.\n'

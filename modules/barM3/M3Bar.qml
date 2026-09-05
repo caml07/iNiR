@@ -69,6 +69,12 @@ Scope {
                 readonly property real shownExclusiveZone: Appearance.sizes.baseBarHeight
                     + (Config.options.bar.m3.cornerStyle === 1 ? Config.options.bar.m3.gapsOut : 0)
                     + (Config.options.bar.m3.cornerStyle === 2 ? -6 : 0)
+                // Keep Organic's exterior field inside the layer-shell buffer,
+                // while leaving shownExclusiveZone and the input mask untouched.
+                readonly property real organicAuraAllowance:
+                    (Config.options?.bar?.visualizer?.enable ?? false)
+                        && (Config.options?.bar?.visualizer?.type ?? "bars") === "organic"
+                    ? Math.ceil(Appearance.sizes.barHeight * 1.75) : 0
                 property bool contextMenuHold: false
                 property bool leftSidebarHold: false
                 property bool rightSidebarHold: false
@@ -90,6 +96,7 @@ Scope {
                 WlrLayershell.layer: WlrLayer.Top
                 implicitHeight: Appearance.sizes.barHeight + Appearance.rounding.screenRounding
                     + (barRoot.autoHideEnabled ? barRoot.layerGap : 0)
+                    + barRoot.organicAuraAllowance
                 // When Overlay-layer, bar shares a layer with the screen-corner click zones (ScreenCorners.qml)
                 // and same-layer overlap is resolved by stacking, not layer priority - bar was winning and
                 // swallowing the tiny corner-open hit rects. Carve them out of the bar's own mask so clicks

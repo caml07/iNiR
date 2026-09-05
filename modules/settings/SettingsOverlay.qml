@@ -218,8 +218,9 @@ Scope {
     }
 
     function trySpotlight() {
-        const pageItem = overlayPagesHost.currentItem
-        if (pageItem && overlayPagesHost.currentIndex === pendingSpotlightPageIndex
+        const pageHost = panelLoader.item?.pageHostItem ?? null
+        const pageItem = pageHost?.currentItem ?? null
+        if (pageItem && pageHost.currentIndex === pendingSpotlightPageIndex
                 && pendingSpotlightSection.length > 0
                 && typeof pageItem.activateSettingsSearchSection === "function")
             pageItem.activateSettingsSearchSection(pendingSpotlightSection)
@@ -421,6 +422,7 @@ Scope {
 
         sourceComponent: PanelWindow {
             id: settingsPanel
+            readonly property var pageHostItem: overlayPagesHost
 
             // Stay visible during the close-animation window so the exit morph
             // renders; the Loader tears down after closeAnimTimer fires.
@@ -800,8 +802,26 @@ Scope {
                                 spacing: 9
 
                                 Item {
+                                    id: overlayAvatarButton
                                     implicitWidth: 38
                                     implicitHeight: 38
+
+                                    HoverHandler {
+                                        id: overlayAvatarHover
+                                        enabled: !root.navEditMode
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+
+                                    TapHandler {
+                                        enabled: !root.navEditMode
+                                        gesturePolicy: TapHandler.WithinBounds
+                                        onTapped: root.openOverlaySearchResult({
+                                            pageIndex: 23,
+                                            label: Translation.tr("Profile picture"),
+                                            section: "right",
+                                            isSection: true
+                                        })
+                                    }
 
                                     Rectangle {
                                         anchors.fill: parent
@@ -862,6 +882,29 @@ Scope {
                                         text: "person"
                                         iconSize: 18
                                         color: Appearance.colors.colPrimary
+                                    }
+
+                                    Rectangle {
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        width: 15
+                                        height: 15
+                                        radius: Appearance.regaliaEverywhere ? Appearance.regalia.roundVerySmall : width / 2
+                                        color: Appearance.colors.colPrimaryContainer
+                                        border.width: 1
+                                        border.color: Appearance.colors.colPrimary
+                                        opacity: overlayAvatarHover.hovered && !root.navEditMode ? 1 : 0
+                                        scale: opacity > 0 ? 1 : 0.7
+
+                                        Behavior on opacity { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+                                        Behavior on scale { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+
+                                        MaterialSymbol {
+                                            anchors.centerIn: parent
+                                            text: "edit"
+                                            iconSize: 10
+                                            color: Appearance.colors.colOnPrimaryContainer
+                                        }
                                     }
                                 }
 

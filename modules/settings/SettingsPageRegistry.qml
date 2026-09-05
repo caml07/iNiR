@@ -309,6 +309,13 @@ Singleton {
 
         _staticSearchIndex = [
         {
+            pageIndex: 10, pageName: root.pages[10].name,
+            section: Translation.tr("Modules"),
+            label: Translation.tr("EasyEffects Equalizer"),
+            description: Translation.tr("Load or unload the native 10-band EasyEffects equalizer integration"),
+            keywords: ["equalizer", "easyeffects", "eq", "audio", "10 band", "module", "optional"]
+        },
+        {
             pageIndex: 27, pageName: root.pages[27].name,
             section: Translation.tr("Activation"),
             label: Translation.tr("Orbit hot corner"),
@@ -380,6 +387,13 @@ Singleton {
             label: Translation.tr("Screenshots folder"),
             description: Translation.tr("Where iNiR screenshots are saved"),
             keywords: ["capture", "screenshot", "snip", "save", "path", "folder", "directory", "picture"]
+        },
+        {
+            pageIndex: 0, pageName: root.pages[0].name,
+            section: Translation.tr("App filters"),
+            label: Translation.tr("Notification and visualizer app filters"),
+            description: Translation.tr("Mute selected notification senders and restrict visualizer playback sources"),
+            keywords: ["filter", "filters", "app", "apps", "notification", "mute", "block", "visualizer", "cava", "audio", "spotify", "ncspot", "ytmusic", "discord", "slack"]
         },
         {
             pageIndex: 19, pageName: root.pages[19].name,
@@ -743,7 +757,7 @@ Singleton {
             pageIndex: 2, pageName: root.pages[2].name,
             section: Translation.tr("Bar module layout"),
             label: Translation.tr("Bar module layout"),
-            description: Translation.tr("Reorder and toggle bar modules"),
+            description: Translation.tr("Reorder modules in horizontal Stock, Islands, Scenic and Frame bars"),
             keywords: ["bar", "module", "layout", "order", "reorder", "resources", "media", "clock"]
         },
 
@@ -1206,6 +1220,13 @@ Singleton {
             label: Translation.tr("Right sidebar header"),
             description: Translation.tr("Profile card with avatar and banner, or the classic uptime row"),
             keywords: ["sidebar", "header", "profile", "avatar", "uptime", "user", "distro", "classic"]
+        },
+        {
+            pageIndex: 23, pageName: root.pages[23].name,
+            section: Translation.tr("Sidebars"),
+            label: Translation.tr("Profile picture"),
+            description: Translation.tr("Profile card with avatar and banner, or the classic uptime row"),
+            keywords: ["profile", "avatar", "picture", "photo", "user", "account", "sidebar", "settings"]
         },
         {
             pageIndex: 23, pageName: root.pages[23].name,
@@ -1797,6 +1818,7 @@ Singleton {
         // =====================================================================
         // Monitors (page 15)
         // =====================================================================
+        { pageIndex: 15, pageName: root.pages[15].name, section: Translation.tr("Monitor arrangement"), label: Translation.tr("Arrange monitors"), description: Translation.tr("Drag displays to match their physical position in Niri"), keywords: ["monitor", "display", "output", "arrange", "position", "layout", "drag", "niri"] },
         { pageIndex: 15, pageName: root.pages[15].name, section: Translation.tr("Shell visibility"), label: Translation.tr("Primary monitor"), description: Translation.tr("Choose the default output for shell popups"), keywords: ["monitor", "display", "primary", "screen", "output"] },
         { pageIndex: 15, pageName: root.pages[15].name, section: Translation.tr("Overview placement"), label: Translation.tr("Active screen only"), description: Translation.tr("Open the overview on the monitor where it was invoked"), keywords: ["overview", "monitor", "screen", "focused", "active", "output"] },
         { pageIndex: 15, pageName: root.pages[15].name, section: Translation.tr("Material shell surfaces"), label: Translation.tr("Bar, dock, sidebars, and media controls"), description: Translation.tr("Choose which monitors show Material shell surfaces"), keywords: ["monitor", "visibility", "bar", "dock", "sidebar", "media", "workspace", "secondary"] },

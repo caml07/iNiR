@@ -1106,11 +1106,21 @@ ContentPage {
         visible: !root.isIiActive || root.activeSection === "source"
         expanded: true
         icon: "wallpaper"
-        title: Translation.tr("Wallpaper backend (awww)")
+        title: Translation.tr("Wallpaper renderer")
 
         SettingsGroup {
+            ConfigSelectionArray {
+                currentValue: Config.options?.background?.backend?.provider ?? "awww"
+                options: [
+                    { displayName: Translation.tr("Standard"), icon: "image", value: "awww" },
+                    { displayName: Translation.tr("Interactive web"), icon: "language", value: "web" }
+                ]
+                onSelected: newValue => Config.setNestedValue("background.backend.provider", newValue)
+            }
+
             StyledText {
                 Layout.fillWidth: true
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww"
                 text: AwwwBackend.available
                     ? (AwwwBackend.isInternalShaderTransitionType(
                             Config.options?.background?.transition?.type ?? "crossfade")
@@ -1126,7 +1136,7 @@ ContentPage {
             }
 
             ConfigSpinBox {
-                visible: AwwwBackend.available
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww" && AwwwBackend.available
                 icon: "speed"
                 text: Translation.tr("awww transition FPS")
                 value: Config.options?.background?.backend?.awww?.transitionFps ?? 60
@@ -1137,7 +1147,7 @@ ContentPage {
             }
 
             ConfigRow {
-                visible: AwwwBackend.available
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww" && AwwwBackend.available
                 uniform: true
 
                 ConfigSpinBox {
@@ -1159,6 +1169,50 @@ ContentPage {
                     stepSize: 1
                     onValueChanged: Config.setNestedValue("background.backend.awww.spatialStep", value)
                 }
+            }
+
+            StyledText {
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web" && !WebWallpaper.available
+                Layout.fillWidth: true
+                text: WebWallpaper.lastError.length > 0
+                    ? Translation.tr("Interactive web wallpapers need Qt 6 WebEngine, LayerShellQt and the Qt QML runner. The standard wallpaper stays available until the web renderer is ready.") + "\n" + WebWallpaper.lastError
+                    : Translation.tr("Checking interactive web wallpaper support…")
+                color: Appearance.colors.colError
+                font.pixelSize: Appearance.font.pixelSize.small
+                wrapMode: Text.WordWrap
+            }
+
+            ContentSubsection {
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
+                title: Translation.tr("Web wallpaper")
+                tooltip: Translation.tr("Load a local HTML file or a web URL with JavaScript, WebGL and browser media support")
+
+                MaterialTextField {
+                    Layout.fillWidth: true
+                    placeholderText: "/path/to/index.html  ·  https://example.com"
+                    text: Config.options?.background?.backend?.web?.source ?? ""
+                    onEditingFinished: Config.setNestedValue("background.backend.web.source", text.trim())
+                }
+            }
+
+            SettingsSwitch {
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
+                buttonIcon: "sports_esports"
+                text: Translation.tr("Interactive mode")
+                checked: Config.options?.background?.backend?.web?.interactive ?? false
+                onCheckedChanged: Config.setNestedValue("background.backend.web.interactive", checked)
+                StyledToolTip {
+                    text: Translation.tr("When enabled, the web wallpaper moves to the desktop input layer so games and interactive pages can receive pointer and keyboard input")
+                }
+            }
+
+            StyledText {
+                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
+                Layout.fillWidth: true
+                text: Translation.tr("Passive mode stays behind desktop widgets. Interactive mode takes over the desktop surface while the bar and dock remain above it. The normal wallpaper remains available as a fallback for lock screen, overview and theme colors.")
+                color: Appearance.colors.colSubtext
+                font.pixelSize: Appearance.font.pixelSize.small
+                wrapMode: Text.WordWrap
             }
         }
     }

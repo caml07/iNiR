@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects as GE
 import Quickshell
 import qs.services
 import qs.modules.common
@@ -91,6 +92,17 @@ Item {
                 color: root.authSurface
                 border.width: 1
                 border.color: root.authBorder
+                // ZzzSurfaceAccent is intentionally an overflowing treatment;
+                // mask it to the badge silhouette so round ZZZ corners stay
+                // round instead of falling back to a rectangular clip.
+                layer.enabled: Appearance.zzzEverywhere
+                layer.effect: GE.OpacityMask {
+                    maskSource: Rectangle {
+                        width: 58
+                        height: 58
+                        radius: root.authRadius
+                    }
+                }
 
                 ZzzSurfaceAccent {
                     showSticker: true
@@ -167,7 +179,7 @@ Item {
                     Layout.fillWidth: true
                     text: PolkitService.cleanMessage
                     horizontalAlignment: Text.AlignLeft
-                    wrapMode: Text.WrapAnywhere
+                    wrapMode: Text.Wrap
                 }
             }
         }

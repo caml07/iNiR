@@ -487,16 +487,23 @@ turnstile or iNiR failure.
   clean checkout, `/run/user/1000`, and
   `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. All required checks
   passed; `xembedsniproxy` was not installed and was reported as optional.
-- PR3.3: predicate-safe Awww, GameMode, clipboard, captures, and thumbnails;
-  add the official XBPS Awww provider and remove the undefined
-  `discover-overlay` integration. WARP provider/lifecycle validation belongs to
-  PR4 and the toggle must not issue a systemd command on Void meanwhile.
+- PR3.3 was validated on 2026-09-05 from a clean clone of commit `bd0925cd`.
+  `scripts/check-void-pr33.sh` passed with the usable-systemd-user-manager
+  predicate false, official XBPS `awww`, `jq`, and `pipewire` providers, and
+  managed `pipewire`, `wireplumber`, and `pipewire-pulse` turnstile services.
+  `pactl info` reported PulseAudio on PipeWire 1.6.7. The clipboard fallback
+  round-tripped through `wl-paste`; `awww-daemon`, `awww query`, and `awww img`
+  succeeded on `wayland-1`. The undefined `discover-overlay` integration is
+  removed. WARP provider/lifecycle validation remains in PR4 and its toggle does
+  not issue a systemd command on Void meanwhile.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
   sweep, clean VM installation, and the external-disk validation.
 - Run shellcheck and `make test-local` before each PR.
 
-`make test-local` passed for PR3.2. ShellCheck was not available in the host
-environment. No upstream PR has been opened; the Void port remains a fork
-progress branch while PR3.3 is developed.
+`make test-local`, `bash -n`, `qmllint`, JSON parsing, and `git diff --check`
+passed after merging Snowarch `upstream/prerelease` at `4c824cf9` through every
+Void branch. ShellCheck was not available in the host environment. No upstream
+PR has been opened; the Void port remains a fork progress branch while PR4 is
+developed.

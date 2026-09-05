@@ -2,11 +2,11 @@
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `feat/void-nonsystemd-runtime` (base: upstream `prerelease`). The
+on branch `feat/void-optional-systemd-adapters` (base: upstream `prerelease`). The
 remaining roadmap and capability ledger are in `docs/VOID.md` and
 `docs/VOID_CAPABILITIES.md`.
 
-## Current progress (2026-09-02)
+## Current progress (2026-09-05)
 
 - PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
 - PR2 `feat/void-dependencies`: committed as `3444ccbd` and pushed to
@@ -36,9 +36,12 @@ remaining roadmap and capability ledger are in `docs/VOID.md` and
     was absent and was correctly treated as optional.
   - PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww,
     GameMode, clipboard, captures, and thumbnails; remove `discover-overlay`.
-    WARP stays visible while its provider and runit lifecycle move to PR4.
+    **Implementation and VM validation complete**. PipeWire, WirePlumber, and
+    PipeWire Pulse run as managed turnstile user services; Awww apply and the
+    clipboard fallback passed in the live graphical session. WARP stays visible
+    while its provider and runit lifecycle move to PR4.
 - All implementation branches were merged forward with Snowarch
-  `upstream/prerelease` at `a288c291` (iNiR 2.30.0) on 2026-09-02.
+  `upstream/prerelease` at `4c824cf9` on 2026-09-05.
 - PR4 now owns system capability providers (NetworkManager, BlueZ, ydotool,
   WARP); PR5 owns desktop/provider parity; PR6 owns XBPS UI; PR7 is the
   mandatory port-closure gate.
@@ -57,6 +60,9 @@ The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
   `inir/run` uses `chpst -e "$TURNSTILE_ENV_DIR"`; the Niri fallback KDL block
   was removed. A turnstile backend `runsvdir` is expected and is not the Niri
   fallback.
+- `~/.config/service/{pipewire,wireplumber,pipewire-pulse}` are managed by iNiR
+  under turnstile. All three services were running and `pactl info` reported
+  PulseAudio on PipeWire 1.6.7.
 - Kitty under Niri has `WAYLAND_DISPLAY=wayland-1`,
   `XDG_SESSION_TYPE=wayland`, and a session D-Bus address.
 - SPICE clipboard is not supported in this Wayland-only VM session because

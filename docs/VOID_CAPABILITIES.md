@@ -11,10 +11,10 @@ after provider, provisioning, activation, operation, and verification pass.
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
 | Network | base | XBPS `NetworkManager` | runit service | package present; activation audit pending | PR4 |
 | Bluetooth | toolkit | XBPS BlueZ provider + `blueman` | runit service | provider/activation audit pending | PR4 |
-| Awww wallpaper | base | official XBPS `awww` | systemd transient unit or session daemon by predicate | package and runtime adapter pending | PR3.3 |
-| GameMode | base | built into iNiR | session process | core works; obsolete `discover-overlay` control pending removal | PR3.3 |
-| Screenshots | screencapture | XBPS `grim`, `slurp`, `swappy`, `wl-clipboard`, `jq` | direct session processes | packages/runtime fallback audit pending | PR3.3 |
-| Screen recording | screencapture | XBPS `wf-recorder`, `ffmpeg`, PipeWire tools | direct session processes | `pipewire-pulse`/audio verification pending | PR3.3 |
+| Awww wallpaper | base | official XBPS `awww` | systemd transient unit or session daemon by predicate | VM validated: daemon + query + img apply on wayland-1 | PR3.3 |
+| GameMode | base | built into iNiR | session process | obsolete `discover-overlay` control removed; VM verification pending | PR3.3 |
+| Screenshots | screencapture | XBPS `grim`, `slurp`, `swappy`, `wl-clipboard`, `jq` | direct session processes | VM validated: clipboard fallback roundtrip (`wl-paste`); capture binaries present | PR3.3 |
+| Screen recording | screencapture | XBPS `wf-recorder`, `ffmpeg`; audio profile provides `pipewire` | direct session processes | VM validated: `pipewire`/`wireplumber`/`pipewire-pulse` user services run; `pactl` reports PulseAudio on PipeWire 1.6.7 | PR3.3 |
 | Clipboard history and paste | base/toolkit | XBPS `wl-clipboard`, `cliphist`; upstream ydotool provider TBD | session watchers + ydotool service | copy works; simulated paste provider pending | PR4 |
 | Cloudflare WARP | toolkit | upstream provider TBD | runit system service | visible UI exists; provider and lifecycle pending | PR4 |
 | Mission Center | toolkit | maintained Flatpak | Flatpak application | provisioning/launcher pending | PR5 |

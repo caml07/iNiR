@@ -639,6 +639,52 @@ Scope {
 
                             Item { Layout.preferredHeight: 4 }
 
+                            Rectangle {
+                                visible: ShellUpdates.repoDiverged
+                                Layout.fillWidth: true
+                                Layout.leftMargin: 24
+                                Layout.rightMargin: 24
+                                implicitHeight: rewriteWarningRow.implicitHeight + 24
+                                radius: root.sectionRadius
+                                color: ColorUtils.transparentize(Appearance.colors.colWarningContainer, 0.2)
+                                border.width: 1
+                                border.color: Appearance.colors.colWarning
+
+                                RowLayout {
+                                    id: rewriteWarningRow
+                                    anchors {
+                                        fill: parent
+                                        margins: 12
+                                    }
+                                    spacing: 10
+
+                                    MaterialSymbol {
+                                        text: "history"
+                                        iconSize: Appearance.font.pixelSize.large
+                                        color: Appearance.colors.colOnWarningContainer
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 2
+
+                                        StyledText {
+                                            text: Translation.tr("Repository history changed upstream")
+                                            font.pixelSize: Appearance.font.pixelSize.small
+                                            font.weight: Font.DemiBold
+                                            color: Appearance.colors.colOnWarningContainer
+                                        }
+                                        StyledText {
+                                            Layout.fillWidth: true
+                                            text: Translation.tr("Your checkout has commits from the old remote history. Repair & Update preserves ambiguous/local work and automatically realigns only when Git proves this is a clean upstream force-push case.")
+                                            font.pixelSize: Appearance.font.pixelSize.smallest
+                                            color: Appearance.colors.colOnWarningContainer
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
+                                }
+                            }
+
                             // ── Current System Info ──
                             Rectangle {
                                 Layout.fillWidth: true
@@ -1462,7 +1508,7 @@ Scope {
                                     ? (ShellUpdates.updateStepMessage.length > 0
                                         ? Translation.tr(ShellUpdates.updateStepMessage) + "..."
                                         : Translation.tr("Updating..."))
-                                    : Translation.tr("Update Now")
+                                    : (ShellUpdates.repoDiverged ? Translation.tr("Repair & Update") : Translation.tr("Update Now"))
                                 font {
                                     pixelSize: Appearance.font.pixelSize.small
                                     weight: Font.DemiBold

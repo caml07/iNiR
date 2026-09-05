@@ -66,6 +66,7 @@ singleton Wallhaven 1.0 Wallhaven.qml
 singleton WallpaperListener 1.0 WallpaperListener.qml
 singleton Wallpapers 1.0 Wallpapers.qml
 singleton Weather 1.0 Weather.qml
+singleton WebWallpaper 1.0 WebWallpaper.qml
 singleton WidgetPowerManager 1.0 WidgetPowerManager.qml
 singleton WindowPreviewService 1.0 WindowPreviewService.qml
 singleton WorldClock 1.0 WorldClock.qml

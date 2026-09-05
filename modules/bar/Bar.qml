@@ -128,13 +128,22 @@ Scope {
                 property bool reservationActive: false
                 readonly property real autoHideHoverWidth: autoHideEnabled
                     ? Math.max(1, Config.options?.bar?.autoHide?.hoverRegionWidth ?? 2) : 0
+                // Organic Spectrum paints beyond the bar surface, like the Media
+                // widget's edge aura. Give the layer surface transparent render
+                // headroom without changing the compositor reservation or input
+                // region: exclusiveZone and hoverMaskRegion still describe only
+                // the actual bar.
+                readonly property real organicAuraAllowance:
+                    (Config.options?.bar?.visualizer?.enable ?? false)
+                        && (Config.options?.bar?.visualizer?.type ?? "bars") === "organic"
+                    ? Math.ceil(barRoot.panelSurfaceHeight * 1.75) : 0
                 exclusionMode: ExclusionMode.Ignore
                 exclusiveZone: GlobalStates.coverflowSelectorOpen ? 0
                     : !autoHideEnabled ? barRoot.panelSurfaceHeight
                     : (pushWindowsWhenShown && reservationActive ? barRoot.panelSurfaceHeight : 0)
                 WlrLayershell.namespace: "quickshell:bar"
                 implicitHeight: barRoot.panelSurfaceHeight + barRoot.roundDecoratorAllowance
-                    + barRoot.islandShadowAllowance
+                    + barRoot.islandShadowAllowance + barRoot.organicAuraAllowance
                 // Explicit zero-size item prevents ambiguous null input region during
                 // surface map/unmap transitions. Region { item: null } can be interpreted
                 // as "full surface accepts input" by the compositor, causing an invisible

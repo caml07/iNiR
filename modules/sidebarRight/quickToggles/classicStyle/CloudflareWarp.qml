@@ -137,12 +137,14 @@ QuickToggleButton {
 
     Process {
         id: startServiceProc
-        command: ["/usr/bin/systemctl", "start", "warp-svc.service"]
+        command: ["/bin/sh", "-c", "if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then exec systemctl start warp-svc.service; fi; exit 125"]
         onExited: (exitCode, exitStatus) => {
             if (exitCode !== 0) {
                 Quickshell.execDetached([root.notifySendPath,
                     Translation.tr("Cloudflare WARP"),
-                    Translation.tr("Failed to start warp-svc. You may need to run: <tt>sudo systemctl start warp-svc</tt>"),
+                    exitCode === 125
+                        ? Translation.tr("warp-svc is not managed by iNiR on this system yet")
+                        : Translation.tr("Failed to start warp-svc. You may need to run: <tt>sudo systemctl start warp-svc</tt>"),
                     "-a", "Shell"
                 ])
             }

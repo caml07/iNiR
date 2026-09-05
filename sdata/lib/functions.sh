@@ -541,6 +541,52 @@ inir_supervisor() {
   fi
 }
 
+# Reconcile PipeWire user services for non-systemd supervisors.
+# Void ships pipewire without activating it; recording needs pipewire,
+# wireplumber, and pipewire-pulse supervised in ~/.config/service.
+# Owned services carry "# Managed by iNiR." so systemd tier can remove them.
+# Args: $1 = supervisor (systemd|turnstile|runsvdir)
+reconcile_audio_user_services() {
+  local supervisor="$1"
+  local service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
+  local svc svc_dir run_file bin bin_quoted
+  local failed=0
+
+  for svc in pipewire wireplumber pipewire-pulse; do
+    svc_dir="$service_root/$svc"
+    run_file="$svc_dir/run"
+    if [[ "$supervisor" == systemd ]]; then
+      if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file"; then
+        command -v sv >/dev/null 2>&1 && sv down "$svc_dir" >/dev/null 2>&1 || true
+        rm -rf "$svc_dir" || failed=1
+      fi
+      continue
+    fi
+    bin="$(command -v "$svc" 2>/dev/null || true)"
+    if [[ -z "$bin" ]]; then
+      if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file"; then
+        rm -rf "$svc_dir" || failed=1
+      fi
+      continue
+    fi
+    if [[ -f "$run_file" ]] && ! grep -q '^# Managed by iNiR\.' "$run_file"; then
+      continue
+    fi
+    mkdir -p "$svc_dir" || {
+      failed=1
+      continue
+    }
+    bin_quoted="$(printf '%s' "$bin" | sed "s/'/'\\\\''/g")"
+    if [[ "$supervisor" == turnstile ]]; then
+      printf '#!/bin/sh\n# Managed by iNiR.\nexec chpst -e "$TURNSTILE_ENV_DIR" '\''%s'\''\n' "$bin_quoted" > "$run_file" || failed=1
+    else
+      printf '#!/bin/sh\n# Managed by iNiR.\nexec '\''%s'\''\n' "$bin_quoted" > "$run_file" || failed=1
+    fi
+    chmod +x "$run_file" || failed=1
+  done
+  return "$failed"
+}
+
 # Reconcile supervisor state for iNiR (shared by install and update).
 # Creates/updates runit service, renders startup KDL block.
 # Args: (none - uses XDG_CONFIG_HOME, XDG_BIN_HOME)
@@ -586,6 +632,7 @@ reconcile_inir_supervisor() {
   if [[ "$supervisor" == turnstile ]] && ! configure_turnstile_user_services; then
     return 1
   fi
+  reconcile_audio_user_services "$supervisor" || return 1
 
   update_inir_startup_supervisor() {
     local file="$1"

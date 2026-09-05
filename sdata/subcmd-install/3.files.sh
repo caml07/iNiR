@@ -619,6 +619,14 @@ if [[ -f "defaults/config.json" ]]; then
   v mkdir -p "${DOTS_CORE_CONFDIR}"
   install_file__auto_backup "defaults/config.json" "${DOTS_CORE_CONFDIR}/config.json"
 fi
+if command -v jq >/dev/null 2>&1 \
+    && [[ -f "${DOTS_CORE_CONFDIR}/config.json" ]] \
+    && [[ -z "$(jq -r '.hotspot.password // empty' "${DOTS_CORE_CONFDIR}/config.json")" ]]; then
+  _hotspot_password="$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
+  jq --arg password "$_hotspot_password" '.hotspot.password = $password' \
+    "${DOTS_CORE_CONFDIR}/config.json" > "${DOTS_CORE_CONFDIR}/config.json.tmp" \
+    && mv "${DOTS_CORE_CONFDIR}/config.json.tmp" "${DOTS_CORE_CONFDIR}/config.json"
+fi
 
 # DISABLED: WebApp plugins — requires quickshell-webengine rebuild, re-enable when ready
 # if [[ -d "defaults/plugins" ]]; then

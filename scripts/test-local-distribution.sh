@@ -307,6 +307,8 @@ fi
 clipboard_helper="$runtime_root/scripts/clipboard-copy.sh"
 if [[ ! -x "$clipboard_helper" ]] \
         || ! grep -Fq 'systemd-run --user' "$clipboard_helper" \
+        || ! grep -Fq 'systemd/private' "$clipboard_helper" \
+        || ! grep -Fq 'systemctl --user show-environment' "$clipboard_helper" \
         || grep -R -Fq '/usr/bin/wl-copy' "$runtime_root/modules/regionSelector" \
         || grep -R -Fq 'execDetached(["wl-copy"' "$runtime_root/modules/japaneseLookup"; then
     printf 'FAIL: snipping clipboard ownership can leak wl-copy into inir.service\n' >&2
@@ -759,6 +761,54 @@ if ! grep -Fq 'service", "restart' "$memory_service" \
     printf 'FAIL: non-systemd runtime adapters are incomplete\n' >&2
     exit 1
 fi
+
+step "optional systemd adapters"
+awww_backend="$runtime_root/services/AwwwBackend.qml"
+capture_helper="$runtime_root/scripts/capture-windows.sh"
+thumbnail_helper="$runtime_root/scripts/thumbnails/thumbgen-venv.sh"
+void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
+if ! grep -Fq 'systemd/private' "$awww_backend" \
+        || ! grep -Fq 'systemctl --user show-environment' "$awww_backend" \
+        || ! grep -Fq 'systemd/private' "$capture_helper" \
+        || ! grep -Fq 'systemctl --user show-environment' "$capture_helper" \
+        || ! grep -Fq 'systemd/private' "$thumbnail_helper" \
+        || ! grep -Fq 'systemctl --user show-environment' "$thumbnail_helper" \
+        || ! grep -Eq '^[[:space:]]+pipewire$' "$void_deps" \
+        || ! grep -Eq '^[[:space:]]+awww$' "$void_deps" \
+        || ! grep -Eq '^[[:space:]]+jq$' "$void_deps"; then
+    printf 'FAIL: optional systemd adapters or Void providers are incomplete\n' >&2
+    exit 1
+fi
+if grep -R -Fq 'inirhotspot' "$runtime_root/defaults" "$runtime_root/modules"; then
+    printf 'FAIL: hotspot still ships a shared default password\n' >&2
+    exit 1
+fi
+if ! grep -Fq '/dev/urandom' "$runtime_root/sdata/subcmd-install/3.files.sh"; then
+    printf 'FAIL: fresh installs do not generate a hotspot password\n' >&2
+    exit 1
+fi
+if grep -R -Fq 'disableDiscoverOverlay' \
+        "$runtime_root/defaults" "$runtime_root/modules" "$runtime_root/services"; then
+    printf 'FAIL: discover-overlay integration is still exposed\n' >&2
+    exit 1
+fi
+for warp_toggle in \
+    "$runtime_root/modules/common/models/quickToggles/CloudflareWarpToggle.qml" \
+    "$runtime_root/modules/sidebarRight/quickToggles/androidStyle/AndroidCloudflareWarpToggle.qml" \
+    "$runtime_root/modules/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml"; do
+    if ! grep -Fq '/run/systemd/system' "$warp_toggle" \
+            || ! grep -Fq 'exit 125' "$warp_toggle"; then
+        printf 'FAIL: WARP toggle can issue systemctl outside systemd: %s\n' "$warp_toggle" >&2
+        exit 1
+    fi
+done
+audio_helper="$runtime_root/sdata/lib/functions.sh"
+if ! grep -Fq 'reconcile_audio_user_services' "$audio_helper" \
+        || ! grep -Fq 'pipewire-pulse' "$audio_helper" \
+        || ! grep -Fq '# Managed by iNiR.' "$audio_helper"; then
+    printf 'FAIL: PipeWire user-service reconciliation is incomplete\n' >&2
+    exit 1
+fi
 if grep -Fq 'systemctl --user show-environment' "$tray_service" \
         && ! grep -Fq 'systemd/private' "$tray_service"; then
     printf 'FAIL: XEmbed runtime predicate is not socket-gated\n' >&2
@@ -985,6 +1035,10 @@ cat > "$reconcile_test_root/bin/sv" <<'SH'
 exit 1
 SH
 chmod +x "$reconcile_test_root/bin/sv"
+for audio_bin in pipewire wireplumber pipewire-pulse; do
+    printf '#!/bin/sh\nexit 0\n' > "$reconcile_test_root/bin/$audio_bin"
+    chmod +x "$reconcile_test_root/bin/$audio_bin"
+done
 # Create startup KDL file (required for reconcile to render)
 cat > "$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
 // 50 — Processes spawned at login
@@ -1005,6 +1059,22 @@ fi
 # Verify runit service created
 if [[ ! -x "$reconcile_test_root/home/.config/service/inir/run" ]]; then
     printf 'FAIL: runit service not created\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
+for audio_svc in pipewire wireplumber pipewire-pulse; do
+    audio_run="$reconcile_test_root/home/.config/service/$audio_svc/run"
+    if [[ ! -x "$audio_run" ]] || ! grep -Fq '# Managed by iNiR.' "$audio_run"; then
+        printf 'FAIL: runsvdir audio service not created: %s\n' "$audio_svc" >&2
+        rm -rf "$reconcile_test_root"
+        exit 1
+    fi
+done
+# Preserve a service owned by the user rather than replacing or deleting it.
+printf '#!/bin/sh\nexec user-pipewire\n' > "$reconcile_test_root/home/.config/service/pipewire/run"
+reconcile_audio_user_services runsvdir
+if ! grep -Fq 'exec user-pipewire' "$reconcile_test_root/home/.config/service/pipewire/run"; then
+    printf 'FAIL: user-owned PipeWire service was overwritten\n' >&2
     rm -rf "$reconcile_test_root"
     exit 1
 fi
@@ -1048,6 +1118,10 @@ cat > "$turnstile_test_root/bin/sv" <<'SH'
 exit 1
 SH
 chmod +x "$turnstile_test_root/bin/sv"
+for audio_bin in pipewire wireplumber pipewire-pulse; do
+    printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/bin/$audio_bin"
+    chmod +x "$turnstile_test_root/bin/$audio_bin"
+done
 cat > "$turnstile_test_root/bin/pgrep" <<'SH'
 #!/bin/sh
 printf '123\n'
@@ -1071,6 +1145,10 @@ if ! (
     turnstile_run="$turnstile_test_root/home/.config/service/inir/run"
     turnstile_conf="$turnstile_test_root/home/.config/service/turnstile-ready/conf"
     grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_run"
+    for audio_svc in pipewire wireplumber pipewire-pulse; do
+        audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
+        grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
+    done
     grep -Fxq 'core_services="dbus"' "$turnstile_conf"
     ! grep -Fq 'runsvdir' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     cp "$turnstile_run" "$turnstile_run.before"

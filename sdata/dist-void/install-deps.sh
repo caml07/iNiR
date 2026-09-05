@@ -64,6 +64,10 @@ VOID_BASE_PACKAGES=(
   # Essential utilities
   gum
   dunst
+  jq
+
+  # Default wallpaper backend
+  awww
 
   # UV (fast Python package manager, in Void repo)
   uv
@@ -121,14 +125,14 @@ VOID_TOOLKIT_PACKAGES=(
   tesseract-ocr-eng
   tesseract-ocr-spa
 
-  # Note: ydotool is NOT in Void repos; compiling it is a compatibility profile (PR later)
+  # ydotool is provided by the upstream-provider work in PR4.
 )
 
 # Screencapture: screenshot, recording, annotation
 VOID_SCREENCAPTURE_PACKAGES=(
   swappy
   wf-recorder
-   ImageMagick
+  ImageMagick
   ffmpeg
 )
 

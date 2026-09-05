@@ -169,7 +169,9 @@ Variants {
             readonly property int blurOverflow: backdropWindow.backdropDecodeOverflow
             readonly property int mediaMargin: -blurOverflow
 
-            // Static wallpaper with crossfade transitions (shares workspace transition settings)
+            // Overview/backdrop is a settled resource, not a second transition
+            // owner. It follows the configured path without replaying the desktop
+            // animation, so the hidden Overview resource can settle independently.
             WallpaperCrossfader {
                 id: wallpaper
                 anchors.fill: parent
@@ -181,9 +183,8 @@ Variants {
                         : "file://" + backdropWindow.effectiveWallpaperPath)
                     : ""
                 visible: !backdropWindow.useAuroraStyle && !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
-                // Constrain decoded size — no need for native resolution since the
-                // backdrop is always screen-sized, and halved again while blurred.
                 sourceSize: backdropWindow.backdropSourceSize
+                enableTransitions: false
             }
 
             MultiEffect {

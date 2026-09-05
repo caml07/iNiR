@@ -34,6 +34,9 @@ Singleton {
     // Public state
     property bool hasUpdate: false
     property int commitsBehind: 0
+    property int commitsAhead: 0
+    property string repoRelation: "unknown" // current | behind | ahead | diverged | unknown
+    readonly property bool repoDiverged: repoRelation === "diverged"
     property string latestMessage: ""
     property string localCommit: ""
     property string remoteCommit: ""
@@ -59,6 +62,25 @@ Singleton {
         root.updateTotalSteps = 0
         root.updateStepMessage = ""
         root._lastWatchdogStatus = ""
+    }
+
+    function updateFailureMessage(status: string, previous: bool): string {
+        const parts = status.split(":")
+        const code = parts.length > 1 ? parts[1] : "unknown"
+        const detail = parts.length > 2 ? parts.slice(2).join(":").trim() : ""
+        const lead = previous ? "Last update failed" : "Update failed"
+        return detail.length > 0
+            ? detail + ". Check " + Directories.updateLogPath + " for details."
+            : lead + " (exit " + code + "). Check " + Directories.updateLogPath + " for details."
+    }
+
+    function handleFailedUpdateStatus(status: string, previous: bool): void {
+        const parts = status.split(":")
+        const code = parts.length > 1 ? parts[1] : "unknown"
+        root.clearUpdateProgressUi()
+        root.lastError = root.updateFailureMessage(status, previous)
+        clearStatusFileProc.running = true
+        print("[ShellUpdates] Update FAILED with exit code " + code + (previous ? " (resume)" : ""))
     }
 
     // Notification tracking (prevent spam)
@@ -137,7 +159,9 @@ Singleton {
         if (remoteCommit.length === 0 || remoteCommit === lastNotifiedCommit) return
 
         const version = root.remoteVersion.length > 0 ? (" v" + root.remoteVersion) : ""
-        const commits = root.commitsBehind > 0 ? (root.commitsBehind + " commits behind") : "New version available"
+        const commits = root.repoDiverged
+            ? "Repository history changed upstream. iNiR will preserve local work and recover clean published checkouts automatically."
+            : (root.commitsBehind > 0 ? (root.commitsBehind + " commits behind") : "New version available")
         Notifications.notify({
             summary: "iNiR Update Available" + version,
             body: commits + ". Click the update indicator in the bar or open Settings → Services.",
@@ -220,19 +244,22 @@ Singleton {
         const teeCmd = useTerminal
             ? "./setup -y update 2>&1 | tee '" + logPath + "'; rc=${PIPESTATUS[0]}"
             : "./setup -y -q update > '" + logPath + "' 2>&1; rc=$?"
+        const preserveFailureStatus =
+            "status=$(cat '" + statusPath + "' 2>/dev/null || true); " +
+            "if [ $rc -ne 0 ] && [[ $status != failed:* ]]; then echo \"failed:$rc\" > '" + statusPath + "'; fi; "
         const termTail =
             "echo; " +
+            preserveFailureStatus +
             "if [ $rc -eq 0 ]; then " +
                 "echo 'All good — iNiR updated successfully. The shell will restart on its own.'; " +
                 "echo 'You can close this window whenever you want.'; " +
             "else " +
-                "echo \"failed:$rc\" > '" + statusPath + "'; " +
                 "echo \"Something went wrong (exit $rc). Check the output above for details.\"; " +
                 "echo 'You can close this window whenever you want.'; " +
             "fi; " +
             "read -r _"
         const detachedTail =
-            "if [ $rc -ne 0 ]; then echo \"failed:$rc\" > '" + statusPath + "'; fi"
+            preserveFailureStatus
         const tail = useTerminal ? termTail : detachedTail
         const bashCmd = "echo 'updating' > '" + statusPath + "'; " +
             "cd '" + repoDir + "' && " + teeCmd + "; " + tail
@@ -287,6 +314,8 @@ Singleton {
             consecutiveFetchErrors: root.consecutiveFetchErrors,
             hasUpdate: root.hasUpdate,
             commitsBehind: root.commitsBehind,
+            commitsAhead: root.commitsAhead,
+            repoRelation: root.repoRelation,
             localCommit: root.localCommit,
             remoteCommit: root.remoteCommit,
             currentBranch: root.currentBranch,
@@ -366,10 +395,7 @@ Singleton {
                 }
 
                 if (status.startsWith("failed")) {
-                    const code = status.split(":")[1] || "unknown"
-                    root.lastError = "Last update failed (exit " + code + "). Check " + Directories.updateLogPath + " for details."
-                    print("[ShellUpdates] Detected failed update from previous shell: exit " + code)
-                    clearStatusFileProc.running = true
+                    root.handleFailedUpdateStatus(status, true)
                     return
                 }
 
@@ -896,15 +922,24 @@ Singleton {
         }
     }
 
-    // Step 6: Count commits behind
+    // Step 6: Classify the graph in both directions. Counting only HEAD..remote
+    // made a force-pushed branch look like an ordinary update even when the
+    // checkout also had commits that disappeared from the rewritten remote.
     Process {
         id: countCommitsProc
         running: false
-        command: [...root._gitCmd, "rev-list", "--count", "HEAD..origin/" + root._remoteBranch]
+        command: [...root._gitCmd, "rev-list", "--left-right", "--count", "HEAD...origin/" + root._remoteBranch]
         stdout: StdioCollector {
             onStreamFinished: {
-                const count = parseInt((text ?? "0").trim())
-                root.commitsBehind = isNaN(count) ? 0 : count
+                const parts = (text ?? "0 0").trim().split(/\s+/)
+                const localOnly = parseInt(parts[0] ?? "0")
+                const remoteOnly = parseInt(parts[1] ?? "0")
+                root.commitsAhead = isNaN(localOnly) ? 0 : localOnly
+                root.commitsBehind = isNaN(remoteOnly) ? 0 : remoteOnly
+                root.repoRelation = root.commitsAhead > 0 && root.commitsBehind > 0 ? "diverged"
+                    : root.commitsAhead > 0 ? "ahead"
+                    : root.commitsBehind > 0 ? "behind"
+                    : "current"
             }
         }
         onExited: (exitCode, exitStatus) => {
@@ -912,12 +947,15 @@ Singleton {
                 // Fallback: compare commits directly
                 root.hasUpdate = root.localCommit !== root.remoteCommit && root.remoteCommit.length > 0
                 root.commitsBehind = root.hasUpdate ? 1 : 0
+                root.commitsAhead = 0
+                root.repoRelation = "unknown"
                 root.isChecking = false
                 root.initialUpdateCheckDone = true
                 return
             }
             root.hasUpdate = root.commitsBehind > 0
-            print("[ShellUpdates] Commits behind: " + root.commitsBehind + ", hasUpdate: " + root.hasUpdate)
+            print("[ShellUpdates] Repo relation: " + root.repoRelation
+                + " (ahead=" + root.commitsAhead + ", behind=" + root.commitsBehind + "), hasUpdate: " + root.hasUpdate)
             if (root.hasUpdate) {
                 latestMessageProc.running = true
             } else {
@@ -1101,8 +1139,9 @@ Singleton {
                     root.updateStep = 0
                     root.updateStepMessage = ""
                 } else if (status.startsWith("failed")) {
-                    // Update failed — stop polling, let watchdog handle error display
-                    updateProgressPoller.running = false
+                    // The setup process has already exited. Handle this immediately
+                    // instead of leaving the bar spinner alive until the 120s watchdog.
+                    root.handleFailedUpdateStatus(status, false)
                 }
             }
         }
@@ -1131,13 +1170,7 @@ Singleton {
                 const status = (text ?? "").trim()
                 print("[ShellUpdates] Update status file: " + status)
                 if (status.startsWith("failed")) {
-                    // Update process exited with error
-                    const parts = status.split(":")
-                    const code = parts.length > 1 ? parts[1] : "unknown"
-                    root.clearUpdateProgressUi()
-                    root.lastError = "Update failed (exit " + code + "). Check " + Directories.updateLogPath + " for details."
-                    clearStatusFileProc.running = true
-                    print("[ShellUpdates] Update FAILED with exit code " + code)
+                    root.handleFailedUpdateStatus(status, false)
                 } else if (status.startsWith("progress:")) {
                     if (status === root._lastWatchdogStatus) {
                         // Same progress marker seen twice — update is stuck

@@ -815,6 +815,21 @@ Scope {
                         x: 14
                         y: header.bannerHeight - header.avatarSize * 0.45
 
+                        HoverHandler {
+                            id: focusAvatarHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
+
+                        TapHandler {
+                            gesturePolicy: TapHandler.WithinBounds
+                            onTapped: root.openSearchResult({
+                                pageIndex: 23,
+                                label: Translation.tr("Profile picture"),
+                                section: "right",
+                                isSection: true
+                            })
+                        }
+
                         Rectangle {
                             anchors.fill: parent
                             radius: Appearance.zzzEverywhere
@@ -872,6 +887,30 @@ Scope {
                                 text: "person"
                                 iconSize: 20
                                 color: SettingsMaterialPreset.accentColor
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            width: 16
+                            height: 16
+                            radius: Appearance.zzzEverywhere
+                                ? Appearance.zzz.controlRadius : width / 2
+                            color: Appearance.colors.colPrimaryContainer
+                            border.width: 1
+                            border.color: SettingsMaterialPreset.accentColor
+                            opacity: focusAvatarHover.hovered ? 1 : 0
+                            scale: opacity > 0 ? 1 : 0.7
+
+                            Behavior on opacity { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+                            Behavior on scale { NumberAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "edit"
+                                iconSize: 10
+                                color: Appearance.colors.colOnPrimaryContainer
                             }
                         }
                     }

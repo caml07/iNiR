@@ -46,6 +46,7 @@ WSettingsPage {
             "appearance.cava.framerate": 60,
             "appearance.cava.stereo": true,
             "appearance.cava.waveOpacity": 30,
+            "appearance.cava.blockedApps": [],
         })
         cavaConfigDebounce.restart()
     }
@@ -983,6 +984,25 @@ WSettingsPage {
             value: Config.options?.appearance?.cava?.waveOpacity ?? 30
             onValueChanged: root.setCavaValue(
                 "appearance.cava.waveOpacity", value, false)
+        }
+
+        WSettingsTextField {
+            label: Translation.tr("Blocked visualizer apps")
+            icon: "music-note-2"
+            description: Translation.tr("Comma-separated playback apps to exclude from visualizers. Empty keeps automatic active-player selection.")
+            placeholderText: Translation.tr("Spotify, ncspot, ytmusic")
+            text: (Config.options?.appearance?.cava?.blockedApps ?? []).join(", ")
+            onEditingFinished: newText => {
+                const seen = ({})
+                const apps = newText.split(",").map(value => value.trim()).filter(value => {
+                    const key = value.toLowerCase()
+                    if (key.length === 0 || seen[key]) return false
+                    seen[key] = true
+                    return true
+                })
+                Config.setNestedValue("appearance.cava.blockedApps", apps)
+                Config.flushWrites()
+            }
         }
 
         WSettingsButton {

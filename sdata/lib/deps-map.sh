@@ -99,10 +99,13 @@ DEPS_AUDIO_PLASMA_BROWSER_INTEGRATION="arch:plasma-browser-integration fedora:pl
 DEPS_AUDIO_PAVUCONTROL="arch:pavucontrol fedora:pavucontrol debian:pavucontrol ubuntu:pavucontrol opensuse:pavucontrol void:pavucontrol"
 DEPS_AUDIO_CAVA="arch:AUR:cava fedora:cava debian:COMPILE:https://github.com/karlstav/cava ubuntu:COMPILE:https://github.com/karlstav/cava opensuse:cava void:cava"
 DEPS_AUDIO_EASYEFFECTS="arch:easyeffects fedora:easyeffects debian:easyeffects ubuntu:easyeffects opensuse:easyeffects void:easyeffects"
+DEPS_AUDIO_LSP_PLUGINS_LV2="arch:lsp-plugins-lv2 fedora:lsp-plugins-lv2 debian:lsp-plugins-lv2 ubuntu:lsp-plugins-lv2 opensuse:lsp-plugins-lv2 void:lsp-plugins-lv2"
 DEPS_AUDIO_MPV="arch:mpv fedora:mpv debian:mpv ubuntu:mpv opensuse:mpv void:mpv"
 DEPS_AUDIO_MPV_MPRIS="arch:mpv-mpris fedora:mpv-mpris debian:mpv-mpris ubuntu:mpv-mpris opensuse:mpv-mpris void:mpv-mpris"
 DEPS_AUDIO_YTDLP="arch:yt-dlp fedora:yt-dlp debian:yt-dlp ubuntu:yt-dlp opensuse:yt-dlp void:yt-dlp"
-DEPS_AUDIO_YTMUSICAPI="arch:python-ytmusicapi fedora:python3-ytmusicapi debian:python3-ytmusicapi ubuntu:python3-ytmusicapi opensuse:python3-ytmusicapi void:python3-ytmusicapi"
+# ytmusicapi and yt-dlp's cookie-loader module are owned by iNiR's managed
+# Python runtime on setup-managed installs; package-managed distros declare
+# their own Python runtime dependency at the packaging boundary.
 DEPS_AUDIO_SOCAT="arch:socat fedora:socat debian:socat ubuntu:socat opensuse:socat void:socat"
 DEPS_AUDIO_SONGREC="arch:songrec fedora:COMPILE:https://github.com/marin-m/SongRec debian:COMPILE:https://github.com/marin-m/SongRec ubuntu:songrec opensuse:songrec void:songrec"
 

@@ -107,11 +107,11 @@ Item {
     readonly property int requestedSampleCount: Math.max(50,
         Math.round(root.requestedSpan / Math.max(4, root.density)))
 
-    component Wing: CavaSpectrum {
+    component Wing: AudioVisualizerLayer {
         y: root.pillItem
             ? root.pillItem.y + (root.pillItem.height - root.wingHeight) / 2 : 0
         height: root.wingHeight
-        active: root.visible && width > 4
+        active: root.visible && width > 4 && root.visualizerType !== "organic"
         threadedRendering: true
         points: active ? root.points : []
         normalizationCeiling: active ? root.normalizationCeiling : 100
@@ -131,6 +131,39 @@ Item {
         edgeSoftness: root.edgeSoftness
         frequencyProfile: root.frequencyProfile
         accentStrength: root.accentStrength
+    }
+
+    AudioVisualizerLayer {
+        id: organicPillAura
+        x: root.pillItem?.x ?? 0
+        y: root.pillItem?.y ?? 0
+        width: root.pillItem?.width ?? 0
+        height: root.pillItem?.height ?? 0
+        active: root.visible && root.visualizerType === "organic"
+            && width > 4 && height > 4
+        points: active ? root.points : []
+        normalizationCeiling: active ? root.normalizationCeiling : 100
+        visualizerType: "organic"
+        spectrumColor: PillTheme.vermLit
+        spectrumOpacity: root.spectrumOpacity
+        fillRatio: root.fillRatio
+        smoothing: root.smoothing
+        frequencyProfile: root.frequencyProfile
+        accentStrength: root.accentStrength
+        organicSensitivity: 0.62
+        organicPulse: 0.72
+        organicMotionSpeed: 0.9
+        organicIdleMotion: 0.18
+        organicGlow: 0.38
+        organicOpacity: root.spectrumOpacity
+        organicEdgeAura: true
+        organicEdgeReach: Math.max(18 * root.s,
+            Math.min(root.wingLength * 0.34, 58 * root.s))
+        organicBaseRadius: 0.42
+        topLeftRadius: height / 2
+        topRightRadius: height / 2
+        bottomLeftRadius: height / 2
+        bottomRightRadius: height / 2
     }
 
     Wing {

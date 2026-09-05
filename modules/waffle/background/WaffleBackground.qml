@@ -58,9 +58,11 @@ Variants {
         }
         readonly property bool enableAnimation: wBg.enableAnimation ?? true
         readonly property bool enableAnimatedBlur: wEffects.enableAnimatedBlur ?? false
+        readonly property bool webWallpaperActive: WebWallpaper.active
         readonly property int thumbnailBlurStrength: wEffects.thumbnailBlurStrength ?? Config.options?.background?.effects?.thumbnailBlurStrength ?? 70
 
         readonly property bool externalMainWallpaperEligible:
+            !panelRoot.webWallpaperActive &&
             AwwwBackend.supportsVisibleMainWallpaper(
                 wallpaperSourceRaw,
                 "fill",
@@ -70,11 +72,17 @@ Variants {
         readonly property bool internalShaderTransitionRequested:
             (Config.options?.background?.transition?.enable ?? true)
             && Looks.transition.enabled
+            && !panelRoot.webWallpaperActive
             && AwwwBackend.isInternalShaderTransitionType(
                 Config.options?.background?.transition?.type ?? "crossfade")
             && !panelRoot.wallpaperIsGif
             && !panelRoot.wallpaperIsVideo
+        // Shader transitions are owned by the in-shell crossfader. Keep QML as
+        // the visible static-wallpaper owner while that mode is selected so the
+        // compositor never has to hand the desktop between AWWW and QML during
+        // a transition.
         readonly property bool externalMainWallpaperActive: panelRoot.externalMainWallpaperEligible
+            && !panelRoot.internalShaderTransitionRequested
         readonly property bool showInternalStaticWallpaper: !externalMainWallpaperActive
         readonly property bool internalShaderPreviewActive: panelRoot.internalShaderTransitionRequested
             && Wallpapers.internalPreviewActive
@@ -252,8 +260,8 @@ Variants {
                     transitionDirection: Config.options?.background?.transition?.direction ?? "right"
                     transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
                     source: wallpaperContainer.needsStaticTexture
-                        ? panelRoot.wallpaperUrl : ""
-                    visible: !panelRoot.wallpaperIsGif && !panelRoot.wallpaperIsVideo && ready
+                        && !panelRoot.webWallpaperActive ? panelRoot.wallpaperUrl : ""
+                    visible: !panelRoot.webWallpaperActive && !panelRoot.wallpaperIsGif && !panelRoot.wallpaperIsVideo && ready
                     opacity: panelRoot.showInternalStaticWallpaper
                         || wallpaper.shaderOverlayHeld ? 1 : 0
                     layer.enabled: wallpaperContainer.needsStaticTexture
@@ -265,7 +273,7 @@ Variants {
                     id: gifWallpaper
                     anchors.fill: parent
                     fillMode: Image.PreserveAspectCrop
-                    source: panelRoot.wallpaperIsGif
+                    source: panelRoot.wallpaperIsGif && !panelRoot.webWallpaperActive
                         ? (panelRoot.wallpaperSourceRaw.startsWith("file://")
                             ? panelRoot.wallpaperSourceRaw
                             : "file://" + panelRoot.wallpaperSourceRaw)
@@ -295,7 +303,7 @@ Variants {
                     id: videoWallpaper
                     anchors.fill: parent
                     visible: panelRoot.wallpaperIsVideo && !blurEffect.visible
-                    source: (panelRoot.wallpaperIsVideo && panelRoot._familyOwnsScreen)
+                    source: (panelRoot.wallpaperIsVideo && panelRoot._familyOwnsScreen && !panelRoot.webWallpaperActive)
                         ? panelRoot.wallpaperSourceRaw : ""
                     fillMode: VideoOutput.PreserveAspectCrop
                     enableTransitions: Config.options?.background?.transition?.enable ?? true
@@ -321,7 +329,7 @@ Variants {
                 id: blurEffect
                 anchors.fill: parent
                 source: wallpaper
-                visible: Looks.effectsEnabled && panelRoot.blurProgress > 0 &&
+                visible: !panelRoot.webWallpaperActive && Looks.effectsEnabled && panelRoot.blurProgress > 0 &&
                          !panelRoot.wallpaperIsGif && !panelRoot.wallpaperIsVideo &&
                          wallpaper.ready
                 blurEnabled: visible

@@ -113,7 +113,7 @@ case "${SKIP_QUICKSHELL}" in
 
     # Generate manifest BEFORE syncing (to know what should exist)
     log_info "Generating file manifest..."
-    generate_manifest "$II_SOURCE" "${II_TARGET}/.inir-manifest.new"
+    generate_manifest "$II_SOURCE" "${II_TARGET}/.inir-manifest.new" || return 1
 
     # Copy all .qml files from root (auto-detect, no manual list needed)
     for qml_file in "${II_SOURCE}"/*.qml; do
@@ -138,7 +138,7 @@ case "${SKIP_QUICKSHELL}" in
       while IFS= read -r dir; do
         [[ -n "$dir" ]] || continue
         if [[ -d "${II_SOURCE}/${dir}" ]]; then
-          install_dir__sync "${II_SOURCE}/${dir}" "${II_TARGET}/${dir}"
+          install_dir__sync "${II_SOURCE}/${dir}" "${II_TARGET}/${dir}" || return 1
         fi
       done < "$runtime_dirs_manifest"
     fi
@@ -149,7 +149,7 @@ case "${SKIP_QUICKSHELL}" in
     # Cleanup orphan files (files that no longer exist in repo)
     if [[ "${IS_UPDATE}" == "true" ]]; then
       log_info "Cleaning up orphan files..."
-      cleanup_orphans "$II_TARGET" "${II_TARGET}/.inir-manifest"
+      cleanup_orphans "$II_TARGET" "${II_TARGET}/.inir-manifest" || return 1
     fi
 
     # Fix script permissions
@@ -158,11 +158,13 @@ case "${SKIP_QUICKSHELL}" in
     [[ -f "${II_TARGET}/setup" ]] && chmod +x "${II_TARGET}/setup"
 
     if [[ -f "${REPO_ROOT}/scripts/inir" ]]; then
-      install_file "${REPO_ROOT}/scripts/inir" "${INIR_LAUNCHER_PATH}"
-      chmod +x "${INIR_LAUNCHER_PATH}"
-      ensure_launcher_path_in_shells "${XDG_BIN_HOME}"
-      log_success "Launcher installed"
-      log_success "Launcher path configured for login and interactive shells"
+      if sync_launcher_from_repo >/dev/null; then
+        log_success "Launcher installed"
+        log_success "Launcher path configured for login and interactive shells"
+      else
+        log_error "Could not install the inir launcher"
+        return 1
+      fi
     fi
 
     local _service_refresh_status=1
@@ -179,24 +181,9 @@ case "${SKIP_QUICKSHELL}" in
         rm -f "$_service_target"
       fi
 
-      if [[ -f "$_service_target" ]]; then
-        # Existing install: sync from repo template
-        if sync_user_inir_service_from_repo_if_present; then
-          _service_refresh_status=0
-          log_success "User inir.service refreshed"
-        fi
-      else
-        # Fresh install: create service from template, rewriting ExecStart path
-        local _tmp_svc="${XDG_CACHE_HOME:-$HOME/.cache}/inir.service.$$"
-        local _launcher_escaped="${INIR_LAUNCHER_PATH//&/\\&}"
-        sed -e "s|^ExecStart=.*|ExecStart=${_launcher_escaped} run --session|" \
-            -e "s|^ExecStopPost=-.*|ExecStopPost=-${_launcher_escaped} cleanup-orphans|" \
-            "$_service_asset" > "$_tmp_svc"
-        cp -f "$_tmp_svc" "$_service_target"
-        rm -f "$_tmp_svc"
-        systemctl --user daemon-reload >/dev/null 2>&1 || true
+      if sync_user_inir_service_from_repo_if_present; then
         _service_refresh_status=0
-        log_success "User inir.service installed"
+        log_success "User inir.service refreshed"
       fi
     fi
 
@@ -207,8 +194,6 @@ case "${SKIP_QUICKSHELL}" in
       local _comp_target=""
       if systemctl --user cat niri.service &>/dev/null; then
         _comp_target="niri.service"
-      elif systemctl --user cat 'wayland-wm@Hyprland.service' &>/dev/null; then
-        _comp_target="wayland-wm@Hyprland.service"
       fi
 
       if [[ -n "$_comp_target" ]]; then
@@ -222,8 +207,8 @@ case "${SKIP_QUICKSHELL}" in
           log_warning "Could not wire inir.service to ${_comp_target} — run 'inir service enable'"
         fi
       else
-        log_warning "No supported compositor detected (niri or Hyprland)"
-        log_warning "inir.service not enabled — run 'inir service enable' from your compositor session"
+        log_warning "niri.service not detected"
+        log_warning "inir.service not enabled — start Niri as a managed session and run 'inir service enable'"
       fi
     fi
 
@@ -253,6 +238,8 @@ case "${SKIP_QUICKSHELL}" in
     # Install Python packages now that requirements.txt is in place
     showfun install-python-packages
     v install-python-packages
+    showfun ensure-ytmusic-js-runtime
+    v ensure-ytmusic-js-runtime
 
     # Verify installation (only on updates, not fresh install)
     if [[ "${IS_UPDATE}" == "true" && "${SKIP_VERIFICATION}" != "true" ]]; then
@@ -468,7 +455,45 @@ done
 
 # Darkly Qt style config
 if [[ -f "dots/.config/darklyrc" ]]; then
-  install_file "dots/.config/darklyrc" "${XDG_CONFIG_HOME}/darklyrc"
+  darkly_target="${XDG_CONFIG_HOME}/darklyrc"
+  if [[ ! -f "$darkly_target" ]]; then
+    install_file "dots/.config/darklyrc" "$darkly_target"
+  else
+    # Keep user Darkly preferences intact. Newer Dolphin versions ask the
+    # QStyle to draw FrameFocusRect for focused items, and current Darkly draws
+    # that as an extra underline. Disable only that one style feature.
+    python3 - "$darkly_target" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+section = re.search(r'(?ms)^\[Style\]\s*$.*?(?=^\[|\Z)', text)
+
+if section:
+    block = section.group(0)
+    if re.search(r'(?m)^ViewDrawFocusIndicator=', block):
+        updated = re.sub(
+            r'(?m)^ViewDrawFocusIndicator=.*$',
+            'ViewDrawFocusIndicator=false',
+            block,
+            count=1,
+        )
+    else:
+        trailing = re.search(r'(?:\n[ \t]*)*\Z', block).group(0)
+        body = block[:-len(trailing)] if trailing else block
+        updated = body + ('' if body.endswith('\n') else '\n') \
+            + 'ViewDrawFocusIndicator=false' + (trailing or '\n')
+    text = text[:section.start()] + updated + text[section.end():]
+else:
+    if text and not text.endswith('\n'):
+        text += '\n'
+    text += '\n[Style]\nViewDrawFocusIndicator=false\n'
+
+path.write_text(text)
+PY
+  fi
 fi
 
 # MPV config
@@ -603,6 +628,14 @@ fi
 if [[ -f "defaults/config.json" ]]; then
   v mkdir -p "${DOTS_CORE_CONFDIR}"
   install_file__auto_backup "defaults/config.json" "${DOTS_CORE_CONFDIR}/config.json"
+fi
+if command -v jq >/dev/null 2>&1 \
+    && [[ -f "${DOTS_CORE_CONFDIR}/config.json" ]] \
+    && [[ -z "$(jq -r '.hotspot.password // empty' "${DOTS_CORE_CONFDIR}/config.json")" ]]; then
+  _hotspot_password="$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
+  jq --arg password "$_hotspot_password" '.hotspot.password = $password' \
+    "${DOTS_CORE_CONFDIR}/config.json" > "${DOTS_CORE_CONFDIR}/config.json.tmp" \
+    && mv "${DOTS_CORE_CONFDIR}/config.json.tmp" "${DOTS_CORE_CONFDIR}/config.json"
 fi
 
 # DISABLED: WebApp plugins — requires quickshell-webengine rebuild, re-enable when ready

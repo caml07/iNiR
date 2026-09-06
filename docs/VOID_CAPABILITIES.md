@@ -9,7 +9,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | Niri + Quickshell | base | XBPS `niri`, `quickshell`, Qt 6 packages | session supervisor | VM validated | PR1-PR3.2 |
 | Session D-Bus and login | base | XBPS `dbus`, `elogind`, `turnstile` | confirmed runit services + turnstile | VM validated | PR3.1 |
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
-| Network | base | XBPS `NetworkManager` | runit service | package present; activation audit pending | PR4 |
+| Network | base | XBPS `NetworkManager` | runit service | provider + activation implemented; VM validation pending | PR4.0 |
 | Bluetooth | toolkit | XBPS BlueZ provider + `blueman` | runit service | provider/activation audit pending | PR4 |
 | Awww wallpaper | base | official XBPS `awww` | systemd transient unit or session daemon by predicate | VM validated: daemon + query + img apply on wayland-1 | PR3.3 |
 | GameMode | base | built into iNiR | session process | `discover-overlay` control removed; still to verify in a live Niri session: toggle on/off, Niri animations + notifications behavior, no `discover-overlay` process touched | PR3.3 |

@@ -1800,6 +1800,17 @@ if ! grep -Fq 'Could not configure the iNiR supervisor' "$runtime_root/sdata/sub
     exit 1
 fi
 
+step "Void NetworkManager provider"
+void_setups="$runtime_root/sdata/subcmd-install/2.setups.sh"
+if ! grep -Fq 'ln -sfn /etc/sv/NetworkManager /var/service/NetworkManager' "$void_setups" \
+        || ! grep -Fq 'skipping NetworkManager activation' "$void_setups" \
+        || ! grep -Fq 'wpa_supplicant' "$void_setups" \
+        || ! grep -Fq 'video,i2c,input,network' "$void_setups" \
+        || ! grep -Eq '^[[:space:]]+NetworkManager$' "$void_deps"; then
+    printf 'FAIL: Void NetworkManager provider is incomplete\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

@@ -84,6 +84,32 @@ function setup_systemd_services(){
         log_info "Enable NetworkManager with: sudo ln -s /etc/sv/NetworkManager /var/service/"
       fi
     fi
+    # Bluetooth (optional) — Void: enable bluetoothd via runit with user confirmation.
+    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+      if [[ -d /etc/sv/bluetoothd ]]; then
+        if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth (bluetoothd) system service?" "yes"; then
+          if elevate sh -c 'ln -sfn /etc/sv/bluetoothd /var/service/bluetoothd'; then
+            log_success "Bluetooth service enabled"
+          else
+            log_warning "Could not enable Bluetooth service"
+            return 1
+          fi
+        else
+          log_info "Enable Bluetooth with: sudo ln -s /etc/sv/bluetoothd /var/service/"
+        fi
+      else
+        log_warning "Bluetooth service directory missing (/etc/sv/bluetoothd); reinstall the bluez package"
+      fi
+    else
+      # systemd path (Arch, etc.) — keep existing behavior
+      if command -v bluetoothctl &>/dev/null; then
+        if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth system service?" "yes"; then
+          v systemctl enable bluetooth --now
+        else
+          log_info "Enable Bluetooth with: systemctl enable bluetooth --now"
+        fi
+      fi
+    fi
     return 0
   fi
   

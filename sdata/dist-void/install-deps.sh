@@ -97,6 +97,7 @@ VOID_AUDIO_PACKAGES=(
   python3-ytmusicapi
   socat
   cava
+  libspa-bluetooth
 )
 
 # Toolkit: input, desktop, backlight, bluetooth, OCR, KDE integration
@@ -115,6 +116,7 @@ VOID_TOOLKIT_PACKAGES=(
   geoclue2
 
   # Bluetooth
+  bluez
   blueman
 
   # KDE integration (kwriteconfig6)

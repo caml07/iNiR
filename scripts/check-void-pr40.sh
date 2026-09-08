@@ -55,8 +55,8 @@ done
 
 # Activation: runit symlink + live service.
 check test -L /var/service/NetworkManager
-check sudo sv status NetworkManager >/dev/null 2>&1
-check sudo sv status dbus >/dev/null 2>&1
+check sudo sv status /var/service/NetworkManager
+check sudo sv status /var/service/dbus
 
 # Operation: nmcli answers and the user may manage networks.
 check nmcli -t -f STATE g

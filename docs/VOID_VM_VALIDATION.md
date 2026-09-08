@@ -512,8 +512,9 @@ turnstile or iNiR failure.
   `blueman-manager`; live `bluetoothd` and `dbus` runit services; acquired
   `org.bluez` system D-Bus ownership; and `bluetooth` group membership. The VM
   exposes no Bluetooth adapter, so hardware discovery, pairing, and audio
-  operation remain pending. A second installer run is also pending for the
-  idempotency checkpoint.
+  operation remain pending. A second dependency/setup run at version `2.30.0`
+  found every selected package already installed, made no package changes, and
+  produced an empty sorted `xbps-query -l` snapshot diff.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002

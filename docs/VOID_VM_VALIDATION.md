@@ -505,10 +505,15 @@ turnstile or iNiR failure.
   checker-only permission errors reading system runit supervision as an
   unprivileged user. Commit `3dd0b9db` makes the existing `sudo sv status`
   checks report their full results; a clean final checker rerun is pending.
-- PR4.1 provisions `bluez` and `blueman` in the toolkit profile,
-  `libspa-bluetooth` in the audio profile, `bluetooth` group membership when
-  the group exists, and confirmed runit activation of `bluetoothd`. VM
-  provider/service validation and optional physical-adapter testing are pending.
+- PR4.1 was checked on 2026-09-08 from clean commit `e112c416` after installing
+  `libspa-bluetooth-1.6.8_1` and enabling `/etc/sv/bluetoothd`. The versioned
+  `scripts/check-void-pr41.sh` contract passed: XBPS `bluez-5.86_2`,
+  `blueman-2.4.6_2`, and `libspa-bluetooth-1.6.8_1`; `bluetoothctl` and
+  `blueman-manager`; live `bluetoothd` and `dbus` runit services; acquired
+  `org.bluez` system D-Bus ownership; and `bluetooth` group membership. The VM
+  exposes no Bluetooth adapter, so hardware discovery, pairing, and audio
+  operation remain pending. A second installer run is also pending for the
+  idempotency checkpoint.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002

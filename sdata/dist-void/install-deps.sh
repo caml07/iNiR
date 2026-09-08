@@ -170,6 +170,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [dunstify]="dunst"
     [fish]="fish-shell"
     [magick]="ImageMagick"
+    [blueman-manager]="blueman"
     [swaylock]="swaylock"
     [swayidle]="swayidle"
     [grim]="grim"

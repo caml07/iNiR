@@ -9,8 +9,8 @@ after provider, provisioning, activation, operation, and verification pass.
 | Niri + Quickshell | base | XBPS `niri`, `quickshell`, Qt 6 packages | session supervisor | VM validated | PR1-PR3.2 |
 | Session D-Bus and login | base | XBPS `dbus`, `elogind`, `turnstile` | confirmed runit services + turnstile | VM validated | PR3.1 |
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
-| Network | base | XBPS `NetworkManager` | runit service | provider + activation implemented; VM validation pending | PR4.0 |
-| Bluetooth | toolkit | XBPS BlueZ provider + `blueman` | runit service | provider/activation audit pending | PR4 |
+| Network | base | XBPS `NetworkManager` | runit service | VM exercised: conflict guard, activation, group, and `nmcli` operation passed; final checker rerun pending | PR4.0 |
+| Bluetooth | toolkit | XBPS `bluez`, `blueman`; audio adds `libspa-bluetooth` | confirmed `bluetoothd` runit service | provider and activation implemented; VM validation pending | PR4.1 |
 | Awww wallpaper | base | official XBPS `awww` | systemd transient unit or session daemon by predicate | VM validated: daemon + query + img apply on wayland-1 | PR3.3 |
 | GameMode | base | built into iNiR | session process | `discover-overlay` control removed; still to verify in a live Niri session: toggle on/off, Niri animations + notifications behavior, no `discover-overlay` process touched | PR3.3 |
 | Screenshots | screencapture | XBPS `grim`, `slurp`, `swappy`, `wl-clipboard`, `jq` | direct session processes | VM validated: clipboard fallback roundtrip (`wl-paste`); capture binaries present | PR3.3 |

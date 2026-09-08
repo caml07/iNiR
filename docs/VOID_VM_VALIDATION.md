@@ -497,6 +497,18 @@ turnstile or iNiR failure.
   succeeded on `wayland-1`. The undefined `discover-overlay` integration is
   removed. WARP provider/lifecycle validation remains in PR4 and its toggle does
   not issue a systemd command on Void meanwhile.
+- PR4.0 was exercised on 2026-09-08 from commit `7d5a0ead`. The first checker
+  run correctly found active `dhcpcd` and did not activate NetworkManager.
+  After the operator explicitly stopped and removed the `dhcpcd` service link,
+  added the user to the `network` group, and enabled `/etc/sv/NetworkManager`,
+  `nmcli -t -f STATE g` reported `connected`. The remaining two failures were
+  checker-only permission errors reading system runit supervision as an
+  unprivileged user. Commit `3dd0b9db` makes the existing `sudo sv status`
+  checks report their full results; a clean final checker rerun is pending.
+- PR4.1 provisions `bluez` and `blueman` in the toolkit profile,
+  `libspa-bluetooth` in the audio profile, `bluetooth` group membership when
+  the group exists, and confirmed runit activation of `bluetoothd`. VM
+  provider/service validation and optional physical-adapter testing are pending.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002

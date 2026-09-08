@@ -99,7 +99,8 @@ Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
 `fish-shell` (provides `/usr/bin/fish` used by terminal and iNiR launchers),
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
-`uv` (repo), `NetworkManager`, `pipewire`, `wl-clipboard`, `cliphist`,
+`uv` (repo), `NetworkManager`, `bluez`, `blueman`, `pipewire`,
+`libspa-bluetooth`, `wl-clipboard`, `cliphist`,
 `grim`, `slurp`, `swappy`, `swayidle`, `swaylock`, `gum`, `dunst`, `jq`,
 `awww` (official XBPS wallpaper backend), fonts, etc.
 
@@ -113,6 +114,8 @@ Notes:
 - `ydotool` is not packaged in the current Void repositories. PR4 must provide
   a pinned upstream build, runit service, permissions, and update path before
   simulated paste is marked supported.
+- Bluetooth uses the toolkit profile's `bluez` daemon and `blueman` frontend.
+  The audio profile adds `libspa-bluetooth` for PipeWire Bluetooth audio.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.
 - Repo sanity: `xbps-query -L` (doctor check).
 

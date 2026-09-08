@@ -17,11 +17,15 @@ function setup_user_groups(){
   fi
   
   # Add user to required groups
-  # On Void, NetworkManager requires membership in the `network` group
-  # (Void handbook: NetworkManager). Keep Arch behavior unchanged.
+  # Void requires network and bluetooth group membership for their providers.
+  # Keep the existing group set unchanged on other distributions.
   if [[ "${OS_GROUP_ID:-}" == void ]]; then
-    x pkg_sudo usermod -aG video,i2c,input,network "$(whoami)"
-    log_success "User added to video, i2c, input, network groups"
+    local required_groups="video,i2c,input,network"
+    if ${INSTALL_TOOLKIT:-true} && getent group bluetooth >/dev/null; then
+      required_groups+=",bluetooth"
+    fi
+    x pkg_sudo usermod -aG "$required_groups" "$(whoami)"
+    log_success "User added to ${required_groups//,/, } groups"
   else
     x pkg_sudo usermod -aG video,i2c,input "$(whoami)"
     log_success "User added to video, i2c, input groups"
@@ -84,8 +88,8 @@ function setup_systemd_services(){
         log_info "Enable NetworkManager with: sudo ln -s /etc/sv/NetworkManager /var/service/"
       fi
     fi
-    # Bluetooth (optional) — Void: enable bluetoothd via runit with user confirmation.
-    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+    # Bluetooth toolkit provider: enable bluetoothd via runit with confirmation.
+    if ${INSTALL_TOOLKIT:-true}; then
       if [[ -d /etc/sv/bluetoothd ]]; then
         if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth (bluetoothd) system service?" "yes"; then
           if elevate sh -c 'ln -sfn /etc/sv/bluetoothd /var/service/bluetoothd'; then
@@ -99,15 +103,6 @@ function setup_systemd_services(){
         fi
       else
         log_warning "Bluetooth service directory missing (/etc/sv/bluetoothd); reinstall the bluez package"
-      fi
-    else
-      # systemd path (Arch, etc.) — keep existing behavior
-      if command -v bluetoothctl &>/dev/null; then
-        if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth system service?" "yes"; then
-          v systemctl enable bluetooth --now
-        else
-          log_info "Enable Bluetooth with: systemctl enable bluetooth --now"
-        fi
       fi
     fi
     return 0

@@ -1811,6 +1811,20 @@ if ! grep -Fq 'ln -sfn /etc/sv/NetworkManager /var/service/NetworkManager' "$voi
     exit 1
 fi
 
+step "Void BlueZ provider"
+void_audio_packages="$(sed -n '/^VOID_AUDIO_PACKAGES=(/,/^)/p' "$void_deps")"
+void_toolkit_packages="$(sed -n '/^VOID_TOOLKIT_PACKAGES=(/,/^)/p' "$void_deps")"
+if ! grep -Eq '^[[:space:]]+bluez$' <<< "$void_toolkit_packages" \
+        || ! grep -Eq '^[[:space:]]+blueman$' <<< "$void_toolkit_packages" \
+        || ! grep -Eq '^[[:space:]]+libspa-bluetooth$' <<< "$void_audio_packages" \
+        || ! grep -Fq '[blueman-manager]="blueman"' "$void_deps" \
+        || ! grep -Fq 'if ${INSTALL_TOOLKIT:-true}; then' "$void_setups" \
+        || ! grep -Fq 'required_groups+=",bluetooth"' "$void_setups" \
+        || ! grep -Fq 'ln -sfn /etc/sv/bluetoothd /var/service/bluetoothd' "$void_setups"; then
+    printf 'FAIL: Void BlueZ provider is incomplete\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

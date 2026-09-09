@@ -114,7 +114,9 @@ Notes:
 - `ydotool` is not packaged in the current Void repositories. PR4.2 provides
   verified upstream v1.0.4 source, a predicate-selected user service,
   input-group `/dev/uinput` permissions, and install/Doctor update paths.
-  Simulated paste is marked supported only after the VM operation check.
+  The provider's UI operation is VM validated through the lock-screen keyboard;
+  simulated paste uses the same verified daemon path but was not exercised as a
+  separate UI action.
 - Bluetooth uses the toolkit profile's `bluez` daemon and `blueman` frontend.
   The audio profile adds `libspa-bluetooth` for PipeWire Bluetooth audio.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.

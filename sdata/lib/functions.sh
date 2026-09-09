@@ -556,7 +556,7 @@ configure_void_ydotool_uinput() {
 
   if [[ "${ask:-true}" != true ]] \
       || tui_confirm "Configure uinput permissions for ydotool?" "yes"; then
-    if elevate sh -c 'printf "%s\n" uinput > /etc/modules-load.d/inir-ydotool.conf && printf "%s\n" '\''KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"'\'' > /etc/udev/rules.d/80-inir-ydotool.rules && udevadm control --reload-rules && modprobe uinput && udevadm trigger --name-match=uinput && udevadm settle'; then
+    if elevate sh -c 'mkdir -p /etc/udev/rules.d && printf "%s\n" uinput > /etc/modules-load.d/inir-ydotool.conf && printf "%s\n" '\''KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"'\'' > /etc/udev/rules.d/80-inir-ydotool.rules && udevadm control --reload-rules && modprobe uinput && udevadm trigger --name-match=uinput && udevadm settle'; then
       if [[ -c /dev/uinput ]] \
           && [[ "$(stat -c %G /dev/uinput 2>/dev/null)" == input ]] \
           && [[ "$(stat -c %a /dev/uinput 2>/dev/null)" == 660 ]]; then

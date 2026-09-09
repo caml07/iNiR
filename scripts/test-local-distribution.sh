@@ -1634,6 +1634,8 @@ for audio_bin in pipewire wireplumber pipewire-pulse; do
     printf '#!/bin/sh\nexit 0\n' > "$reconcile_test_root/bin/$audio_bin"
     chmod +x "$reconcile_test_root/bin/$audio_bin"
 done
+printf '#!/bin/sh\nexit 0\n' > "$reconcile_test_root/bin/ydotoold"
+chmod +x "$reconcile_test_root/bin/ydotoold"
 # Create startup KDL file (required for reconcile to render)
 cat > "$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
 // 50 — Processes spawned at login
@@ -1644,6 +1646,8 @@ export XDG_BIN_HOME="$reconcile_test_root/home/.local/bin"
 export XDG_CONFIG_HOME="$reconcile_test_root/home/.config"
 export XDG_RUNTIME_DIR="$reconcile_test_root/runtime"
 export INIR_TURNSTILED_SERVICE_PATH="$reconcile_test_root/var/service/turnstiled"
+export OS_GROUP_ID=void
+export INSTALL_TOOLKIT=true
 export PATH="$reconcile_test_root/bin:$PATH"
 # No systemd socket = predicate false = runsvdir
 if ! reconcile_inir_supervisor | grep -q '^runsvdir$'; then
@@ -1665,6 +1669,12 @@ for audio_svc in pipewire wireplumber pipewire-pulse; do
         exit 1
     fi
 done
+ydotool_run="$reconcile_test_root/home/.config/service/ydotool/run"
+if [[ ! -x "$ydotool_run" ]] || ! grep -Fq '# Managed by iNiR.' "$ydotool_run"; then
+    printf 'FAIL: runsvdir ydotool service not created\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
 # Preserve a service owned by the user rather than replacing or deleting it.
 printf '#!/bin/sh\nexec user-pipewire\n' > "$reconcile_test_root/home/.config/service/pipewire/run"
 reconcile_audio_user_services runsvdir
@@ -1717,6 +1727,8 @@ for audio_bin in pipewire wireplumber pipewire-pulse; do
     printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/bin/$audio_bin"
     chmod +x "$turnstile_test_root/bin/$audio_bin"
 done
+printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/bin/ydotoold"
+chmod +x "$turnstile_test_root/bin/ydotoold"
 cat > "$turnstile_test_root/bin/pgrep" <<'SH'
 #!/bin/sh
 printf '123\n'
@@ -1734,6 +1746,8 @@ if ! (
     export XDG_RUNTIME_DIR="$turnstile_test_root/runtime"
     export INIR_TURNSTILED_SERVICE_PATH="$turnstile_test_root/var/service/turnstiled"
     export INIR_TURNSTILE_EXAMPLES="$turnstile_test_root/examples"
+    export OS_GROUP_ID=void
+    export INSTALL_TOOLKIT=true
     export PATH="$turnstile_test_root/bin:$PATH"
     result="$(reconcile_inir_supervisor)"
     [[ "$result" == turnstile ]]
@@ -1744,6 +1758,7 @@ if ! (
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
     done
+    grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_test_root/home/.config/service/ydotool/run"
     grep -Fxq 'core_services="dbus"' "$turnstile_conf"
     ! grep -Fq 'runsvdir' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     cp "$turnstile_run" "$turnstile_run.before"
@@ -1822,6 +1837,19 @@ if ! grep -Eq '^[[:space:]]+bluez$' <<< "$void_toolkit_packages" \
         || ! grep -Fq 'required_groups+=",bluetooth"' "$void_setups" \
         || ! grep -Fq 'ln -sfn /etc/sv/bluetoothd /var/service/bluetoothd' "$void_setups"; then
     printf 'FAIL: Void BlueZ provider is incomplete\n' >&2
+    exit 1
+fi
+
+step "Void ydotool provider"
+if ! grep -Fq 'YDOTOOL_VERSION="1.0.4"' "$void_deps" \
+        || ! grep -Fq 'YDOTOOL_SOURCE_SHA256=' "$void_deps" \
+        || ! grep -Fq 'sha256sum -c -' "$void_deps" \
+        || ! grep -Fq 'install_void_ydotool' "$void_deps" \
+        || ! grep -Fq 'installed_ydotool_version' "$runtime_root/sdata/lib/doctor.sh" \
+        || ! grep -Fq 'configure_void_ydotool_uinput' "$runtime_root/setup" \
+        || ! grep -Fq 'KERNEL=="uinput", GROUP="input", MODE="0660"' "$runtime_root/sdata/lib/functions.sh" \
+        || ! grep -Fq 'reconcile_ydotool_user_service' "$runtime_root/sdata/lib/functions.sh"; then
+    printf 'FAIL: Void ydotool provider is incomplete\n' >&2
     exit 1
 fi
 

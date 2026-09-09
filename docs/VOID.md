@@ -111,9 +111,10 @@ Notes:
   `deps-map.sh` must say `void:quickshell`, not `void:COMPILE`.
 - `kf6-kirigami` / `kf6-syntax-highlighting` are needed only for the
   compile-from-source profile, not the base install.
-- `ydotool` is not packaged in the current Void repositories. PR4 must provide
-  a pinned upstream build, runit service, permissions, and update path before
-  simulated paste is marked supported.
+- `ydotool` is not packaged in the current Void repositories. PR4.2 provides
+  verified upstream v1.0.4 source, a predicate-selected user service,
+  input-group `/dev/uinput` permissions, and install/Doctor update paths.
+  Simulated paste is marked supported only after the VM operation check.
 - Bluetooth uses the toolkit profile's `bluez` daemon and `blueman` frontend.
   The audio profile adds `libspa-bluetooth` for PipeWire Bluetooth audio.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.

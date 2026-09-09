@@ -111,6 +111,9 @@ check_dependencies() {
     if [[ "${OS_GROUP_ID:-unknown}" == "arch" ]]; then
         cmds+=("checkupdates:pacman-contrib")
     fi
+    if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
+        cmds+=("ydotool:ydotool")
+    fi
 
     # Check required commands
     for item in "${cmds[@]}"; do
@@ -121,6 +124,20 @@ check_dependencies() {
             missing_cmds+=("$cmd")
         fi
     done
+
+    # Void's source provider is version-pinned, so an old binary is also a
+    # repairable dependency rather than merely an available command.
+    if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
+        local doctor_repo_root void_ydotool_version installed_ydotool_version
+        doctor_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
+        void_ydotool_version="$(sed -n 's/^YDOTOOL_VERSION="\([^"]*\)"/\1/p' "$doctor_repo_root/sdata/dist-void/install-deps.sh")"
+        installed_ydotool_version="$(ydotoold --version 2>/dev/null || true)"
+        if [[ -n "$void_ydotool_version" && "$installed_ydotool_version" != "v${void_ydotool_version}" ]] \
+                && [[ " ${missing_cmds[*]} " != *" ydotool "* ]]; then
+            missing+=("ydotool v${void_ydotool_version}")
+            missing_cmds+=("ydotool")
+        fi
+    fi
 
     # EasyEffects can expose Equalizer settings through its local server even
     # when the actual LSP LV2 DSP backend is absent. Check the bundle itself so
@@ -1725,14 +1742,21 @@ run_doctor_with_fixes() {
     if [[ ${#doctor_missing_deps[@]} -gt 0 ]]; then
         detect_distro
         case "$OS_GROUP_ID" in
-            arch|fedora|debian|ubuntu)
+            arch|fedora|debian|ubuntu|void)
                 if ! $ask || tui_confirm "Install missing dependencies now?"; then
                     SKIP_SYSUPDATE=true
                     ONLY_MISSING_DEPS="${doctor_missing_deps[*]}"
-                    source ./sdata/subcmd-install/1.deps-router.sh
-                    # Re-check after install
-                    doctor_passed=0; doctor_failed=0; doctor_fixed=0
-                    _doctor_run_step 1 $total_steps "Re-checking dependencies" check_dependencies
+                    if ! source ./sdata/subcmd-install/1.deps-router.sh; then
+                        doctor_fail "Dependency installation failed"
+                    elif [[ "$OS_GROUP_ID" == void ]] && ! configure_void_ydotool_uinput; then
+                        doctor_fail "Could not configure the ydotool provider"
+                    elif [[ "$OS_GROUP_ID" == void ]] && ! reconcile_inir_supervisor >/dev/null; then
+                        doctor_fail "Could not activate the ydotool provider"
+                    else
+                        # Re-check after a successful repair.
+                        doctor_passed=0; doctor_failed=0; doctor_fixed=0
+                        _doctor_run_step 1 $total_steps "Re-checking dependencies" check_dependencies
+                    fi
                 fi
                 ;;
             *)

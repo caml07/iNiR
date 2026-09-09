@@ -2749,10 +2749,6 @@ run_update() {
         fi
     fi
 
-    # Reconcile supervisor state (shared helper; PR3.0: always runsvdir fallback when no systemd)
-    source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
-    reconcile_inir_supervisor >/dev/null
-
     local niri_config="${XDG_CONFIG_HOME}/niri/config.kdl"
     local niri_startup_cfg="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
     local niri_binds_cfg="${XDG_CONFIG_HOME}/niri/config.d/70-binds.kdl"
@@ -2810,7 +2806,10 @@ run_update() {
                 detect_distro
                 SKIP_SYSUPDATE=true
                 ONLY_MISSING_DEPS="${doctor_missing_deps[*]}"
-                source ./sdata/subcmd-install/1.deps-router.sh
+                if ! source ./sdata/subcmd-install/1.deps-router.sh; then
+                    tui_error "Dependency installation failed"
+                    return 1
+                fi
                 tui_success "Dependencies installed"
             else
                 tui_info "Skipped dependency installation"
@@ -2822,7 +2821,10 @@ run_update() {
             SKIP_SYSUPDATE=true
             ONLY_MISSING_DEPS="${doctor_missing_deps[*]}"
             USE_ELEVATE=true  # Signal deps-router to use elevate() instead of sudo
-            source ./sdata/subcmd-install/1.deps-router.sh
+            if ! source ./sdata/subcmd-install/1.deps-router.sh; then
+                tui_error "Dependency installation failed"
+                return 1
+            fi
             tui_success "Dependencies installed"
         else
             # No way to elevate — just inform
@@ -2830,6 +2832,18 @@ run_update() {
         fi
     else
         tui_success "All required commands available"
+    fi
+
+    # Run after dependency repair so newly installed providers get supervised
+    # during the same update.
+    source "$REPO_ROOT/sdata/lib/functions.sh" 2>/dev/null || true
+    if [[ "${OS_GROUP_ID:-}" == void ]] && ! configure_void_ydotool_uinput; then
+        tui_error "Could not configure the ydotool provider"
+        return 1
+    fi
+    if ! reconcile_inir_supervisor >/dev/null; then
+        tui_error "Could not reconcile the iNiR supervisor"
+        return 1
     fi
 
     # DISABLED: webapps — requires quickshell-webengine rebuild, re-enable when ready

@@ -538,6 +538,40 @@ inir_supervisor() {
   fi
 }
 
+configure_void_ydotool_uinput() {
+  [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0
+  command -v ydotoold >/dev/null 2>&1 || return 0
+
+  local module_conf=/etc/modules-load.d/inir-ydotool.conf
+  local udev_rule=/etc/udev/rules.d/80-inir-ydotool.rules
+  local rule='KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"'
+  if [[ "$(cat "$module_conf" 2>/dev/null)" == uinput ]] \
+      && grep -Fxq "$rule" "$udev_rule" 2>/dev/null \
+      && [[ -c /dev/uinput ]] \
+      && [[ "$(stat -c %G /dev/uinput 2>/dev/null)" == input ]] \
+      && [[ "$(stat -c %a /dev/uinput 2>/dev/null)" == 660 ]]; then
+    log_success "ydotool uinput permissions already configured"
+    return 0
+  fi
+
+  if [[ "${ask:-true}" != true ]] \
+      || tui_confirm "Configure uinput permissions for ydotool?" "yes"; then
+    if elevate sh -c 'printf "%s\n" uinput > /etc/modules-load.d/inir-ydotool.conf && printf "%s\n" '\''KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"'\'' > /etc/udev/rules.d/80-inir-ydotool.rules && udevadm control --reload-rules && modprobe uinput && udevadm trigger --name-match=uinput && udevadm settle'; then
+      if [[ -c /dev/uinput ]] \
+          && [[ "$(stat -c %G /dev/uinput 2>/dev/null)" == input ]] \
+          && [[ "$(stat -c %a /dev/uinput 2>/dev/null)" == 660 ]]; then
+        log_success "ydotool uinput permissions configured"
+        return 0
+      fi
+    fi
+    log_warning "Could not configure ydotool uinput permissions"
+    return 1
+  fi
+
+  log_info "Configure ydotool with: echo uinput | sudo tee /etc/modules-load.d/inir-ydotool.conf"
+  log_info "Then add a udev rule granting group input mode 0660 on /dev/uinput and load the uinput module"
+}
+
 # Reconcile PipeWire user services for non-systemd supervisors.
 # Void ships pipewire without activating it; recording needs pipewire,
 # wireplumber, and pipewire-pulse supervised in ~/.config/service.
@@ -582,6 +616,77 @@ reconcile_audio_user_services() {
     chmod +x "$run_file" || failed=1
   done
   return "$failed"
+}
+
+# Reconcile Void's ydotool daemon across the same user-supervisor tiers as iNiR.
+reconcile_ydotool_user_service() {
+  local supervisor="$1"
+  local enabled="${2:-true}"
+  local service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
+  local service_dir="$service_root/ydotool"
+  local run_file="$service_dir/run"
+  local unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  local unit_file="$unit_dir/ydotool.service"
+  local wants_link="$unit_dir/default.target.wants/ydotool.service"
+  local bin version service_changed=false
+  bin="$(command -v ydotoold 2>/dev/null || true)"
+  version="$(ydotoold --version 2>/dev/null || true)"
+
+  if [[ "$enabled" != true || -z "$bin" ]]; then
+    if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file"; then
+      command -v sv >/dev/null 2>&1 && sv down "$service_dir" >/dev/null 2>&1 || true
+      rm -rf "$service_dir"
+    fi
+    if [[ -f "$unit_file" ]] && grep -q '^# Managed by iNiR\.' "$unit_file"; then
+      has_usable_systemd_user_manager && systemctl --user disable --now ydotool.service >/dev/null 2>&1 || true
+      rm -f "$unit_file" "$wants_link"
+    fi
+    return 0
+  fi
+
+  if [[ "$supervisor" == systemd ]]; then
+    if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file"; then
+      command -v sv >/dev/null 2>&1 && sv down "$service_dir" >/dev/null 2>&1 || true
+      rm -rf "$service_dir"
+    fi
+    if [[ -f "$unit_file" ]] && grep -q '^# Managed by iNiR\.' "$unit_file" \
+        && ! grep -Fxq "# Version: $version" "$unit_file"; then
+      service_changed=true
+    fi
+    if [[ ! -f "$unit_file" ]] || grep -q '^# Managed by iNiR\.' "$unit_file"; then
+      mkdir -p "$unit_dir"
+      printf '# Managed by iNiR.\n# Version: %s\n[Unit]\nDescription=ydotool input daemon\n\n[Service]\nExecStart=%s\nRestart=always\n\n[Install]\nWantedBy=default.target\n' "$version" "$bin" > "$unit_file" || return 1
+    fi
+    if ! systemctl --user daemon-reload >/dev/null 2>&1 \
+        || ! systemctl --user enable --now ydotool.service >/dev/null 2>&1; then
+      return 1
+    fi
+    if $service_changed; then
+      systemctl --user restart ydotool.service >/dev/null 2>&1 || return 1
+    fi
+    return
+  fi
+
+  if [[ -f "$unit_file" ]] && grep -q '^# Managed by iNiR\.' "$unit_file"; then
+    rm -f "$unit_file" "$wants_link"
+  fi
+  if [[ -f "$run_file" ]] && ! grep -q '^# Managed by iNiR\.' "$run_file"; then
+    return 0
+  fi
+  if [[ -f "$run_file" ]] && ! grep -Fxq "# Version: $version" "$run_file"; then
+    service_changed=true
+  fi
+  mkdir -p "$service_dir" || return 1
+  if [[ "$supervisor" == turnstile ]]; then
+    printf '#!/bin/sh\n# Managed by iNiR.\n# Version: %s\nexec chpst -e "$TURNSTILE_ENV_DIR" %s\n' "$version" "$bin" > "$run_file" || return 1
+  else
+    printf '#!/bin/sh\n# Managed by iNiR.\n# Version: %s\nexec %s\n' "$version" "$bin" > "$run_file" || return 1
+  fi
+  chmod +x "$run_file" || return 1
+  if $service_changed && command -v sv >/dev/null 2>&1 \
+      && sv status "$service_dir" 2>/dev/null | grep -q '^run:'; then
+    sv restart "$service_dir" >/dev/null 2>&1 || return 1
+  fi
 }
 
 # Reconcile supervisor state for iNiR (shared by install and update).
@@ -630,6 +735,9 @@ reconcile_inir_supervisor() {
     return 1
   fi
   reconcile_audio_user_services "$supervisor" || return 1
+  if [[ "${OS_GROUP_ID:-}" == void ]]; then
+    reconcile_ydotool_user_service "$supervisor" "${INSTALL_TOOLKIT:-true}" || return 1
+  fi
 
   update_inir_startup_supervisor() {
     local file="$1"

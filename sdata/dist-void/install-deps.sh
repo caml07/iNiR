@@ -102,6 +102,8 @@ VOID_AUDIO_PACKAGES=(
 
 # Toolkit: input, desktop, backlight, bluetooth, OCR, KDE integration
 VOID_TOOLKIT_PACKAGES=(
+  curl
+  cmake
   upower
   wtype
   python3-evdev
@@ -127,7 +129,6 @@ VOID_TOOLKIT_PACKAGES=(
   tesseract-ocr-eng
   tesseract-ocr-spa
 
-  # ydotool is provided by the upstream-provider work in PR4.
 )
 
 # Screencapture: screenshot, recording, annotation
@@ -149,6 +150,43 @@ VOID_FONTS_PACKAGES=(
   # adw-gtk3, capitaine-cursors, and whitesur-icon-theme are not in Void repos.
   noto-fonts-emoji
 )
+
+YDOTOOL_VERSION="1.0.4"
+YDOTOOL_SOURCE_SHA256="ba075a43aa6ead51940e892ecffa4d0b8b40c241e4e2bc4bd9bd26b61fde23bd"
+
+install_void_ydotool() {
+  local installed_version
+  installed_version="$(ydotoold --version 2>/dev/null || true)"
+  if command -v ydotool >/dev/null 2>&1 && [[ "$installed_version" == "v${YDOTOOL_VERSION}" ]]; then
+    log_success "ydotool v${YDOTOOL_VERSION} already installed"
+    return 0
+  fi
+
+  tui_info "Installing ydotool v${YDOTOOL_VERSION} from verified upstream source..."
+  local temp_dir archive source_dir build_dir
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/ydotool.tar.gz"
+  source_dir="$temp_dir/ydotool-${YDOTOOL_VERSION}"
+  build_dir="$temp_dir/build"
+
+  if ! curl -fsSL --max-time 90 -o "$archive" \
+      "https://github.com/ReimuNotMoe/ydotool/archive/refs/tags/v${YDOTOOL_VERSION}.tar.gz" \
+      || ! printf '%s  %s\n' "$YDOTOOL_SOURCE_SHA256" "$archive" | sha256sum -c - >/dev/null \
+      || ! tar -xzf "$archive" -C "$temp_dir" \
+      || ! (cd "$source_dir" && cmake -S . -B "$build_dir" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        "-DCMAKE_C_FLAGS=-DVERSION=\\\"v${YDOTOOL_VERSION}\\\"" \
+        && cmake --build "$build_dir" --target ydotool ydotoold -j"$(nproc)") \
+      || ! pkg_sudo install -Dm755 "$build_dir/ydotool" "$build_dir/ydotoold" /usr/local/bin/; then
+    rm -rf "$temp_dir"
+    log_warning "ydotool v${YDOTOOL_VERSION} source installation failed"
+    return 1
+  fi
+
+  rm -rf "$temp_dir"
+  log_success "ydotool v${YDOTOOL_VERSION} installed"
+}
 
 #####################################################################################
 # Optional: install only a specific list of missing deps (update path)
@@ -194,14 +232,25 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
 
   _miss_pkgs=()
   _miss_cmds=()
+  _need_ydotool=false
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
+    if [[ "$cmd" == ydotool || "$cmd" == ydotoold ]]; then
+      _need_ydotool=true
+      for _miss_pkg in curl cmake; do
+        [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
+      done
+      continue
+    fi
     _miss_pkg="${cmd_to_pkg[$cmd]:-$cmd}"
     [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
   done
 
   if [[ ${#_miss_pkgs[@]} -gt 0 ]]; then
     v pkg_sudo xbps-install "${_miss_installflags[@]}" "${_miss_pkgs[@]}"
+  fi
+  if $_need_ydotool; then
+    install_void_ydotool || return 1
   fi
 
   unset ONLY_MISSING_DEPS
@@ -249,6 +298,7 @@ fi
 if ${INSTALL_TOOLKIT:-true}; then
   tui_info "Installing toolkit packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_TOOLKIT_PACKAGES[@]}"
+  install_void_ydotool || return 1
 fi
 
 #####################################################################################

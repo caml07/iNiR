@@ -515,6 +515,17 @@ turnstile or iNiR failure.
   operation remain pending. A second dependency/setup run at version `2.30.0`
   found every selected package already installed, made no package changes, and
   produced an empty sorted `xbps-query -l` snapshot diff.
+- PR4.2 implementation pins ydotool v1.0.4 to the verified upstream source
+  archive SHA-256
+  `ba075a43aa6ead51940e892ecffa4d0b8b40c241e4e2bc4bd9bd26b61fde23bd`.
+  The toolkit path builds only `ydotool` and `ydotoold`, installs them under
+  `/usr/local/bin`, configures `/dev/uinput` for the `input` group, and renders
+  a user service selected by the usable-systemd predicate. Turnstile and
+  runsvdir use `~/.config/service/ydotool`; all tiers retain upstream's
+  `$XDG_RUNTIME_DIR/.ydotool_socket` contract. `setup update` detects missing
+  or stale provider versions and service reconciliation restarts only a
+  version-changed daemon. Host contracts pass; VM provisioning, idempotency,
+  service, socket, direct key injection, and simulated-paste checks are pending.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002

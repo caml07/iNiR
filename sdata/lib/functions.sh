@@ -752,8 +752,8 @@ supervisor = sys.argv[2]
 text = path.read_text()
 
 text = re.sub(
-    r'(?ms)^[ \t]*// BEGIN inir-(?:systemd-environment|runsvdir-fallback)\n'
-    r'.*?^[ \t]*// END inir-(?:systemd-environment|runsvdir-fallback)\n?',
+    r'(?ms)^[ \t]*// BEGIN inir-(?:systemd-environment|runsvdir-fallback|turnstile-environment)\n'
+    r'.*?^[ \t]*// END inir-(?:systemd-environment|runsvdir-fallback|turnstile-environment)\n?',
     '',
     text,
 )
@@ -791,7 +791,10 @@ spawn-sh-at-startup "exec runsvdir ~/.config/service"
 else:
     supervisor_comment = '''// iNiR is managed by the turnstile user service (service/inir).
 // Do not add a compositor startup entry here or you'll get two shells.'''
-    block = ''
+    block = '''// BEGIN inir-turnstile-environment
+// Publish Niri's session environment to Turnstile-managed user services.
+spawn-sh-at-startup "if command -v turnstile-update-runit-env >/dev/null 2>&1 && [ -n \"${WAYLAND_DISPLAY:-}\" ] && [ -n \"${XDG_RUNTIME_DIR:-}\" ] && [ -n \"${DBUS_SESSION_BUS_ADDRESS:-}\" ]; then turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET; fi"
+// END inir-turnstile-environment'''
 
 suffix = f"\n\n{supervisor_comment}\n"
 if block:

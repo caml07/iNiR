@@ -58,7 +58,7 @@ Singleton {
             # rendering and optional GPU policy that must not leak into apps.
             manager_env=""
             systemd_user_manager_usable=false
-            if [ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ] &&
+            if [ -S "\${XDG_RUNTIME_DIR:-}/systemd/private" ] &&
                [ -x /usr/bin/systemctl ] && [ -x /usr/bin/timeout ]; then
                 if manager_env="$(/usr/bin/timeout 3s /usr/bin/systemctl --user show-environment 2>/dev/null)"; then
                     systemd_user_manager_usable=true

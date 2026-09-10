@@ -1275,6 +1275,7 @@ thumbnail_helper="$runtime_root/scripts/thumbnails/thumbgen-venv.sh"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 if ! grep -Fq 'systemd/private' "$awww_backend" \
         || ! grep -Fq 'systemctl --user show-environment' "$awww_backend" \
+        || ! grep -Fq '\${XDG_RUNTIME_DIR:-}/systemd/private' "$awww_backend" \
         || ! grep -Fq 'systemd/private' "$capture_helper" \
         || ! grep -Fq 'systemctl --user show-environment' "$capture_helper" \
         || ! grep -Fq 'systemd/private' "$thumbnail_helper" \
@@ -1321,7 +1322,8 @@ if grep -Fq 'systemctl --user show-environment' "$tray_service" \
     exit 1
 fi
 if ! grep -Fq 'systemd_user_manager_usable' "$shell_exec" \
-        || ! grep -Fq 'systemd_user_manager_usable" = true' "$shell_exec"; then
+        || ! grep -Fq 'systemd_user_manager_usable" = true' "$shell_exec" \
+        || ! grep -Fq '\${XDG_RUNTIME_DIR:-}/systemd/private' "$shell_exec"; then
     printf 'FAIL: application launcher can use systemd-run without a usable manager\n' >&2
     exit 1
 fi
@@ -1754,6 +1756,8 @@ if ! (
     turnstile_run="$turnstile_test_root/home/.config/service/inir/run"
     turnstile_conf="$turnstile_test_root/home/.config/service/turnstile-ready/conf"
     grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_run"
+    grep -Fq 'BEGIN inir-turnstile-environment' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq 'turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     for audio_svc in pipewire wireplumber pipewire-pulse; do
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
@@ -1763,9 +1767,12 @@ if ! (
     ! grep -Fq 'runsvdir' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     cp "$turnstile_run" "$turnstile_run.before"
     cp "$turnstile_conf" "$turnstile_conf.before"
+    cp "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl" "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl.before"
     reconcile_inir_supervisor >/dev/null
     cmp -s "$turnstile_run" "$turnstile_run.before"
     cmp -s "$turnstile_conf" "$turnstile_conf.before"
+    cmp -s "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl" "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl.before"
+    [[ "$(grep -c 'BEGIN inir-turnstile-environment' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl")" -eq 1 ]]
     if INIR_TURNSTILE_EXAMPLES="$turnstile_test_root/missing" configure_turnstile_user_services; then
         exit 1
     fi

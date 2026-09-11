@@ -41,8 +41,13 @@ Button {
     property int clickIndex: parentGroup?.clickIndex ?? -1
     property bool isAtSide: indexInParent === 0 || indexInParent === (parentGroup?.childrenCount - 1)
 
-    Layout.fillWidth: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
-    Layout.fillHeight: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
+    // Bounce stretch only while a press is active. With clickIndex at the idle
+    // value -1 the raw interval test also matched the first child, permanently
+    // stretching it and starving its siblings (disproportionate quick controls).
+    property bool clickStretch: root.clickIndex >= 0
+        && (root.clickIndex - 1 <= root.indexInParent && root.indexInParent <= root.clickIndex + 1)
+    Layout.fillWidth: root.clickStretch
+    Layout.fillHeight: root.clickStretch
     implicitWidth: (root.down && bounce) ? clickedWidth : baseWidth
     implicitHeight: (root.down && bounce) ? clickedHeight : baseHeight
 

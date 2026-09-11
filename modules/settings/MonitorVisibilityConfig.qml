@@ -76,6 +76,7 @@ ContentPage {
             { key: "monthCalendar", title: Translation.tr("Month Calendar"), icon: "calendar_month", defaultOn: false },
             { key: "todo", title: Translation.tr("Todo"), icon: "checklist", defaultOn: false },
             { key: "timers", title: Translation.tr("Timers"), icon: "timer", defaultOn: false },
+            { key: "dayProgress", title: Translation.tr("Day progress"), icon: "av_timer", defaultOn: false },
             { key: "uptime", title: Translation.tr("System uptime"), icon: "avg_pace", defaultOn: false },
             { key: "worldClock", title: Translation.tr("World clock"), icon: "public", defaultOn: false },
             { key: "userCard", title: Translation.tr("User card"), icon: "account_circle", defaultOn: false },

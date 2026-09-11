@@ -1833,6 +1833,40 @@ Singleton {
                         property real y: 420
                     }
 
+                    property JsonObject dayProgress: JsonObject {
+                        property bool enable: false
+                        property bool locked: false
+                        property string placementStrategy: "free"
+                        property int contentWidth: 240
+                        property int contentHeight: 240
+                        property int widgetScale: 100
+                        property int widgetOpacity: 100
+                        property bool showBackground: false
+                        property bool useBlur: false
+                        property bool showBorder: false
+                        property real backgroundOpacity: 0
+                        property real borderWidth: 0
+                        property real borderOpacity: 0.20
+                        property real cornerRadius: -1
+                        property string colorMode: "auto"
+                        property string style: "ring"
+                        property bool comet: true
+                        property bool showIcon: true
+                        property bool showDate: true
+                        property bool hourLabels: true
+                        property int fontScale: 100
+                        property JsonObject palette: JsonObject {
+                            property string primary: "primary"
+                            property string secondary: "secondary"
+                            property string tertiary: "tertiary"
+                            property string signal: "signal"
+                            property string surface: "surface"
+                        }
+                        property int dim: 0
+                        property real x: 80
+                        property real y: 260
+                    }
+
                     property JsonObject uptime: JsonObject {
                         property bool enable: false
                         property bool locked: false

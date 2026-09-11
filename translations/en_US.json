@@ -6736,5 +6736,13 @@
   "Wallpaper glass composition: Islands bar, island dock, island sidebars and floating content with restrained transparent desktop widgets.": "Wallpaper glass composition: Islands bar, island dock, island sidebars and floating content with restrained transparent desktop widgets.",
   "When enabled, Settings opens as a floating overlay inside the shell instead of a separate window. Switching modes takes effect immediately and keeps you on this Settings page.": "When enabled, Settings opens as a floating overlay inside the shell instead of a separate window. Switching modes takes effect immediately and keeps you on this Settings page.",
   "Widget library": "Widget library",
-  "Widgets panel": "Widgets panel"
+  "Widgets panel": "Widgets panel",
+  "Day progress": "Day progress",
+  "Day progress widget": "Day progress widget",
+  "%1 of the day": "%1 of the day",
+  "Arc": "Arc",
+  "Ticks": "Ticks",
+  "Comet tail": "Comet tail",
+  "Sun icon": "Sun icon",
+  "Hour labels": "Hour labels"
 }

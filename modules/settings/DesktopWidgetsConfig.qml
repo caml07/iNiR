@@ -368,7 +368,7 @@ ContentPage {
     readonly property var _paletteWidgetKeys: [
         "clock", "weather", "customImage", "imageConverter", "mediaControls",
         "visualizer", "systemMonitor", "battery", "notes", "japaneseTypography",
-        "calendarUpcoming", "monthCalendar", "todo", "timers", "uptime", "worldClock", "shape", "dateBadge", "editorial",
+        "calendarUpcoming", "monthCalendar", "todo", "timers", "dayProgress", "uptime", "worldClock", "shape", "dateBadge", "editorial",
         "userCard", "mascot", "newsTicker"
     ]
 
@@ -1576,6 +1576,7 @@ ContentPage {
                         { key: "monthCalendar", icon: "calendar_month", label: Translation.tr("Calendar"), def: false },
                         { key: "todo", icon: "checklist", label: Translation.tr("Todo"), def: false },
                         { key: "timers", icon: "timer", label: Translation.tr("Timers"), def: false },
+                        { key: "dayProgress", icon: "av_timer", label: Translation.tr("Day progress"), def: false },
                         { key: "uptime", icon: "avg_pace", label: Translation.tr("Uptime"), def: false },
                         { key: "shape", icon: "category", label: Translation.tr("Decorative shape"), def: false },
                         { key: "dateBadge", icon: "today", label: Translation.tr("Date badge"), def: false },
@@ -5403,6 +5404,124 @@ ContentPage {
                 })
             }
         }
+            }
+        }
+    }
+
+    // ── Day progress ─────────────────────────────────────────
+    LazySection {
+        requested: root.isIiActive && root.activeSection === "time"
+        sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "time"
+                expanded: false
+                icon: "av_timer"
+                title: Translation.tr("Day progress widget")
+
+                SettingsGroup {
+                    WidgetStateControls {
+                        configPath: "background.widgets.dayProgress"
+                        configEntry: Config.getNestedValue("background.widgets.dayProgress", ({}))
+                        defaultStrategy: "free"
+                    }
+                    ContentSubsection {
+                        title: Translation.tr("Dimensions")
+
+                        WidgetSettingRow {
+                            label: Translation.tr("Width")
+                            icon: "swap_horiz"
+                            StyledSpinBox {
+                                from: 190; to: 500; stepSize: 10
+                                value: Config.getNestedValue("background.widgets.dayProgress.contentWidth", 220)
+                                onValueModified: Config.setNestedValue("background.widgets.dayProgress.contentWidth", value)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Height")
+                            icon: "swap_vert"
+                            StyledSpinBox {
+                                from: 190; to: 500; stepSize: 10
+                                value: Config.getNestedValue("background.widgets.dayProgress.contentHeight", 220)
+                                onValueModified: Config.setNestedValue("background.widgets.dayProgress.contentHeight", value)
+                            }
+                        }
+                    }
+
+                    ContentSubsection {
+                        title: Translation.tr("Style")
+
+                        ConfigSelectionArray {
+                            currentValue: Config.getNestedValue("background.widgets.dayProgress.style", "ring")
+                            onSelected: newValue => Config.setNestedValue("background.widgets.dayProgress.style", newValue)
+                            options: [
+                                { displayName: Translation.tr("Ring"), value: "ring" },
+                                { displayName: Translation.tr("Arc"), value: "arc" },
+                                { displayName: Translation.tr("Ticks"), value: "ticks" }
+                            ]
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Comet tail")
+                            icon: "flare"
+                            StyledSwitch {
+                                checked: Config.getNestedValue("background.widgets.dayProgress.comet", true)
+                                onCheckedChanged: Config.setNestedValue("background.widgets.dayProgress.comet", checked)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Sun icon")
+                            icon: "light_mode"
+                            StyledSwitch {
+                                checked: Config.getNestedValue("background.widgets.dayProgress.showIcon", true)
+                                onCheckedChanged: Config.setNestedValue("background.widgets.dayProgress.showIcon", checked)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Show date")
+                            icon: "event"
+                            StyledSwitch {
+                                checked: Config.getNestedValue("background.widgets.dayProgress.showDate", true)
+                                onCheckedChanged: Config.setNestedValue("background.widgets.dayProgress.showDate", checked)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Hour labels")
+                            icon: "pin_drop"
+                            StyledSwitch {
+                                checked: Config.getNestedValue("background.widgets.dayProgress.hourLabels", true)
+                                onCheckedChanged: Config.setNestedValue("background.widgets.dayProgress.hourLabels", checked)
+                            }
+                        }
+                        WidgetSettingRow {
+                            label: Translation.tr("Text size")
+                            icon: "format_size"
+                            StyledSpinBox {
+                                from: 60; to: 180; stepSize: 10
+                                value: Config.getNestedValue("background.widgets.dayProgress.fontScale", 100)
+                                onValueModified: Config.setNestedValue("background.widgets.dayProgress.fontScale", value)
+                            }
+                        }
+                    }
+
+                    WidgetAppearanceControls {
+                        configPath: "background.widgets.dayProgress"
+                        configEntry: Config.getNestedValue("background.widgets.dayProgress", ({}))
+                        hasCardControls: false
+                    }
+                }
+
+                SettingsGroup {
+                    WidgetResetButton {
+                        configPath: "background.widgets.dayProgress"
+                        defaults: ({
+                            placementStrategy: "free", contentWidth: 240, contentHeight: 240,
+                            dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: false,
+                            style: "ring", comet: true, showIcon: true, showDate: true, hourLabels: true, fontScale: 100,
+                            useBlur: false, showBorder: false, backgroundOpacity: 0,
+                            borderWidth: 0, borderOpacity: 0.20, cornerRadius: -1,
+                            colorMode: "auto", locked: false, x: 80, y: 260
+                        })
+                    }
+                }
             }
         }
     }

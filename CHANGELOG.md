@@ -17,6 +17,7 @@ Target release: **2.31.0**.
 - **Optional Kira companion runtime** adds the companion shell integration, Settings/IPC controls, expanded JRPG animation profile, locale coverage and safer optional asset-pack delivery.
 - **Fresh-install experience presets** now combine curated desktop compositions, coherent visual styles and explicit graphics budgets so new installs can choose a complete starting point instead of assembling every subsystem manually.
 - **Kalaallisut (`kl_GL`) localization** is now available as a complete selectable locale.
+- **Day progress desktop widget** shows a borderless instrument ring of 60 minute ticks with quarter hour labels, a comet-tipped elapsed arc and the current time/percentage at the center, with style (ring/arc/ticks), text size, icon, labels and date toggles plus the shared per-role palette.
 
 ### Changed
 
@@ -30,6 +31,7 @@ Target release: **2.31.0**.
 ### Fixed
 
 - **Update/crash recovery** now refreshes Niri-owned session environment from the running compositor and limits `cleanup-orphans` to Quickshell processes owned by `inir.service`, fixing the two failure paths reported in [#257](https://github.com/snowarch/iNiR/issues/257). Doctor also surfaces a failed/start-limit shell service with the normal concise `inir logs` path instead of requiring full framework logs.
+- **Terminal update completion** now captures the real `setup update` exit status without relying on `PIPESTATUS`, so successful VM updates no longer end with Bash unary-operator errors and a false failure summary.
 - **Uninstall restoration** now restores pre-iNiR Kitty and Foot configuration, removes generated terminal theme links safely, preserves a final uninstall backup and removes only iNiR-owned shell integration ([#256](https://github.com/snowarch/iNiR/issues/256)).
 - **Niri lock recovery** now survives an interrupted Quickshell/session-lock lifecycle without leaving the next shell instance in a broken lock state.
 - **Niri display Settings** no longer write compositor configuration merely by loading the page, persist actual display edits correctly and keep success/error feedback from disrupting the Settings workflow.

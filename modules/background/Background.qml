@@ -30,6 +30,7 @@ import qs.modules.background.widgets.timers
 import qs.modules.background.widgets.shape
 import qs.modules.background.widgets.dateBadge
 import qs.modules.background.widgets.uptime
+import qs.modules.background.widgets.dayProgress
 import qs.modules.background.widgets.worldClock
 import qs.modules.background.widgets.userCard
 import qs.modules.background.widgets.newsTicker
@@ -161,7 +162,7 @@ Scope {
                 imageConverter: false, mediaControls: false,
                 visualizer: false, systemMonitor: false, battery: false,
                 notes: false, calendarUpcoming: false, monthCalendar: false,
-                todo: false, timers: false, uptime: false, shape: false, dateBadge: false, editorial: false,
+                todo: false, timers: false, dayProgress: false, uptime: false, shape: false, dateBadge: false, editorial: false,
                 newsTicker: false, mascot: false, japaneseTypography: false,
                 worldClock: false, userCard: false
             })
@@ -228,7 +229,7 @@ Scope {
         function setWidgetEnabled(widgetName: string, enabled: bool): string {
             const knownWidgets = ["weather", "clock", "customImage", "imageConverter",
                 "mediaControls", "visualizer", "systemMonitor", "battery", "notes",
-                "calendarUpcoming", "monthCalendar", "todo", "timers", "uptime", "shape", "dateBadge", "editorial",
+                "calendarUpcoming", "monthCalendar", "todo", "timers", "dayProgress", "uptime", "shape", "dateBadge", "editorial",
                 "newsTicker", "mascot", "japaneseTypography",
                 "worldClock", "userCard"];
             if (!knownWidgets.includes(widgetName))
@@ -2658,6 +2659,22 @@ Scope {
                     WidgetInputMask { id: _hitMaskTimers; loader: parent }
                     sourceComponent: TimerWidget {
                         widgetIndex: 18
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("dayProgress", false)
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskDayProgress : null
+                    WidgetInputMask { id: _hitMaskDayProgress; loader: parent }
+                    sourceComponent: DayProgressWidget {
+                        widgetIndex: 8
                         outputName: bgRoot.screen?.name ?? ""
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height

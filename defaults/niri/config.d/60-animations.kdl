@@ -24,7 +24,7 @@ animations {
 
     // Slow down every animation by this factor.
     // Values below 1.0 speed them up. iNiR default: 1.50
-    slowdown 1.50
+    slowdown 1.20
 
     // ── Workspace transitions ───────────────────────────────────────────────
     workspace-switch {

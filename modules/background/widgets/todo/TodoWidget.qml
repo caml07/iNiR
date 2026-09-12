@@ -18,7 +18,7 @@ AbstractBackgroundWidget {
     defaultConfig: ({
         placementStrategy: "free",
         contentWidth: 300, contentHeight: 276,
-        widgetScale: 100, widgetOpacity: 100,
+        widgetScale: 100, widgetOpacity: 100, style: "card",
         showBackground: true, useBlur: false, showBorder: true,
         backgroundOpacity: 0.14, borderWidth: 1, borderOpacity: 0.16,
         cornerRadius: -1, colorMode: "auto", dim: 0,
@@ -41,6 +41,13 @@ AbstractBackgroundWidget {
 
     property string mode: "list"
     property string editingText: ""
+
+    readonly property bool instrument: String(root._readConfigKey("style") ?? "card") === "instrument"
+    // Instrument reads on the wallpaper: sampled ink instead of surface ink.
+    readonly property color ink: root.instrument ? root.widgetInk : root.widgetSurfaceInk
+    readonly property color inkMuted: root.instrument
+        ? root.widgetInkMuted : ColorUtils.applyAlpha(root.widgetSurfaceInk, 0.62)
+    readonly property color signal: root.widgetAccentVisible
 
     readonly property color primaryFace: root.widgetSemanticContainer(root.widgetPrimaryRole)
     readonly property color primaryInk: root.widgetSemanticOnContainer(root.widgetPrimaryRole)
@@ -97,6 +104,28 @@ AbstractBackgroundWidget {
         }
     }
 
+    editPopoverContent: Component {
+        RowLayout {
+            spacing: 4
+            Layout.alignment: Qt.AlignHCenter
+
+            Repeater {
+                model: [
+                    { label: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
+                    { label: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                ]
+                WidgetChoiceButton {
+                    required property var modelData
+                    leftmost: true; rightmost: true
+                    buttonIcon: modelData.icon
+                    buttonText: modelData.label
+                    toggled: root.instrument === (modelData.value === "instrument")
+                    onClicked: root._setOutputValue("style", modelData.value)
+                }
+            }
+        }
+    }
+
     Item {
         id: taskFocusSink
         focus: false
@@ -119,7 +148,9 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
+        visible: root.instrument
+            ? false
+            : (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     Item {
@@ -177,7 +208,7 @@ AbstractBackgroundWidget {
 
                     StyledText {
                         text: Translation.tr("Todo")
-                        color: root.widgetSurfaceInk
+                        color: root.ink
                         font.family: root.widgetTitleFamily
                         font.pixelSize: Math.round(Appearance.font.pixelSize.huge
                             * root.widgetTitleScale * root.scaleFactor)
@@ -188,8 +219,11 @@ AbstractBackgroundWidget {
                         text: Todo.list.filter(item => !item.done).length === 1
                             ? Translation.tr("1 task left")
                             : Translation.tr("%1 tasks left").arg(Todo.list.filter(item => !item.done).length)
-                        color: ColorUtils.applyAlpha(root.widgetSurfaceInk, 0.62)
+                        color: root.inkMuted
                         font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
+                        font.letterSpacing: root.instrument
+                            ? Math.round(1.2 * root.scaleFactor) : 0
+                        font.capitalization: root.instrument ? Font.AllUppercase : Font.MixedCase
                     }
                 }
 
@@ -197,15 +231,18 @@ AbstractBackgroundWidget {
                     Layout.preferredWidth: Math.round(38 * root.scaleFactor)
                     Layout.preferredHeight: Math.round(38 * root.scaleFactor)
                     buttonRadius: Appearance.rounding.full
-                    colBackground: root.primaryFace
-                    colBackgroundHover: ColorUtils.mix(root.primaryFace, root.primaryInk, 0.9)
-                    colRipple: ColorUtils.applyAlpha(root.primaryInk, 0.16)
+                    colBackground: root.instrument
+                        ? ColorUtils.applyAlpha(root.ink, 0.06) : root.primaryFace
+                    colBackgroundHover: root.instrument
+                        ? ColorUtils.applyAlpha(root.ink, 0.12)
+                        : ColorUtils.mix(root.primaryFace, root.primaryInk, 0.9)
+                    colRipple: ColorUtils.applyAlpha(root.instrument ? root.ink : root.primaryInk, 0.16)
                     releaseAction: () => root.openNewTask()
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: "add"
                         iconSize: Math.round(19 * root.scaleFactor)
-                        color: root.primaryInk
+                        color: root.instrument ? root.ink : root.primaryInk
                     }
                     StyledToolTip { text: Translation.tr("Add task") }
                 }
@@ -223,6 +260,10 @@ AbstractBackgroundWidget {
                     id: taskRow
                     required property var modelData
                     required property int index
+                    // Instrument: no colored pills — quiet rows over the
+                    // wallpaper, separated by hairline rules.
+                    readonly property color rowInk: root.instrument
+                        ? root.ink : root.taskInk(taskRow.index)
 
                     width: todoList.width
                     implicitHeight: root.itemHeight
@@ -230,10 +271,22 @@ AbstractBackgroundWidget {
                     background: null
                     clip: true
 
-                    contentItem: Rectangle {
-                        radius: Math.min(Appearance.rounding.normal, height / 2)
-                        color: root.taskFace(taskRow.index)
-                        opacity: taskRow.modelData.done ? 0.56 : 1
+                    contentItem: Item {
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Math.min(Appearance.rounding.normal, height / 2)
+                            color: root.instrument
+                                ? "transparent" : root.taskFace(taskRow.index)
+                            opacity: taskRow.modelData.done ? 0.56 : 1
+                        }
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            visible: root.instrument && taskRow.index < Todo.list.length - 1
+                            height: Math.max(1, Math.round(1 * root.scaleFactor))
+                            color: ColorUtils.applyAlpha(root.ink, 0.1)
+                        }
 
                         RowLayout {
                             anchors.fill: parent
@@ -247,10 +300,13 @@ AbstractBackgroundWidget {
                                 Layout.alignment: Qt.AlignVCenter
                                 buttonRadius: Appearance.rounding.full
                                 colBackground: taskRow.modelData.done
-                                    ? ColorUtils.applyAlpha(root.taskInk(taskRow.index), 0.16)
+                                    ? ColorUtils.applyAlpha(root.instrument
+                                        ? root.signal : rowInk, 0.16)
                                     : "transparent"
-                                colBackgroundHover: ColorUtils.applyAlpha(root.taskInk(taskRow.index), 0.12)
-                                colRipple: ColorUtils.applyAlpha(root.taskInk(taskRow.index), 0.16)
+                                colBackgroundHover: ColorUtils.applyAlpha(
+                                    root.instrument ? root.signal : rowInk, 0.12)
+                                colRipple: ColorUtils.applyAlpha(
+                                    root.instrument ? root.signal : rowInk, 0.16)
                                 releaseAction: () => {
                                     if (taskRow.modelData.done)
                                         Todo.markUnfinished(taskRow.index)
@@ -264,15 +320,22 @@ AbstractBackgroundWidget {
                                         width: Math.round(20 * root.scaleFactor)
                                         height: width
                                         radius: Appearance.rounding.full
-                                        color: "transparent"
+                                        // Instrument check: a hairline circle that
+                                        // signals completion in accent ink.
+                                        color: root.instrument && taskRow.modelData.done
+                                            ? ColorUtils.applyAlpha(root.signal, 0.18) : "transparent"
                                         border.width: Math.max(1, Math.round(2 * root.scaleFactor))
-                                        border.color: root.taskInk(taskRow.index)
+                                        border.color: root.instrument
+                                            ? (taskRow.modelData.done
+                                                ? root.signal
+                                                : ColorUtils.applyAlpha(root.ink, 0.34))
+                                            : rowInk
                                         MaterialSymbol {
                                             anchors.centerIn: parent
                                             visible: taskRow.modelData.done
                                             text: "check"
                                             iconSize: Math.round(15 * root.scaleFactor)
-                                            color: root.taskInk(taskRow.index)
+                                            color: root.instrument ? root.signal : rowInk
                                         }
                                     }
                                 }
@@ -282,7 +345,7 @@ AbstractBackgroundWidget {
                                 Layout.fillWidth: true
                                 Layout.alignment: Qt.AlignVCenter
                                 text: taskRow.modelData.content
-                                color: root.taskInk(taskRow.index)
+                                color: rowInk
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                                 font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
@@ -311,7 +374,7 @@ AbstractBackgroundWidget {
                     anchors.centerIn: parent
                     visible: Todo.list.length === 0
                     text: Translation.tr("Nothing pending")
-                    color: ColorUtils.applyAlpha(root.widgetSurfaceInk, 0.55)
+                    color: root.inkMuted
                     font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
                 }
             }
@@ -331,21 +394,21 @@ AbstractBackgroundWidget {
                     Layout.preferredHeight: Math.round(34 * root.scaleFactor)
                     buttonRadius: Appearance.rounding.full
                     colBackground: "transparent"
-                    colBackgroundHover: ColorUtils.applyAlpha(root.widgetSurfaceInk, 0.08)
-                    colRipple: ColorUtils.applyAlpha(root.widgetSurfaceInk, 0.12)
+                    colBackgroundHover: ColorUtils.applyAlpha(root.ink, 0.08)
+                    colRipple: ColorUtils.applyAlpha(root.ink, 0.12)
                     releaseAction: () => root.closeEditor()
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: "arrow_back"
                         iconSize: Math.round(18 * root.scaleFactor)
-                        color: root.widgetSurfaceInk
+                        color: root.ink
                     }
                 }
 
                 StyledText {
                     Layout.fillWidth: true
                     text: Translation.tr("New task")
-                    color: root.widgetSurfaceInk
+                    color: root.ink
                     font.family: root.widgetTitleFamily
                     font.pixelSize: Math.round(Appearance.font.pixelSize.large
                         * root.widgetTitleScale * root.scaleFactor)
@@ -359,15 +422,18 @@ AbstractBackgroundWidget {
                     enabled: root.editingText.trim().length > 0
                     opacity: enabled ? 1 : 0.45
                     buttonRadius: Appearance.rounding.full
-                    colBackground: root.primaryFace
-                    colBackgroundHover: ColorUtils.mix(root.primaryFace, root.primaryInk, 0.9)
-                    colRipple: ColorUtils.applyAlpha(root.primaryInk, 0.16)
+                    colBackground: root.instrument
+                        ? ColorUtils.applyAlpha(root.signal, 0.18) : root.primaryFace
+                    colBackgroundHover: root.instrument
+                        ? ColorUtils.applyAlpha(root.signal, 0.28)
+                        : ColorUtils.mix(root.primaryFace, root.primaryInk, 0.9)
+                    colRipple: ColorUtils.applyAlpha(root.instrument ? root.signal : root.primaryInk, 0.16)
                     releaseAction: () => root.saveAndBack()
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: "check"
                         iconSize: Math.round(19 * root.scaleFactor)
-                        color: root.primaryInk
+                        color: root.instrument ? root.signal : root.primaryInk
                     }
                 }
             }
@@ -376,9 +442,11 @@ AbstractBackgroundWidget {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 radius: Appearance.rounding.normal
-                color: ColorUtils.applyAlpha(root.primaryFace, 0.74)
-                border.width: taskInput.activeFocus ? Math.max(1, Math.round(2 * root.scaleFactor)) : 0
-                border.color: root.widgetAccent
+                color: root.instrument
+                    ? "transparent" : ColorUtils.applyAlpha(root.primaryFace, 0.74)
+                border.width: root.instrument && !taskInput.activeFocus
+                    ? Math.max(1, Math.round(1 * root.scaleFactor)) : 0
+                border.color: ColorUtils.applyAlpha(root.ink, 0.16)
 
                 TextArea {
                     id: taskInput

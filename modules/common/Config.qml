@@ -1756,6 +1756,7 @@ Singleton {
                         property int contentHeight: 340
                         property int weekStart: 1 // 0 Sunday, 1 Monday
                         property bool showAdjacentDays: true
+                        property string style: "card" // "card" | "instrument" (readout on wallpaper ink)
                         property int widgetScale: 100
                         property int widgetOpacity: 100
                         property bool showBackground: true
@@ -1784,6 +1785,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property int contentWidth: 300
                         property int contentHeight: 276
+                        property string style: "card" // "card" | "instrument" (readout on wallpaper ink)
                         property int widgetScale: 100
                         property int widgetOpacity: 100
                         property bool showBackground: true

@@ -15,7 +15,10 @@ Item {
     property real dragThreshold: 6
     property bool dragAboveContent: false
     property bool dragMoved: false
-    readonly property bool containsPress: _dragArea.pressed
+    // MouseArea releases its pressed/drag flags before emitting released.
+    // Keep placement bindings suspended until the consumer commits the drop.
+    property bool _dragSessionActive: false
+    readonly property bool containsPress: _dragArea.pressed || root._dragSessionActive
     readonly property bool isDragging: _dragArea.drag.active
 
     signal pressed()
@@ -42,18 +45,23 @@ Item {
         drag.threshold: root.dragThreshold
         cursorShape: (root.draggable && pressed) ? Qt.ClosedHandCursor : root.draggable ? Qt.OpenHandCursor : Qt.ArrowCursor
         onPressed: {
+            root._dragSessionActive = true
             startX = root.x
             startY = root.y
             root.dragMoved = false
             root.pressed()
         }
         drag.onActiveChanged: if (drag.active) root.dragMoved = true
-        onReleased: root.released()
+        onReleased: {
+            root.released()
+            root._dragSessionActive = false
+        }
         onCanceled: {
             root.x = startX
             root.y = startY
             root.dragMoved = false
             root.canceled()
+            root._dragSessionActive = false
         }
     }
 

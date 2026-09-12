@@ -44,6 +44,7 @@ Item {
         { key: "monthCalendar", icon: "calendar_month", label: "Month Calendar", defaultOn: false },
         { key: "todo", icon: "checklist", label: "Todo", defaultOn: false },
         { key: "timers", icon: "timer", label: "Timers", defaultOn: false },
+        { key: "dayProgress", icon: "timelapse", label: "Day progress", defaultOn: false },
         { key: "uptime", icon: "avg_pace", label: "System Uptime", defaultOn: false },
         { key: "shape", icon: "category", label: "Decorative Shape", defaultOn: false },
         { key: "dateBadge", icon: "today", label: "Date Badge", defaultOn: false },

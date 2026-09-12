@@ -86,6 +86,26 @@ AbstractWidget {
     property bool _isResizing: false
     property var _resizePreviewValues: ({})
     readonly property real scaleFactor: _baseScale
+    property bool _geometryReady: false
+    readonly property bool animateGeometry: root._geometryReady && root.animationsActive
+        && !root._isResizing && !root.containsPress
+
+    Behavior on implicitWidth {
+        enabled: root.animateGeometry
+        NumberAnimation {
+            duration: Appearance.animation.elementMove.duration
+            easing.type: Appearance.animation.elementMove.type
+            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        }
+    }
+    Behavior on implicitHeight {
+        enabled: root.animateGeometry
+        NumberAnimation {
+            duration: Appearance.animation.elementMove.duration
+            easing.type: Appearance.animation.elementMove.type
+            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+        }
+    }
     readonly property real widgetOpacity: {
         const v = Number(root._readConfigKey("widgetOpacity") ?? 100);
         return Math.max(0, Math.min(1, Number.isFinite(v) ? v / 100 : 1.0));
@@ -307,16 +327,10 @@ AbstractWidget {
         return root._clampY(root._autoPlaceY);
     }
 
-    // Guard: briefly suppress auto-position after release so onReleased can update config
-    property bool _releaseGuard: false
-    Timer {
-        id: _releaseGuardTimer
-        interval: 50
-        onTriggered: root._releaseGuard = false
-    }
-
-    // Auto-position when NOT free and NOT actively being dragged in edit mode
-    readonly property bool _autoPosition: root.placementStrategy !== "free" && !(GlobalStates.widgetEditMode && (root.isDragging || root.containsPress || root._isResizing || root._releaseGuard))
+    // The canvas keeps containsPress true through the drop commit. Placement
+    // therefore resumes from committed coordinates, without a timed guard.
+    readonly property bool _autoPosition: root.placementStrategy !== "free"
+        && !root.containsPress && !root.isDragging && !root._isResizing
     Binding {
         target: root
         property: "x"
@@ -535,7 +549,7 @@ AbstractWidget {
     onTargetYChanged: root.syncFreePositionFromConfig()
 
     function applyPlacementFromConfig(): void {
-        if (!Config.ready) return;
+        if (!Config.ready || root.containsPress || root._isResizing) return;
         if (root._isZonePlacement) {
             root.snapToZone(root.placementStrategy);
             // Local wallpaper sampling is explicitly opt-in. Zone placement
@@ -662,35 +676,34 @@ AbstractWidget {
             return true
         if (!root._editControlsShown)
             return false
-        const geometry = root._editControlsGeometry
-        return inRect(geometry.toolbarX - root.x, geometry.toolbarY - root.y,
-                editToolbar.width, editToolbar.height)
-            || (editPopoverPanel.open && inRect(geometry.popoverX - root.x,
-                geometry.popoverY - root.y, editPopoverPanel.width, editPopoverPanel.height))
+        // Hit testing follows the rendered rectangles, not the animation's
+        // destination. Controls remain clickable while the widget reflows.
+        return inRect(editToolbar.x, editToolbar.y, editToolbar.width, editToolbar.height)
+            || (editPopoverPanel.open && inRect(editToolbar.x + editPopoverPanel.x,
+                editToolbar.y + editPopoverPanel.y, editPopoverPanel.width, editPopoverPanel.height))
     }
 
     readonly property real editInputX: {
         if (!GlobalStates.widgetEditMode || !root._editControlsShown)
             return -8
-        const toolbarX = root._editControlsGeometry.toolbarX - root.x
-        const popoverX = root._editControlsGeometry.popoverX - root.x
+        const toolbarX = editToolbar.x
+        const popoverX = editToolbar.x + editPopoverPanel.x
         return Math.min(-8, toolbarX - 8,
             editPopoverPanel.open ? popoverX - 8 : 0)
     }
     readonly property real editInputY: {
         if (!GlobalStates.widgetEditMode || !root._editControlsShown)
             return -8
-        const toolbarY = root._editControlsGeometry.toolbarY - root.y
-        const popoverY = root._editControlsGeometry.popoverY - root.y
+        const toolbarY = editToolbar.y
+        const popoverY = editToolbar.y + editPopoverPanel.y
         return Math.min(-8, toolbarY - 8,
             editPopoverPanel.open ? popoverY - 8 : 0)
     }
     readonly property real editInputWidth: {
         if (!GlobalStates.widgetEditMode || !root._editControlsShown)
             return root.width + 16
-        const toolbarRight = root._editControlsGeometry.toolbarX - root.x
-            + editToolbar.width + 8
-        const popoverRight = root._editControlsGeometry.popoverX - root.x
+        const toolbarRight = editToolbar.x + editToolbar.width + 8
+        const popoverRight = editToolbar.x + editPopoverPanel.x
             + editPopoverPanel.width + 8
         return Math.max(root.width + 8, toolbarRight,
             editPopoverPanel.open ? popoverRight : 0) - root.editInputX
@@ -698,9 +711,8 @@ AbstractWidget {
     readonly property real editInputHeight: {
         if (!GlobalStates.widgetEditMode || !root._editControlsShown)
             return root.height + 16
-        const toolbarBottom = root._editControlsGeometry.toolbarY - root.y
-            + editToolbar.height + 8
-        const popoverBottom = root._editControlsGeometry.popoverY - root.y
+        const toolbarBottom = editToolbar.y + editToolbar.height + 8
+        const popoverBottom = editToolbar.y + editPopoverPanel.y
             + editPopoverPanel.height + 8
         return Math.max(root.height + 8, toolbarBottom,
             editPopoverPanel.open ? popoverBottom : 0) - root.editInputY
@@ -870,7 +882,7 @@ AbstractWidget {
     readonly property bool _editEngaged: GlobalStates.widgetEditMode
         && (root.editSelected || toolbarEditHover.hovered
             || root.containsPress || root.isDragging || root._isResizing
-            || root._releaseGuard || editPopoverPanel.open
+            || editPopoverPanel.open
             || root.debugQuickControlsOpen)
     property bool _editControlsShown: false
     on_EditEngagedChanged: {
@@ -998,6 +1010,7 @@ AbstractWidget {
         z: 200
         visible: opacity > 0
         opacity: GlobalStates.widgetEditMode && root._editControlsShown ? 1 : 0
+        enabled: GlobalStates.widgetEditMode && root._editControlsShown
 
         HoverHandler {
             id: toolbarEditHover
@@ -1117,6 +1130,13 @@ AbstractWidget {
             width: Math.min(root.quickControlsAvailableWidth,
                 popoverLoader.item ? (popoverLoader.item.resolvedWidth ?? popoverLoader.item.implicitWidth) + 24 : 344)
             height: popoverLoader.item ? popoverLoader.item.implicitHeight + 24 : 0
+            Behavior on height {
+                enabled: root.animateGeometry && editPopoverPanel.open
+                NumberAnimation {
+                    duration: Appearance.animation.elementMove.duration
+                    easing.type: Easing.OutCubic
+                }
+            }
 
             Behavior on opacity {
                 enabled: Appearance.animationsEnabled
@@ -1174,12 +1194,15 @@ AbstractWidget {
 
             Loader {
                 id: popoverLoader
-                anchors.centerIn: parent
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: 12
                 width: editPopoverPanel.width - 24
                 sourceComponent: root._effectivePopover
                 // `visible` is effective visibility and inherits the parent chain;
                 // using it as Loader state can latch this popover unloaded forever.
-                active: editPopoverPanel.open && root._effectivePopover !== null
+                active: (editPopoverPanel.open || editPopoverPanel.opacity > 0)
+                    && root._effectivePopover !== null
             }
         }
     }
@@ -1333,16 +1356,13 @@ AbstractWidget {
                 const axes = root.resizableAxes;
                 let vals = {};
                 if (axes.uniform) vals.uniform = Number(root._readConfigKey(axes.uniform) ?? 100);
-                if (axes.width) {
-                    const storedWidth = Number(root._readConfigKey(axes.width));
-                    vals.width = Number.isFinite(storedWidth) && storedWidth > 0
-                        ? storedWidth : Math.round(root.width / root.scaleFactor);
-                }
-                if (axes.height) {
-                    const storedHeight = Number(root._readConfigKey(axes.height));
-                    vals.height = Number.isFinite(storedHeight) && storedHeight > 0
-                        ? storedHeight : Math.round(root.height / root.scaleFactor);
-                }
+                // Axis dimensions are logical pixels. Start from the rendered
+                // frame, including a presentation's minimum, not a smaller saved
+                // card size. Merely switching style must not rewrite that size.
+                if (axes.width)
+                    vals.width = root.width / root.scaleFactor;
+                if (axes.height)
+                    vals.height = root.height / root.scaleFactor;
                 rh._startConfigVals = vals
                 root._resizePreviewValues = ({})
                 root._isResizing = true
@@ -1509,10 +1529,6 @@ AbstractWidget {
 
     onReleased: {
         if (GlobalStates.screenLocked || !root.dragMoved) return;
-        // Suppress _autoPosition Binding for a frame so it doesn't snap back
-        root._releaseGuard = true;
-        _releaseGuardTimer.restart();
-
         let newX = root.x;
         let newY = root.y;
 
@@ -1756,36 +1772,25 @@ AbstractWidget {
             Config.setNestedValues(updates);
     }
     Component.onCompleted: {
+        Qt.callLater(() => root._geometryReady = true)
         _seedDefaultsIfNeeded();
         root._syncPlacementStrategy();
         Qt.callLater(root.applyPlacementFromConfig);
     }
     function resetToDefaults(): void {
-        const prefix = root._configPath;
-        const defaults = root.defaultConfig;
         const updates = {};
-        for (const key in defaults) {
-            // Resetting a visible widget must not make it disappear or change
-            // the lock state that guards this action. Those are lifecycle and
-            // interaction controls, not visual defaults.
-            if (key === "enable" || key === "locked")
-                continue;
-            updates[prefix + "." + key] = defaults[key];
+        for (const key in root.defaultConfig) {
+            // Reset the selected instance, not its siblings on other outputs.
+            // Keep the lifecycle and lock controls intact.
+            if (key !== "enable" && key !== "locked")
+                updates[key] = root.defaultConfig[key];
         }
-        updates[prefix + ".palette.primary"] = "primary"
-        updates[prefix + ".palette.secondary"] = "secondary"
-        updates[prefix + ".palette.tertiary"] = "tertiary"
-        updates[prefix + ".palette.signal"] = "signal"
-        updates[prefix + ".palette.surface"] = "surface"
-        Config.setNestedValues(updates);
-        const layoutKeys = ["locked", "placementStrategy", "x", "y", "widgetScale",
-            "palette.primary", "palette.secondary", "palette.tertiary", "palette.signal", "palette.surface"]
-        for (const axis of Object.keys(root.resizableAxes ?? {})) {
-            const key = String(root.resizableAxes[axis] ?? "")
-            if (key.length > 0 && !layoutKeys.includes(key))
-                layoutKeys.push(key)
-        }
-        DesktopWidgetLayout.clearValues(root.outputName, root.configEntryName, layoutKeys)
+        updates["palette.primary"] = "primary"
+        updates["palette.secondary"] = "secondary"
+        updates["palette.tertiary"] = "tertiary"
+        updates["palette.signal"] = "signal"
+        updates["palette.surface"] = "surface"
+        root._setOutputValues(updates);
         syncFreePositionFromConfig();
         refreshPlacementIfNeeded();
     }
@@ -1854,11 +1859,11 @@ AbstractWidget {
     // Every built-in widget selects from the palette already generated by the
     // wallpaper/theme. Local region analysis may choose WHICH generated token is
     // readable, but never synthesizes a new hue/lightness variant.
-    readonly property string widgetPrimaryRole: String(Config.getNestedValue(root._configPath + ".palette.primary", "primary"))
-    readonly property string widgetSecondaryRole: String(Config.getNestedValue(root._configPath + ".palette.secondary", "secondary"))
-    readonly property string widgetTertiaryRole: String(Config.getNestedValue(root._configPath + ".palette.tertiary", "tertiary"))
-    readonly property string widgetSignalRole: String(Config.getNestedValue(root._configPath + ".palette.signal", "signal"))
-    readonly property string widgetSurfaceRole: String(Config.getNestedValue(root._configPath + ".palette.surface", "surface"))
+    readonly property string widgetPrimaryRole: String(root._readConfigKey("palette.primary") ?? "primary")
+    readonly property string widgetSecondaryRole: String(root._readConfigKey("palette.secondary") ?? "secondary")
+    readonly property string widgetTertiaryRole: String(root._readConfigKey("palette.tertiary") ?? "tertiary")
+    readonly property string widgetSignalRole: String(root._readConfigKey("palette.signal") ?? "signal")
+    readonly property string widgetSurfaceRole: String(root._readConfigKey("palette.surface") ?? "surface")
 
     readonly property var widgetPalettePresets: [
         { value: "balanced", label: Translation.tr("Default"), roles: ["primary", "secondary", "tertiary"] },
@@ -1904,14 +1909,13 @@ AbstractWidget {
 
     function applyWidgetPalettePreset(preset: string): void {
         const spec = root.widgetPalettePresetSpec(preset);
-        const prefix = root._configPath + ".palette.";
-        const updates = {};
-        updates[prefix + "primary"] = spec.primary;
-        updates[prefix + "secondary"] = spec.secondary;
-        updates[prefix + "tertiary"] = spec.tertiary;
-        updates[prefix + "signal"] = spec.signal;
-        updates[prefix + "surface"] = spec.surface;
-        Config.setNestedValues(updates);
+        root._setOutputValues({
+            "palette.primary": spec.primary,
+            "palette.secondary": spec.secondary,
+            "palette.tertiary": spec.tertiary,
+            "palette.signal": spec.signal,
+            "palette.surface": spec.surface
+        });
     }
 
     function widgetSemanticSet(role: string): var {
@@ -1971,7 +1975,11 @@ AbstractWidget {
     readonly property color widgetAccent2: root.widgetSemanticColor(root.widgetSecondaryRole)
     readonly property color widgetAccent3: root.widgetSemanticColor(root.widgetTertiaryRole)
     readonly property color widgetSignal: root.widgetSemanticColor(root.widgetSignalRole)
-    readonly property bool widgetHasSurface: root.backgroundOpacity > 0 || root.effectiveBlur
+    // Presentation owns whether the configured plate is actually rendered.
+    // Borderless variants must sample wallpaper, even when the saved card is on.
+    property bool widgetSurfaceEnabled: true
+    readonly property bool widgetHasSurface: root.widgetSurfaceEnabled
+        && (root.backgroundOpacity > 0 || root.effectiveBlur)
     readonly property bool regionIsBright: root.positionColorAdaptationEnabled && root._hasBrightness
         ? root.regionBrightness > 0.55 : !Appearance.m3colors.darkmode
 

@@ -13,6 +13,14 @@ import qs.services
 Rectangle {
     id: root
 
+    property bool shown: true
+    opacity: shown ? 1 : 0
+    visible: opacity > 0
+    Behavior on opacity {
+        enabled: Appearance.animationsEnabled && root.powerActive
+        NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+    }
+
     property real screenX: 0
     property real screenY: 0
     property real screenWidth: 1920

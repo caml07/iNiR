@@ -450,6 +450,8 @@ with (root / "defaults/config.json").open(encoding="utf-8") as handle:
 schema = (root / "modules/common/Config.qml").read_text(encoding="utf-8")
 wizard = (root / "welcome.qml").read_text(encoding="utf-8")
 bar_settings = (root / "modules/settings/BarConfig.qml").read_text(encoding="utf-8")
+right_sidebar_button = (root / "modules/barM3/RightSidebarButton.qml").read_text(encoding="utf-8")
+m3_bar_content = (root / "modules/barM3/BarContent.qml").read_text(encoding="utf-8")
 
 checks = {
     "settings rail": config["settingsUi"]["overlayStyle"] == "rail",
@@ -487,6 +489,21 @@ schema_checks = {
     "schema M3 dock": 'property string style: "m3"' in schema.split(
         "property JsonObject dock: JsonObject {", 1)[1].split(
         "property JsonObject controlPanel: JsonObject {", 1)[0],
+    "schema M3 joined pills default": 'property string borderless: "pills"' in schema.split(
+        "property JsonObject m3: JsonObject {", 1)[1].split(
+        "property JsonObject layouts: JsonObject {", 1)[0],
+    "schema fresh Flow uses discoverable compact M3": all(fragment in schema for fragment in [
+        'property string layoutMode: "compact"',
+        'property list<string> leftLayout: ["leftSidebarButton", "media", "workspaces"]',
+        'property list<string> middleLayout: ["docktoPanel"]',
+        'property list<string> rightLayout: ["utilButtons", "weatherBar", "clockWidget", "systemIcons", "rightSidebarButton"]'
+    ]),
+    "M3 right sidebar entry is a real runtime button": all(fragment in right_sidebar_button for fragment in [
+        'ShellLayoutController.sidebarOpenAtSlot("right", screenName)',
+        'ShellLayoutController.toggleSidebarAtSlot("right", screenName)',
+        'text: root.toggled ? "right_panel_close" : "right_panel_open"'
+    ]) and 'id: "rightSidebarButton"' in bar_settings
+        and '"leftSidebarButton", "rightSidebarButton", "activeWindow"' in m3_bar_content,
     "schema fresh Material experience": 'property string stylePreset: "material"' in schema,
     "schema fresh graphics budget": 'property string performancePreset: "balanced"' in schema,
     "schema iNiR Alt+Tab opt-in": "property bool altSwitcher: false" in schema.split(
@@ -512,99 +529,70 @@ schema_checks = {
             "property real backgroundOpacity: 0.16",
             "property real borderWidth: 1",
         ]),
-    "wizard applies initial experience": "root.applyExperiencePreset(root.selectedExperiencePreset)" in wizard,
+    "wizard applies initial balanced profile": "root.applyProfile(root.selectedProfile)" in wizard,
     "wizard applies initial graphics budget": "root.applyPerformancePreset(root.selectedPerformancePreset)" in wizard,
+    "wizard does not auto-apply a style on page entry": 'if (root.currentStep === 2' not in wizard,
     "wizard has no invented Signature preset": 'id: "signature"' not in wizard,
-    "wizard experience catalog covers existing families": all(preset in wizard for preset in [
+    "wizard style catalog covers all ii global styles": all(preset in wizard for preset in [
         'id: "material"', 'id: "cards"', 'id: "aurora"', 'id: "inir"',
         'id: "angel"', 'id: "regalia"', 'id: "zzz"', 'id: "cookie"',
-        'id: "editorial"', 'id: "waffle"'
+        'id: "editorial"'
     ]),
-    "wizard experiences cover all ii bar chassis": all(fragment in wizard for fragment in [
+    "wizard styles cover all ii bar chassis": all(fragment in wizard for fragment in [
         '"bar.appearanceStyle": "classic"', '"bar.appearanceStyle": "islands"',
         '"bar.appearanceStyle": "scenic"', '"bar.appearanceStyle": "frame"',
         '"bar.appearanceStyle": "m3"', '"bar.appearanceStyle": "pill"'
     ]),
-    "wizard experiences cover all dock chassis": all(fragment in wizard for fragment in [
+    "wizard styles cover all dock chassis": all(fragment in wizard for fragment in [
         '"dock.style": "panel"', '"dock.style": "pill"', '"dock.style": "macos"',
         '"dock.style": "island"', '"dock.style": "m3"'
     ]),
-    "wizard Material preset uses the populated M3 Showcase layout": all(fragment in wizard for fragment in [
-        '"bar.m3.layoutMode": "showcase"',
-        '["media", "workspaces"]',
-        '["visualizer", "docktoPanel", "visualizer"]',
-        '["utilButtons", "systemIcons", "weatherBar", "clockWidget"]'
+    "wizard Material stays on compact M3": all(fragment in wizard for fragment in [
+        '"bar.appearanceStyle": "m3"', '"bar.m3.layoutMode": "compact"',
+        '"bar.m3.borderless": "pills"', '"dock.style": "m3"',
+        '["leftSidebarButton", "media", "workspaces"]',
+        '["utilButtons", "weatherBar", "clockWidget", "systemIcons", "rightSidebarButton"]'
+    ]) and '"bar.m3.layoutMode": "showcase"' not in wizard,
+    "wizard Pill preset keeps visualizer opt-in": all(fragment in wizard for fragment in [
+        '"bar.appearanceStyle": "pill"', '"bar.pill.musicViz": false',
+        '"bar.pill.soul.enable": true', '"bar.pill.soul.style": "orb"'
     ]),
-    "Settings M3 Showcase matches fresh-install composition": all(fragment in bar_settings for fragment in [
-        'updates["bar.m3.layouts.leftLayout"] = ["media", "workspaces"]',
-        'updates["bar.m3.layouts.middleLayout"] = ["visualizer", "docktoPanel", "visualizer"]',
-        'updates["bar.m3.layouts.rightLayout"] = ["utilButtons", "systemIcons", "weatherBar", "clockWidget"]'
+    "wizard balanced sidebars remain useful without provider bloat": all(fragment in wizard for fragment in [
+        '"sidebar.news.enable": true', '"sidebar.wallhaven.enable": true',
+        '"sidebar.tools.enable": false', '"sidebar.software.enable": false',
+        '"sidebar.widgets.controls": true', '"sidebar.widgets.status": true',
+        '"sidebar.right.enabledWidgets": [\n                "calendar", "events", "todo", "notepad", "weather"\n            ]'
     ]),
-    "wizard Pill experience configures Pill-owned behavior": all(fragment in wizard for fragment in [
-        '"bar.pill.musicViz": true', '"bar.pill.soul.style": "orb"',
-        '"bar.pill.surfaces.clipboard": true', '"bar.visualizer.pillWingMode": "bounded"'
+    "wizard balanced quick toggles match maintained baseline": all(fragment in wizard for fragment in [
+        '{ "size": 1, "type": "network" }', '{ "size": 1, "type": "bluetooth" }',
+        '{ "size": 1, "type": "audio" }', '{ "size": 1, "type": "mic" }',
+        '{ "size": 1, "type": "nightLight" }', '{ "size": 1, "type": "screenSnip" }',
+        '{ "size": 1, "type": "colorPicker" }', '{ "size": 1, "type": "idleInhibitor" }'
     ]),
-    "wizard sidebars are composed beyond their chassis": all(fragment in wizard for fragment in [
-        '"sidebar.widgets.widgetOrder"', '"sidebar.right.enabledWidgets"',
-        '"sidebar.right.sectionOrder"', '"sidebar.quickToggles.android.toggles"',
-        '"sidebar.quickSliders.showBrightness": true', '"sidebar.right.headerStyle"'
+    "wizard fresh desktop stays sparse and zoned": all(fragment in wizard for fragment in [
+        '"background.widgets.clock.enable": true',
+        '"background.widgets.clock.placementStrategy": "topRight"',
+        '"background.widgets.visualizer.enable": false',
+        '"background.widgets.mediaControls.enable": false'
     ]),
-    "wizard desktop presets use adaptive zones and internal styles": all(fragment in wizard for fragment in [
-        '"background.widgets.clock.placementStrategy": "topLeft"',
-        '"background.widgets.dateBadge.placementStrategy": "topRight"',
+    "wizard Full avoids demo-only clutter": all(fragment in wizard for fragment in [
+        '"background.widgets.systemMonitor.enable": true',
         '"background.widgets.systemMonitor.placementStrategy": "bottomRight"',
-        '"background.widgets.mediaControls.placementStrategy": "bottomLeft"',
-        '"background.widgets.clock.style": "androidStacked"',
-        '"background.widgets.clock.style": "pixel"',
-        '"background.widgets.clock.style": "cookie"',
-        '"background.widgets.systemMonitor.displayMode": "tiles"',
-        '"background.widgets.systemMonitor.displayMode": "text"',
-        '"background.widgets.mediaControls.playerPreset": "albumart"',
-        '"background.widgets.mediaControls.playerPreset": "visualizer"'
-    ]),
-    "wizard Editorial experience uses Editorial-owned composition": all(fragment in wizard for fragment in [
-        '"settingsUi.overlayStyle": "editorial"', '"appearance.editorial.paperStack": true',
-        '"background.widgets.editorial.placementStrategy": "centerLeft"',
-        '"background.widgets.shape.placementStrategy": "centerRight"'
-    ]),
-    "wizard preset selection resets managed per-output widget overrides": all(fragment in wizard for fragment in [
-        'readonly property var presetManagedDesktopWidgets:',
-        'DesktopWidgetLayout.clearWidget(output, widget)',
-        'root.applyDesktopComposition(preset.id)'
-    ]),
-    "wizard desktop compositions define explicit compact geometry": all(fragment in wizard for fragment in [
-        'dateBadge: { placementStrategy: "topRight", contentWidth: 176, contentHeight: 120 }',
-        'systemMonitor: { placementStrategy: "bottomRight", contentWidth: 300, contentHeight: 100 }',
-        'editorial: { placementStrategy: "centerLeft", contentWidth: 320, contentHeight: 190 }',
-        'shape: { placementStrategy: "centerRight", contentWidth: 92, contentHeight: 92 }'
-    ]),
-    "wizard classic-family presets own the five-zone bar layout": all(fragment in wizard for fragment in [
-        '"bar.layout.migrated": true',
-        '"bar.layout.center": ["workspaces"]',
-        '"bar.layout.center": ["clock"]'
-    ]),
-    "wizard Waffle experience is native rather than ii chrome": all(fragment in wizard for fragment in [
-        'panelFamily: "waffle"', '"waffles.startMenu.sizePreset": "wide"',
-        '"waffles.taskView.mode": "carousel"', '"waffles.widgetsPanel.quickActions"',
-        '"waffles.actionCenter.toggles"', '"waffles.background.widgets.clock.style": "hero"'
-    ]),
-    "wizard showcase widgets are cardless": all(fragment in wizard for fragment in [
-        '"background.widgets.clock.showBackground": false',
-        '"background.widgets.clock.showBorder": false',
-        '"background.widgets.dateBadge.showBackground": false',
-        '"background.widgets.dateBadge.showBorder": false',
-        '"background.widgets.systemMonitor.showBackground": false',
-        '"background.widgets.systemMonitor.showBorder": false',
-        '"background.widgets.visualizer.showBackground": false',
-        '"background.widgets.visualizer.showBorder": false'
+        '"mascot.enable": false'
+    ]) and '"background.widgets.visualizer.enable": true' not in wizard,
+    "wizard uses one real curated style selector": wizard.count('ThemeService.setGlobalStyle(') == 1
+        and 'ThemeService.setGlobalStyle(newValue)' not in wizard,
+    "wizard preserves independent Waffle family selection": all(fragment in wizard for fragment in [
+        'title: "Waffle"',
+        'onClicked: root.setProfileFeature("panelFamily", "waffle")'
     ]),
     "wizard graphics catalog": all(preset in wizard for preset in [
         'id: "minimum"', 'id: "efficient"', 'id: "balanced"'
     ]),
-    "wizard graphics labels distinguish hardware budget from composition profile": all(label in wizard for label in [
-        'id: "minimum", name: Translation.tr("Low-end")',
-        'id: "efficient", name: Translation.tr("Low-end styled")',
-        'id: "balanced", name: Translation.tr("Medium")'
+    "wizard graphics labels stay outcome-oriented": all(label in wizard for label in [
+        'id: "minimum", name: Translation.tr("Save power")',
+        'id: "efficient", name: Translation.tr("Fewer effects")',
+        'id: "balanced", name: Translation.tr("Full style")'
     ]),
     "wizard graphics budgets preserve style-default blur policy": (
         wizard.split("readonly property var performancePresets:", 1)[1]
@@ -622,10 +610,17 @@ schema_checks = {
     "wizard dock not hover-only": '"dock.hoverToReveal": false' in wizard,
     "wizard right sidebar full height": '"sidebar.collapseEmptyNotifications": false' in wizard,
     "wizard left sidebar full height": '"sidebar.collapseWidgetsTab": false' in wizard,
-    "wizard manual surface edits leave preset mode explicitly custom": all(fragment in wizard for fragment in [
-        'root.setExperienceFeature("bar.appearanceStyle", newValue)',
-        'root.setExperienceFeature("dock.style", newValue)',
-        'root.setExperienceFeature("sidebar.style", newValue)'
+    "wizard layout refinements mark the profile custom": all(fragment in wizard for fragment in [
+        'root.setProfileFeature("bar.bottom", value === "bottom")',
+        'root.setProfileFeature("dock.position", value)',
+        'root.setProfileFeature("panelFamily", "ii")',
+        'root.setProfileFeature("panelFamily", "waffle")'
+    ]),
+    "wizard responsive grids collapse on narrow widths": all(fragment in wizard for fragment in [
+        'columns: welcomeFlickable.width < 720 ? 1 : 2',
+        'columns: layoutFlickable.width < 760 ? 1 : 2',
+        'columns: featuresFlickable.width < 760 ? 1 : 2',
+        'columns: themeFlickable.width < 760 ? 1 : 2'
     ]),
 }
 failed = [name for name, passed in schema_checks.items() if not passed]

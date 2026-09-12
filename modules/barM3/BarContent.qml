@@ -134,7 +134,7 @@ Item {
         (Config.options?.bar?.visualizer?.organicBaseRadius ?? 36) / 100))
     readonly property bool spectrumOrganicEdgeAura: spectrumOrganicFit === "aura"
     readonly property bool materialSpectrum: root.isMaterial
-        && (Config.options?.bar?.m3?.borderless ?? "separated") !== "transparent"
+        && (Config.options?.bar?.m3?.borderless ?? "pills") !== "transparent"
 
     function spectrumStartRatio(item): real {
         if (!item || !(root.width > 0))
@@ -255,7 +255,7 @@ Item {
 
     function materialSectionSegments(repeater, surface): var {
         const segments = []
-        if ((Config.options?.bar?.m3?.borderless ?? "separated") === "separated")
+        if ((Config.options?.bar?.m3?.borderless ?? "pills") === "separated")
             root.appendRepeaterSegments(segments, repeater, surface)
         return segments
     }
@@ -438,7 +438,7 @@ Item {
                 clip: root.layoutCompressionActive
                 radius: Appearance.rounding.full
                 color: (Config.options?.bar?.m3?.showBackground ?? true)
-                    && (Config.options?.bar?.m3?.borderless ?? "separated") === "pills"
+                    && (Config.options?.bar?.m3?.borderless ?? "pills") === "pills"
                     ? Appearance.colors.colLayer0 : "transparent"
 
                 SurfaceSpectrum {
@@ -556,7 +556,7 @@ Item {
                 clip: root.layoutCompressionActive
                 radius: Appearance.rounding.full
                 color: (Config.options?.bar?.m3?.showBackground ?? true)
-                    && (Config.options?.bar?.m3?.borderless ?? "separated") === "pills"
+                    && (Config.options?.bar?.m3?.borderless ?? "pills") === "pills"
                     ? Appearance.colors.colLayer0 : "transparent"
 
                 SurfaceSpectrum {
@@ -674,7 +674,7 @@ Item {
                 clip: root.layoutCompressionActive
                 radius: Appearance.rounding.full
                 color: (Config.options?.bar?.m3?.showBackground ?? true)
-                    && (Config.options?.bar?.m3?.borderless ?? "separated") === "pills"
+                    && (Config.options?.bar?.m3?.borderless ?? "pills") === "pills"
                     ? Appearance.colors.colLayer0 : "transparent"
 
                 SurfaceSpectrum {

@@ -659,7 +659,7 @@ ContentPage {
                 }
 
                     ConfigSelectionArray {
-                        currentValue: Config.options?.bar?.m3?.borderless ?? "separated"
+                        currentValue: Config.options?.bar?.m3?.borderless ?? "pills"
                         onSelected: newValue => root.setM3Value("bar.m3.borderless", newValue)
                         options: [
                             { displayName: Translation.tr("Joined pills"), icon: "join", value: "pills" },

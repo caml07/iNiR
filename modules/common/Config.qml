@@ -2411,7 +2411,7 @@ Singleton {
                     // "pills" (adjacent groups join into one continuous shape)
                     // | "separated" (every group is its own capsule)
                     // | "transparent" (no group surface at all)
-                    property string borderless: "separated"
+                    property string borderless: "pills"
                     property bool showBackground: true
                     property bool verbose: true
                     property JsonObject clock: JsonObject {

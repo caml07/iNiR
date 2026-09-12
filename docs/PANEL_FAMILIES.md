@@ -4,7 +4,7 @@ iNiR has two completely separate UI families that share the same services and co
 
 ## Material ii
 
-The default family. Material Design language with six style variants that form a spectrum from structured to expressive.
+The default family. Material Design language with nine global styles that form a spectrum from structured to expressive.
 
 ### Styles
 
@@ -15,16 +15,16 @@ The default family. Material Design language with six style variants that form a
 | **aurora** | Professional glass transparency. Blur-backed surfaces, frosted panels. |
 | **inir** | TUI-inspired elegance. Border and text hierarchy, muted tones, monospace accents. |
 | **angel** | The flagship. Neo-brutalism meets glass. Offset shadows, partial borders, inset glow, warm golden palette. |
+| **regalia** | Engineered luxury: dark structure, warm ivory, antique-gold and oxblood accents. |
 | **zzz** | Zenless Zone Zero poster UI: wallpaper-generated signal colors, black console surfaces, technical grid frames, cut-corner plates, sticker badges, segmented metrics, halftone texture, and Oxanium type. |
+| **cookie** | Material Expressive organic silhouettes, tonal plates and state morphing. |
+| **editorial** | Paper-and-ink visual system with strong typographic hierarchy and restrained ornament. |
 
-Style dispatch priority: **zzz > angel > inir > aurora > material**. This means if you're checking which style to apply, check zzz first:
+Style detection belongs to `Appearance.qml`. Prefer semantic tokens such as `Appearance.colors.*`, shared components, and the specific `Appearance.<style>Everywhere` flag when a style genuinely needs custom behavior. Do not reproduce a local style-priority chain: some capabilities deliberately overlap (for example Angel inherits Aurora glass/blur capability).
 
 ```qml
-color: Appearance.zzzEverywhere ? Appearance.colors.colLayer1
-     : Appearance.angelEverywhere ? Appearance.angel.colGlassCard
-     : Appearance.inirEverywhere ? Appearance.inir.colLayer1
-     : Appearance.auroraEverywhere ? Appearance.aurora.colSubSurface
-     : Appearance.colors.colLayer1
+color: Appearance.colors.colLayer1
+radius: Appearance.rounding.normal
 ```
 
 ### Layout
@@ -33,7 +33,7 @@ color: Appearance.zzzEverywhere ? Appearance.colors.colLayer1
 - **Sidebars**: left sidebar (AI chat, YT Music, widgets), right sidebar (toggles, calendar, tools)
 - **Dock**: application dock (any of 4 edges)
 - **Overview**: workspace overview with app launcher and search (`Super+Space`)
-- **Settings**: overlay panel rendered on top of the current desktop
+- **Settings**: shared page registry presented either as the shell overlay or the standalone `settings.qml` window, according to `settingsUi.overlayMode`
 
 ### Visual tokens
 
@@ -49,7 +49,7 @@ Never hardcode colors, radii, or font sizes. The entire point of the token syste
 
 ### Panels
 
-ii loads about 25 panels through `ShellIiPanels.qml`. Some notable ones:
+ii composition is split between `modules/ii/critical/ShellIiCriticalPanels.qml` and `modules/ii/ShellIiPanelsImpl.qml` (reached through the thin `ShellIiPanels.qml` wrapper). Some notable panel ids:
 
 | Panel ID | What it is |
 |----------|-----------|
@@ -88,7 +88,7 @@ Windows 11 Fluent Design. Not "ii with a different skin" but a completely separa
 - **Action Center**: quick settings (WiFi, Bluetooth, volume, brightness, toggles)
 - **Screen Time**: optional entry in Action Center when usage tracking is enabled
 - **Notification Center**: notification list with calendar
-- **Settings**: standalone window (separate from ii settings)
+- **Settings**: Waffle-native standalone window by default; Waffle can be configured to reuse Material/shared Settings presentation
 
 ### Visual tokens
 
@@ -112,7 +112,7 @@ font.family: Looks.font.fontFamily
 
 ### Panels
 
-Waffle loads about 22 panels through `ShellWafflePanels.qml`:
+Waffle composition is split between `modules/waffle/critical/ShellWaffleCriticalPanels.qml` and `modules/waffle/ShellWafflePanelsImpl.qml` (reached through the thin `ShellWafflePanels.qml` wrapper):
 
 | Panel ID | What it is |
 |----------|-----------|
@@ -140,30 +140,30 @@ The transition is handled by `FamilyTransitionOverlay.qml`. Config persists the 
 
 ## Panel loading
 
-Both families use the same loading system. Each panel is a `PanelLoader`:
+Both families use the same staged loading idea, but not every surface uses the same loader. Critical first-frame surfaces use `CriticalPanelLoader`; the implementation roots use `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader` according to lifecycle needs.
 
 ```qml
-PanelLoader {
-    identifier: "iiBar"
-    extraCondition: !(Config.options?.bar?.vertical ?? false)
-    component: Bar {}
+CriticalPanelLoader {
+    identifier: "iiBackground"
+    component: Background {}
 }
 ```
 
-Three conditions must all be true for a panel to load:
+The common conditions are:
 
 1. **`Config.ready`** is true (config file loaded)
 2. **Identifier in `enabledPanels`** (user hasn't disabled it)
-3. **`extraCondition`** passes (panel-specific logic)
+3. **`extraCondition`** passes when the loader has one
+4. **Lifecycle gate** is satisfied (`shellEntryReady`, `deferredPanelsReady`, or an on-demand `open`/resident state)
 
-Panels are split into immediate (bar, background, OSD) and deferred (sidebars, overview, clipboard). Deferred panels load 500ms after the first frame to keep startup fast.
+The critical host is deliberately tiny: ii starts background/bar/dock, while Waffle starts taskbar/background/backdrop. The heavier family tree becomes eligible after the first frame; many interactive surfaces stay unloaded until actually opened.
 
 ## For contributors
 
 If you're adding a new panel:
 
 1. Create the QML component in the appropriate module directory
-2. Add a `PanelLoader` entry in `ShellIiPanels.qml` or `ShellWafflePanels.qml`
+2. Choose the correct owner: add only truly first-frame surfaces to the relevant `modules/*/critical/Shell*CriticalPanels.qml`; otherwise add the appropriate loader to `modules/*/Shell*PanelsImpl.qml`
 3. Add the identifier to `enabledPanels` default in `defaults/config.json`
 4. If it has settings, add them to the correct Settings UI
 

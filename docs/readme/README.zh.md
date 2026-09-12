@@ -111,7 +111,7 @@ Wayland → GPU
 ## 功能
 
 **两套面板家族**，通过 `Super+Shift+W` 随时切换：
-- **Material ii** — 浮动栏、侧边栏、Dock、5 种视觉风格（material、cards、aurora、inir、angel）
+- **Material ii** — 浮动栏、侧边栏、Dock、9 种全局风格（material、cards、aurora、inir、angel、regalia、zzz、cookie、editorial）
 - **Waffle** — Windows 11 风格任务栏、开始菜单、操作中心、通知中心
 
 **自动主题** — 选一张壁纸，一切自动适配：
@@ -128,7 +128,7 @@ Wayland → GPU
 
 选一张壁纸，整个系统跟着变 — Shell、GTK/Qt 应用、终端、Firefox、Discord、SDDM 登录界面。全自动。
 
-- **5 种视觉风格** — Material（纯色）、Cards、Aurora（毛玻璃）、iNiR（TUI 风格）、Angel（新残酷主义）
+- **9 种全局风格** — Material（纯色）、Cards、Aurora（毛玻璃）、iNiR（TUI 风格）、Angel（新残酷主义）、Regalia、ZZZ、Cookie Shapes、Editorial
 - **壁纸动态取色** — 通过 Material You 传播到全系统
 - **10 个终端工具自动主题化** — foot、kitty、alacritty、starship、fuzzel、pywalfox、btop、lazygit、yazi
 - **应用主题化** — GTK3/4、Qt（通过 plasma-integration + darkly）、Firefox（MaterialFox）、Discord/Vesktop（System24）
@@ -175,7 +175,7 @@ Wayland → GPU
 - **自动更新** — `inir update`，支持回滚、迁移和用户更改保留
 - **锁屏** 和 **会话界面**（注销/重启/关机/休眠）
 - **Polkit 代理**、**屏幕键盘**、**自启动管理器**
-- **9 种语言** — 自动检测，支持 AI 辅助翻译生成
+- **17 个区域设置** — 自动检测，支持 AI 辅助翻译生成
 - **夜灯** — 定时或手动
 - **天气** — Open-Meteo，支持 GPS、手动坐标或城市名
 - **电池管理** — 可配置阈值，低电量自动休眠

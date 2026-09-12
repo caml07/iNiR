@@ -536,9 +536,10 @@ Scope {
         // Desktop items remain pointer-driven until their focus contract is
         // owned by the background surface; do not make a stale global selection
         // turn the Bottom layer keyboard-focusable during reload.
-        readonly property bool _needsKeyboardFocus: GlobalStates.widgetEditMode
-            || bgRoot._widgetEnabled("notes", false)
-            || bgRoot._widgetEnabled("todo", false)
+        readonly property bool _needsKeyboardFocus: GlobalStates.deferredPanelsReady
+            && (GlobalStates.widgetEditMode
+                || bgRoot._widgetEnabled("notes", false)
+                || bgRoot._widgetEnabled("todo", false))
 
         // Zone occupancy: map zone name → array of widget names
         readonly property var _builtinWidgets: [
@@ -959,11 +960,11 @@ Scope {
         // Keep background behind the lock surface. Moving this to Overlay can capture input.
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:background"
-        // Make the desktop layer focusable only when an interactive widget needs it
-        // (sticky notes today). With OnDemand the compositor only routes keyboard
-        // input to us when the user clicks on the surface, so it doesn't steal
-        // focus from real apps. When no interactive widget is enabled we stay
-        // None to keep things lean.
+        // Map the desktop keyboard-inert during startup, then arm OnDemand after
+        // the first-frame/deferred lifecycle has settled. Niri can temporarily
+        // focus a newly mapped OnDemand layer surface during shell restart, which
+        // loses the previously focused app. Changing an already-mapped surface to
+        // OnDemand is safe and still lets Notes/Todo receive keyboard input.
         WlrLayershell.keyboardFocus: bgRoot._needsKeyboardFocus
             ? WlrKeyboardFocus.OnDemand
             : WlrKeyboardFocus.None

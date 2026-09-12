@@ -17,12 +17,13 @@ AbstractBackgroundWidget {
     configEntryName: "calendarUpcoming"
     defaultConfig: ({
         placementStrategy: "free",
-        contentWidth: 280, contentHeight: 220,
+        contentWidth: 280, contentHeight: 240,
         maxEvents: 5,
         showDate: true,
         showTime: true,
         showLocation: false,
         groupByDay: true,
+        style: "card",
         widgetScale: 100, widgetOpacity: 100,
         showBackground: true, useBlur: false, showBorder: true,
         backgroundOpacity: 0.10, borderWidth: 1, borderOpacity: 0.12,
@@ -32,7 +33,7 @@ AbstractBackgroundWidget {
 
     implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 280)
         * root.scaleFactor)
-    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 220)
+    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 240)
         * root.scaleFactor)
 
     visibleWhenLocked: true
@@ -43,11 +44,14 @@ AbstractBackgroundWidget {
     resizeMaxWidth: 600
     resizeMaxHeight: 800
 
-    readonly property int maxEvents: Config.getNestedValue("background.widgets.calendarUpcoming.maxEvents", 5)
-    readonly property bool showDate: Config.getNestedValue("background.widgets.calendarUpcoming.showDate", true)
-    readonly property bool showTime: Config.getNestedValue("background.widgets.calendarUpcoming.showTime", true)
-    readonly property bool showLocation: Config.getNestedValue("background.widgets.calendarUpcoming.showLocation", false)
-    readonly property bool groupByDay: Config.getNestedValue("background.widgets.calendarUpcoming.groupByDay", true)
+    readonly property int maxEvents: Number(root._readConfigKey("maxEvents") ?? 5)
+    readonly property bool showDate: root._readConfigKey("showDate") ?? true
+    readonly property bool showTime: root._readConfigKey("showTime") ?? true
+    readonly property bool showLocation: root._readConfigKey("showLocation") ?? false
+    readonly property bool groupByDay: root._readConfigKey("groupByDay") ?? true
+    readonly property string eventStyle: root._readConfigKey("style") ?? "card"
+    readonly property bool instrument: root.eventStyle === "instrument"
+    widgetSurfaceEnabled: !root.instrument
 
     readonly property real cardRadius: root.widgetCardRadius
 
@@ -116,6 +120,24 @@ AbstractBackgroundWidget {
         ColumnLayout {
             spacing: 6
 
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
+                Repeater {
+                    model: [
+                        { label: Translation.tr("Card"), value: "card" },
+                        { label: Translation.tr("Instrument"), value: "instrument" }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonText: modelData.label
+                        toggled: root.eventStyle === modelData.value
+                        onClicked: root._setOutputValue("style", modelData.value)
+                    }
+                }
+            }
+
             // Max events spinner
             Row {
                 spacing: 6
@@ -133,7 +155,7 @@ AbstractBackgroundWidget {
                         leftmost: true; rightmost: true
                         buttonText: String(modelData)
                         toggled: root.maxEvents === modelData
-                        onClicked: Config.setNestedValue("background.widgets.calendarUpcoming.maxEvents", modelData)
+                        onClicked: root._setOutputValue("maxEvents", modelData)
                     }
                 }
             }
@@ -147,28 +169,28 @@ AbstractBackgroundWidget {
                     buttonIcon: "schedule"
                     buttonText: Translation.tr("Time")
                     toggled: root.showTime
-                    onClicked: Config.setNestedValue("background.widgets.calendarUpcoming.showTime", !root.showTime)
+                    onClicked: root._setOutputValue("showTime", !root.showTime)
                 }
                 WidgetChoiceButton {
                     leftmost: true; rightmost: true
                     buttonIcon: "today"
                     buttonText: Translation.tr("Date")
                     toggled: root.showDate
-                    onClicked: Config.setNestedValue("background.widgets.calendarUpcoming.showDate", !root.showDate)
+                    onClicked: root._setOutputValue("showDate", !root.showDate)
                 }
                 WidgetChoiceButton {
                     leftmost: true; rightmost: true
                     buttonIcon: "place"
                     buttonText: Translation.tr("Location")
                     toggled: root.showLocation
-                    onClicked: Config.setNestedValue("background.widgets.calendarUpcoming.showLocation", !root.showLocation)
+                    onClicked: root._setOutputValue("showLocation", !root.showLocation)
                 }
                 WidgetChoiceButton {
                     leftmost: true; rightmost: true
                     buttonIcon: "view_day"
                     buttonText: Translation.tr("Group")
                     toggled: root.groupByDay
-                    onClicked: Config.setNestedValue("background.widgets.calendarUpcoming.groupByDay", !root.groupByDay)
+                    onClicked: root._setOutputValue("groupByDay", !root.groupByDay)
                 }
             }
         }
@@ -191,7 +213,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
+        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     // ── Content ────────────────────────────────────────────────
@@ -208,16 +230,25 @@ AbstractBackgroundWidget {
             spacing: 6
 
             StyledText {
-                text: Translation.tr("Upcoming")
-                color: root.widgetEditorial ? root.widgetInk : root.widgetInkMuted
-                font.family: root.widgetTitleFamily
-                font.pixelSize: Math.round(Appearance.font.pixelSize.smaller
-                    * root.widgetTitleScale * root.scaleFactor)
-                font.weight: root.widgetEditorial ? root.widgetTitleWeight : Font.Medium
-                font.letterSpacing: root.widgetTitleTracking
+                text: root.instrument ? Translation.tr("AGENDA") : Translation.tr("Upcoming")
+                color: root.instrument ? root.widgetInk : (root.widgetEditorial ? root.widgetInk : root.widgetInkMuted)
+                font.family: root.instrument ? Appearance.font.family.monospace : root.widgetTitleFamily
+                font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.normal
+                    : Appearance.font.pixelSize.smaller * root.widgetTitleScale) * root.scaleFactor)
+                font.weight: root.instrument ? Font.Bold : (root.widgetEditorial ? root.widgetTitleWeight : Font.Medium)
+                font.letterSpacing: root.instrument ? Math.round(1.4 * root.scaleFactor) : root.widgetTitleTracking
             }
 
             Item { Layout.fillWidth: true }
+
+            StyledText {
+                visible: root.instrument
+                text: String(root.upcomingEvents.length).padStart(2, "0")
+                color: root.widgetAccentVisible
+                font.family: Appearance.font.family.numbers
+                font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
+                font.weight: Font.Bold
+            }
 
         }
 
@@ -235,9 +266,11 @@ AbstractBackgroundWidget {
                 StyledText {
                     visible: eventDelegate.modelData?._showDayHeader ?? false
                     text: root._dayHeading(eventDelegate.modelData)
-                    color: root.widgetAccentVisible
+                    color: root.instrument ? root.widgetInkMuted : root.widgetAccentVisible
                     font {
-                        pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
+                        family: root.instrument ? Appearance.font.family.monospace : Appearance.font.family.main
+                        pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.small
+                            : Appearance.font.pixelSize.smaller) * root.scaleFactor)
                         weight: Font.DemiBold
                     }
                 }
@@ -248,10 +281,10 @@ AbstractBackgroundWidget {
 
                     Rectangle {
                         Layout.alignment: Qt.AlignTop
-                        Layout.topMargin: Math.round(4 * root.scaleFactor)
-                        width: Math.max(3, Math.round(3 * root.scaleFactor))
-                        height: Math.round(16 * root.scaleFactor)
-                        radius: width / 2
+                        Layout.topMargin: Math.round((root.instrument ? 1 : 4) * root.scaleFactor)
+                        width: Math.max(2, Math.round((root.instrument ? 2 : 3) * root.scaleFactor))
+                        height: Math.round((root.instrument ? 34 : 16) * root.scaleFactor)
+                        radius: root.instrument ? 0 : width / 2
                         color: eventDelegate.modelData?.color || root.widgetAccentVisible
                     }
 
@@ -265,8 +298,10 @@ AbstractBackgroundWidget {
                             color: root.widgetInk
                             font.family: root.widgetEditorial
                                 ? root.widgetTitleFamily : Appearance.font.family.main
-                            font.pixelSize: Math.round(Appearance.font.pixelSize.small * root.scaleFactor)
-                            font.weight: root.widgetEditorial ? root.widgetTitleWeight : Font.Medium
+                            font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.normal
+                                : Appearance.font.pixelSize.small) * root.scaleFactor)
+                            font.weight: root.instrument ? Font.DemiBold
+                                : (root.widgetEditorial ? root.widgetTitleWeight : Font.Medium)
                             font.letterSpacing: root.widgetEditorial ? root.widgetTitleTracking : 0
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
@@ -276,8 +311,9 @@ AbstractBackgroundWidget {
                             Layout.fillWidth: true
                             visible: text.length > 0
                             text: root._formatDateTime(eventDelegate.modelData)
-                            color: root.widgetInkMuted
-                            font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
+                            color: root.instrument ? root.widgetAccentVisible : root.widgetInkMuted
+                            font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.small
+                                : Appearance.font.pixelSize.smaller) * root.scaleFactor)
                             font.family: Appearance.font.family.numbers
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
@@ -309,6 +345,7 @@ AbstractBackgroundWidget {
                 spacing: Math.round(7 * root.scaleFactor)
 
                 MaterialShape {
+                    visible: !root.instrument
                     anchors.horizontalCenter: parent.horizontalCenter
                     implicitSize: Math.round(54 * root.scaleFactor)
                     shape: MaterialShape.Shape.Ghostish
@@ -326,11 +363,29 @@ AbstractBackgroundWidget {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: Translation.tr("No upcoming events")
-                    color: root.widgetInkMuted
-                    font.pixelSize: Math.round(
-                        Appearance.font.pixelSize.small * root.scaleFactor)
+                    text: root.instrument ? Translation.tr("CLEAR")
+                        : Translation.tr("No upcoming events")
+                    color: root.instrument ? root.widgetInk : root.widgetInkMuted
+                    font.family: root.instrument ? Appearance.font.family.monospace
+                        : Appearance.font.family.main
+                    font.pixelSize: Math.round((root.instrument
+                        ? Appearance.font.pixelSize.large
+                        : Appearance.font.pixelSize.small) * root.scaleFactor)
+                    font.weight: root.instrument ? Font.Bold : Font.Normal
+                    font.letterSpacing: root.instrument ? Math.round(2 * root.scaleFactor) : 0
                     wrapMode: Text.WordWrap
+                }
+
+                StyledText {
+                    visible: root.instrument
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    text: Translation.tr("NO UPCOMING EVENTS")
+                    color: root.widgetAccentVisible
+                    font.family: Appearance.font.family.monospace
+                    font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: Math.round(1 * root.scaleFactor)
                 }
             }
         }

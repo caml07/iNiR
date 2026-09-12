@@ -1276,13 +1276,16 @@ Singleton {
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
-                        property string style: "digital" // Options: "cookie", "digital"
+                        property string style: "digital" // "digital" | "androidStacked" | "cookie" | "pixel" | "instrument"
                         property int dim: 70 // Extra dim for clock text (0-100)
                         property string fontFamily: "Space Grotesk"
                         property string timeFormat: "system" // "system", "24h", "12h"
                         property string dateStyle: "long" // "long", "minimal", "weekday", "numeric"
                         property bool showDate: true
                         property bool showSeconds: false
+                        property bool instrumentTrail: true
+                        property int instrumentTrailLength: 6
+                        property bool instrumentNumerals: true
                         property bool showShadow: true
                         property int timeScale: 100
                         property int dateScale: 100
@@ -1346,11 +1349,14 @@ Singleton {
                         property bool showTemp: true
                         property bool showIcon: true
                         property bool showCondition: false
+                        property bool showSunPath: true
+                        property bool showSunTimes: true
+                        property bool showLocation: true
                         property int padding: 20
                         property int tempFontWeight: 500 // Font.Medium
                         property real conditionOpacity: 0.7
                         property string preset: "default"
-                        property string style: "pill" // "pill" (shape), "card" (adaptive overlay), "detail" (M3 tonal)
+                        property string style: "pill" // "pill" (shape), "card" (adaptive overlay), "detail" (M3 tonal), "dial" (instrument)
                         property bool showMetrics: true // "detail" style only
                         property string shape: "pill" // MaterialShape shape name
                         property int widgetScale: 100
@@ -1537,7 +1543,7 @@ Singleton {
                         property bool enable: false
                         property bool locked: false
                         property string placementStrategy: "free"
-                        property string displayMode: "bars" // "bars", "graph", "rings", "text", "tiles"
+                        property string displayMode: "bars" // "bars", "graph", "rings", "text", "tiles", "instrument"
                         property int barCount: 32
                         property int barSpacing: 2
                         property real trackAlpha: 0.08
@@ -1581,6 +1587,7 @@ Singleton {
                         property string placementStrategy: "free"
                         property string displayMode: "ring"
                         property bool showTime: true
+                        property bool showRate: true
                         property int ringSize: 72
                         property int ringLineWidth: 6
                         property int barCount: 20
@@ -1618,6 +1625,8 @@ Singleton {
                         property int fontSize: 14
                         property string fontFamily: "sans"
                         property string textAlign: "left"
+                        property string style: "card" // "card" | "instrument" (ruled field note)
+                        property bool showRules: true
                         property int contentWidth: 240
                         property int contentHeight: 160
                         property int dim: 0
@@ -1724,8 +1733,9 @@ Singleton {
                         property bool showTime: true
                         property bool showLocation: false
                         property bool groupByDay: true
+                        property string style: "card" // "card" | "instrument" (agenda ledger)
                         property int contentWidth: 280
-                        property int contentHeight: 220
+                        property int contentHeight: 240
                         property int dim: 0
                         property int widgetScale: 100
                         property int widgetOpacity: 100
@@ -1757,6 +1767,7 @@ Singleton {
                         property int weekStart: 1 // 0 Sunday, 1 Monday
                         property bool showAdjacentDays: true
                         property string style: "card" // "card" | "instrument" (readout on wallpaper ink)
+                        property bool instrumentRule: true
                         property int widgetScale: 100
                         property int widgetOpacity: 100
                         property bool showBackground: true
@@ -1786,6 +1797,8 @@ Singleton {
                         property int contentWidth: 300
                         property int contentHeight: 276
                         property string style: "card" // "card" | "instrument" (readout on wallpaper ink)
+                        property bool instrumentRules: true
+                        property bool showCompleted: true
                         property int widgetScale: 100
                         property int widgetOpacity: 100
                         property bool showBackground: true
@@ -1813,6 +1826,11 @@ Singleton {
                         property bool locked: false
                         property string placementStrategy: "free"
                         property bool vertical: false
+                        property string style: "cards" // "cards" | "instrument" (measurement readouts)
+                        property bool glow: true // running-state pulse in Instrument presentation
+                        property bool showProgress: true
+                        property bool showState: true
+                        property bool showHundredths: true
                         property int widgetScale: 100
                         property int widgetOpacity: 100
                         property bool showBackground: false
@@ -1872,6 +1890,9 @@ Singleton {
                     property JsonObject uptime: JsonObject {
                         property bool enable: false
                         property bool locked: false
+                        property string style: "row"
+                        property bool showSince: true
+                        property bool showBreakdown: true
                         property string placementStrategy: "free"
                         property int contentWidth: 250
                         property int contentHeight: 96
@@ -1967,6 +1988,9 @@ Singleton {
                         property bool enable: false
                         property string style: "ticket"
                         property bool showYear: true
+                        property bool showWeekday: true
+                        property bool showOrdinal: true
+                        property bool instrumentMarks: true
                         property bool locked: false
                         property string placementStrategy: "free"
                         property int contentWidth: 220
@@ -2019,7 +2043,14 @@ Singleton {
                         property int dim: 0
                         property real x: 80
                         property real y: 200
-                        property list<string> timezones: ["Australia/Sydney", "Asia/Tokyo", "Europe/London", "America/New_York"]
+                        property list<string> timezones: ["Asia/Tokyo", "Europe/London", "America/New_York"]
+                        property string style: "cards" // "cards" (list) | "instrument" (chronometer board)
+                        property string instrumentLayout: "grid" // "grid" | "rows"
+                        property bool showNames: true
+                        property bool showOffsets: true
+                        property bool showDate: true
+                        property bool showDayState: true
+                        property bool pulseSeparator: false
                     }
 
                     property JsonObject userCard: JsonObject {
@@ -2038,6 +2069,10 @@ Singleton {
                         property real borderOpacity: 0.20
                         property real cornerRadius: -1
                         property string colorMode: "auto"
+                        property string style: "card" // "card" | "instrument" (identity/session plate)
+                        property bool showAvatar: true
+                        property bool showWeather: true
+                        property bool showHostname: true
                         property JsonObject palette: JsonObject {
                             property string primary: "primary"
                             property string secondary: "secondary"
@@ -2098,6 +2133,8 @@ Singleton {
                         property real borderOpacity: 0.20
                         property real cornerRadius: -1
                         property string colorMode: "auto"
+                        property string style: "card" // "card" | "instrument" (wire bulletin)
+                        property bool showMeta: true
                         property JsonObject palette: JsonObject {
                             property string primary: "primary"
                             property string secondary: "secondary"

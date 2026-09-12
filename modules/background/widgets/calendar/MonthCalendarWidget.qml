@@ -18,7 +18,7 @@ AbstractBackgroundWidget {
     defaultConfig: ({
         placementStrategy: "free",
         contentWidth: 300, contentHeight: 340,
-        weekStart: 1, showAdjacentDays: true, style: "card",
+        weekStart: 1, showAdjacentDays: true, style: "card", instrumentRule: true,
         widgetScale: 100, widgetOpacity: 100,
         showBackground: true, useBlur: false, showBorder: true,
         backgroundOpacity: 0.14, borderWidth: 1, borderOpacity: 0.16,
@@ -40,6 +40,8 @@ AbstractBackgroundWidget {
     readonly property int weekStart: Number(root._readConfigKey("weekStart") ?? 1)
     readonly property bool showAdjacentDays: Boolean(root._readConfigKey("showAdjacentDays") ?? true)
     readonly property bool instrument: String(root._readConfigKey("style") ?? "card") === "instrument"
+    readonly property bool instrumentRule: Boolean(root._readConfigKey("instrumentRule") ?? true)
+    widgetSurfaceEnabled: !root.instrument
     readonly property date today: DateTime.clock.date
     readonly property date viewingDate: {
         const date = new Date(root.today)
@@ -144,7 +146,7 @@ AbstractBackgroundWidget {
                         leftmost: true; rightmost: true
                         buttonText: Translation.tr(modelData.label)
                         toggled: root.weekStart === modelData.value
-                        onClicked: Config.setNestedValue("background.widgets.monthCalendar.weekStart", modelData.value)
+                        onClicked: root._setOutputValue("weekStart", modelData.value)
                     }
                 }
             }
@@ -154,7 +156,16 @@ AbstractBackgroundWidget {
                 buttonIcon: "date_range"
                 buttonText: Translation.tr("Adjacent days")
                 toggled: root.showAdjacentDays
-                onClicked: Config.setNestedValue("background.widgets.monthCalendar.showAdjacentDays", !root.showAdjacentDays)
+                onClicked: root._setOutputValue("showAdjacentDays", !root.showAdjacentDays)
+            }
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.instrument
+                leftmost: true; rightmost: true
+                buttonIcon: "horizontal_rule"
+                buttonText: Translation.tr("Header rule")
+                toggled: root.instrumentRule
+                onClicked: root._setOutputValue("instrumentRule", !root.instrumentRule)
             }
         }
     }
@@ -175,9 +186,8 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.instrument
-            ? false
-            : (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
+        shown: !root.instrument
+            && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     ColumnLayout {
@@ -217,11 +227,13 @@ AbstractBackgroundWidget {
                 ]
                 RippleButton {
                     required property var modelData
-                    Layout.preferredWidth: Math.round(32 * root.scaleFactor)
-                    Layout.preferredHeight: Math.round(32 * root.scaleFactor)
-                    buttonRadius: Appearance.rounding.full
+                    Layout.preferredWidth: Math.round((root.instrument ? 28 : 32) * root.scaleFactor)
+                    Layout.preferredHeight: Math.round((root.instrument ? 28 : 32) * root.scaleFactor)
+                    buttonRadius: root.instrument ? root.widgetControlRadius : Appearance.rounding.full
                     colBackground: modelData.delta === 0 && root.monthShift === 0
-                        ? root.accentFace : "transparent"
+                        ? (root.instrument
+                            ? ColorUtils.applyAlpha(root.accentMark, 0.16) : root.accentFace)
+                        : "transparent"
                     colBackgroundHover: ColorUtils.applyAlpha(root.ink, 0.08)
                     colRipple: ColorUtils.applyAlpha(root.ink, 0.12)
                     releaseAction: () => {
@@ -231,7 +243,7 @@ AbstractBackgroundWidget {
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: modelData.icon
-                        iconSize: Math.round(17 * root.scaleFactor)
+                        iconSize: Math.round((root.instrument ? 15 : 17) * root.scaleFactor)
                         color: modelData.delta === 0 && root.monthShift === 0
                             ? root.accentMarkInk : root.ink
                     }
@@ -244,7 +256,7 @@ AbstractBackgroundWidget {
         // over the grid, not a card header.
         Rectangle {
             Layout.fillWidth: true
-            visible: root.instrument
+            visible: root.instrument && root.instrumentRule
             height: Math.max(1, Math.round(1 * root.scaleFactor))
             color: ColorUtils.applyAlpha(root.ink, 0.16)
         }

@@ -10,6 +10,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
+import qs.modules.background.widgets.instrument
 
 AbstractBackgroundWidget {
     id: root
@@ -28,17 +29,27 @@ AbstractBackgroundWidget {
         cornerRadius: -1, x: 50, y: 400
     })
 
+    widgetSurfaceEnabled: root.displayMode !== "instrument" && root.displayMode !== "tiles"
+    readonly property int meterColumns: Math.max(1, Math.min(root._resourceModel.length,
+        Math.floor((root.implicitWidth + 10 * root.scaleFactor) / (110 * root.scaleFactor))))
+    readonly property int meterRows: Math.ceil(root._resourceModel.length / root.meterColumns)
     implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 320) * scaleFactor)
     implicitHeight: {
         const stored = Math.round(Number(root._readConfigKey("contentHeight") ?? 120) * scaleFactor);
-        return root.displayMode === "tiles" ? Math.max(stored, root._tilesMinHeight) : stored;
+        if (root.displayMode === "tiles")
+            return Math.max(stored, root._tilesMinHeight);
+        if (root.displayMode === "instrument")
+            return Math.max(stored, Math.round((root.meterRows * 110 + 20) * root.scaleFactor));
+        return stored;
     }
 
     visibleWhenLocked: false
     needsColText: true
     resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
-    resizeMinWidth: root.displayMode === "tiles" ? 100 : 120
-    resizeMinHeight: root.displayMode === "tiles" ? 100 : 60
+    resizeMinWidth: root.displayMode === "tiles" ? 100
+        : root.displayMode === "instrument" ? 150 : 120
+    resizeMinHeight: root.displayMode === "tiles" ? 100
+        : root.displayMode === "instrument" ? 150 : 60
 
     // ── Popover: mode + resource toggles ──
     editPopoverContent: Component {
@@ -55,7 +66,8 @@ AbstractBackgroundWidget {
                         { label: Translation.tr("Graph"), icon: "show_chart", value: "graph" },
                         { label: Translation.tr("Rings"), icon: "donut_large", value: "rings" },
                         { label: Translation.tr("Text"), icon: "text_fields", value: "text" },
-                        { label: Translation.tr("Tiles"), icon: "grid_view", value: "tiles" }
+                        { label: Translation.tr("Tiles"), icon: "grid_view", value: "tiles" },
+                        { label: Translation.tr("Instrument"), icon: "equalizer", value: "instrument" }
                     ]
                     WidgetChoiceButton {
                         required property var modelData
@@ -64,7 +76,7 @@ AbstractBackgroundWidget {
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
                         toggled: root.displayMode === modelData.value
-                        onClicked: Config.setNestedValue("background.widgets.systemMonitor.displayMode", modelData.value)
+                        onClicked: root._setOutputValue("displayMode", modelData.value)
                     }
                 }
             }
@@ -75,12 +87,12 @@ AbstractBackgroundWidget {
                 Layout.alignment: Qt.AlignHCenter
                 Repeater {
                     model: [
-                        { label: Translation.tr("CPU"), icon: "memory", key: "showCpu", active: root.showCpu },
-                        { label: Translation.tr("RAM"), icon: "storage", key: "showMemory", active: root.showMemory },
-                        { label: Translation.tr("GPU"), icon: "developer_board", key: "showGpu", active: root.showGpu },
-                        { label: Translation.tr("CPU temp"), icon: "thermostat", key: "showTemp", active: root.showTemp },
-                        { label: Translation.tr("GPU temp"), icon: "device_thermostat", key: "showGpuTemp", active: root.showGpuTemp },
-                        { label: Translation.tr("Disk"), icon: "hard_drive", key: "showDisk", active: root.showDisk }
+                        { label: Translation.tr("CPU"), icon: "memory", key: "showCpu", fallback: true },
+                        { label: Translation.tr("RAM"), icon: "storage", key: "showMemory", fallback: true },
+                        { label: Translation.tr("GPU"), icon: "developer_board", key: "showGpu", fallback: true },
+                        { label: Translation.tr("CPU temp"), icon: "thermostat", key: "showTemp", fallback: false },
+                        { label: Translation.tr("GPU temp"), icon: "device_thermostat", key: "showGpuTemp", fallback: false },
+                        { label: Translation.tr("Disk"), icon: "hard_drive", key: "showDisk", fallback: false }
                     ]
                     WidgetChoiceButton {
                         required property var modelData
@@ -88,10 +100,19 @@ AbstractBackgroundWidget {
                         leftmost: true; rightmost: true
                         buttonIcon: modelData.icon
                         buttonText: modelData.label
-                        toggled: modelData.active
-                        onClicked: Config.setNestedValue("background.widgets.systemMonitor." + modelData.key, !modelData.active)
+                        toggled: Boolean(root._readConfigKey(modelData.key) ?? modelData.fallback)
+                        enabled: !toggled || root._resourceModel.length > 1
+                        onClicked: root._setOutputValue(modelData.key, !toggled)
                     }
                 }
+            }
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                leftmost: true; rightmost: true
+                buttonIcon: "label"
+                buttonText: Translation.tr("Labels")
+                toggled: root.showLabels
+                onClicked: root._setOutputValue("showLabels", !root.showLabels)
             }
         }
     }
@@ -101,17 +122,17 @@ AbstractBackgroundWidget {
     // Rechecking the global base here breaks output-local overrides and can
     // leave a visible monitor without ResourceUsage keep-alive.
     readonly property bool _active: root.visible
-    readonly property string displayMode: Config.getNestedValue("background.widgets.systemMonitor.displayMode", "bars")
-    readonly property bool showCpu: Config.getNestedValue("background.widgets.systemMonitor.showCpu", true)
-    readonly property bool showMemory: Config.getNestedValue("background.widgets.systemMonitor.showMemory", true)
-    readonly property bool showGpu: Config.getNestedValue("background.widgets.systemMonitor.showGpu", true)
-    readonly property bool showTemp: Config.getNestedValue("background.widgets.systemMonitor.showTemp", false)
-    readonly property bool showGpuTemp: Config.getNestedValue("background.widgets.systemMonitor.showGpuTemp", false)
-    readonly property bool showDisk: Config.getNestedValue("background.widgets.systemMonitor.showDisk", false)
-    readonly property bool showLabels: Config.getNestedValue("background.widgets.systemMonitor.showLabels", true)
-    readonly property real trackAlpha: Config.getNestedValue("background.widgets.systemMonitor.trackAlpha", 0.08)
-    readonly property real fillOpacity: Config.getNestedValue("background.widgets.systemMonitor.fillOpacity", 0.7)
-    readonly property real graphFillOpacity: Config.getNestedValue("background.widgets.systemMonitor.graphFillOpacity", 0.3)
+    readonly property string displayMode: root._readConfigKey("displayMode") ?? "bars"
+    readonly property bool showCpu: root._readConfigKey("showCpu") ?? true
+    readonly property bool showMemory: root._readConfigKey("showMemory") ?? true
+    readonly property bool showGpu: root._readConfigKey("showGpu") ?? true
+    readonly property bool showTemp: root._readConfigKey("showTemp") ?? false
+    readonly property bool showGpuTemp: root._readConfigKey("showGpuTemp") ?? false
+    readonly property bool showDisk: root._readConfigKey("showDisk") ?? false
+    readonly property bool showLabels: root._readConfigKey("showLabels") ?? true
+    readonly property real trackAlpha: root._readConfigKey("trackAlpha") ?? 0.08
+    readonly property real fillOpacity: root._readConfigKey("fillOpacity") ?? 0.7
+    readonly property real graphFillOpacity: root._readConfigKey("graphFillOpacity") ?? 0.3
 
     // ── Static resource model (metadata only — no live values) ──
     readonly property var _resourceModel: {
@@ -320,8 +341,115 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.displayMode !== "tiles"
+        shown: root.displayMode !== "tiles" && root.displayMode !== "instrument"
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // INSTRUMENT MODE — a bank of comparable vertical measurement rails.
+    // Values, units and resource identity stay readable without watch faces.
+    // ══════════════════════════════════════════════════════════
+    Grid {
+        anchors.centerIn: parent
+        opacity: root.displayMode === "instrument" ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "instrument"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
+        columns: root.meterColumns
+        spacing: Math.round(10 * root.scaleFactor)
+        move: Transition {
+            enabled: root.animateGeometry
+            NumberAnimation {
+                properties: "x,y"
+                duration: Appearance.animation.elementMove.duration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Repeater {
+            model: root._resourceModel
+
+            Item {
+                id: resourceMeter
+                required property var modelData
+                readonly property real side: Math.min(
+                    (root.height - root._innerMargin * 2 - Math.round(10 * root.scaleFactor) * (root.meterRows - 1)) / Math.max(1, root.meterRows),
+                    (root.width - root._innerMargin * 2 - Math.round(10 * root.scaleFactor) * (root.meterColumns - 1))
+                        / root.meterColumns)
+                readonly property real liveValue: root._getValue(modelData.key)
+                readonly property color liveColor: root.widgetRoleColor(root._getColor(modelData.key))
+
+                width: Math.max(40, Math.round(resourceMeter.side))
+                height: Math.max(40, Math.round(resourceMeter.side))
+
+                InstrumentScale {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.topMargin: Math.round(8 * root.scaleFactor)
+                    anchors.bottomMargin: Math.round(8 * root.scaleFactor)
+                    width: Math.round(14 * root.scaleFactor)
+                    vertical: true
+                    divisions: 20
+                    fraction: resourceMeter.liveValue
+                    ink: root.widgetInk
+                    accent: resourceMeter.liveColor
+                    animated: root.animationsActive
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: Math.round(24 * root.scaleFactor)
+                    anchors.topMargin: Math.round(6 * root.scaleFactor)
+                    anchors.bottomMargin: Math.round(6 * root.scaleFactor)
+                    spacing: Math.round(4 * root.scaleFactor)
+
+                    MaterialSymbol {
+                        Layout.alignment: Qt.AlignLeft
+                        text: resourceMeter.modelData.icon
+                        iconSize: Math.max(14, Math.round(resourceMeter.side * 0.12))
+                        color: resourceMeter.liveColor
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        verticalAlignment: Text.AlignBottom
+                        fontSizeMode: Text.Fit
+                        minimumPixelSize: Math.round(14 * root.scaleFactor)
+                        text: root._getDisplayText(resourceMeter.modelData.key)
+                        color: root.widgetInk
+                        font {
+                            family: Appearance.font.family.numbers
+                            pixelSize: Math.round(resourceMeter.side * 0.29)
+                            weight: Font.Bold
+                            features: ({ "tnum": 1 })
+                            letterSpacing: -0.5
+                        }
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        visible: root.showLabels
+                        elide: Text.ElideRight
+                        text: resourceMeter.modelData.key === "temp" ? Translation.tr("CPU temp")
+                            : resourceMeter.modelData.key === "gpuTemp" ? Translation.tr("GPU temp")
+                            : resourceMeter.modelData.label
+                        color: root.widgetInkMuted
+                        font {
+                            family: Appearance.font.family.main
+                            pixelSize: Math.max(10, Math.round(resourceMeter.side * 0.075))
+                            weight: Font.DemiBold
+                            letterSpacing: Math.round(1.4 * root.scaleFactor)
+                            capitalization: Font.AllUppercase
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════
@@ -331,7 +459,13 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: root._innerMargin
         spacing: Appearance.sizes.spacingSmall ?? 4
-        visible: root.displayMode === "bars"
+        opacity: root.displayMode === "bars" ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "bars"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
 
         Repeater {
             model: root._resourceModel
@@ -401,7 +535,13 @@ AbstractBackgroundWidget {
     Item {
         anchors.fill: parent
         anchors.margins: root._innerMargin
-        visible: root.displayMode === "graph"
+        opacity: root.displayMode === "graph" ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "graph"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
 
         readonly property int _legendH: root.showLabels ? 16 : 0
 
@@ -509,7 +649,13 @@ AbstractBackgroundWidget {
     Row {
         anchors.centerIn: parent
         spacing: Appearance.sizes.spacingNormal ?? 8
-        visible: root.displayMode === "rings"
+        opacity: root.displayMode === "rings" ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "rings"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
 
         Repeater {
             model: root._resourceModel
@@ -602,7 +748,13 @@ AbstractBackgroundWidget {
     Flow {
         anchors.centerIn: parent
         spacing: Appearance.sizes.spacingSmall ?? 4
-        visible: root.displayMode === "text"
+        opacity: root.displayMode === "text" ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "text"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
         width: parent.width - root._innerMargin * 2
 
         Repeater {
@@ -659,7 +811,13 @@ AbstractBackgroundWidget {
         id: tileGrid
         anchors.fill: parent
         anchors.margins: root._innerMargin
-        visible: root.displayMode === "tiles" && root._resourceModel.length > 0
+        opacity: root.displayMode === "tiles" && root._resourceModel.length > 0 ? 1 : 0
+        visible: opacity > 0
+        enabled: root.displayMode === "tiles"
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
         columnSpacing: root._tileGap
         rowSpacing: root._tileGap
         columns: root._tileColumns

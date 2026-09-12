@@ -21,6 +21,7 @@ AbstractBackgroundWidget {
         widgetScale: 100, widgetOpacity: 100, colorMode: "auto", dim: 0,
         showBackground: true, showBorder: true, backgroundOpacity: 0.16,
         borderWidth: 1, borderOpacity: 0.2, cornerRadius: -1, useBlur: false,
+        style: "card", showMeta: true,
         x: 100, y: 260
     })
 
@@ -32,6 +33,10 @@ AbstractBackgroundWidget {
     resizeMinWidth: 220
     resizeMinHeight: 72
     needsColText: true
+    readonly property string tickerStyle: root._readConfigKey("style") ?? "card"
+    readonly property bool instrument: root.tickerStyle === "instrument"
+    readonly property bool showMeta: root._readConfigKey("showMeta") ?? true
+    widgetSurfaceEnabled: !root.instrument
 
     property int headlineIndex: 0
     property var displayedArticle: null
@@ -117,6 +122,24 @@ AbstractBackgroundWidget {
         ColumnLayout {
             spacing: 6
 
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
+                Repeater {
+                    model: [
+                        { label: Translation.tr("Card"), value: "card" },
+                        { label: Translation.tr("Instrument"), value: "instrument" }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonText: modelData.label
+                        toggled: root.tickerStyle === modelData.value
+                        onClicked: root._setOutputValue("style", modelData.value)
+                    }
+                }
+            }
+
             Row {
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 2
@@ -189,6 +212,15 @@ AbstractBackgroundWidget {
                 wrapMode: Text.NoWrap
                 elide: Text.ElideMiddle
             }
+
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                leftmost: true; rightmost: true
+                buttonIcon: "label"
+                buttonText: Translation.tr("Metadata")
+                toggled: root.showMeta
+                onClicked: root._setOutputValue("showMeta", !root.showMeta)
+            }
         }
     }
 
@@ -209,8 +241,8 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0
-            || root.effectiveBlur
+        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0
+            || root.effectiveBlur)
     }
 
     HoverHandler { id: newsHover }
@@ -221,6 +253,7 @@ AbstractBackgroundWidget {
         spacing: Math.round(9 * root.scaleFactor)
 
         MaterialShape {
+            visible: !root.instrument
             Layout.alignment: Qt.AlignVCenter
             implicitSize: Math.round(32 * root.scaleFactor)
             shape: MaterialShape.Shape.Cookie4Sided
@@ -235,6 +268,29 @@ AbstractBackgroundWidget {
         }
 
         ColumnLayout {
+            visible: root.instrument
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: Math.round(34 * root.scaleFactor)
+            spacing: Math.round(3 * root.scaleFactor)
+
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: Math.max(2, Math.round(2 * root.scaleFactor))
+                Layout.preferredHeight: Math.round(28 * root.scaleFactor)
+                color: root.widgetAccentVisible
+            }
+            StyledText {
+                Layout.alignment: Qt.AlignHCenter
+                text: "WIRE"
+                color: root.widgetInkMuted
+                font.family: Appearance.font.family.monospace
+                font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
+                font.weight: Font.DemiBold
+                font.letterSpacing: Math.round(1 * root.scaleFactor)
+            }
+        }
+
+        ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Math.round(2 * root.scaleFactor)
@@ -245,11 +301,15 @@ AbstractBackgroundWidget {
 
                 StyledText {
                     Layout.fillWidth: true
+                    visible: root.showMeta
                     text: root.articleMeta.length > 0
                         ? root.articleMeta : Translation.tr("News")
-                    color: root.widgetInkMuted
-                    font.pixelSize: Math.round(
-                        Appearance.font.pixelSize.smaller * root.scaleFactor)
+                    color: root.instrument ? root.widgetAccentVisible : root.widgetInkMuted
+                    font.family: root.instrument ? Appearance.font.family.monospace : Appearance.font.family.main
+                    font.pixelSize: Math.round((root.instrument
+                        ? Appearance.font.pixelSize.smallest : Appearance.font.pixelSize.smaller) * root.scaleFactor)
+                    font.weight: root.instrument ? Font.DemiBold : Font.Normal
+                    font.letterSpacing: root.instrument ? Math.round(0.8 * root.scaleFactor) : 0
                     wrapMode: Text.NoWrap
                     elide: Text.ElideRight
                 }
@@ -258,7 +318,7 @@ AbstractBackgroundWidget {
                     visible: root.articleCount > 1
                     text: ((root.headlineIndex % Math.max(1, root.articleCount)) + 1)
                         + "/" + root.articleCount
-                    color: root.widgetInkSubtle
+                    color: root.instrument ? root.widgetInkMuted : root.widgetInkSubtle
                     font.family: Appearance.font.family.numbers
                     font.pixelSize: Math.round(
                         Appearance.font.pixelSize.smallest * root.scaleFactor)
@@ -277,9 +337,9 @@ AbstractBackgroundWidget {
                 maximumLineCount: 2
                 elide: Text.ElideRight
                 font.family: root.widgetTitleFamily
-                font.pixelSize: Math.round(Appearance.font.pixelSize.small
-                    * root.widgetTitleScale * root.scaleFactor)
-                font.weight: root.widgetTitleWeight
+                font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.normal
+                    : Appearance.font.pixelSize.small * root.widgetTitleScale) * root.scaleFactor)
+                font.weight: root.instrument ? Font.DemiBold : root.widgetTitleWeight
                 font.letterSpacing: root.widgetTitleTracking
                 opacity: 1
                 Behavior on opacity {

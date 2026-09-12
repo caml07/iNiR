@@ -1820,6 +1820,7 @@ ContentPage {
                         { displayName: Translation.tr("Android stacked"), icon: "android", value: "androidStacked" },
                         { displayName: Translation.tr("Cookie"), icon: "cookie", value: "cookie" },
                         { displayName: Translation.tr("Pixel"), icon: "view_comfy_alt", value: "pixel" },
+                        { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" },
                     ]
                 }
             }
@@ -1922,8 +1923,6 @@ ContentPage {
                 title: Translation.tr("Display options")
 
                 ConfigRow {
-                    visible: Config.getNestedValue(
-                        "background.widgets.weather.style", "pill") !== "detail"
                     Layout.fillWidth: true
                     SettingsSwitch {
                         Layout.fillWidth: false
@@ -2129,6 +2128,72 @@ ContentPage {
             }
 
             ContentSubsection {
+                visible: clockSection._clockStyle === "instrument"
+                title: Translation.tr("Instrument")
+
+                ConfigRow {
+                    Layout.fillWidth: true
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "timelapse"
+                        text: Translation.tr("Seconds")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.clock.showSeconds", false)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.clock.showSeconds", checked)
+                    }
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "calendar_today"
+                        text: Translation.tr("Date")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.clock.showDate", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.clock.showDate", checked)
+                    }
+                }
+
+                ConfigRow {
+                    Layout.fillWidth: true
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "blur_on"
+                        text: Translation.tr("Minute trail")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.clock.instrumentTrail", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.clock.instrumentTrail", checked)
+                    }
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "pin"
+                        text: Translation.tr("Numerals")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.clock.instrumentNumerals", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.clock.instrumentNumerals", checked)
+                    }
+                }
+
+                WidgetSettingRow {
+                    visible: Config.getNestedValue("background.widgets.clock.instrumentTrail", true)
+                    label: Translation.tr("Trail length")
+                    icon: "history"
+                    StyledSpinBox {
+                        from: 2; to: 15; stepSize: 1
+                        value: Config.getNestedValue("background.widgets.clock.instrumentTrailLength", 6)
+                        onValueModified: Config.setNestedValue("background.widgets.clock.instrumentTrailLength", value)
+                    }
+                }
+
+                WidgetSettingRow {
+                    label: Translation.tr("Instrument size")
+                    icon: "open_in_full"
+                    StyledSpinBox {
+                        from: 60; to: 180; stepSize: 5
+                        value: Config.getNestedValue("background.widgets.clock.timeScale", 100)
+                        onValueModified: Config.setNestedValue("background.widgets.clock.timeScale", value)
+                    }
+                }
+            }
+
+            ContentSubsection {
                 visible: clockSection._clockStyle === "cookie"
                 title: Translation.tr("Dial and hands")
 
@@ -2325,6 +2390,9 @@ ContentPage {
                     },
                     "showDate": true,
                     "showSeconds": false,
+                    "instrumentTrail": true,
+                    "instrumentTrailLength": 6,
+                    "instrumentNumerals": true,
                     "showShadow": true,
                     "style": "digital",
                     "timeFormat": "system",
@@ -2368,6 +2436,19 @@ ContentPage {
                     ContentSubsection {
                         title: Translation.tr("Calendar")
                         WidgetSettingRow {
+                            label: Translation.tr("Style")
+                            trailing: false
+                            ConfigSelectionArray {
+                                Layout.fillWidth: true
+                                currentValue: Config.getNestedValue("background.widgets.monthCalendar.style", "card")
+                                onSelected: newValue => Config.setNestedValue("background.widgets.monthCalendar.style", newValue)
+                                options: [
+                                    { displayName: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
+                                    { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                                ]
+                            }
+                        }
+                        WidgetSettingRow {
                             label: Translation.tr("Week starts on")
                             trailing: false
                             ConfigSelectionArray {
@@ -2386,6 +2467,14 @@ ContentPage {
                             autoToggle: false
                             checked: Config.getNestedValue("background.widgets.monthCalendar.showAdjacentDays", true)
                             onToggledByUser: checked => Config.setNestedValue("background.widgets.monthCalendar.showAdjacentDays", checked)
+                        }
+                        SettingsSwitch {
+                            visible: Config.getNestedValue("background.widgets.monthCalendar.style", "card") === "instrument"
+                            buttonIcon: "horizontal_rule"
+                            text: Translation.tr("Header rule")
+                            autoToggle: false
+                            checked: Config.getNestedValue("background.widgets.monthCalendar.instrumentRule", true)
+                            onToggledByUser: checked => Config.setNestedValue("background.widgets.monthCalendar.instrumentRule", checked)
                         }
                     }
                     ContentSubsection {
@@ -2421,7 +2510,8 @@ ContentPage {
                         configPath: "background.widgets.monthCalendar"
                         defaults: ({
                             placementStrategy: "free", contentWidth: 300, contentHeight: 340,
-                            weekStart: 1, showAdjacentDays: true, widgetScale: 100,
+                            weekStart: 1, showAdjacentDays: true, style: "card", instrumentRule: true,
+                            widgetScale: 100,
                             widgetOpacity: 100, showBackground: true, useBlur: false,
                             showBorder: true, backgroundOpacity: 0.14, borderWidth: 1,
                             borderOpacity: 0.16, cornerRadius: -1, colorMode: "auto",
@@ -2450,6 +2540,19 @@ ContentPage {
                         defaultStrategy: "free"
                     }
                     WidgetSettingRow {
+                        label: Translation.tr("Style")
+                        trailing: false
+                        ConfigSelectionArray {
+                            Layout.fillWidth: true
+                            currentValue: Config.getNestedValue("background.widgets.timers.style", "cards")
+                            onSelected: newValue => Config.setNestedValue("background.widgets.timers.style", newValue)
+                            options: [
+                                { displayName: Translation.tr("Cards"), icon: "dashboard_2", value: "cards" },
+                                { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                            ]
+                        }
+                    }
+                    WidgetSettingRow {
                         label: Translation.tr("Orientation")
                         trailing: false
                         ConfigSelectionArray {
@@ -2460,6 +2563,41 @@ ContentPage {
                                 { displayName: Translation.tr("Horizontal"), icon: "view_week", value: false },
                                 { displayName: Translation.tr("Vertical"), icon: "view_agenda", value: true }
                             ]
+                        }
+                    }
+                    WidgetSettingRow {
+                        visible: Config.getNestedValue("background.widgets.timers.style", "cards") === "instrument"
+                        label: Translation.tr("Instrument details")
+                        icon: "tune"
+                        trailing: false
+                        GridLayout {
+                            columns: 2
+                            columnSpacing: 6
+                            rowSpacing: 6
+                            WidgetToggleChip {
+                                configPath: "background.widgets.timers.glow"
+                                defaultValue: true
+                                buttonIcon: "bolt"
+                                buttonText: Translation.tr("Active pulse")
+                            }
+                            WidgetToggleChip {
+                                configPath: "background.widgets.timers.showProgress"
+                                defaultValue: true
+                                buttonIcon: "linear_scale"
+                                buttonText: Translation.tr("Progress")
+                            }
+                            WidgetToggleChip {
+                                configPath: "background.widgets.timers.showState"
+                                defaultValue: true
+                                buttonIcon: "label"
+                                buttonText: Translation.tr("Details")
+                            }
+                            WidgetToggleChip {
+                                configPath: "background.widgets.timers.showHundredths"
+                                defaultValue: true
+                                buttonIcon: "timer_10_alt_1"
+                                buttonText: Translation.tr("Hundredths")
+                            }
                         }
                     }
                     WidgetAppearanceControls {
@@ -2473,7 +2611,8 @@ ContentPage {
                     WidgetResetButton {
                         configPath: "background.widgets.timers"
                         defaults: ({
-                            placementStrategy: "free", vertical: false, widgetScale: 100,
+                            placementStrategy: "free", vertical: false, style: "cards", glow: true,
+                            showProgress: true, showState: true, showHundredths: true, widgetScale: 100,
                             widgetOpacity: 100, showBackground: false, useBlur: false,
                             showBorder: false, backgroundOpacity: 0, borderWidth: 0,
                             borderOpacity: 0.16, cornerRadius: -1, colorMode: "auto",
@@ -2500,6 +2639,37 @@ ContentPage {
                         configPath: "background.widgets.todo"
                         configEntry: Config.getNestedValue("background.widgets.todo", ({}))
                         defaultStrategy: "free"
+                    }
+                    ContentSubsection {
+                        title: Translation.tr("Style")
+                        WidgetSettingRow {
+                            label: Translation.tr("Presentation")
+                            trailing: false
+                            ConfigSelectionArray {
+                                Layout.fillWidth: true
+                                currentValue: Config.getNestedValue("background.widgets.todo.style", "card")
+                                onSelected: newValue => Config.setNestedValue("background.widgets.todo.style", newValue)
+                                options: [
+                                    { displayName: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
+                                    { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                                ]
+                            }
+                        }
+                        SettingsSwitch {
+                            visible: Config.getNestedValue("background.widgets.todo.style", "card") === "instrument"
+                            buttonIcon: "horizontal_rule"
+                            text: Translation.tr("Row rules")
+                            autoToggle: false
+                            checked: Config.getNestedValue("background.widgets.todo.instrumentRules", true)
+                            onToggledByUser: checked => Config.setNestedValue("background.widgets.todo.instrumentRules", checked)
+                        }
+                        SettingsSwitch {
+                            buttonIcon: "done_all"
+                            text: Translation.tr("Show completed tasks")
+                            autoToggle: false
+                            checked: Config.getNestedValue("background.widgets.todo.showCompleted", true)
+                            onToggledByUser: checked => Config.setNestedValue("background.widgets.todo.showCompleted", checked)
+                        }
                     }
                     ContentSubsection {
                         title: Translation.tr("Dimensions")
@@ -2534,6 +2704,7 @@ ContentPage {
                         configPath: "background.widgets.todo"
                         defaults: ({
                             placementStrategy: "free", contentWidth: 300, contentHeight: 276,
+                            style: "card", instrumentRules: true, showCompleted: true,
                             widgetScale: 100, widgetOpacity: 100, showBackground: true,
                             useBlur: false, showBorder: true, backgroundOpacity: 0.14,
                             borderWidth: 1, borderOpacity: 0.16, cornerRadius: -1,
@@ -3079,6 +3250,7 @@ ContentPage {
                         { displayName: Translation.tr("Shape"), icon: "category", value: "pill" },
                         { displayName: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
                         { displayName: Translation.tr("Detail"), icon: "dashboard", value: "detail" },
+                        { displayName: Translation.tr("Instrument"), icon: "wb_twilight", value: "dial" },
                     ]
                 }
 
@@ -3146,6 +3318,36 @@ ContentPage {
 
                     checked: Config.getNestedValue("background.widgets.weather.showMetrics", true)
                     onToggledByUser: checked => Config.setNestedValue("background.widgets.weather.showMetrics", checked)
+                }
+
+                ConfigRow {
+                    visible: Config.getNestedValue("background.widgets.weather.style", "pill") === "dial"
+                    Layout.fillWidth: true
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "wb_twilight"
+                        text: Translation.tr("Sun path")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.weather.showSunPath", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.weather.showSunPath", checked)
+                    }
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "schedule"
+                        text: Translation.tr("Sun times")
+                        autoToggle: false
+                        enabled: Config.getNestedValue("background.widgets.weather.showSunPath", true)
+                        checked: Config.getNestedValue("background.widgets.weather.showSunTimes", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.weather.showSunTimes", checked)
+                    }
+                    SettingsSwitch {
+                        Layout.fillWidth: false
+                        buttonIcon: "location_on"
+                        text: Translation.tr("Location")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.weather.showLocation", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.weather.showLocation", checked)
+                    }
                 }
             }
 
@@ -3250,6 +3452,9 @@ ContentPage {
                     "showIcon": true,
                     "showCondition": false,
                     "showMetrics": true,
+                    "showSunPath": true,
+                    "showSunTimes": true,
+                    "showLocation": true,
                     "padding": 20,
                     "tempFontWeight": 500,
                     "conditionOpacity": 0.7,
@@ -4605,6 +4810,7 @@ ContentPage {
                         { displayName: Translation.tr("Rings"), icon: "radio_button_checked", value: "rings" },
                         { displayName: Translation.tr("Text"), icon: "text_fields", value: "text" },
                         { displayName: Translation.tr("Tiles"), icon: "grid_view", value: "tiles" },
+                        { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" },
                     ]
                 }
             }
@@ -4634,6 +4840,30 @@ ContentPage {
                         defaultValue: true
                         buttonIcon: "developer_board"
                         buttonText: Translation.tr("GPU")
+                    }
+                }
+
+                WidgetSettingRow {
+                    label: Translation.tr("Thermals and disk")
+                    icon: "thermostat"
+                    trailing: false
+                    WidgetToggleChip {
+                        configPath: "background.widgets.systemMonitor.showTemp"
+                        defaultValue: false
+                        buttonIcon: "thermostat"
+                        buttonText: Translation.tr("CPU temp")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.systemMonitor.showGpuTemp"
+                        defaultValue: false
+                        buttonIcon: "device_thermostat"
+                        buttonText: Translation.tr("GPU temp")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.systemMonitor.showDisk"
+                        defaultValue: false
+                        buttonIcon: "hard_drive"
+                        buttonText: Translation.tr("Disk")
                     }
                 }
 
@@ -4727,6 +4957,7 @@ ContentPage {
                     "showMemory": true,
                     "showGpu": true,
                     "showTemp": false,
+                    "showGpuTemp": false,
                     "showDisk": false,
                     "showLabels": true,
                     "dim": 0,
@@ -4831,6 +5062,7 @@ ContentPage {
                         { displayName: Translation.tr("Ring"), icon: "radio_button_checked", value: "ring" },
                         { displayName: Translation.tr("Bars"), icon: "bar_chart", value: "bars" },
                         { displayName: Translation.tr("Pill"), icon: "horizontal_rule", value: "pill" },
+                        { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" },
                     ]
                 }
 
@@ -4912,6 +5144,14 @@ ContentPage {
                     checked: Config.getNestedValue("background.widgets.battery.showTime", true)
                     onToggledByUser: checked => Config.setNestedValue("background.widgets.battery.showTime", checked)
                 }
+                SettingsSwitch {
+                    visible: Config.getNestedValue("background.widgets.battery.displayMode", "ring") === "instrument"
+                    buttonIcon: "electric_bolt"
+                    text: Translation.tr("Show power draw")
+                    autoToggle: false
+                    checked: Config.getNestedValue("background.widgets.battery.showRate", true)
+                    onToggledByUser: checked => Config.setNestedValue("background.widgets.battery.showRate", checked)
+                }
             }
 
             }
@@ -4931,6 +5171,7 @@ ContentPage {
                     "placementStrategy": "free",
                     "displayMode": "ring",
                     "showTime": true,
+                    "showRate": true,
                     "ringSize": 72,
                     "dim": 0,
                     "widgetScale": 100,
@@ -4977,6 +5218,27 @@ ContentPage {
             }
             ContentSubsection {
                 title: Translation.tr("Text")
+                WidgetSettingRow {
+                    label: Translation.tr("Presentation")
+                    icon: "view_quilt"
+                    trailing: false
+                    ConfigSelectionArray {
+                        currentValue: Config.getNestedValue("background.widgets.notes.style", "card")
+                        onSelected: newValue => Config.setNestedValue("background.widgets.notes.style", newValue)
+                        options: [
+                            { displayName: Translation.tr("Card"), value: "card" },
+                            { displayName: Translation.tr("Instrument"), value: "instrument" }
+                        ]
+                    }
+                }
+                SettingsSwitch {
+                    visible: Config.getNestedValue("background.widgets.notes.style", "card") === "instrument"
+                    buttonIcon: "horizontal_rule"
+                    text: Translation.tr("Writing guides")
+                    autoToggle: false
+                    checked: Config.getNestedValue("background.widgets.notes.showRules", true)
+                    onToggledByUser: checked => Config.setNestedValue("background.widgets.notes.showRules", checked)
+                }
                 WidgetSettingRow {
                     label: Translation.tr("Font size")
                     icon: "format_size"
@@ -5049,7 +5311,8 @@ ContentPage {
                 configPath: "background.widgets.notes"
                 defaults: ({
                     placementStrategy: "free", text: "", fontSize: 14, fontFamily: "sans",
-                    textAlign: "left", contentWidth: 240, contentHeight: 160, dim: 0,
+                    textAlign: "left", style: "card", showRules: true,
+                    contentWidth: 240, contentHeight: 160, dim: 0,
                     widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.10,
                     borderWidth: 1, borderOpacity: 0.12, cornerRadius: -1,
@@ -5079,6 +5342,19 @@ ContentPage {
             }
             ContentSubsection {
                 title: Translation.tr("Content")
+                WidgetSettingRow {
+                    label: Translation.tr("Presentation")
+                    icon: "view_quilt"
+                    trailing: false
+                    ConfigSelectionArray {
+                        currentValue: Config.getNestedValue("background.widgets.calendarUpcoming.style", "card")
+                        onSelected: newValue => Config.setNestedValue("background.widgets.calendarUpcoming.style", newValue)
+                        options: [
+                            { displayName: Translation.tr("Card"), value: "card" },
+                            { displayName: Translation.tr("Instrument"), value: "instrument" }
+                        ]
+                    }
+                }
                 WidgetSettingRow {
                     label: Translation.tr("Maximum events")
                     icon: "format_list_numbered"
@@ -5156,7 +5432,8 @@ ContentPage {
                 configPath: "background.widgets.calendarUpcoming"
                 defaults: ({
                     placementStrategy: "free", maxEvents: 5, showDate: true, showTime: true,
-                    showLocation: false, groupByDay: true, contentWidth: 280, contentHeight: 220,
+                    showLocation: false, groupByDay: true, style: "card",
+                    contentWidth: 280, contentHeight: 240,
                     dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.10,
                     borderWidth: 1, borderOpacity: 0.12, cornerRadius: -1,
@@ -5290,17 +5567,49 @@ ContentPage {
             ConfigSelectionArray {
                 currentValue: Config.getNestedValue("background.widgets.dateBadge.style", "ticket")
                 onSelected: newValue => Config.setNestedValue("background.widgets.dateBadge.style", newValue)
-                options: [{ displayName: Translation.tr("Ticket"), value: "ticket" }, { displayName: Translation.tr("Stacked"), value: "stacked" }, { displayName: Translation.tr("Seal"), value: "seal" }]
+                options: [
+                    { displayName: Translation.tr("Ticket"), value: "ticket" },
+                    { displayName: Translation.tr("Stacked"), value: "stacked" },
+                    { displayName: Translation.tr("Seal"), value: "seal" },
+                    { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                ]
             }
             ConfigSelectionArray {
                 currentValue: Config.getNestedValue("background.widgets.dateBadge.showYear", true)
                 onSelected: newValue => Config.setNestedValue("background.widgets.dateBadge.showYear", newValue)
                 options: [{ displayName: Translation.tr("Show year"), value: true }, { displayName: Translation.tr("Hide year"), value: false }]
             }
+            WidgetSettingRow {
+                visible: Config.getNestedValue("background.widgets.dateBadge.style", "ticket") === "instrument"
+                label: Translation.tr("Instrument details")
+                icon: "tune"
+                trailing: false
+                RowLayout {
+                    spacing: 6
+                    WidgetToggleChip {
+                        configPath: "background.widgets.dateBadge.showWeekday"
+                        defaultValue: true
+                        buttonIcon: "calendar_view_week"
+                        buttonText: Translation.tr("Weekday")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.dateBadge.showOrdinal"
+                        defaultValue: true
+                        buttonIcon: "tag"
+                        buttonText: Translation.tr("Ordinal")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.dateBadge.instrumentMarks"
+                        defaultValue: true
+                        buttonIcon: "crop_free"
+                        buttonText: Translation.tr("Marks")
+                    }
+                }
+            }
             WidgetAppearanceControls {
                 configPath: "background.widgets.dateBadge"
                 configEntry: Config.getNestedValue("background.widgets.dateBadge", ({}))
-                hasCardControls: true
+                hasCardControls: Config.getNestedValue("background.widgets.dateBadge.style", "ticket") !== "instrument"
             }
         }
 
@@ -5309,7 +5618,8 @@ ContentPage {
                 configPath: "background.widgets.dateBadge"
                 defaults: ({
                     placementStrategy: "free", contentWidth: 220, contentHeight: 140,
-                    style: "ticket", showYear: true, dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
+                    style: "ticket", showYear: true, showWeekday: true, showOrdinal: true,
+                    instrumentMarks: true, dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.16,
                     borderWidth: 1, borderOpacity: 0.20, cornerRadius: -1,
                     colorMode: "auto", locked: false, x: 260, y: 80
@@ -5432,7 +5742,7 @@ ContentPage {
                             icon: "swap_horiz"
                             StyledSpinBox {
                                 from: 190; to: 500; stepSize: 10
-                                value: Config.getNestedValue("background.widgets.dayProgress.contentWidth", 220)
+                                value: Config.getNestedValue("background.widgets.dayProgress.contentWidth", 240)
                                 onValueModified: Config.setNestedValue("background.widgets.dayProgress.contentWidth", value)
                             }
                         }
@@ -5441,7 +5751,7 @@ ContentPage {
                             icon: "swap_vert"
                             StyledSpinBox {
                                 from: 190; to: 500; stepSize: 10
-                                value: Config.getNestedValue("background.widgets.dayProgress.contentHeight", 220)
+                                value: Config.getNestedValue("background.widgets.dayProgress.contentHeight", 240)
                                 onValueModified: Config.setNestedValue("background.widgets.dayProgress.contentHeight", value)
                             }
                         }
@@ -5565,6 +5875,41 @@ ContentPage {
                 }
             }
 
+            ContentSubsection {
+                title: Translation.tr("Style")
+
+                ConfigSelectionArray {
+                    currentValue: Config.getNestedValue("background.widgets.uptime.style", "row")
+                    onSelected: newValue => Config.setNestedValue("background.widgets.uptime.style", newValue)
+                    options: [
+                        { displayName: Translation.tr("Row"), value: "row" },
+                        { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                    ]
+                }
+
+                WidgetSettingRow {
+                    visible: Config.getNestedValue("background.widgets.uptime.style", "row") === "instrument"
+                    label: Translation.tr("Instrument details")
+                    icon: "tune"
+                    trailing: false
+                    RowLayout {
+                        spacing: 6
+                        WidgetToggleChip {
+                            configPath: "background.widgets.uptime.showSince"
+                            defaultValue: true
+                            buttonIcon: "schedule"
+                            buttonText: Translation.tr("Since")
+                        }
+                        WidgetToggleChip {
+                            configPath: "background.widgets.uptime.showBreakdown"
+                            defaultValue: true
+                            buttonIcon: "view_agenda"
+                            buttonText: Translation.tr("Breakdown")
+                        }
+                    }
+                }
+            }
+
             WidgetAppearanceControls {
                 configPath: "background.widgets.uptime"
                 configEntry: Config.getNestedValue("background.widgets.uptime", ({}))
@@ -5576,6 +5921,9 @@ ContentPage {
             WidgetResetButton {
                 configPath: "background.widgets.uptime"
                 defaults: ({
+                    style: "row",
+                    showSince: true,
+                    showBreakdown: true,
                     placementStrategy: "free", contentWidth: 250, contentHeight: 96,
                     dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.16,
@@ -5604,11 +5952,75 @@ ContentPage {
                 defaultStrategy: "free"
             }
 
+            WidgetSettingRow {
+                label: Translation.tr("Style")
+                trailing: false
+                ConfigSelectionArray {
+                    Layout.fillWidth: true
+                    currentValue: Config.getNestedValue("background.widgets.worldClock.style", "cards")
+                    onSelected: newValue => Config.setNestedValue("background.widgets.worldClock.style", newValue)
+                    options: [
+                        { displayName: Translation.tr("List"), icon: "view_list", value: "cards" },
+                        { displayName: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                    ]
+                }
+            }
+
+
+            WidgetSettingRow {
+                visible: Config.getNestedValue("background.widgets.worldClock.style", "cards") === "instrument"
+                label: Translation.tr("Instrument layout")
+                icon: "grid_view"
+                trailing: false
+                ConfigSelectionArray {
+                    Layout.fillWidth: true
+                    currentValue: Config.getNestedValue("background.widgets.worldClock.instrumentLayout", "grid")
+                    onSelected: newValue => Config.setNestedValue("background.widgets.worldClock.instrumentLayout", newValue)
+                    options: [
+                        { displayName: Translation.tr("Atlas"), icon: "travel_explore", value: "grid" },
+                        { displayName: Translation.tr("Strip"), icon: "view_agenda", value: "rows" }
+                    ]
+                }
+            }
+
+            WidgetSettingRow {
+                visible: Config.getNestedValue("background.widgets.worldClock.style", "cards") === "instrument"
+                label: Translation.tr("Instrument detail")
+                icon: "tune"
+                trailing: false
+                GridLayout {
+                    columns: 3
+                    columnSpacing: 6
+                    rowSpacing: 6
+                    WidgetToggleChip {
+                        configPath: "background.widgets.worldClock.showOffsets"
+                        defaultValue: true
+                        buttonIcon: "schedule"
+                        buttonText: Translation.tr("Offsets")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.worldClock.showDate"
+                        defaultValue: true
+                        buttonIcon: "calendar_today"
+                        buttonText: Translation.tr("Date")
+                    }
+                    WidgetToggleChip {
+                        configPath: "background.widgets.worldClock.showDayState"
+                        defaultValue: true
+                        buttonIcon: "routine"
+                        buttonText: Translation.tr("Day/Night")
+                    }
+                }
+            }
+
             ContentSubsection {
+                id: worldClockZones
+                property var availableTimezones: WorldClock.comboModel.filter(
+                    entry => !WorldClock.timezones.includes(entry.tz))
                 title: Translation.tr("Time zones")
 
                 Repeater {
-                    model: 4
+                    model: WorldClock.timezones.length
                     delegate: WidgetSettingRow {
                         id: tzRow
                         required property int index
@@ -5623,6 +6035,60 @@ ContentPage {
                             currentIndex: Math.max(0, WorldClock.comboModel.findIndex(o => o.tz === WorldClock.timezones[tzRow.index]))
                             onActivated: idx => WorldClock.setTimezone(tzRow.index, WorldClock.comboModel[idx].tz)
                         }
+
+                        RippleButton {
+                            Layout.preferredWidth: 34
+                            Layout.preferredHeight: 34
+                            enabled: WorldClock.timezones.length > 1
+                            opacity: enabled ? 1 : 0.32
+                            buttonRadius: Appearance.rounding.small
+                            colBackground: "transparent"
+                            colBackgroundHover: Appearance.colors.colLayer2Hover
+                            colRipple: Appearance.colors.colLayer2Active
+                            releaseAction: () => WorldClock.removeTimezone(tzRow.index)
+                            contentItem: MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "delete"
+                                color: Appearance.colors.colOnLayer1
+                                iconSize: 17
+                            }
+                            StyledToolTip { text: Translation.tr("Remove city") }
+                        }
+                    }
+                }
+
+                WidgetSettingRow {
+                    visible: WorldClock.timezones.length < WorldClock.maxTimezones
+                        && worldClockZones.availableTimezones.length > 0
+                    label: Translation.tr("Add city")
+                    icon: "add_location_alt"
+                    trailing: false
+
+                    StyledComboBox {
+                        id: worldClockAddZone
+                        Layout.fillWidth: true
+                        model: worldClockZones.availableTimezones
+                        textRole: "label"
+                    }
+                    RippleButton {
+                        Layout.preferredWidth: 36
+                        Layout.preferredHeight: 34
+                        buttonRadius: Appearance.rounding.small
+                        colBackground: Appearance.colors.colPrimaryContainer
+                        colBackgroundHover: Appearance.colors.colPrimaryContainerHover
+                        colRipple: Appearance.colors.colPrimaryContainerActive
+                        releaseAction: () => {
+                            const entry = worldClockZones.availableTimezones[worldClockAddZone.currentIndex]
+                            if (entry)
+                                WorldClock.addTimezone(entry.tz)
+                        }
+                        contentItem: MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "add"
+                            color: Appearance.colors.colOnPrimaryContainer
+                            iconSize: 18
+                        }
+                        StyledToolTip { text: Translation.tr("Add city") }
                     }
                 }
             }
@@ -5643,7 +6109,7 @@ ContentPage {
                     label: Translation.tr("Height")
                     icon: "swap_vert"
                     StyledSpinBox {
-                        from: 170; to: 480; stepSize: 4
+                        from: 190; to: 480; stepSize: 4
                         value: Config.getNestedValue("background.widgets.worldClock.contentHeight", 210)
                         onValueModified: Config.setNestedValue("background.widgets.worldClock.contentHeight", value)
                     }
@@ -5653,7 +6119,7 @@ ContentPage {
             WidgetAppearanceControls {
                 configPath: "background.widgets.worldClock"
                 configEntry: Config.getNestedValue("background.widgets.worldClock", ({}))
-                hasCardControls: true
+                hasCardControls: Config.getNestedValue("background.widgets.worldClock.style", "cards") !== "instrument"
             }
         }
 
@@ -5666,7 +6132,9 @@ ContentPage {
                     useBlur: false, showBorder: true, backgroundOpacity: 0.16,
                     borderWidth: 1, borderOpacity: 0.20, cornerRadius: -1,
                     colorMode: "auto", locked: false, x: 80, y: 200,
-                    timezones: ["Australia/Sydney", "Asia/Tokyo", "Europe/London", "America/New_York"]
+                    timezones: ["Asia/Tokyo", "Europe/London", "America/New_York"],
+                    style: "cards", instrumentLayout: "grid", showNames: true,
+                    showOffsets: true, showDate: true, showDayState: true, pulseSeparator: false
                 })
             }
         }
@@ -5691,6 +6159,46 @@ ContentPage {
             }
 
             ContentSubsection {
+                title: Translation.tr("Content")
+                WidgetSettingRow {
+                    label: Translation.tr("Presentation")
+                    icon: "view_quilt"
+                    trailing: false
+                    ConfigSelectionArray {
+                        currentValue: Config.getNestedValue("background.widgets.userCard.style", "card")
+                        onSelected: newValue => Config.setNestedValue("background.widgets.userCard.style", newValue)
+                        options: [
+                            { displayName: Translation.tr("Card"), value: "card" },
+                            { displayName: Translation.tr("Instrument"), value: "instrument" }
+                        ]
+                    }
+                }
+                ConfigRow {
+                    SettingsSwitch {
+                        buttonIcon: "person"
+                        text: Translation.tr("Avatar")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.userCard.showAvatar", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.userCard.showAvatar", checked)
+                    }
+                    SettingsSwitch {
+                        buttonIcon: "cloud"
+                        text: Translation.tr("Weather")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.userCard.showWeather", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.userCard.showWeather", checked)
+                    }
+                    SettingsSwitch {
+                        buttonIcon: "computer"
+                        text: Translation.tr("Hostname")
+                        autoToggle: false
+                        checked: Config.getNestedValue("background.widgets.userCard.showHostname", true)
+                        onToggledByUser: checked => Config.setNestedValue("background.widgets.userCard.showHostname", checked)
+                    }
+                }
+            }
+
+            ContentSubsection {
                 title: Translation.tr("Dimensions")
 
                 WidgetSettingRow {
@@ -5706,7 +6214,7 @@ ContentPage {
                     label: Translation.tr("Height")
                     icon: "swap_vert"
                     StyledSpinBox {
-                        from: 170; to: 320; stepSize: 2
+                        from: 190; to: 320; stepSize: 2
                         value: Config.getNestedValue("background.widgets.userCard.contentHeight", 176)
                         onValueModified: Config.setNestedValue("background.widgets.userCard.contentHeight", value)
                     }
@@ -5725,6 +6233,7 @@ ContentPage {
                 configPath: "background.widgets.userCard"
                 defaults: ({
                     placementStrategy: "free", contentWidth: 280, contentHeight: 176,
+                    style: "card", showAvatar: true, showWeather: true, showHostname: true,
                     dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.16,
                     borderWidth: 1, borderOpacity: 0.20, cornerRadius: -1,
@@ -5897,6 +6406,29 @@ ContentPage {
                 defaultStrategy: "free"
             }
             ContentSubsection {
+                title: Translation.tr("Content")
+                WidgetSettingRow {
+                    label: Translation.tr("Presentation")
+                    icon: "view_quilt"
+                    trailing: false
+                    ConfigSelectionArray {
+                        currentValue: Config.getNestedValue("background.widgets.newsTicker.style", "card")
+                        onSelected: newValue => Config.setNestedValue("background.widgets.newsTicker.style", newValue)
+                        options: [
+                            { displayName: Translation.tr("Card"), value: "card" },
+                            { displayName: Translation.tr("Instrument"), value: "instrument" }
+                        ]
+                    }
+                }
+                SettingsSwitch {
+                    buttonIcon: "label"
+                    text: Translation.tr("Metadata")
+                    autoToggle: false
+                    checked: Config.getNestedValue("background.widgets.newsTicker.showMeta", true)
+                    onToggledByUser: checked => Config.setNestedValue("background.widgets.newsTicker.showMeta", checked)
+                }
+            }
+            ContentSubsection {
                 title: Translation.tr("Dimensions")
 
                 WidgetSettingRow {
@@ -5931,6 +6463,7 @@ ContentPage {
                 configPath: "background.widgets.newsTicker"
                 defaults: ({
                     placementStrategy: "free", contentWidth: 320, contentHeight: 92,
+                    style: "card", showMeta: true,
                     dim: 0, widgetScale: 100, widgetOpacity: 100, showBackground: true,
                     useBlur: false, showBorder: true, backgroundOpacity: 0.16,
                     borderWidth: 1, borderOpacity: 0.20, cornerRadius: -1,

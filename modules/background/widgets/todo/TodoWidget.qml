@@ -18,7 +18,8 @@ AbstractBackgroundWidget {
     defaultConfig: ({
         placementStrategy: "free",
         contentWidth: 300, contentHeight: 276,
-        widgetScale: 100, widgetOpacity: 100, style: "card",
+        widgetScale: 100, widgetOpacity: 100, style: "card", instrumentRules: true,
+        showCompleted: true,
         showBackground: true, useBlur: false, showBorder: true,
         backgroundOpacity: 0.14, borderWidth: 1, borderOpacity: 0.16,
         cornerRadius: -1, colorMode: "auto", dim: 0,
@@ -41,8 +42,21 @@ AbstractBackgroundWidget {
 
     property string mode: "list"
     property string editingText: ""
+    property bool clearCompletedArmed: false
 
     readonly property bool instrument: String(root._readConfigKey("style") ?? "card") === "instrument"
+    readonly property bool instrumentRules: Boolean(root._readConfigKey("instrumentRules") ?? true)
+    readonly property bool showCompleted: Boolean(root._readConfigKey("showCompleted") ?? true)
+    readonly property int pendingCount: Todo.list.filter(item => !item.done).length
+    readonly property int completedCount: Todo.list.length - root.pendingCount
+    readonly property var taskEntries: Todo.list.map((item, originalIndex) => ({
+        content: item.content,
+        done: item.done,
+        originalIndex: originalIndex
+    }))
+    readonly property var visibleTaskEntries: root.showCompleted
+        ? root.taskEntries : root.taskEntries.filter(item => !item.done)
+    widgetSurfaceEnabled: !root.instrument
     // Instrument reads on the wallpaper: sampled ink instead of surface ink.
     readonly property color ink: root.instrument ? root.widgetInk : root.widgetSurfaceInk
     readonly property color inkMuted: root.instrument
@@ -76,6 +90,24 @@ AbstractBackgroundWidget {
         root.closeEditor()
     }
 
+    function requestClearCompleted(): void {
+        if (!root.clearCompletedArmed) {
+            root.clearCompletedArmed = true
+            clearCompletedTimeout.restart()
+            return
+        }
+        clearCompletedTimeout.stop()
+        root.clearCompletedArmed = false
+        Todo.clearCompleted()
+    }
+
+    Timer {
+        id: clearCompletedTimeout
+        interval: 3000
+        repeat: false
+        onTriggered: root.clearCompletedArmed = false
+    }
+
     function taskFace(index: int): color {
         switch (index % 3) {
         case 0: return root.tertiaryFace
@@ -105,23 +137,43 @@ AbstractBackgroundWidget {
     }
 
     editPopoverContent: Component {
-        RowLayout {
-            spacing: 4
-            Layout.alignment: Qt.AlignHCenter
+        ColumnLayout {
+            spacing: 6
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
 
-            Repeater {
-                model: [
-                    { label: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
-                    { label: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
-                ]
-                WidgetChoiceButton {
-                    required property var modelData
-                    leftmost: true; rightmost: true
-                    buttonIcon: modelData.icon
-                    buttonText: modelData.label
-                    toggled: root.instrument === (modelData.value === "instrument")
-                    onClicked: root._setOutputValue("style", modelData.value)
+                Repeater {
+                    model: [
+                        { label: Translation.tr("Card"), icon: "crop_landscape", value: "card" },
+                        { label: Translation.tr("Instrument"), icon: "avg_pace", value: "instrument" }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonIcon: modelData.icon
+                        buttonText: modelData.label
+                        toggled: root.instrument === (modelData.value === "instrument")
+                        onClicked: root._setOutputValue("style", modelData.value)
+                    }
                 }
+            }
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.instrument
+                leftmost: true; rightmost: true
+                buttonIcon: "horizontal_rule"
+                buttonText: Translation.tr("Row rules")
+                toggled: root.instrumentRules
+                onClicked: root._setOutputValue("instrumentRules", !root.instrumentRules)
+            }
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                leftmost: true; rightmost: true
+                buttonIcon: "done_all"
+                buttonText: Translation.tr("Show done")
+                toggled: root.showCompleted
+                onClicked: root._setOutputValue("showCompleted", !root.showCompleted)
             }
         }
     }
@@ -148,9 +200,8 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.instrument
-            ? false
-            : (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
+        shown: !root.instrument
+            && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     Item {
@@ -158,44 +209,18 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: root.inset
 
-        transform: Scale {
-            id: flipScale
-            origin.x: stage.width / 2
-            origin.y: stage.height / 2
-            xScale: 1
-        }
-
-        states: [
-            State { name: "list"; when: root.mode === "list" },
-            State { name: "edit"; when: root.mode === "edit" }
-        ]
-
-        transitions: Transition {
-            enabled: Appearance.animationsEnabled
-            SequentialAnimation {
-                NumberAnimation {
-                    target: flipScale
-                    property: "xScale"
-                    from: 1; to: 0
-                    duration: Appearance.calcEffectiveDuration(120)
-                    easing.type: Easing.InQuad
-                }
-                PropertyAction { target: listPage; property: "visible" }
-                PropertyAction { target: editPage; property: "visible" }
-                NumberAnimation {
-                    target: flipScale
-                    property: "xScale"
-                    from: 0; to: 1
-                    duration: Appearance.calcEffectiveDuration(150)
-                    easing.type: Easing.OutQuad
-                }
-            }
-        }
-
+        // Preserve both pages through the fade. Collapsing the entire stage
+        // while visibility bindings change immediately produces a blank flash.
         ColumnLayout {
             id: listPage
             anchors.fill: parent
-            visible: root.mode === "list"
+            opacity: root.mode === "list" ? 1 : 0
+            visible: opacity > 0
+            enabled: root.mode === "list" && !GlobalStates.widgetEditMode
+            Behavior on opacity {
+                enabled: root.animationsActive
+                NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+            }
             spacing: Math.round(9 * root.scaleFactor)
 
             RowLayout {
@@ -216,9 +241,11 @@ AbstractBackgroundWidget {
                         font.letterSpacing: root.widgetTitleTracking
                     }
                     StyledText {
-                        text: Todo.list.filter(item => !item.done).length === 1
+                        text: root.pendingCount === 0 && root.completedCount > 0
+                            ? Translation.tr("All done · %1 completed").arg(root.completedCount)
+                            : root.pendingCount === 1
                             ? Translation.tr("1 task left")
-                            : Translation.tr("%1 tasks left").arg(Todo.list.filter(item => !item.done).length)
+                            : Translation.tr("%1 tasks left").arg(root.pendingCount)
                         color: root.inkMuted
                         font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
                         font.letterSpacing: root.instrument
@@ -228,21 +255,43 @@ AbstractBackgroundWidget {
                 }
 
                 RippleButton {
-                    Layout.preferredWidth: Math.round(38 * root.scaleFactor)
-                    Layout.preferredHeight: Math.round(38 * root.scaleFactor)
-                    buttonRadius: Appearance.rounding.full
+                    visible: root.completedCount > 0
+                    Layout.preferredWidth: Math.round((root.instrument ? 30 : 34) * root.scaleFactor)
+                    Layout.preferredHeight: Math.round((root.instrument ? 30 : 34) * root.scaleFactor)
+                    buttonRadius: root.instrument ? root.widgetControlRadius : Appearance.rounding.full
+                    colBackground: "transparent"
+                    colBackgroundHover: ColorUtils.applyAlpha(root.ink, 0.1)
+                    colRipple: ColorUtils.applyAlpha(root.ink, 0.16)
+                    releaseAction: () => root.requestClearCompleted()
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: root.clearCompletedArmed ? "delete_forever" : "delete_sweep"
+                        iconSize: Math.round(18 * root.scaleFactor)
+                        color: root.clearCompletedArmed ? Appearance.colors.colError : root.inkMuted
+                    }
+                    StyledToolTip {
+                        text: root.clearCompletedArmed
+                            ? Translation.tr("Click again to clear completed")
+                            : Translation.tr("Clear completed")
+                    }
+                }
+
+                RippleButton {
+                    Layout.preferredWidth: Math.round((root.instrument ? 34 : 38) * root.scaleFactor)
+                    Layout.preferredHeight: Math.round((root.instrument ? 34 : 38) * root.scaleFactor)
+                    buttonRadius: root.instrument ? root.widgetControlRadius : Appearance.rounding.full
                     colBackground: root.instrument
-                        ? ColorUtils.applyAlpha(root.ink, 0.06) : root.primaryFace
+                        ? ColorUtils.applyAlpha(root.signal, 0.14) : root.primaryFace
                     colBackgroundHover: root.instrument
-                        ? ColorUtils.applyAlpha(root.ink, 0.12)
+                        ? ColorUtils.applyAlpha(root.signal, 0.22)
                         : ColorUtils.mix(root.primaryFace, root.primaryInk, 0.9)
-                    colRipple: ColorUtils.applyAlpha(root.instrument ? root.ink : root.primaryInk, 0.16)
+                    colRipple: ColorUtils.applyAlpha(root.instrument ? root.signal : root.primaryInk, 0.22)
                     releaseAction: () => root.openNewTask()
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: "add"
                         iconSize: Math.round(19 * root.scaleFactor)
-                        color: root.instrument ? root.ink : root.primaryInk
+                        color: root.instrument ? root.signal : root.primaryInk
                     }
                     StyledToolTip { text: Translation.tr("Add task") }
                 }
@@ -254,12 +303,13 @@ AbstractBackgroundWidget {
                 Layout.fillHeight: true
                 clip: true
                 spacing: Math.round(6 * root.scaleFactor)
-                model: Todo.list
+                model: root.visibleTaskEntries
 
                 delegate: SwipeDelegate {
                     id: taskRow
                     required property var modelData
                     required property int index
+                    HoverHandler { id: taskHover }
                     // Instrument: no colored pills — quiet rows over the
                     // wallpaper, separated by hairline rules.
                     readonly property color rowInk: root.instrument
@@ -283,7 +333,8 @@ AbstractBackgroundWidget {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            visible: root.instrument && taskRow.index < Todo.list.length - 1
+                            visible: root.instrument && root.instrumentRules
+                                && taskRow.index < Todo.list.length - 1
                             height: Math.max(1, Math.round(1 * root.scaleFactor))
                             color: ColorUtils.applyAlpha(root.ink, 0.1)
                         }
@@ -309,9 +360,9 @@ AbstractBackgroundWidget {
                                     root.instrument ? root.signal : rowInk, 0.16)
                                 releaseAction: () => {
                                     if (taskRow.modelData.done)
-                                        Todo.markUnfinished(taskRow.index)
+                                        Todo.markUnfinished(taskRow.modelData.originalIndex)
                                     else
-                                        Todo.markDone(taskRow.index)
+                                        Todo.markDone(taskRow.modelData.originalIndex)
                                 }
                                 contentItem: Item {
                                     anchors.fill: parent
@@ -351,6 +402,28 @@ AbstractBackgroundWidget {
                                 font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
                                 font.strikeout: taskRow.modelData.done
                             }
+
+                            RippleButton {
+                                Layout.preferredWidth: Math.round(28 * root.scaleFactor)
+                                Layout.preferredHeight: Math.round(28 * root.scaleFactor)
+                                Layout.alignment: Qt.AlignVCenter
+                                enabled: taskRow.modelData.done || taskHover.hovered
+                                opacity: taskRow.modelData.done ? 0.78
+                                    : taskHover.hovered ? 0.58 : 0
+                                buttonRadius: root.widgetControlRadius
+                                colBackground: "transparent"
+                                colBackgroundHover: ColorUtils.applyAlpha(Appearance.colors.colError, 0.12)
+                                colRipple: ColorUtils.applyAlpha(Appearance.colors.colError, 0.2)
+                                releaseAction: () => Todo.deleteItem(taskRow.modelData.originalIndex)
+                                contentItem: MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "delete"
+                                    iconSize: Math.round(17 * root.scaleFactor)
+                                    color: taskRow.modelData.done
+                                        ? root.inkMuted : Appearance.colors.colError
+                                }
+                                StyledToolTip { text: Translation.tr("Delete task") }
+                            }
                         }
                     }
 
@@ -366,14 +439,15 @@ AbstractBackgroundWidget {
                             iconSize: Math.round(19 * root.scaleFactor)
                             color: Appearance.colors.colOnError
                         }
-                        SwipeDelegate.onClicked: Todo.deleteItem(taskRow.index)
+                        SwipeDelegate.onClicked: Todo.deleteItem(taskRow.modelData.originalIndex)
                     }
                 }
 
                 StyledText {
                     anchors.centerIn: parent
-                    visible: Todo.list.length === 0
-                    text: Translation.tr("Nothing pending")
+                    visible: root.visibleTaskEntries.length === 0
+                    text: Todo.list.length > 0 && !root.showCompleted
+                        ? Translation.tr("No pending tasks") : Translation.tr("Nothing pending")
                     color: root.inkMuted
                     font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
                 }
@@ -383,7 +457,13 @@ AbstractBackgroundWidget {
         ColumnLayout {
             id: editPage
             anchors.fill: parent
-            visible: root.mode === "edit"
+            opacity: root.mode === "edit" ? 1 : 0
+            visible: opacity > 0
+            enabled: root.mode === "edit" && !GlobalStates.widgetEditMode
+            Behavior on opacity {
+                enabled: root.animationsActive
+                NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+            }
             spacing: Math.round(10 * root.scaleFactor)
 
             RowLayout {

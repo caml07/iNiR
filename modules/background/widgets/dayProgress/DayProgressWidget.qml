@@ -8,6 +8,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.background.widgets
+import qs.modules.background.widgets.instrument
 
 AbstractBackgroundWidget {
     id: root
@@ -28,6 +29,7 @@ AbstractBackgroundWidget {
     resizeMinWidth: 190
     resizeMinHeight: 190
     needsColText: true
+    widgetSurfaceEnabled: false
 
     // ── Tokens ───────────────────────────────────────────────
     // Semantic roles follow the shared desktop-widget palette contract
@@ -77,133 +79,25 @@ AbstractBackgroundWidget {
             Layout.fillHeight: true
 
             readonly property real size: Math.min(width, height)
-            // Single shared radius: ticks and arc live on the same circle so
-            // the elapsed path reads as one continuous instrument.
-            readonly property real radius: size / 2 - Math.max(14, Math.round(15 * root.scaleFactor))
-            readonly property real arcWidth: Math.max(3, Math.round(4.5 * root.scaleFactor))
+            readonly property real dialScale: root.scaleFactor
 
-            // ── Minute tick ring ─────────────────────────────
-            Repeater {
-                model: root.showTicks ? 60 : 0
-
-                Item {
-                    id: tick
-                    required property int index
-                    readonly property bool elapsed: (index / 60) <= root.dayFraction
-                    readonly property bool quarter: index % 15 === 0
-                    // Recent minutes burn brighter toward the tip: the ring
-                    // reads as a fading trail instead of a flat fill.
-                    readonly property real recency: Math.max(0,
-                        Math.min(1, 1 - (root.dayFraction * 60 - index) / 40))
-                    anchors.centerIn: ringArea
-                    width: ringArea.size
-                    height: ringArea.size
-                    rotation: index * 6
-
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        // Ticks straddle the shared radius so the arc meets
-                        // them edge-to-edge instead of floating inside.
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.verticalCenterOffset: -ringArea.radius
-                        width: tick.quarter ? Math.round(2.5 * root.scaleFactor) : Math.max(1, Math.round(1.5 * root.scaleFactor))
-                        height: tick.quarter ? Math.round(12 * root.scaleFactor) : Math.round(6.5 * root.scaleFactor)
-                        radius: width / 2
-                        color: !tick.elapsed
-                            ? (tick.quarter ? root.inkDim : root.inkFaint)
-                            : tick.quarter ? root.accent
-                            : ColorUtils.applyAlpha(root.accentSoft, 0.30 + 0.70 * tick.recency)
-                        Behavior on color {
-                            enabled: root.animationsActive
-                            ColorAnimation { duration: Appearance.animation.elementMoveFast.duration }
-                        }
-                    }
-                }
-            }
-
-            // ── Hour labels 00 / 06 / 12 / 18 ────────────────
-            // Direct trigonometric placement in screen coordinates: the
-            // label center sits on the ray of its quarter at a fixed
-            // distance just beyond the tick ring. No nested transforms.
-            Repeater {
-                model: root.showHourLabels ? [0, 6, 12, 18] : []
-
-                StyledText {
-                    id: hourLabel
-                    required property int modelData
-                    // -PI/2 puts 0h at 12 o'clock; hours then run clockwise.
-                    readonly property real angle: (modelData / 24) * 2 * Math.PI - Math.PI / 2
-                    readonly property real labelRadius: ringArea.radius
-                        + Math.max(15, Math.round(16 * root.scaleFactor))
-                    // Center on the ring's true center per axis (same
-                    // reference as the ticks' anchors.centerIn), so labels
-                    // stay attached at any widget aspect ratio.
-                    x: ringArea.width / 2 + labelRadius * Math.cos(angle) - width / 2
-                    y: ringArea.height / 2 + labelRadius * Math.sin(angle) - height / 2
-                    text: String(modelData).padStart(2, "0")
-                    color: root.inkMuted
-                    font {
-                        family: Appearance.font.family.numbers
-                        pixelSize: Math.round(11 * root.scaleFactor * root.textScale)
-                        weight: Font.DemiBold
-                        letterSpacing: 1
-                    }
-                }
-            }
-
-            // ── Elapsed arc ──────────────────────────────────
-            Shape {
-                anchors.centerIn: parent
-                width: ringArea.size
-                height: ringArea.size
-                preferredRendererType: Shape.CurveRenderer
-                visible: root.showArc && root.dayFraction > 0.0005
-
-                ShapePath {
-                    strokeColor: root.accent
-                    strokeWidth: ringArea.arcWidth
-                    capStyle: ShapePath.RoundCap
-                    fillColor: "transparent"
-                    PathAngleArc {
-                        centerX: ringArea.size / 2
-                        centerY: ringArea.size / 2
-                        radiusX: ringArea.radius
-                        radiusY: ringArea.radius
-                        startAngle: -90
-                        sweepAngle: root.dayFraction * 360
-                    }
-                }
-
-                // Comet tail riding the tip on the same radius: motion
-                // emphasis that melts into the arc instead of a detached dot.
-                ShapePath {
-                    strokeColor: root.showComet ? ColorUtils.applyAlpha(root.accent, 0.18) : "transparent"
-                    strokeWidth: ringArea.arcWidth + Math.max(2, Math.round(2.5 * root.scaleFactor))
-                    capStyle: ShapePath.RoundCap
-                    fillColor: "transparent"
-                    PathAngleArc {
-                        centerX: ringArea.size / 2
-                        centerY: ringArea.size / 2
-                        radiusX: ringArea.radius
-                        radiusY: ringArea.radius
-                        startAngle: -90 + root.dayFraction * 360 - 14
-                        sweepAngle: 14
-                    }
-                }
-                ShapePath {
-                    strokeColor: root.showComet ? ColorUtils.applyAlpha(root.accent, 0.38) : "transparent"
-                    strokeWidth: ringArea.arcWidth + Math.max(1, Math.round(1.5 * root.scaleFactor))
-                    capStyle: ShapePath.RoundCap
-                    fillColor: "transparent"
-                    PathAngleArc {
-                        centerX: ringArea.size / 2
-                        centerY: ringArea.size / 2
-                        radiusX: ringArea.radius
-                        radiusY: ringArea.radius
-                        startAngle: -90 + root.dayFraction * 360 - 5
-                        sweepAngle: 5
-                    }
-                }
+            InstrumentRing {
+                id: ring
+                anchors.fill: parent
+                scaleFactor: ringArea.dialScale
+                fraction: root.dayFraction
+                showTicks: root.showTicks
+                showArc: root.showArc
+                showComet: root.showComet
+                labels: [
+                    { text: "00", hour: 0 }, { text: "06", hour: 6 },
+                    { text: "12", hour: 12 }, { text: "18", hour: 18 }
+                ]
+                showLabels: root.showHourLabels
+                ink: root.ink
+                accent: root.accent
+                accentSoft: root.accentSoft
+                animated: root.animationsActive
             }
 
             // ── Center readout ───────────────────────────────
@@ -222,7 +116,10 @@ AbstractBackgroundWidget {
                 StyledText {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: root.showIcon ? Math.round(2 * root.scaleFactor) : 0
+                    Layout.maximumWidth: ringArea.size * 0.68
                     text: DateTime.time
+                    fontSizeMode: Text.Fit
+                    minimumPixelSize: 12
                     color: root.ink
                     font {
                         family: Appearance.font.family.numbers
@@ -231,16 +128,34 @@ AbstractBackgroundWidget {
                     }
                 }
 
-                StyledText {
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: Math.round(1 * root.scaleFactor)
-                    text: Translation.tr("%1 of the day").arg(Math.round(root.dayFraction * 100) + "%")
-                    color: root.accentSoft
-                    font {
-                        family: Appearance.font.family.numbers
-                        pixelSize: Math.round(ringArea.size * 0.075 * root.textScale)
-                        weight: Font.DemiBold
-                        letterSpacing: 0.4
+                    spacing: Math.round(3 * root.scaleFactor)
+
+                    // Signal is the number: live ticks in accent. The phrase
+                    // is a caption and stays muted.
+                    StyledText {
+                        text: Math.round(root.dayFraction * 100) + "%"
+                        color: root.accentSoft
+                        font {
+                            family: Appearance.font.family.numbers
+                            pixelSize: Math.round(ringArea.size * 0.075 * root.textScale)
+                            weight: Font.DemiBold
+                            letterSpacing: 0.4
+                        }
+                    }
+
+                    StyledText {
+                        text: Translation.tr("of the day")
+                        color: root.inkMuted
+                        font {
+                            family: Appearance.font.family.main
+                            pixelSize: Math.round(ringArea.size * 0.062 * root.textScale)
+                            weight: Font.DemiBold
+                            letterSpacing: Math.round(1.2 * root.scaleFactor)
+                            capitalization: Font.AllUppercase
+                        }
                     }
                 }
             }
@@ -321,10 +236,11 @@ AbstractBackgroundWidget {
                 Layout.fillWidth: true
                 spacing: 10
 
-                MaterialSymbol {
-                    text: "format_size"
-                    iconSize: 18
+                StyledText {
+                    text: Translation.tr("Text size")
                     color: root.inkMuted
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    font.weight: Font.DemiBold
                 }
                 StyledSlider {
                     id: textSizeSlider

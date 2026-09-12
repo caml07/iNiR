@@ -215,7 +215,7 @@ Item {
         // its base capsule while information-rich widgets retain tonal pills.
         const joinedBlacklist = [
             "workspaces", "divisor", "powerButton", "docktoPanel",
-            "leftSidebarButton", "activeWindow", "visualizer",
+            "leftSidebarButton", "rightSidebarButton", "activeWindow", "visualizer",
             "notificationUnreadCount"
         ]
         return !joinedBlacklist.includes(name)

@@ -2385,20 +2385,22 @@ Singleton {
                     }
                     property int gapsOut: 5 // Outer gap the float/M3 styles detach by
                     // Widget names resolve to modules/barM3/<Name>.qml. Available:
-                    // media, workspaces, activeWindow, leftSidebarButton, docktoPanel,
+                    // media, workspaces, activeWindow, leftSidebarButton, rightSidebarButton, docktoPanel,
                     // visualizer, divisor, resources, sysTray, systemIcons, utilButtons,
                     // networkSpeed, updatesCount, batteryIndicator, weatherBar,
                     // clockWidget, notificationUnreadCount, powerButton.
-                    // The showcase uses a mirrored visualizer around the in-bar dock.
+                    // Fresh installs start on the compact Flow composition so the
+                    // feature/system sidebars have discoverable entry points. The
+                    // showcase remains an explicit preset with mirrored visualizers.
                     // The active layout is kept separate from the user's custom
                     // layout. Presets may replace the active lists, but must never
                     // destroy the last custom arrangement.
-                    property string layoutMode: "auto" // "auto" | "compact" | "showcase" | "information" | "custom"
+                    property string layoutMode: "compact" // "auto" | "compact" | "showcase" | "information" | "custom"
                     property bool customLayoutSaved: false
                     property JsonObject layouts: JsonObject {
-                        property list<string> leftLayout: ["media", "workspaces"]
-                        property list<string> middleLayout: ["visualizer", "docktoPanel", "visualizer"]
-                        property list<string> rightLayout: ["utilButtons", "systemIcons", "weatherBar", "clockWidget"]
+                        property list<string> leftLayout: ["leftSidebarButton", "media", "workspaces"]
+                        property list<string> middleLayout: ["docktoPanel"]
+                        property list<string> rightLayout: ["utilButtons", "weatherBar", "clockWidget", "systemIcons", "rightSidebarButton"]
                     }
                     property JsonObject customLayouts: JsonObject {
                         property list<string> leftLayout: []

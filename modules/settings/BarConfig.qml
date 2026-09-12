@@ -261,9 +261,9 @@ ContentPage {
         const left = JSON.stringify(Config.options?.bar?.m3?.layouts?.leftLayout ?? [])
         const middle = JSON.stringify(Config.options?.bar?.m3?.layouts?.middleLayout ?? [])
         const right = JSON.stringify(Config.options?.bar?.m3?.layouts?.rightLayout ?? [])
-        if (left === JSON.stringify(["media", "workspaces"])
+        if (left === JSON.stringify(["leftSidebarButton", "media", "workspaces"])
                 && middle === JSON.stringify(["docktoPanel"])
-                && right === JSON.stringify(["utilButtons", "systemIcons", "weatherBar", "clockWidget"]))
+                && right === JSON.stringify(["utilButtons", "weatherBar", "clockWidget", "systemIcons", "rightSidebarButton"]))
             return "compact"
         if (left === JSON.stringify(["media", "workspaces"])
                 && middle === JSON.stringify(["visualizer", "docktoPanel", "visualizer"])
@@ -278,8 +278,12 @@ ContentPage {
 
     readonly property string m3LayoutPreset: {
         const stored = Config.options?.bar?.m3?.layoutMode ?? "auto"
-        return ["compact", "showcase", "information", "custom"].includes(stored)
-            ? stored : root.detectM3LayoutPreset()
+        if (stored === "custom")
+            return "custom"
+        const detected = root.detectM3LayoutPreset()
+        if (["compact", "showcase", "information"].includes(stored))
+            return detected === stored ? stored : detected
+        return detected
     }
 
     function currentM3Layouts(): var {
@@ -369,9 +373,9 @@ ContentPage {
         }
 
         if (value === "compact") {
-            updates["bar.m3.layouts.leftLayout"] = ["media", "workspaces"]
+            updates["bar.m3.layouts.leftLayout"] = ["leftSidebarButton", "media", "workspaces"]
             updates["bar.m3.layouts.middleLayout"] = ["docktoPanel"]
-            updates["bar.m3.layouts.rightLayout"] = ["utilButtons", "systemIcons", "weatherBar", "clockWidget"]
+            updates["bar.m3.layouts.rightLayout"] = ["utilButtons", "weatherBar", "clockWidget", "systemIcons", "rightSidebarButton"]
         } else if (value === "showcase") {
             updates["bar.m3.layouts.leftLayout"] = ["media", "workspaces"]
             updates["bar.m3.layouts.middleLayout"] = ["visualizer", "docktoPanel", "visualizer"]
@@ -387,6 +391,8 @@ ContentPage {
     readonly property var m3Widgets: [
         { id: "leftSidebarButton", name: Translation.tr("Left Sidebar Button"), icon: "left_panel_open",
             description: Translation.tr("Click: Left Sidebar") },
+        { id: "rightSidebarButton", name: Translation.tr("Right Sidebar Button"), icon: "right_panel_open",
+            description: Translation.tr("Click: Right Sidebar") },
         { id: "workspaces", name: Translation.tr("Workspaces"), icon: "steppers" },
         { id: "weatherBar", name: Translation.tr("Weather"), icon: "flare" },
         { id: "media", name: Translation.tr("Media"), icon: "music_note" },

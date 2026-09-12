@@ -102,6 +102,7 @@ Item {
     readonly property bool _cookie: root._resolvedDialect === "cookie"
     readonly property bool _editorial: root._resolvedDialect === "editorial"
     readonly property bool _island: root._resolvedDialect === "island"
+    readonly property bool _material: root._resolvedDialect === "material"
     readonly property bool _editorialStackActive: root._editorial
         && Appearance.editorial.paperStack && !root.borderless
         && (root.editorialFocus || (root.outlined && root.elevation <= 1))
@@ -110,7 +111,16 @@ Item {
         && (root._aurora || (root._editorial && Appearance.editorial.glassActive && !root.editorialFocus))
 
     // ── Color de fondo (misma elección que hacían los paneles a mano) ──
-    readonly property color _solidFill: root.elevation <= 0 ? Appearance.colors.colLayer0Base
+    // An explicit Material dialect is a real ownership boundary: consumers such
+    // as onboarding must not become Aurora glass, Regalia mass or Cookie dough
+    // merely because the shell style changes underneath them.
+    readonly property color _materialFill: root.elevation <= 0 ? Appearance.m3colors.m3surface
+        : root.elevation === 1 ? Appearance.m3colors.m3surfaceContainerLow
+        : root.elevation === 2 ? Appearance.m3colors.m3surfaceContainer
+        : root.elevation === 3 ? Appearance.m3colors.m3surfaceContainerHigh
+        : Appearance.m3colors.m3surfaceContainerHighest
+    readonly property color _solidFill: root._material ? root._materialFill
+        : root.elevation <= 0 ? Appearance.colors.colLayer0Base
         : root.elevation === 1 ? Appearance.colors.colLayer1Base
         : root.elevation === 2 ? Appearance.colors.colLayer2Base
         : root.elevation === 3 ? Appearance.colors.colLayer3Base
@@ -119,6 +129,7 @@ Item {
         : root._editorial && root.editorialFocus ? Appearance.editorial.ink
         : root._editorial && root.editorialGlassMaterial && Appearance.editorial.glassActive
             ? (root.elevation >= 2 ? Appearance.editorial.glassLayer2 : Appearance.editorial.glassPaper)
+        : root._material ? root._materialFill
         : root.opaqueSurface ? root._solidFill
         : root._angel ? Appearance.angel.colGlassCard
         : root._regalia ? (root.elevation <= 0 ? Appearance.regalia.bg0
@@ -152,7 +163,8 @@ Item {
         : root._editorial ? 1
         : root._inir ? 1
         : (root.cardStyle ? 1 : 0)
-    readonly property color _borderColor: root._angel ? Appearance.angel.colCardBorder
+    readonly property color _borderColor: root._material ? Appearance.m3colors.m3outlineVariant
+        : root._angel ? Appearance.angel.colCardBorder
         : root._regalia ? "transparent"
         : root._inir ? Appearance.inir.colBorder
         : Appearance.colors.colLayer0Border

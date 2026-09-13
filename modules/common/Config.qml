@@ -1262,7 +1262,7 @@ Singleton {
                         property bool pauseOnGameMode: true
                         property bool pauseOnFullscreen: true
                         property bool pauseWhenWindowsPresent: false
-                        property bool showPausedEffect: true
+                        property bool showPausedEffect: false
                     }
                     property list<string> screenList: []
                     property list<var> outputOverrides: []

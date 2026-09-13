@@ -1003,7 +1003,7 @@ Desktop-widget power management (pauses widget rendering on game mode, fullscree
 
 | Function | Description |
 |----------|-------------|
-| `status` | Returns JSON: `enabled`, `widgetsActive`, and the active `triggers` (gameMode, fullscreen, windowsPresent, editMode) |
+| `status` | Returns JSON: `enabled`, `widgetsActive`, `pauseReason`, and the active `triggers` (gameMode, fullscreen, windowsPresent, editMode) |
 
 ---
 

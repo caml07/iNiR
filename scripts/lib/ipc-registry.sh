@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: a8fc33975732bfff
+# IPC.md hash: d4e2bfe6ac10461d
 # Targets: 62
 
 declare -gA IPC_TARGET_DESC=(
@@ -473,7 +473,7 @@ declare -gA IPC_FUNCTION_DESC=(
   ["wbar:toggle"]="Show/hide taskbar"
   ["wbar:close"]="Hide taskbar"
   ["wbar:open"]="Show taskbar"
-  ["widgetpower:status"]="Returns JSON: \`enabled\`, \`widgetsActive\`, and the active \`triggers\` (gameMode, fullscreen, windowsPresent, editMode)"
+  ["widgetpower:status"]="Returns JSON: \`enabled\`, \`widgetsActive\`, \`pauseReason\`, and the active \`triggers\` (gameMode, fullscreen, windowsPresent, editMode)"
   ["wnotificationCenter:toggle"]="Open/close notification center"
   ["wnotificationCenter:close"]="Close notification center"
   ["wnotificationCenter:open"]="Open notification center"

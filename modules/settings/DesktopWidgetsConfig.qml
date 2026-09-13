@@ -1736,11 +1736,13 @@ ContentPage {
                 label: Translation.tr("Pause when windows present")
                 icon: "web_asset"
                 psKey: "pauseWhenWindowsPresent"
+                psDefault: false
             }
             PowerSavingSwitchRow {
                 label: Translation.tr("Show paused effect")
                 icon: "filter_b_and_w"
                 psKey: "showPausedEffect"
+                psDefault: false
             }
 
             // Status indicator
@@ -1768,9 +1770,17 @@ ContentPage {
                         }
                         StyledText {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: WidgetPowerManager.widgetsActive 
-                                ? Translation.tr("Active") 
-                                : Translation.tr("Paused")
+                            text: {
+                                if (WidgetPowerManager.widgetsActive)
+                                    return Translation.tr("Active")
+                                switch (WidgetPowerManager.pauseReason) {
+                                case "gameMode": return Translation.tr("Paused - GameMode")
+                                case "fullscreen": return Translation.tr("Paused - fullscreen")
+                                case "windowsPresent": return Translation.tr("Paused - windows present")
+                                case "outputDisabled": return Translation.tr("Paused - output disabled")
+                                default: return Translation.tr("Paused")
+                                }
+                            }
                             font.pixelSize: Appearance.font.pixelSize.small
                             color: WidgetPowerManager.widgetsActive 
                                 ? Appearance.colors.colPrimary 

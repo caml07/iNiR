@@ -506,7 +506,7 @@ AbstractWidget {
 
     // Visual feedback when paused - desaturation + slight dim
     // Config option to disable visual effect if user only wants GPU savings
-    readonly property bool _showPausedEffect: Config.options?.background?.widgets?.powerSaving?.showPausedEffect ?? true
+    readonly property bool _showPausedEffect: Config.options?.background?.widgets?.powerSaving?.showPausedEffect ?? false
     readonly property real _pausedSaturation: root.powerActive ? 0 : -0.7  // -0.7 = mostly grayscale
     readonly property real _pausedBrightness: root.powerActive ? 0 : -0.15 // slight dim
     

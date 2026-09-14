@@ -553,7 +553,7 @@ AbstractBackgroundWidget {
                         pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         weight: Font.DemiBold
                         letterSpacing: Math.round(1.4 * root.scaleFactor)
-                        capitalization: Font.AllUppercase
+                        capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     }
                 }
 
@@ -594,7 +594,7 @@ AbstractBackgroundWidget {
                     font.family: Appearance.font.family.main
                     font.pixelSize: Math.max(10, Math.round(instrumentArea.side * 0.055))
                     font.weight: Font.DemiBold
-                    font.capitalization: Font.AllUppercase
+                    font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     font.letterSpacing: Math.round(1.1 * root.scaleFactor)
                 }
             }

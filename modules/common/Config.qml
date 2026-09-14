@@ -3808,10 +3808,17 @@ Singleton {
                 property JsonObject dock: JsonObject {
                     property bool enable: true
                     property bool autoHide: true
+                    property bool blur: false
                     property int iconSize: 40
+                    property bool notch: false
+                    property bool magnification: true
+                    property bool badges: true // Unread notification counts on app icons
+                    property bool revealOnEmpty: true // Auto-hide keeps the dock shown on an empty workspace
                 }
                 property JsonObject appearance: JsonObject {
                     property string design: "island" // "classic" or "island"
+                    property int expandedRadius: 28
+                    property int motionDuration: 220
                     property string fontFamily: "" // Empty = inherit the global UI font
                     property string titleFontFamily: "" // Empty = inherit the global title font
                     property real density: 1.0
@@ -3820,6 +3827,11 @@ Singleton {
                 }
                 property JsonObject bar: JsonObject {
                     property string position: "top" // "top" or "bottom"
+                    property string composition: "unified" // "unified" or "cluster"
+                    property bool notch: false
+                    property bool hoverExpand: true
+                    property int hoverDelay: 160
+                    property string scrollAction: "volume" // "volume", "brightness" or "none"
                     property int height: 42
                     property int margin: 8
                     property bool reserveSpace: true
@@ -3832,6 +3844,10 @@ Singleton {
                     property int width: 640
                     property int maxResults: 8
                     property bool showHints: true
+                }
+                property JsonObject player: JsonObject {
+                    property bool roundCover: true
+                    property bool artworkBackground: true
                 }
                 property JsonObject controlCenter: JsonObject {
                     property int width: 360

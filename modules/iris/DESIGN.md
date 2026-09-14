@@ -1,272 +1,340 @@
-# iRiS — Apple Design Contract
+# iRiS — Design Contract
 
-iRiS is iNiR's Apple-inspired shell family. It is a separate product language, not a Material II
-theme and not a Waffle variant. The default presentation is `island`; `classic` remains available
-as a compatibility/fallback layout while the Apple direction expands.
+iRiS is iNiR's Apple-inspired shell family and its next flagship. It is a separate product
+language: not a Material II theme, not a Waffle variant. `island` is the default design;
+`classic` remains the alternate compact-bar design and must keep working.
 
-This document describes the direction that must constrain new iRiS work and records the current
-baseline introduced by the first Island/Dock pass.
+This document is the contract for iRiS presentation and interaction. Read `AGENTS.md` in this
+directory for the working method (render → capture → inspect loop) before changing anything here.
 
-## Product direction
+## 1. Product principles
 
-- **Apple-inspired desktop composition.** Prefer calm neutral surfaces, continuous rounded
-  silhouettes, strong spatial hierarchy, a centered Dock and a compact morphing Island.
-- **Wallpaper-first.** Chrome should frame the desktop rather than cover it. Desktop widgets may
-  participate, but they must read as part of the same family instead of importing Material II's
-  visual dialect.
-- **One visual family.** Palette, Control Center, notifications, OSD, session, lock, auth, Dock,
-  Island and desktop widgets must feel like one system.
-- **System-like behavior over decoration.** Interaction, hierarchy, motion and spacing matter more
-  than ornamental shapes. Avoid adding visual elements merely to make a surface look "designed".
-- **Preserve iNiR capability.** Apple aesthetics are the presentation contract; shared iNiR
-  services and mature behavior primitives remain the implementation foundation where appropriate.
+1. **One object, many shapes.** The Island is the origin of the system. Surfaces the user opens
+   from it (Control Center, Settings, Spotlight) grow out of the exact shape that opened them and
+   collapse back into what the Island looks like when they close. Only one shape is ever on screen.
+2. **Wallpaper-first.** Chrome frames the desktop. No full-screen dimming except where the task
+   demands attention (Session, Lock).
+3. **Glanceable, then deep.** Compact states answer "what's happening" in one look; expanded
+   states offer the next action without another window.
+4. **Direct motion.** Fast, front-loaded, with a short settle. No bounce except launch feedback.
+   Reversing mid-flight stays one coherent shape.
+5. **Truthful controls.** Every visible option drives a real runtime consumer. No speculative knobs.
+6. **Reuse iNiR.** Services, models and providers are shared; iRiS owns presentation only.
+7. **Family isolation.** iRiS adaptations of shared code are gated on the active family
+   (`panelFamily === "iris"` and, where relevant, `IrisStyle.island`). Material II and Waffle must
+   render byte-for-byte the same when iRiS is not active.
 
-## Current baseline
+## 2. Visual grammar
 
-The Apple branch currently establishes these pieces:
-
-- `appearance.design = "island"` as the default iRiS design;
-- a morphing top/bottom `IrisIsland` owned by `IrisBar`;
-- integrated media state and volume/brightness/microphone feedback in the Island;
-- an auto-hiding centered `IrisDock` using iNiR taskbar/app services;
-- shared desktop widgets through `Background`, with iRiS semantic tokens and surfaces;
-- iRiS Palette, Control Center, notification popup, OSD fallback, Session, Lock, Polkit and close
-  confirmation surfaces;
-- `classic` bar support retained as an alternate design;
-- configurable density, motion, bar geometry, Dock behavior, module slots and surface sizing.
-
-This is a **foundation**, not the final Apple pass. Some surfaces still contain visual vocabulary
-from the earlier technical iRiS direction (for example uppercase technical section labels, accent
-rails and older action-row composition). Those are transitional. New work should move them toward
-the Apple grammar below rather than extending that older language.
-
-## Apple visual grammar
-
-### Surfaces
-
-- Prefer one continuous surface per interaction region instead of cards nested inside cards.
-- Island/Dock silhouettes use large continuous radii. The current Island radius resolves to
-  `28px * density`; compact controls use smaller derived radii.
-- Separators are quiet hairlines. Borders are not the primary way to create hierarchy.
-- Avoid Material-specific ornamental shapes such as `MaterialCookie` as default containers.
-- Avoid heavy drop shadows and permanent full-screen effects. If translucency/vibrancy is added,
-  it must remain readable without blur and must have a measured runtime cost.
-- Rounded geometry must be intentional: a capsule is for Island/Dock/control chrome, not a generic
-  answer for every row.
-
-### Baseline palette
-
-The current Island implementation intentionally starts from an Apple-like neutral dark chassis:
+### Palette (owned by `IrisStyle.qml`)
 
 ```text
-surface             #000000
-surface high        #1c1c1e
-surface highest     #2c2c2e
+surface             #000000   Island, Dock, panels
+surface high        #1c1c1e   grouped cards, sidebars, widget plates
+surface highest     #2c2c2e   raised tiles, launcher tile
 text                #f5f5f7
 secondary text      #aeaeb2
 muted text          #8e8e93
-accent              #a8c7fa
-secondary accent    #ff9f0a
-danger              #ff6961
+accent              #a8c7fa   selection, on-state switches, sliders
+secondary accent    #ff9f0a   timers
+danger              #ff6961   recording, destructive confirmation, badges
 hairline            #262628
 strong hairline     #48484a
 ```
 
-These are semantic tokens owned by `IrisStyle.qml`; consumers must not copy the literals. A later
-light appearance or wallpaper-adaptive variant belongs in `IrisStyle`, not in individual panels.
+Consumers use tokens, never literals. Two documented exceptions: Settings section badges use a
+fixed category tint per section, and Lock/Session text over wallpaper uses pure white with alpha.
+
+Translucent fills inside black surfaces are expressed as `applyAlpha(text, n)`:
+`0.07` quiet tile, `0.10–0.14` control track / resting disc, `0.20–0.26` hover / selected segment.
+Keyboard/list selection inside Spotlight and Settings uses `applyAlpha(accent, 0.20–0.22)`.
+
+### Shape
+
+| Element | Radius |
+| --- | --- |
+| Compact Island, satellites, capsule controls, chips | height / 2 |
+| Expanded Island | `max(IrisStyle.radius, 30·d)` |
+| Control Center, Settings frame | `30·d` |
+| Spotlight | `26·d` |
+| Desktop widget plates | `22·d` |
+| Grouped cards (Settings), status tiles | `14–16·d` |
+| Sidebar rows, dock menu rows | `10–12·d` |
+| App-icon-like tiles (dock launcher) | `26 %` of the tile |
+
+No nested cards: a card inside a black surface is a `surface high` or `text@0.07` fill, never a
+second bordered container. Separators are 1px hairlines inset to the text column.
 
 ### Typography
 
-- iRiS should read like a system UI: clean sans-serif body text, restrained weights, compact
-  metadata and clear numeric/status hierarchy.
-- Do **not** bundle Apple proprietary fonts. `fontFamily` and `titleFontFamily` remain user
-  overrides; Island currently falls back to `Noto Sans` when no iRiS font is configured.
-- Respect the shell-wide typography scale independently from iRiS density. Density controls
-  geometry; typography scale controls text.
-- Avoid making uppercase technical labels or letter-spaced eyebrows a defining Apple motif. They
-  may remain during migration but should not spread to new surfaces.
+`IrisStyle.fontMain` (Noto Sans unless the user sets `iris.appearance.fontFamily`). Numbers use
+tabular figures (`font.features: { "tnum": 1 }`). Sentence case everywhere — no uppercase
+eyebrows or letter-spaced labels in Island design (Classic may keep them). Scale follows the
+shell typography scale (`IrisStyle.typeScale`); density scales geometry only.
+
+| Role | Size |
+| --- | --- |
+| Lock clock | 112 |
+| Session clock | 64 |
+| Desktop page clock | 36 |
+| Page title (Settings) | 21 bold |
+| Spotlight field | 21 |
+| Body / row label | 13–13.5 |
+| Metadata / section header | 11.5–12, muted, demibold for headers |
 
 ### Icons
 
-- Use `MaterialSymbol` only as iNiR's available semantic glyph engine, not as an excuse to copy
-  Material component composition.
-- Prefer simple monochrome glyphs with state conveyed by fill/weight, opacity or surrounding
-  control material.
-- Application identity uses `SmartAppIcon`; do not replace real app artwork with generic symbols.
+`MaterialSymbol` is the glyph engine; filled for state, outline for affordance. App identity
+always uses `SmartAppIcon`. Glyph badges are plain circles — never Material expressive shapes.
 
-### Motion
+## 3. Motion
 
-- Motion should feel direct and physical: short opacity, scale, radius and geometry transitions.
-- Current Island geometry uses ~240ms `OutQuint`; Dock reveal uses ~180ms `OutCubic`; app hover
-  scale is ~110ms.
-- No persistent decorative animation in idle UI.
-- `IrisStyle.duration()` remains the gate so global animation policy and the iRiS motion switch are
-  respected.
+- **Curve:** `IrisStyle.morphCurve` = `cubic-bezier(0.16, 1, 0.3, 1)`.
+- **Durations:** morph `iris.appearance.motionDuration` (default 220 ms); surface morph ×1.35;
+  feedback 100 ms; hover/colour 110–140 ms; content cross-fades 150–160 ms.
+- `IrisStyle.duration()` gates everything so the global animation policy and the iRiS motion
+  switch are respected.
+- One geometry animation per transition. Never animate width, height, radius, scale and opacity
+  independently to fake richness.
+- Idle UI has no decorative animation. Waveform, recording pulse and similar only run while that
+  state is real and visible.
 
-## Island
+### Morph surfaces (`IrisMorphSurface`)
 
-`modules/iris/bar/IrisIsland.qml` is the signature iRiS surface.
+- One `presentation` value (0→1) interpolates a clipping chassis from the origin rect to the
+  surface's resting rect. Content fades in after 35 % and scales from 0.965.
+- Origins: `GlobalStates.irisMorphOrigin` (published by the Island), or `originItem` (Dock icon).
+- The Island publishes **on open and on close**; the surface re-captures on close so it collapses
+  into the Island's current shape.
+- `GlobalStates.irisMorphHandoff` is true while an Island-origin morph is in flight; the Island
+  hides the published part (chassis or controls satellite) on that frame and fades back in after.
+- The chassis is visible from the open request (so fields can take focus) but transparent until
+  armed (so the fallback rect never paints).
+- Layer surfaces never resize per frame: windows are stable canvases, input is limited by `mask`.
 
-Compact state should communicate only the most useful context:
+## 4. Layer-shell rules (hard-won)
 
-- current media / system feedback;
-- time;
-- a small semantic status glyph.
+- **Never change a surface's anchors at runtime to catch outside clicks.** A layer anchored to two
+  opposite edges loses its exclusive zone and every tiled window resizes.
+- **Never switch a live surface's layer to get above something.** The surface is recreated and its
+  content flashes (menus "open and close"). Outside-click dismissal uses a transparent full-screen
+  `*-dismiss` layer (`ExclusionMode.Ignore`, Top) that is declared and mapped *before* its owner,
+  stays mapped, and only enables input through its `mask` while needed — so it always stacks
+  below the owner on the same layer.
+- Items that accept hover block `HoverHandler`s on **sibling** items beneath them. Track pointer
+  presence with a handler on a common ancestor (window content) and let the input mask decide
+  where it counts.
+- `forceActiveFocus()` is ignored on invisible subtrees and inside unfocused `Loader` scopes.
+  Give loaders `focus: true` and re-claim focus when a morph settles.
+- Escape is handled with a window-level `Shortcut`, never only in a child's `Keys` handler.
+- Content that scales up (Dock magnification) is rasterised at its largest size and scaled down at
+  rest; scaling a small bitmap up pixelates it.
+- A blur that fills a clipped surface is drawn past its bounds (overscan) so its transparent,
+  darkened edges never show as rims.
 
-Expanded state may expose:
+## 5. Surfaces
 
-- artwork and track metadata;
-- media transport and seek controls;
-- configured bar modules;
-- a route to Quick Controls.
+### Island (`bar/IrisIsland.qml`)
 
-The Island should morph as one object. Do not simulate expansion by stacking unrelated cards or
-opening another popup on top of it. Opening Palette/Control Center or a notification may collapse
-the Island when those surfaces need priority.
+One black `ClippingRectangle` chassis owns the silhouette; everything is clipped by it.
 
-## Dock
+- **Live activities**, prioritised `record > timer > media`. The primary fills the chassis; a
+  second detaches as a satellite that slides out from behind the edge.
+- **Compositions:** Unified (one chassis) or Cluster (clock chassis + activity satellite + controls
+  satellite).
+- **Feedback HUD:** volume/brightness/mic morph into glyph + level capsule + value.
+- **Expanded pages** with a shared nav row (media · activities · desktop | Control Center · Settings):
+  - *Now playing*: cover, title/artist, tinted waveform, scrubber with elapsed/remaining,
+    transport, full-chassis blurred artwork.
+  - *Live activities*: recording (stop) and timer (pause/resume/stop) rows.
+  - *Desktop*: clock + date + weather (when enabled), workspace page dots for this output
+    (click to switch), focused app card (read from the workspace's last-focused window because a
+    pinned Island holds keyboard focus), status tiles (network, sound, Bluetooth, battery when
+    present — each opens Control Center), and any `custom:` bar modules.
+- **Interaction:** intent hover (pointer settles ≤6 px for `iris.bar.hoverDelay`), never opens a
+  panel by hover; any press inside pins; pinned closes on outside click (dismiss layer) or Escape;
+  middle click toggles playback; scroll adjusts volume/brightness (Shift swaps).
+- **Fullscreen:** resting Island fades out and releases input; HUD and explicit opens appear on
+  Overlay.
+- **Notch:** chassis overflows the edge by its radius plus concave fillets; no per-corner radii.
+- Hover preloads Control Center; expansion preloads Settings.
 
-`modules/iris/dock/IrisDock.qml` is the Apple-style application anchor.
+### Dock (`dock/IrisDock.qml`)
 
-- centered on the active edge;
-- auto-hide is configurable and enabled by default;
-- real application icons come from iNiR's taskbar/app services;
-- hover scale is subtle;
-- running/active state uses a minimal indicator;
-- secondary click exposes window/new-window/pin actions;
-- Dock behavior must work independently of whether the bar is top or bottom.
+- Centred on the edge opposite the Island; stable anchors and exclusive zone while visible.
+- **Visibility:** always visible, or auto-hide with reveal-by-intent (edge held ~110 ms, hide
+  ~420 ms after leaving). `iris.dock.revealOnEmpty` keeps it shown on an empty workspace.
+- **Pointer tracking** lives on the window content; the input region grows to include magnified
+  icons while hovered so the pointer never falls off an enlarged icon.
+- **Icons:** launcher is an app-icon-shaped tile (not a bare glyph) and magnifies like apps;
+  cosine magnification pushes neighbours; name bubble rides above the hovered icon including its
+  magnification; running dot (brighter when focused); pinned/running separator; notification
+  badge (`iris.dock.badges`); launch bounce.
+- **Actions:** click activates/cycles, middle click opens a new window, scroll cycles an app's
+  windows, right click morphs a menu out of the icon (windows, New window, Keep/Unpin, Close).
+  Each button's hit area grows upward with its magnified icon.
+- **Icons** are rasterised at the magnified size (`iconOversample`) and scaled down at rest.
+- **Menu:** the canvas permanently reserves menu space (no resize on open); magnification freezes
+  where it was at the right click so the icon and menu stay aligned; an always-mapped dismiss layer
+  below the dock catches outside clicks.
+- Notch mode flattens the edge side; blur is optional and off by default.
 
-Do not turn the Dock into another Material taskbar. Its primary hierarchy is icon, activity state
-and spatial continuity.
+### Spotlight (`palette/IrisPalette.qml`)
 
-## Desktop widgets
+- Morphs out of the Island into a floating capsule at 20 % screen height; results extend it
+  downward with an animated height. No scrim.
+- Borderless field (search glyph + 21 px input) — never a box inside the box.
+- **Empty query:** Suggestions row (Dock apps: pinned then running, running dot) and search-mode
+  chips that type their prefix (clipboard, calculator, actions, emoji, web, command).
+- **Query:** "Top hit" (large row with description) followed by grouped sections; sliding accent
+  selection; the selected row shows its verb and ↵. Calculator fallback only for numeric queries.
+- **Clipboard mode** (query starts with the clipboard prefix; `Super+V` opens it): "Clipboard
+  history" list, image entries show decoded thumbnails (`CliphistImage`) with dimensions, Enter
+  copies, Delete removes the selected entry; history refreshes when the mode opens.
+- **Keys:** ↑/↓/Tab move (←/→ in suggestions), Enter runs, Escape clears then closes.
 
-Island mode may reuse the existing iNiR `Background` widget canvas instead of maintaining a second
-widget framework.
+### Control Center (`control/IrisQuickPanel.qml`)
 
-`AbstractBackgroundWidget.qml` and `WidgetSurface.qml` adapt shared widgets to `IrisStyle` when the
-active family is iRiS/Island. That adaptation must remain presentation-only: widget behavior and
-data providers stay shared.
+Grows from the controls satellite (Cluster) or chassis (Unified). Header with date and
+Lock/Settings/Power; connectivity discs; now-playing card; capsule sliders with output picker;
+quick tiles; notifications grouped by app.
 
-Current Island widget surfaces are opaque. Any future glass/vibrancy treatment must be introduced
-centrally and measured; do not independently enable wallpaper blur in every widget.
+### Settings (`settings/IrisSettings.qml`, `IrisSetting.qml`)
 
-The `iris.modules.desktopWidgets` switch owns whether this shared canvas is loaded. When disabled,
-the lightweight `IrisBackground` owns the wallpaper again.
+- macOS-style two-pane window morphing out of the Island.
+- **Sidebar** (`surface high`): search capsule, sections with tinted rounded-square badges, iRiS
+  identity footer.
+- **Content:** large title + subtitle, then grouped cards. Rows put the label (and optional
+  description) left and the control right: switch (accent track, white knob), inline segmented
+  control for ≤3 short choices, value + full-width slider for ranges. Wider choices wrap below.
+- The Island section starts with a live miniature preview that follows composition, edge, notch,
+  height, gap and Dock options with the morph curve.
+- Search spans all sections and groups results by section. Page changes slide in 10 px.
+- Keys: Escape clears search → leaves an advanced page → closes; Ctrl+F focuses search.
+- "All Settings" lists the shared iNiR pages as chevron rows.
 
-## Controls and transient surfaces
+### Session (`session/IrisSessionScreen.qml`)
 
-Palette, Control Center, notifications, OSD, Session, Lock, Polkit and Close Confirm must converge
-on the same Apple family vocabulary:
+Dimmed desktop (black 58 %), large clock and long date, one row of 76 px discs with labels:
+Sleep, Restart, Shut Down, Lock, Log Out. Restart/Shut Down/Log Out arm on first press (disc turns
+danger, label "Confirm", hint line explains) and expire after 5 s. ←/→/Tab move a visible focus
+ring, Enter/Space activates, Escape cancels the armed action then closes, clicking outside closes.
 
-- strong title/content hierarchy;
-- grouped controls without excessive nested cards;
-- quiet separators;
-- large but disciplined corner radii;
-- clear selected/disabled/destructive states;
-- keyboard focus that remains visible without adding a permanent outline to every control.
+### Lock (`lock/IrisLockSurface.qml`)
 
-The current components reuse mature iNiR behavior primitives (`RippleButton`, `StyledSlider`,
-`MaterialTextField`, `SmartAppIcon`, `MaterialSymbol`) while iRiS owns their composition and tokens.
+Blurred wallpaper (MultiEffect, desaturated, respects `lock.blur.enable`) with a top/bottom
+gradient; date over a 112 px clock; now-playing card only while media plays; avatar (user avatar
+paths with initial fallback), display name, password capsule with submit arrow, shake on failure,
+status line. PAM/context behaviour is shared and untouched.
 
-## Composition and residency
+### Notifications (`notificationPopup/IrisNotificationPopup.qml`)
+
+Island design shows banners centred under the Island, newest first, up to three:
+
+- black plate, `22·d` radius, critical urgency adds a danger hairline;
+- artwork: notification image with the app icon as a corner badge, the app icon alone, or a quiet
+  glyph disc when the sender has no resolvable icon (never the missing-icon texture);
+- summary + relative time ("now", "5m"), body (2 lines, 8 on hover), app name, action capsules;
+- drop in from the Island (morph curve, short travel, slight scale);
+- click runs the default action or focuses the sender's window; hover cancels the timeout and shows
+  a close button; horizontal swipe past 30 % dismisses;
+- the window's input mask covers only the banners.
+
+Classic keeps its compact right-aligned cards.
+
+### Overview backdrop
+
+On Niri, iRiS loads the shared iNiR `Background/Backdrop.qml` (namespace `quickshell:iiBackdrop`,
+placed within Niri's overview backdrop by the shipped layer rule) when `background.backdrop.enable`
+is on. Settings › Desktop exposes enable, blur, dim and vignette.
+
+### Other transient surfaces
+
+OSD fallback, Polkit and Close Confirm follow the same grammar: black surface, grouped content
+without nested cards, sentence case, disciplined radii, visible keyboard focus. Polkit and Close
+Confirm still use the earlier card composition and are the next alert-style pass.
+
+### Desktop widgets
+
+The shared `Background` canvas hosts widgets; iRiS adapts presentation centrally:
+
+- `WidgetSurface`: black plate, `22·d` radius, no glass.
+- `AbstractBackgroundWidget.widgetSemanticSet()`: iRiS tokens for roles; card radius `22·d`,
+  control radius `12·d`, title family `IrisStyle.fontMain`.
+- Per-widget, gated on `widgetIris`: plain circular glyph badges and Noto numerals (System
+  Monitor); mixed-case labels instead of forced uppercase (Uptime, Day Progress, Battery, Timers,
+  Weather, Date Badge, World Clock); native iRiS media player for full/compact presets.
+- User-chosen widget shapes/styles stay the user's choice.
+- `iris.modules.desktopWidgets = false` unloads the canvas and its providers.
+
+## 6. Composition and residency
 
 ```text
 shell.qml
   -> modules/iris/critical/ShellIrisCriticalPanels.qml
-       -> IrisBar
+       -> IrisBar (+ dismiss layer while pinned)
        -> IrisBackground            (when desktop widgets are disabled)
-  -> ShellIrisPanels.qml
-       -> modules/iris/ShellIrisPanelsImpl.qml
-            -> IrisDock             (deferred, if enabled)
-            -> shared Background    (deferred, if desktop widgets are enabled)
-            -> transient/on-demand iRiS surfaces
+  -> ShellIrisPanels.qml -> modules/iris/ShellIrisPanelsImpl.qml
+       -> IrisDock (+ dismiss layer) (deferred, if enabled)
+       -> Background/Backdrop       (deferred, Niri, if background.backdrop.enable)
+       -> Background                (deferred, if desktop widgets are enabled)
+       -> on-demand: Spotlight, Control Center, Settings, Session, notifications
+       -> Lock, Polkit              (deferred)
 ```
 
-The Apple direction is allowed to be richer than the original ultra-light iRiS experiment, but
-cost must stay explicit. Enabling the shared desktop widget canvas can instantiate providers used
-by those widgets; that is a deliberate tradeoff, not a reason to make every iRiS surface resident.
+On-demand morph surfaces keep a close grace of `morphDuration × 1.35 + 120 ms` so the collapse is
+never cut. Disabled features must not keep timers, processes, decoders or visual trees alive.
 
-Palette, Control Center, Session and other user-action surfaces should still unload after close.
-Disabled features must not keep timers, subprocesses, media decoders or large visual trees alive.
+## 7. Configuration
 
-## Bar modules and extensibility
-
-The classic bar and expanded Island share the existing three logical slots:
-
-```text
-bar.left    bar.center    bar.right
-```
-
-Built-ins are `brand`, `workspaces`, `activeWindow`, `status`, `clock`, and `controls`.
-`iris.bar.{leftModules,centerModules,rightModules}` owns placement/order.
-
-Custom modules continue to use `custom:<widget-id>` and the existing `CustomWidgets` discovery
-service. User components should consume `IrisStyle` and `qs.modules.iris.components`, keep a small
-implicit size, accept `targetScreen`/`irisSlot` where useful, and fail locally.
-
-The user-facing extension contract lives in `defaults/widgets/IRIS-SDK.md`.
-
-## Multi-output contract
-
-- Bar, Island and Dock are per-output surfaces.
-- `iris.bar.screenList` controls where the bar/Island appears; an empty list means all outputs.
-- Singular transient surfaces follow `GlobalStates.focusedScreen`.
-- Island IPC expansion targets the focused output.
-- Lock and Session remain session-wide and must not assume screen index zero.
-- Shared desktop widgets retain the existing Background multi-output ownership model.
-
-## Configuration contract
-
-`modules/settings/IrisConfig.qml` owns iRiS-specific settings.
-
-Current top-level iRiS configuration:
+`modules/common/Config.qml` (schema) + `defaults/config.json` (fresh installs) +
+`modules/iris/settings/IrisSettings.qml` (UI). Current keys:
 
 ```text
 iris.appearance.design        island | classic
-iris.appearance.density
-iris.appearance.radius
-iris.appearance.motion
-iris.bar.*
-iris.dock.enable
-iris.dock.autoHide
-iris.dock.iconSize
-iris.modules.desktopWidgets
-iris.modules.*
-iris.palette.*
-iris.controlCenter.*
-iris.notifications.*
-iris.osd.*
+iris.appearance.expandedRadius, motion, motionDuration, density, radius, fontFamily, titleFontFamily
+iris.bar.position, composition, notch, height, margin, reserveSpace,
+         hoverExpand, hoverDelay, scrollAction, screenList, left/center/rightModules
+iris.dock.enable, autoHide, revealOnEmpty, notch, blur, iconSize, magnification, badges
+iris.player.roundCover, artworkBackground
+iris.palette.width, maxResults, showHints
+iris.controlCenter.width
+iris.modules.desktopWidgets, palette, controlCenter, notificationPopup, osd, sessionScreen, lock, polkit
 ```
 
-Existing installs are not migrated into iRiS automatically. Material II remains the fresh-install
-family unless product policy explicitly changes.
+New defaults apply to fresh installs; no migrations unless explicitly requested.
 
-## IPC
+## 8. Bar modules and extensibility
 
-The iRiS bar exposes:
+Built-ins: `brand`, `workspaces`, `activeWindow`, `status`, `clock`, `controls` (Classic bar).
+`custom:<widget-id>` modules use `CustomWidgets` discovery and also appear on the Island's Desktop
+page. User components consume `IrisStyle` and `qs.modules.iris.components`
+(see `defaults/widgets/IRIS-SDK.md`).
+
+## 9. Multi-output
+
+Bar, Island and Dock are per-output. Singular surfaces follow `GlobalStates.focusedScreen`; only
+the focused output publishes morph origins. Lock and Session are session-wide.
+
+## 10. IPC
 
 ```bash
-inir iris open
-inir iris close
-inir iris design island
-inir iris design classic
+inir iris open | close
+inir iris design island|classic
 ```
 
-`docs/IPC.md` and the generated IPC registry must stay synchronized whenever this contract changes.
+`docs/IPC.md` and the generated registry stay in sync with this contract.
 
-## Acceptance for this baseline
+## 11. Acceptance
 
-Before treating an iRiS Apple change as a stable checkpoint:
+A change to iRiS is acceptable only when:
 
-- iRiS cold-starts without QML/type/binding/loader errors;
-- Island opens/closes through IPC and only expands on the focused output;
-- Dock loads when enabled and does not steal keyboard focus while idle;
-- desktop widgets use iRiS tokens in Island mode and are absent when disabled;
-- Palette, Controls and Session open/close without leaving stale layer surfaces;
-- `classic` remains selectable without breaking the family;
-- direct/cycled family switches do not leave stale iRiS layers;
-- Settings exposes the options actually consumed by runtime;
-- `git diff --check`, IPC registry freshness and local distribution tests pass;
-- performance/residency changes are measured when a new persistent provider or visual tree is
-  introduced.
+- it cold-starts without QML/type/binding/loader warnings (`inir logs`);
+- the affected surface was exercised in the real runtime and inspected from a `grim` capture —
+  for motion, intermediate frames were captured;
+- Escape and outside click close every transient surface it touches;
+- pinning the Island or opening a Dock menu does not change tiled window geometry
+  (`niri msg -j windows`);
+- Classic, Material II and Waffle are unaffected;
+- every Settings row still drives a real consumer;
+- anything that needs pointer or keyboard input the agent must not inject is listed as untested.

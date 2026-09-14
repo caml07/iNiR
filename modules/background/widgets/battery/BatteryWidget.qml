@@ -165,7 +165,7 @@ AbstractBackgroundWidget {
                     font.family: Appearance.font.family.main
                     font.pixelSize: Math.round(11 * root.scaleFactor)
                     font.weight: Font.DemiBold
-                    font.capitalization: Font.AllUppercase
+                    font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     font.letterSpacing: root.scaleFactor
                 }
                 MaterialSymbol {

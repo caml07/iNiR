@@ -44,11 +44,21 @@ Item {
 
     function incrementCurrentIndex() {
         tabBar.incrementCurrentIndex()
+        root._requestedIndex = tabBar.currentIndex
     }
     function decrementCurrentIndex() {
         tabBar.decrementCurrentIndex()
+        root._requestedIndex = tabBar.currentIndex
+    }
+    // Last index requested programmatically or by a click. TabBar shifts its
+    // currentIndex as the Repeater inserts tabs, so population re-applies it.
+    property int _requestedIndex: -1
+    function _restoreRequestedIndex(): void {
+        if (root._requestedIndex >= 0 && root._requestedIndex < tabBar.count && tabBar.currentIndex !== root._requestedIndex)
+            tabBar.setCurrentIndex(root._requestedIndex)
     }
     function setCurrentIndex(index) {
+        root._requestedIndex = index
         tabBar.setCurrentIndex(index)
     }
 
@@ -354,6 +364,9 @@ Item {
         id: tabBar
         z: -1
         background: null
+        // TabBar adjusts currentIndex after count changes; restore on the next tick.
+        onCountChanged: Qt.callLater(root._restoreRequestedIndex)
+        onCurrentIndexChanged: if (count < root.tabButtonList.length) Qt.callLater(root._restoreRequestedIndex)
         Repeater { // This is to fool the TabBar that it has tabs so it does the indices properly
             model: root.tabButtonList.length
             delegate: TabButton {

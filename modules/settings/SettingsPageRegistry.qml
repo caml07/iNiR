@@ -245,7 +245,7 @@ Singleton {
             key: "iris",
             name: "iRiS",
             icon: "visibility",
-            desc: Translation.tr("Minimal shell family and modules"),
+            desc: Translation.tr("Apple-inspired Island shell and modules"),
             essential: true,
             component: "modules/settings/IrisConfig.qml"
         }

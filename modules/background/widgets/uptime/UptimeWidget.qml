@@ -157,7 +157,7 @@ AbstractBackgroundWidget {
                         font.pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         font.weight: root.widgetLabelWeight
                         font.letterSpacing: root.widgetMetadataTracking
-                        font.capitalization: Font.AllUppercase
+                        font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     }
                 }
 

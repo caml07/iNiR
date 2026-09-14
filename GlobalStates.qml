@@ -113,7 +113,7 @@ Singleton {
         if (isWaffle) {
             Quickshell.execDetached([Quickshell.shellPath("scripts/inir"),
                 "waffle-settings-window"])
-        } else if (Config.options?.settingsUi?.overlayMode ?? false) {
+        } else if (Config.options?.panelFamily === "iris" || (Config.options?.settingsUi?.overlayMode ?? false)) {
             root.settingsOverlayRequestedPage = index
             root.settingsOverlayRequestedSection = requestedSection
             root.settingsOverlayOpen = true
@@ -132,7 +132,7 @@ Singleton {
         if (isWaffle) {
             Quickshell.execDetached([Quickshell.shellPath("scripts/inir"),
                 "waffle-settings-window"])
-        } else if (Config.options?.settingsUi?.overlayMode ?? false) {
+        } else if (Config.options?.panelFamily === "iris" || (Config.options?.settingsUi?.overlayMode ?? false)) {
             root.settingsOverlayOpen = true
         } else {
             Quickshell.execDetached([Quickshell.shellPath("scripts/inir"),
@@ -146,7 +146,7 @@ Singleton {
         if (isWaffle) {
             Quickshell.execDetached([Quickshell.shellPath("scripts/inir"),
                 "waffle-settings-window", "--toggle"])
-        } else if (Config.options?.settingsUi?.overlayMode ?? false) {
+        } else if (Config.options?.panelFamily === "iris" || (Config.options?.settingsUi?.overlayMode ?? false)) {
             root.settingsOverlayOpen = !root.settingsOverlayOpen
         } else {
             Quickshell.execDetached([Quickshell.shellPath("scripts/inir"),
@@ -324,6 +324,18 @@ Singleton {
         }
     }
     property bool controlPanelOpen: false
+    // iRiS: screen-local geometry ({x, y, width, height, radius, screen}) of the
+    // Island part that last opened a surface, so it can morph out of and back
+    // into that exact shape. Transient coordination only; null means "no origin".
+    property var irisMorphOrigin: null
+    // True while a surface is mid-morph out of or back into that origin; the
+    // Island hides the published part so only one shape is ever on screen.
+    property bool irisMorphHandoff: false
+    // iRiS intent preloading: the pointer resting on the Island (controls) or an
+    // expanded Island (settings) instantiates those surfaces hidden, so the
+    // morph starts on the click frame instead of after an async load.
+    property bool irisControlsWarm: false
+    property bool irisSettingsWarm: false
     property bool dashboardOpen: false
     property bool workspaceShowNumbers: false
     property var activeBooruImageMenu: null  // Track which BooruImage has its menu open

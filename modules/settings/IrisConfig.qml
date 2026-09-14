@@ -74,7 +74,7 @@ ContentPage {
     SettingsTaskNavigator {
         icon: "visibility"
         title: "iRiS"
-        description: Translation.tr("Minimal shell family with small primitives and on-demand features.")
+        description: Translation.tr("Apple-inspired Island shell with Dock, Palette and optional desktop widgets.")
         summary: Translation.tr("Design · bar · modules · surfaces")
         currentValue: root.activeSection
         onSelected: value => root.activeSection = value
@@ -112,7 +112,7 @@ ContentPage {
                             }
                             StyledText {
                                 Layout.fillWidth: true
-                                text: Translation.tr("Heavy providers stay unloaded until a feature needs them.")
+                                text: Translation.tr("Island chrome stays lightweight; Dock and desktop widgets can be enabled independently.")
                                 color: Appearance.colors.colSubtext
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 wrapMode: Text.WordWrap
@@ -176,7 +176,8 @@ ContentPage {
                         }
                         ConfigSpinBox {
                             icon: "rounded_corner"
-                            text: Translation.tr("Radius")
+                            text: Translation.tr("Classic radius")
+                            enabled: (Config.options?.iris?.appearance?.design ?? "island") === "classic"
                             value: Config.options?.iris?.appearance?.radius ?? 12
                             from: 4
                             to: 28
@@ -431,6 +432,12 @@ ContentPage {
                         text: Translation.tr("Automatically hide dock")
                         checked: Config.options?.iris?.dock?.autoHide ?? true
                         onCheckedChanged: Config.setNestedValue("iris.dock.autoHide", checked)
+                    }
+                    SettingsSwitch {
+                        buttonIcon: "blur_on"
+                        text: Translation.tr("Dock blur")
+                        checked: Config.options?.iris?.dock?.blur ?? false
+                        onCheckedChanged: Config.setNestedValue("iris.dock.blur", checked)
                     }
                     ConfigSpinBox {
                         icon: "photo_size_select_small"

@@ -2328,7 +2328,12 @@
         "dock": {
             "enable": true,
             "autoHide": true,
-            "iconSize": 40
+            "blur": false,
+            "notch": false,
+            "iconSize": 40,
+            "magnification": true,
+            "badges": true,
+            "revealOnEmpty": true
         },
         "appearance": {
             "design": "island",
@@ -2336,10 +2341,17 @@
             "titleFontFamily": "",
             "density": 1.0,
             "radius": 12,
-            "motion": true
+            "motion": true,
+            "motionDuration": 220,
+            "expandedRadius": 28
         },
         "bar": {
             "position": "top",
+            "composition": "unified",
+            "notch": false,
+            "hoverExpand": true,
+            "hoverDelay": 160,
+            "scrollAction": "volume",
             "height": 42,
             "margin": 8,
             "reserveSpace": true,
@@ -2352,6 +2364,10 @@
             "width": 640,
             "maxResults": 8,
             "showHints": true
+        },
+        "player": {
+            "roundCover": true,
+            "artworkBackground": true
         },
         "controlCenter": {
             "width": 360

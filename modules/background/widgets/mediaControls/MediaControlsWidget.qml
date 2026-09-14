@@ -8,6 +8,7 @@ import qs.modules.common.functions
 import qs.modules.background.widgets
 import qs.modules.mediaControls.presets
 import qs.modules.mediaControls.components
+import qs.modules.iris.components
 
 import QtQuick
 import QtQuick.Layouts
@@ -121,7 +122,11 @@ AbstractBackgroundWidget {
         }
     }
 
-    readonly property real widgetHeight: Math.round(
+    readonly property bool nativeIrisPlayer: root.widgetIris && ["full", "compact"].includes(root.effectiveRenderedPreset)
+
+    readonly property real widgetHeight: root.nativeIrisPlayer
+        ? Math.round((root.effectiveRenderedPreset === "compact" ? 126 : 204) * scaleFactor * Appearance.fontSizeScale)
+        : Math.round(
         (root.sizedGeometry.hBare ?? root.sizedGeometry.h) * Appearance.fontSizeScale * scaleFactor)
         + root.lyricsSheetHeight + root.lyricsPanelHeight
 
@@ -531,7 +536,7 @@ AbstractBackgroundWidget {
     ]
 
     Timer {
-        running: !root.hasPlayer && root.visible && root.powerActive
+        running: !root.widgetIris && !root.hasPlayer && root.visible && root.powerActive
             && Appearance.animationsEnabled
         interval: 9000
         repeat: true
@@ -568,6 +573,15 @@ AbstractBackgroundWidget {
         }
     }
     
+    Component {
+        id: irisPlayerComponent
+        IrisMediaCard {
+            compact: root.effectiveRenderedPreset === "compact"
+            active: root.visible && root.powerActive
+            showBackground: false
+        }
+    }
+
     Component {
         id: fullPlayerComponent
         FullPlayer {}
@@ -652,7 +666,7 @@ AbstractBackgroundWidget {
                     z: -2
                     target: playerLoader
                     radius: root.popupRounding
-                    visible: root.vizType !== "organic" || root.vizPosition === "none"
+                    visible: !root.widgetIris && (root.vizType !== "organic" || root.vizPosition === "none")
                 }
 
                 Loader {
@@ -660,16 +674,18 @@ AbstractBackgroundWidget {
                     z: 0
                     anchors.fill: parent
                     active: root.presetLoaderActive
-                    sourceComponent: root.presetComponent
+                    sourceComponent: root.nativeIrisPlayer ? irisPlayerComponent : root.presetComponent
 
                     onLoaded: {
                         item.player = delegateRoot.modelData
-                        item.blendedColors = root._desktopInkOverride
-                        item.themeSourceColor = Qt.binding(() => root.widgetAccentVisible)
-                        item.visualizerPoints = Qt.binding(() => root.visualizerPoints)
-                        item.radius = root.popupRounding
-                        item.screenX = Qt.binding(() => root.widgetScreenPos.x)
-                        item.screenY = Qt.binding(() => root.widgetScreenPos.y)
+                        if (!root.nativeIrisPlayer) {
+                            item.blendedColors = root._desktopInkOverride
+                            item.themeSourceColor = Qt.binding(() => root.widgetAccentVisible)
+                            item.visualizerPoints = Qt.binding(() => root.visualizerPoints)
+                            item.radius = root.popupRounding
+                            item.screenX = Qt.binding(() => root.widgetScreenPos.x)
+                            item.screenY = Qt.binding(() => root.widgetScreenPos.y)
+                        }
                         const loadedPreset = root.effectiveRenderedPreset;
                         Qt.callLater(() => {
                             if (root.presetLoaderActive
@@ -687,8 +703,15 @@ AbstractBackgroundWidget {
             Layout.fillHeight: true
             visible: !root.hasPlayer
 
+            IrisArtwork {
+                anchors.centerIn: parent
+                visible: root.widgetIris
+                width: Math.min(parent.width, parent.height) * 0.6
+                height: width
+            }
             MaterialShape {
                 id: idleOrnament
+                visible: !root.widgetIris
                 anchors.centerIn: parent
                 implicitSize: Math.max(24, Math.min(parent.width, parent.height)
                     - Appearance.sizes.elevationMargin)

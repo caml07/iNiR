@@ -6,6 +6,7 @@ import Quickshell
 import qs
 import qs.services
 import qs.modules.common
+import qs.modules.iris.style
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
@@ -178,6 +179,8 @@ AbstractBackgroundWidget {
     }
 
     function _tileShape(key: string): int {
+        // iRiS keeps glyph badges plain round; expressive shapes are Material's.
+        if (root.widgetIris) return MaterialShape.Shape.Circle
         switch (key) {
             case "cpu": return MaterialShape.Shape.Gem;
             case "mem": return MaterialShape.Shape.Cookie4Sided;
@@ -423,7 +426,7 @@ AbstractBackgroundWidget {
                         text: root._getDisplayText(resourceMeter.modelData.key)
                         color: root.widgetInk
                         font {
-                            family: Appearance.font.family.numbers
+                            family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers
                             pixelSize: Math.round(resourceMeter.side * 0.29)
                             weight: Font.Bold
                             features: ({ "tnum": 1 })
@@ -444,7 +447,7 @@ AbstractBackgroundWidget {
                             pixelSize: Math.max(10, Math.round(resourceMeter.side * 0.075))
                             weight: Font.DemiBold
                             letterSpacing: Math.round(1.4 * root.scaleFactor)
-                            capitalization: Font.AllUppercase
+                            capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                     }
                 }
@@ -520,7 +523,7 @@ AbstractBackgroundWidget {
                     color: barRow._liveColor
                     font {
                         pixelSize: Appearance.font.pixelSize.smaller
-                        family: Appearance.font.family.numbers
+                        family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers
                     }
                     horizontalAlignment: Text.AlignRight
                     Layout.preferredWidth: barRow.modelData.key === "temp" ? 40 : 32
@@ -565,7 +568,7 @@ AbstractBackgroundWidget {
                     StyledText {
                         text: root._getDisplayText(modelData.key)
                         color: root._graphColor(modelData.key)
-                        font { pixelSize: Appearance.font.pixelSize.smaller; family: Appearance.font.family.numbers }
+                        font { pixelSize: Appearance.font.pixelSize.smaller; family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers }
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -583,7 +586,7 @@ AbstractBackgroundWidget {
                 required property var modelData
                 text: modelData.label
                 color: root._metricSubtext
-                font { pixelSize: Appearance.font.pixelSize.smaller - 2; family: Appearance.font.family.numbers }
+                font { pixelSize: Appearance.font.pixelSize.smaller - 2; family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers }
                 anchors.right: parent.right
                 anchors.rightMargin: 2
                 y: parent._legendH + (parent.height - parent._legendH) * (1.0 - modelData.pct) - height / 2
@@ -707,7 +710,7 @@ AbstractBackgroundWidget {
                         color: ringCol._liveColor
                         font {
                             pixelSize: Math.max(10, Math.round(ringCol._ringSize * 0.26))
-                            family: Appearance.font.family.numbers
+                            family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers
                             weight: Font.DemiBold
                         }
                     }
@@ -797,7 +800,7 @@ AbstractBackgroundWidget {
                         color: textChip._liveColor
                         font {
                             pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
-                            family: Appearance.font.family.numbers
+                            family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers
                             weight: Font.DemiBold
                         }
                         anchors.verticalCenter: parent.verticalCenter
@@ -857,7 +860,7 @@ AbstractBackgroundWidget {
                 StyledRectangularShadow {
                     target: tile
                     z: -2
-                    visible: !Appearance.zzzEverywhere && !Appearance.inirEverywhere
+                    visible: !root.widgetIris && !Appearance.zzzEverywhere && !Appearance.inirEverywhere
                         && !Appearance.regaliaEverywhere
                 }
 
@@ -890,7 +893,7 @@ AbstractBackgroundWidget {
                                 Math.round(Appearance.font.pixelSize.hugeass * root.scaleFactor),
                                 Math.round(tile.height * 0.30),
                                 Math.round(tile.width * 0.34)))
-                            family: Appearance.font.family.numbers
+                            family: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.numbers
                             weight: Font.Bold
                         }
                     }

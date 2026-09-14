@@ -233,7 +233,7 @@ AbstractBackgroundWidget {
                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                     font.weight: Font.DemiBold
                     font.letterSpacing: root.widgetMetadataTracking
-                    font.capitalization: Font.AllUppercase
+                    font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                 }
 
                 RippleButton {

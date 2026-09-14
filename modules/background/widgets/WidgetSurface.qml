@@ -140,7 +140,8 @@ Rectangle {
         fill: String(root._cookie ? root._cookieFill : root._flatFill)
     })
 
-    radius: root._iris ? IrisStyle.radius : surfaceRadius
+    // iRiS widget plates share one continuous corner, tighter than the Island.
+    radius: root._iris ? Math.round(22 * IrisStyle.density) : surfaceRadius
     color: root._iris ? (root._backgroundVisible ? IrisStyle.surface : "transparent")
         : _editorialStack ? "transparent"
         : _island ? "transparent"

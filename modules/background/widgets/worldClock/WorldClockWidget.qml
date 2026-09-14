@@ -295,7 +295,7 @@ AbstractBackgroundWidget {
                 font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                 font.weight: Font.Medium
                 font.letterSpacing: root.widgetMetadataTracking
-                font.capitalization: Font.AllUppercase
+                font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
             }
         }
 
@@ -343,7 +343,7 @@ AbstractBackgroundWidget {
                             font.pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                             font.weight: root.widgetLabelWeight
                             font.letterSpacing: root.widgetMetadataTracking
-                            font.capitalization: Font.AllUppercase
+                            font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                         StyledText {
                             visible: root.showOffsets && referenceZone.modelData
@@ -399,7 +399,7 @@ AbstractBackgroundWidget {
                             font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             font.weight: Font.Medium
                             font.letterSpacing: root.widgetMetadataTracking
-                            font.capitalization: Font.AllUppercase
+                            font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                     }
                 }
@@ -447,7 +447,7 @@ AbstractBackgroundWidget {
                                     font.pixelSize: Math.max(11, Math.round(11 * root.scaleFactor))
                                     font.weight: root.widgetLabelWeight
                                     font.letterSpacing: root.widgetMetadataTracking
-                                    font.capitalization: Font.AllUppercase
+                                    font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                                 }
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -471,7 +471,7 @@ AbstractBackgroundWidget {
                                         font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                                         font.weight: Font.Medium
                                         font.letterSpacing: root.widgetMetadataTracking
-                                        font.capitalization: Font.AllUppercase
+                                        font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                                     }
                                     StyledText {
                                         visible: root.showOffsets
@@ -553,7 +553,7 @@ AbstractBackgroundWidget {
                                 font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                                 font.weight: index === 0 ? root.widgetLabelWeight : Font.Medium
                                 font.letterSpacing: root.widgetMetadataTracking
-                                font.capitalization: Font.AllUppercase
+                                font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                             }
                             RowLayout {
                                 Layout.fillWidth: true
@@ -577,7 +577,7 @@ AbstractBackgroundWidget {
                                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                                     font.weight: Font.Medium
                                     font.letterSpacing: root.widgetMetadataTracking
-                                    font.capitalization: Font.AllUppercase
+                                    font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                                 }
                                 StyledText {
                                     visible: root.showOffsets

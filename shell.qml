@@ -600,20 +600,20 @@ ShellRoot {
     // overlayStyle picks the chrome; sibling loaders keep only the selected
     // presentation alive. Any unrecognised style falls back to the nav rail.
     LazyLoader {
-        active: Config.ready && (Config.options?.settingsUi?.overlayMode ?? false)
+        active: Config.ready && (Config.options?.panelFamily ?? "ii") !== "iris" && (Config.options?.settingsUi?.overlayMode ?? false)
             && (Config.options?.settingsUi?.overlayStyle ?? "rail") !== "focus"
             && (Config.options?.settingsUi?.overlayStyle ?? "rail") !== "editorial"
         component: SettingsOverlay {}
     }
 
     LazyLoader {
-        active: Config.ready && (Config.options?.settingsUi?.overlayMode ?? false)
+        active: Config.ready && (Config.options?.panelFamily ?? "ii") !== "iris" && (Config.options?.settingsUi?.overlayMode ?? false)
             && (Config.options?.settingsUi?.overlayStyle ?? "rail") === "focus"
         component: SettingsFocus {}
     }
 
     LazyLoader {
-        active: Config.ready && (Config.options?.settingsUi?.overlayMode ?? false)
+        active: Config.ready && (Config.options?.panelFamily ?? "ii") !== "iris" && (Config.options?.settingsUi?.overlayMode ?? false)
             && (Config.options?.settingsUi?.overlayStyle ?? "rail") === "editorial"
         component: SettingsEditorial {}
     }

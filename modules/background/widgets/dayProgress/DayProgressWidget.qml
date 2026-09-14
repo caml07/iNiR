@@ -154,7 +154,7 @@ AbstractBackgroundWidget {
                             pixelSize: Math.round(ringArea.size * 0.062 * root.textScale)
                             weight: Font.DemiBold
                             letterSpacing: Math.round(1.2 * root.scaleFactor)
-                            capitalization: Font.AllUppercase
+                            capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                     }
                 }

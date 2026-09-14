@@ -227,7 +227,7 @@ AbstractBackgroundWidget {
                         pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         weight: Font.DemiBold
                         letterSpacing: Math.round(1.5 * root.scaleFactor)
-                        capitalization: Font.AllUppercase
+                        capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     }
                 }
 
@@ -272,7 +272,7 @@ AbstractBackgroundWidget {
                             pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             weight: Font.DemiBold
                             letterSpacing: Math.round(1.0 * root.scaleFactor)
-                            capitalization: Font.AllUppercase
+                            capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                     }
                 }

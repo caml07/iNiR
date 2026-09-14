@@ -746,7 +746,7 @@ ContentPage {
 
     // Motion Section
     SettingsTaskLoader {
-        requested: root.activeSection === "motion" && (Config.options?.panelFamily ?? "ii") !== "waffle"
+        requested: root.activeSection === "motion" && (Config.options?.panelFamily ?? "ii") === "ii"
         sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "motion"

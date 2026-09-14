@@ -52,7 +52,7 @@ Scope {
         }
         readonly property bool orbitInteractionSuppressed: orbitHotCornerBlocked()
         readonly property bool shouldShowOrbitHotCorner: CompositorService.isNiri
-            && (Config.options?.panelFamily ?? "ii") !== "waffle"
+            && (Config.options?.panelFamily ?? "ii") === "ii"
             && (Config.options?.orbit?.enable ?? true)
             && (Config.options?.orbit?.hotCornerEnable ?? true)
             && cornerName === orbitCorner

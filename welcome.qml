@@ -543,6 +543,13 @@ Scope {
 
     function setProfileFeature(path: string, value: var): void {
         root.profileCustomized = true
+        if (path === "panelFamily") {
+            Quickshell.execDetached([
+                Quickshell.shellPath("scripts/inir"),
+                "panelFamily", "set", String(value)
+            ])
+            return
+        }
         Config.setNestedValue(path, value)
     }
 
@@ -2100,7 +2107,7 @@ Scope {
 
                 WelcomeText {
                     Layout.fillWidth: true
-                    text: Translation.tr("Choose between iNiR's Material shell and the Waffle desktop.")
+                    text: Translation.tr("Choose the shell family that matches how you want the desktop to work.")
                     font.pixelSize: root.welcomeFontCaption
                     color: root.welcomeSecondaryText
                     wrapMode: Text.WordWrap
@@ -2121,6 +2128,14 @@ Scope {
                     symbol: "grid_view"
                     selected: (Config.options?.panelFamily ?? "ii") === "waffle"
                     onClicked: root.setProfileFeature("panelFamily", "waffle")
+                }
+
+                WelcomeChoiceRow {
+                    title: "iRiS"
+                    detail: Translation.tr("Minimal bar, Palette and controls with the lowest idle footprint.")
+                    symbol: "visibility"
+                    selected: (Config.options?.panelFamily ?? "ii") === "iris"
+                    onClicked: root.setProfileFeature("panelFamily", "iris")
                 }
             }
 
@@ -2848,7 +2863,7 @@ Scope {
                             model: [
                                 { icon: "tune", label: Translation.tr("Starting point"), value: root.selectedProfileTitle },
                                 { icon: "palette", label: Translation.tr("Style"), value: root.effectiveStylePreset === "custom" ? Translation.tr("Custom") : root.currentStylePreset.name },
-                                { icon: "dashboard", label: Translation.tr("Family"), value: (Config.options?.panelFamily ?? "ii") === "waffle" ? "Waffle" : "Material II" },
+                                { icon: "dashboard", label: Translation.tr("Family"), value: (Config.options?.panelFamily ?? "ii") === "waffle" ? "Waffle" : (Config.options?.panelFamily ?? "ii") === "iris" ? "iRiS" : "Material II" },
                                 { icon: "speed", label: Translation.tr("Effects"), value: root.effectivePerformancePreset === "custom" ? Translation.tr("Custom") : root.currentPerformancePreset.name }
                             ]
 

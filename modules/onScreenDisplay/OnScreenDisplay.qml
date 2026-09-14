@@ -425,22 +425,6 @@ Scope {
     }
     }
 
-    IpcHandler {
-        target: "osdVolume"
-
-        function trigger(): void {
-            root.triggerOsd();
-        }
-
-        function hide(): void {
-            root.hideOsd();
-        }
-
-        function toggle(): void {
-            GlobalStates.osdVolumeOpen = !GlobalStates.osdVolumeOpen;
-        }
-    }
-
     Loader {
         active: CompositorService.isHyprland
         sourceComponent: Item {

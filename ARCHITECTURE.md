@@ -16,23 +16,23 @@ Startup flow:
 1. Environment pragmas configure Qt/Quickshell policy.
 2. Startup-critical singletons and shell-wide IPC routers are materialized.
 3. `Config.ready` applies the current theme/icon theme and selects one family.
-4. The family's **critical host** renders first-frame surfaces (background/bar/dock for ii; bar/background/backdrop for Waffle).
+4. The family's **critical host** renders first-frame surfaces (background/bar/dock for ii; bar/background/backdrop for Waffle; background/bar for iRiS).
 5. After the shell entry frame, `GlobalStates.deferredPanelsReady` enables the family wrapper and its full `Shell*PanelsImpl.qml` tree.
 6. Interaction-heavy panels use deferred/on-demand loaders, while background services are staggered after first paint.
 
 ## Panel Families
 
-Two mutually exclusive UI families, switchable at runtime (`Super+Shift+W`):
+Three mutually exclusive UI families, switchable at runtime (`Super+Shift+W`):
 
-| | **Material ii** | **Waffle** |
-|---|---|---|
-| Active when | `panelFamily !== "waffle"` | `panelFamily === "waffle"` |
-| Visual tokens | `Appearance.*` | `Looks.*` |
-| Global styles | material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial | Waffle keeps its Fluent layout/tokens while `Looks` adapts shared global-style color/material semantics |
-| Bar | Top (or vertical; bar.appearanceStyle selects classic/islands/scenic/frame, pill, or m3) | Bottom (Win11 taskbar) |
-| App launcher | Overview | StartMenu with search |
-| Right panel | SidebarRight | ActionCenter + NotificationCenter |
-| Panels | ii (iiBar, iiDock, iiSidebarLeft, ...) | w (wBar, wStartMenu, wActionCenter, ... + shared ii panels) |
+| | **Material ii** | **Waffle** | **iRiS** |
+|---|---|---|---|
+| Active when | `panelFamily === "ii"` | `panelFamily === "waffle"` | `panelFamily === "iris"` |
+| Visual tokens | `Appearance.*` | `Looks.*` | `IrisStyle.*` |
+| Global styles | material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial | Waffle keeps its Fluent layout/tokens while `Looks` adapts shared global-style color/material semantics | Stable minimal grammar using semantic Material palette colors without inheriting ii surface composition |
+| Bar | Top (or vertical; bar.appearanceStyle selects classic/islands/scenic/frame, pill, or m3) | Bottom (Win11 taskbar) | Compact top/bottom modular bar |
+| App launcher | Overview | StartMenu with search | IrisPalette |
+| Right panel | SidebarRight | ActionCenter + NotificationCenter | IrisControlCenter |
+| Panels | ii (iiBar, iiDock, iiSidebarLeft, ...) | w (wBar, wStartMenu, wActionCenter, ... + shared ii panels) | iris (irisBar, irisBackground, irisPalette, irisControlCenter, ...) |
 
 Panel composition is intentionally split. `shell.qml` loads a small critical family host first and only loads the heavier family implementation after `deferredPanelsReady`:
 
@@ -44,6 +44,10 @@ shell.qml
 shell.qml
   -> modules/waffle/critical/ShellWaffleCriticalPanels.qml
   -> ShellWafflePanels.qml -> modules/waffle/ShellWafflePanelsImpl.qml
+
+shell.qml
+  -> modules/iris/critical/ShellIrisCriticalPanels.qml
+  -> ShellIrisPanels.qml -> modules/iris/ShellIrisPanelsImpl.qml
 ```
 
 Inside the implementation roots, `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader` choose whether a surface should be resident. For example:
@@ -64,6 +68,7 @@ Global-style detection is centralized in `Appearance.qml`. Use its semantic styl
 shell.qml                     # Root entry — startup, IPC routers, critical/deferred family gates
 ShellIiPanels.qml             # Thin deferred ii wrapper
 ShellWafflePanels.qml         # Thin deferred Waffle wrapper
+ShellIrisPanels.qml           # Thin deferred iRiS wrapper
 GlobalStates.qml              # Runtime UI state (panel open/closed booleans)
 FamilyTransitionOverlay.qml   # Animated family switch
 settings.qml                  # Standalone shared Settings entrypoint
@@ -78,6 +83,7 @@ modules/                      # UI module directories
 │   └── widgets/              # Reusable widgets + qmldir
 ├── bar/                      # Top bar (ii family)
 ├── barM3/                    # Material 3 bar — independent layout model, bar.appearanceStyle "m3"
+├── iris/                     # Minimal iRiS family, visual primitives and surfaces
 ├── background/               # Wallpaper backdrop + desktop widgets + desktop items
 ├── ii/                       # ii composition implementation + critical host + ii-only overlay pieces
 │   ├── ShellIiPanelsImpl.qml # Deferred/on-demand ii composition authority

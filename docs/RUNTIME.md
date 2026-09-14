@@ -126,7 +126,7 @@ Panel composition is split so startup-critical surfaces are not blocked by the f
 - `modules/ii/critical/ShellIiCriticalPanels.qml`
 - `modules/waffle/critical/ShellWaffleCriticalPanels.qml`
 
-After `GlobalStates.deferredPanelsReady`, it loads the thin family wrapper, which delegates to `modules/ii/ShellIiPanelsImpl.qml` or `modules/waffle/ShellWafflePanelsImpl.qml`.
+After `GlobalStates.deferredPanelsReady`, it loads the thin family wrapper, which delegates to the ii, Waffle, or iRiS `Shell*PanelsImpl.qml` composition root.
 
 The family implementation then chooses between ordinary, deferred and on-demand loaders. A typical deferred/on-demand panel still uses the same identifier contract:
 

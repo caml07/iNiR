@@ -459,7 +459,7 @@ ContentPage {
         SettingsGroup {
             StyledText {
                 Layout.fillWidth: true
-                text: Translation.tr("Settings for switching between Material ii and Waffle panel styles.")
+                text: Translation.tr("Settings for switching between Material ii, Waffle, and iRiS panel families.")
                 color: Appearance.colors.colSubtext
                 font.pixelSize: Appearance.font.pixelSize.small
                 wrapMode: Text.WordWrap

@@ -715,14 +715,30 @@ bind "Super+F12" { spawn "inir" "gamemode" "toggle"; }
 
 ---
 
-### panelFamily
+### iris
 
-Switch between panel styles. ii supports two visual styles: Material ii (default) and Waffle (Windows 11-like).
+iRiS bar and Island design. Available while the iRiS bar is enabled.
 
 | Function | Description |
 |----------|-------------|
-| `cycle` | Cycle to next panel family (ii → waffle → ii) |
-| `set` | Set specific family ("ii" or "waffle") |
+| `open` | Expand the island on the focused output |
+| `close` | Collapse the island |
+| `design` | Select `island` or `classic` and persist the preference |
+
+```bash
+inir iris design island
+inir iris open
+inir iris close
+```
+
+### panelFamily
+
+Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight).
+
+| Function | Description |
+|----------|-------------|
+| `cycle` | Cycle to next panel family (ii → waffle → iris → ii) |
+| `set` | Set specific family ("ii", "waffle", or "iris") |
 
 ```kdl
 bind "Mod+Shift+W" { spawn "inir" "panelFamily" "cycle"; }

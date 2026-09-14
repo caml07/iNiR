@@ -641,7 +641,7 @@ Singleton {
             // Panel system
             property list<string> enabledPanels: ["iiBar", "iiBackground", "iiBackdrop", "iiCheatsheet", "iiControlPanel", "iiDock", "iiLock", "iiMediaControls", "iiNotificationPopup", "iiOnScreenDisplay", "iiOnScreenKeyboard", "iiOverlay", "iiOverview", "iiPolkit", "iiRegionSelector", "iiScreenCorners", "iiSessionScreen", "iiSidebarLeft", "iiSidebarRight", "iiTilingOverlay", "iiVerticalBar", "iiWallpaperSelector", "iiWallpaperLauncher", "iiCoverflowSelector", "iiClipboard", "iiShellUpdate", "iiDashboard", "iiMascotCompanion"]
             property list<string> knownPanels: [] // Tracks panels the user has seen; used to distinguish "user disabled" from "new in update"
-            property string panelFamily: "ii" // "ii" or "waffle"
+            property string panelFamily: "ii" // "ii", "waffle", or "iris"
             property bool familyTransitionAnimation: true // Show animated overlay when switching families
 
             property JsonObject policies: JsonObject {
@@ -3802,6 +3802,56 @@ Singleton {
                 property bool scrollNavigation: false
                 property bool scrollNavigationSwitchWorkspace: true
                 property int scrollNavigationDebounceMs: 180
+            }
+
+            property JsonObject iris: JsonObject {
+                property JsonObject dock: JsonObject {
+                    property bool enable: true
+                    property bool autoHide: true
+                    property int iconSize: 40
+                }
+                property JsonObject appearance: JsonObject {
+                    property string design: "island" // "classic" or "island"
+                    property string fontFamily: "" // Empty = inherit the global UI font
+                    property string titleFontFamily: "" // Empty = inherit the global title font
+                    property real density: 1.0
+                    property int radius: 12
+                    property bool motion: true
+                }
+                property JsonObject bar: JsonObject {
+                    property string position: "top" // "top" or "bottom"
+                    property int height: 42
+                    property int margin: 8
+                    property bool reserveSpace: true
+                    property list<string> screenList: []
+                    property list<string> leftModules: ["brand", "workspaces"]
+                    property list<string> centerModules: ["activeWindow"]
+                    property list<string> rightModules: ["status", "clock", "controls"]
+                }
+                property JsonObject palette: JsonObject {
+                    property int width: 640
+                    property int maxResults: 8
+                    property bool showHints: true
+                }
+                property JsonObject controlCenter: JsonObject {
+                    property int width: 360
+                }
+                property JsonObject notifications: JsonObject {
+                    property int width: 380
+                }
+                property JsonObject osd: JsonObject {
+                    property int width: 320
+                }
+                property JsonObject modules: JsonObject {
+                    property bool desktopWidgets: true
+                    property bool palette: true
+                    property bool controlCenter: true
+                    property bool notificationPopup: true
+                    property bool osd: true
+                    property bool sessionScreen: true
+                    property bool lock: true
+                    property bool polkit: true
+                }
             }
 
             property JsonObject waffles: JsonObject {

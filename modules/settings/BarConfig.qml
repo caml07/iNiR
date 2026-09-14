@@ -12,7 +12,7 @@ ContentPage {
     settingsPageIndex: 2
     settingsPageName: Translation.tr("Bar")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
     property string activeSection: "appearance"
     property int _taskLoadingCount: 0
 

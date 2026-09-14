@@ -20,7 +20,7 @@ ContentPage {
     settingsPageIndex: 23
     settingsPageName: Translation.tr("Sidebars")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
 
     property string activeSection: "general"
     property string pendingProfileAvatarPath: ""

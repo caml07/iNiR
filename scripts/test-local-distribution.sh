@@ -586,6 +586,10 @@ schema_checks = {
         'title: "Waffle"',
         'onClicked: root.setProfileFeature("panelFamily", "waffle")'
     ]),
+    "wizard exposes independent iRiS family selection": all(fragment in wizard for fragment in [
+        'title: "iRiS"',
+        'onClicked: root.setProfileFeature("panelFamily", "iris")'
+    ]),
     "wizard graphics catalog": all(preset in wizard for preset in [
         'id: "minimum"', 'id: "efficient"', 'id: "balanced"'
     ]),
@@ -614,7 +618,8 @@ schema_checks = {
         'root.setProfileFeature("bar.bottom", value === "bottom")',
         'root.setProfileFeature("dock.position", value)',
         'root.setProfileFeature("panelFamily", "ii")',
-        'root.setProfileFeature("panelFamily", "waffle")'
+        'root.setProfileFeature("panelFamily", "waffle")',
+        'root.setProfileFeature("panelFamily", "iris")'
     ]),
     "wizard responsive grids collapse on narrow widths": all(fragment in wizard for fragment in [
         'columns: welcomeFlickable.width < 720 ? 1 : 2',

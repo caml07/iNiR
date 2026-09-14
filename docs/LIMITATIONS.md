@@ -137,7 +137,7 @@ ii is built for **Niri**. Some features were inherited from the original Hyprlan
 
 ### Backdrop & Wallpaper
 
-- **Separate configs**: Material ii and Waffle have independent backdrop/wallpaper settings. If you enable both families, each manages its own background layer.
+- **Family backgrounds**: Material ii and Waffle have independent backdrop/wallpaper settings. iRiS intentionally uses the shared main wallpaper and does not maintain another animated-wallpaper configuration.
 - **Niri layer rules required**: The backdrop uses Niri's `place-within-backdrop` layer rule. If your wallpaper doesn't show in overview, check that your `config.kdl` has the layer rules for `quickshell:iiBackdrop` and `quickshell:wBackdrop`.
 - **Migration is automatic**: Switching between families auto-migrates your `enabledPanels` config. You shouldn't need to touch it manually.
 

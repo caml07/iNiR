@@ -33,13 +33,13 @@ ContentPage {
     SettingsTaskNavigator {
         icon: "settings_input_component"
         title: Translation.tr("Monitors")
-        description: Translation.tr("Choose which monitor shows each shell surface: outputs, ii surfaces, desktop widgets and shared popups.")
+        description: Translation.tr("Choose which monitor shows each shell surface: outputs, family surfaces, desktop widgets and shared popups.")
         summary: Translation.tr("Outputs · Surfaces · Widgets · Popups")
         currentValue: root.activeSection
         onSelected: value => root.activeSection = value
         options: [
             { displayName: Translation.tr("Outputs"), icon: "monitor", value: "outputs" },
-            { displayName: Translation.tr("ii surfaces"), icon: "web_asset", value: "surfaces" },
+            { displayName: Translation.tr("Shell surfaces"), icon: "web_asset", value: "surfaces" },
             { displayName: Translation.tr("Desktop widgets"), icon: "widgets", value: "widgets" },
             { displayName: Translation.tr("Popups"), icon: "notifications", value: "popups" }
         ]
@@ -50,6 +50,9 @@ ContentPage {
         { title: Translation.tr("Dock"), description: Translation.tr("Application dock and its hover reveal area"), icon: "call_to_action", path: "dock.screenList" },
         { title: Translation.tr("Sidebars"), description: Translation.tr("Feature and system sidebars on each screen edge"), icon: "side_navigation", path: "sidebar.screenList" },
         { title: Translation.tr("Media controls"), description: Translation.tr("Floating player popup opened from the bar or IPC"), selectionLabel: Translation.tr("Enabled outputs"), icon: "music_note", path: "media.screenList" }
+    ]
+    readonly property var irisSurfaces: [
+        { title: Translation.tr("iRiS bar"), description: Translation.tr("Minimal iRiS bar; an empty list shows it on every connected output"), icon: "visibility", path: "iris.bar.screenList" }
     ]
     readonly property var sharedSurfaces: [
         { title: Translation.tr("Notification popups"), description: Translation.tr("Transient notification toasts"), icon: "notifications", path: "notifications.screenList" },
@@ -1466,6 +1469,24 @@ ContentPage {
                     surface: modelData
                 }
             }
+
+            NoticeBox {
+                Layout.fillWidth: true
+                materialIcon: "visibility"
+                text: Translation.tr("iRiS keeps its monitor contract small: only the bar is selectable. Background remains per-output; transient iRiS surfaces follow focus.")
+            }
+
+            PresetActions {
+                paths: root.surfacePaths(root.irisSurfaces)
+            }
+
+            Repeater {
+                model: root.irisSurfaces
+                SurfaceVisibilityBlock {
+                    required property var modelData
+                    surface: modelData
+                }
+            }
         }
     }
         }
@@ -1517,7 +1538,7 @@ ContentPage {
             NoticeBox {
                 Layout.fillWidth: true
                 materialIcon: "merge"
-                text: Translation.tr("These surfaces are shared by both families, so the same monitor choices apply in Material and Waffle.")
+                text: Translation.tr("These monitor lists apply to Material and Waffle. iRiS keeps one transient popup on the focused output to reduce residency.")
             }
 
             PresetActions {

@@ -39,7 +39,7 @@ Niri
   -> Quickshell
   -> shell.qml
   -> shared config and services
-  -> ii or Waffle
+  -> ii, Waffle, or iRiS
   -> panels, overlays and widgets
 ```
 

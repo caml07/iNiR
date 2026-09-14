@@ -123,9 +123,12 @@ ApplicationWindow {
     property var searchTargetControl: null
 
     // Static section/option index — shared with the overlay via SettingsPageRegistry.
-    function getWaffleSettingsPageIndex() {
+    function getFamilySettingsPageIndex(family: string) {
+        const componentName = family === "waffle" ? "WaffleConfig.qml"
+            : family === "iris" ? "IrisConfig.qml" : ""
+        if (!componentName.length) return -1
         for (var i = 0; i < pages.length; i++) {
-            if ((pages[i].component || "").indexOf("modules/settings/WaffleConfig.qml") >= 0)
+            if ((pages[i].component || "").indexOf(componentName) >= 0)
                 return i;
         }
         return -1;
@@ -140,18 +143,20 @@ ApplicationWindow {
 
         var results = [];
 
-        // Check if waffle family is active
-        var isWaffleActive = Config.options?.panelFamily === "waffle";
-        var wafflePageIndex = getWaffleSettingsPageIndex();
+        var activeFamily = Config.options?.panelFamily ?? "ii";
+        var wafflePageIndex = getFamilySettingsPageIndex("waffle");
+        var irisPageIndex = getFamilySettingsPageIndex("iris");
         var easyOn = root.easyMode;
 
         var staticResults = SettingsSearchRegistry.buildStaticResults(
             settingsSearchText, SettingsPageRegistry.searchIndex());
         staticResults = staticResults.filter(entry => {
             const family = String(entry.panelFamily || "")
-            if (family.length > 0 && family !== (isWaffleActive ? "waffle" : "ii"))
+            if (family.length > 0 && family !== activeFamily)
                 return false;
-            if (wafflePageIndex >= 0 && entry.pageIndex === wafflePageIndex && !isWaffleActive)
+            if (wafflePageIndex >= 0 && entry.pageIndex === wafflePageIndex && activeFamily !== "waffle")
+                return false;
+            if (irisPageIndex >= 0 && entry.pageIndex === irisPageIndex && activeFamily !== "iris")
                 return false;
             return !(easyOn && entry.pageIndex >= 0 && entry.pageIndex < pages.length
                 && pages[entry.pageIndex].essential !== true);
@@ -161,10 +166,11 @@ ApplicationWindow {
         // 2. Buscar en el registro dinámico de widgets
         if (typeof SettingsSearchRegistry !== "undefined") {
             var widgetResults = SettingsSearchRegistry.buildResults(settingsSearchText);
-            // Filter out Waffle Style widgets if waffle family is not active
-            if (!isWaffleActive) {
+            if (activeFamily !== "waffle") {
                 widgetResults = widgetResults.filter(r => r.pageIndex !== wafflePageIndex);
             }
+            if (activeFamily !== "iris")
+                widgetResults = widgetResults.filter(r => r.pageIndex !== irisPageIndex);
             if (easyOn) {
                 widgetResults = widgetResults.filter(r =>
                     r.pageIndex >= 0 && r.pageIndex < pages.length

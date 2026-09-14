@@ -9,7 +9,7 @@ Panel loading has two stages. `shell.qml` first activates one family-specific cr
 - `modules/ii/critical/ShellIiCriticalPanels.qml`
 - `modules/waffle/critical/ShellWaffleCriticalPanels.qml`
 
-After the first shell frame, `GlobalStates.deferredPanelsReady` enables the thin root wrapper (`ShellIiPanels.qml` or `ShellWafflePanels.qml`), which loads the real family composition from `modules/ii/ShellIiPanelsImpl.qml` or `modules/waffle/ShellWafflePanelsImpl.qml`.
+After the first shell frame, `GlobalStates.deferredPanelsReady` enables the thin root wrapper (`ShellIiPanels.qml`, `ShellWafflePanels.qml`, or `ShellIrisPanels.qml`), which loads the corresponding family implementation root.
 
 Those implementation roots use `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader`. Depending on the loader, a panel is gated by some combination of:
 
@@ -166,4 +166,4 @@ Waffle owns its clipboard implementation separately (`modules/waffle/clipboard/`
 3. Use the correct token system: `Appearance.*` for ii, `Looks.*` for waffle
 4. Register new panels in the correct composition owner: a `critical/` host only for first-frame surfaces, otherwise the family's `Shell*PanelsImpl.qml`; keep shell-wide IPC routers in `shell.qml` when the command must exist before heavy panels load
 5. Register new shared widgets in `modules/common/widgets/qmldir`
-6. If touching shared modules, test under both families
+6. If touching shared modules, test every family that consumes the changed contract

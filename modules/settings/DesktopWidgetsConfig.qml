@@ -18,7 +18,7 @@ ContentPage {
     settingsPageIndex: 14
     settingsPageName: Translation.tr("Widgets")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: ["ii", "iris"].includes(Config.options?.panelFamily ?? "ii")
     property int _customMediaFolderCount: 0
     property int _customMediaFolderImageCount: 0
     property int _customMediaFolderGifCount: 0

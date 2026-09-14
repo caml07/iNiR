@@ -6,6 +6,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.services
+import qs.modules.iris.style
 
 // Style-aware widget background surface.
 // Adapts to the active ii style: blur for aurora/angel, border-only for inir, solid for material.
@@ -57,7 +58,8 @@ Rectangle {
     // otherwise blur twice as wide) and the layer is smoothed on upscale.
     readonly property real _blurScale: 0.5
 
-    readonly property string _surfaceDialect: (Config.options?.background?.widgets?.style ?? "panel") === "island"
+    readonly property bool _iris: (Config.options?.panelFamily ?? "ii") === "iris" && IrisStyle.island
+    readonly property string _surfaceDialect: root._iris ? "iris" : (Config.options?.background?.widgets?.style ?? "panel") === "island"
         ? "island" : Appearance.globalStyle
     readonly property bool _angel: root._surfaceDialect === "angel"
     readonly property bool _aurora: root._surfaceDialect === "aurora" || root._angel
@@ -75,7 +77,7 @@ Rectangle {
     // the shared Ricelin opacity again or every widget becomes nearly invisible.
     readonly property real _plateAlpha: root._backgroundVisible
         ? (root._island ? 1 : root._editorial ? (root._glass ? Appearance.editorial.glassOpacity : Math.min(1, 0.86 + root._surfaceStrength * 0.14)) : Math.min(0.96, 0.72 + root._surfaceStrength * 0.24)) : 0
-    readonly property bool _glass: !root._island && root._backgroundVisible
+    readonly property bool _glass: !root._iris && !root._island && root._backgroundVisible
         && Appearance.blurBackendFor("widgets", Appearance.blurTopology.unsupported) === "wallpaper"
         && root.surfaceUseBlur
         && (!root._editorial || Appearance.editorial.glassActive)
@@ -138,8 +140,9 @@ Rectangle {
         fill: String(root._cookie ? root._cookieFill : root._flatFill)
     })
 
-    radius: surfaceRadius
-    color: _editorialStack ? "transparent"
+    radius: root._iris ? IrisStyle.radius : surfaceRadius
+    color: root._iris ? (root._backgroundVisible ? IrisStyle.surface : "transparent")
+        : _editorialStack ? "transparent"
         : _island ? "transparent"
         : _glass ? "transparent"
         : _zzz ? "transparent"

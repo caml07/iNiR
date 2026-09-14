@@ -2,8 +2,8 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: d4e2bfe6ac10461d
-# Targets: 62
+# IPC.md hash: 539c4d5b586b4711
+# Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
   [ai]="Shared multi-provider AI service. It supports Gemini, OpenAI-compatible chat and Responses APIs, Mistral and Anthropic; live provider catalogs are normalized into capability-aware model records. Catalog visibility is separate from execution readiness, so public model lists remain browseable without pretending an API key exists. OpenCode Zen and Go resolve their current model lists and per-model API routes dynamically. Normal shell tools use typed actions and approval cards, while arbitrary commands are isolated in Advanced mode."
@@ -26,6 +26,7 @@ declare -gA IPC_TARGET_DESC=(
   [equalizer]="Open the ii-family EasyEffects output equalizer. The integration is optional and disabled until you enable it. Run \`inir settings\`, then go to **Modules → Optional → EasyEffects Equalizer** and enable the switch. While it is disabled the IPC target is intentionally not constructed. On a fresh empty EasyEffects output pipeline, iNiR bootstraps a neutral 10-band \`iNiR Equalizer\` preset. Existing non-empty effect chains are never replaced automatically."
   [gamemode]="Performance mode for gaming. Auto-detects fullscreen apps and disables animations/effects. Can also be toggled manually for those stubborn games that don't go fullscreen properly."
   [globalActions]="Command palette / action registry. Search and execute shell actions from scripts or keybinds."
+  [iris]="iRiS bar and Island design. Available while the iRiS bar is enabled."
   [keyboard]="Keyboard layout switching (Niri only). Cycles through configured keyboard layouts and queries layout info."
   [lock]="Lock screen. For when you need to pretend you're working."
   [mascot]="Playful mascot companion (needs \`mascot.enable\` and the companion switch in Settings › Mascot). She peeks from screen edges and reacts to events; every reaction and its pose is configurable in the dedicated Mascot settings page. Never appears over fullscreen apps, game mode, the lock screen or the session screen."
@@ -42,7 +43,7 @@ declare -gA IPC_TARGET_DESC=(
   [overlay]="Floating tools (Super+G): notes, images, crosshair, recorder, resources and other pinnable desktop tools."
   [overview]="Toggle the workspace overview panel. The one with all your windows looking tiny and organized."
   [packageSearch]="Package search service. Searches pacman repos and installed packages."
-  [panelFamily]="Switch between panel styles. ii supports two visual styles: Material ii (default) and Waffle (Windows 11-like)."
+  [panelFamily]="Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight)."
   [pill]="The pill bar's morphing surfaces (only registered while Bar appearance is set to Pill). Valid surface names: \`power\`, \`media\`, \`battery\`, \`calendar\`, \`link\`, \`mixer\`, \`sysmon\`, \`clipboard\`, \`glance\`, \`launcher\`, \`recorder\`."
   [recordingOsd]="Screen recording floating pill OSD. Shows elapsed time and stop button during active recording."
   [region]="Region selection tools. Screenshots, OCR, recording. Draw a box, get stuff done."
@@ -91,6 +92,7 @@ declare -gA IPC_TARGET_FAMILY=(
   [equalizer]="ii"
   [gamemode]="shared"
   [globalActions]="shared"
+  [iris]="shared"
   [keyboard]="shared"
   [lock]="shared"
   [mascot]="shared"
@@ -156,6 +158,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [equalizer]="toggle close open refresh ensure status setBand preset configure"
   [gamemode]="toggle activate deactivate status"
   [globalActions]="run runWithArgs list search open"
+  [iris]="open close design"
   [keyboard]="switchLayout switchLayoutPrevious getCurrentLayout getLayouts"
   [lock]="activate prepareSleep deactivate status focus"
   [mascot]="poke status setVoice romp chase hideSeek tidy appear appearContextual appearWithLine hide snooze"
@@ -298,6 +301,9 @@ declare -gA IPC_FUNCTION_DESC=(
   ["globalActions:list"]="List all actions, optionally filtered by category"
   ["globalActions:search"]="Fuzzy search actions by name/description/keywords"
   ["globalActions:open"]="Open the overview in action mode"
+  ["iris:open"]="Expand the island on the focused output"
+  ["iris:close"]="Collapse the island"
+  ["iris:design"]="Select \`island\` or \`classic\` and persist the preference"
   ["keyboard:switchLayout"]="Switch to next keyboard layout"
   ["keyboard:switchLayoutPrevious"]="Switch to previous keyboard layout"
   ["keyboard:getCurrentLayout"]="Get the current layout name"
@@ -368,8 +374,8 @@ declare -gA IPC_FUNCTION_DESC=(
   ["overview:actionOpen"]="Open overview in action search mode"
   ["packageSearch:search"]="Start a package search"
   ["packageSearch:results"]="Print current search results"
-  ["panelFamily:cycle"]="Cycle to next panel family (ii → waffle → ii)"
-  ["panelFamily:set"]="Set specific family (\"ii\" or \"waffle\")"
+  ["panelFamily:cycle"]="Cycle to next panel family (ii → waffle → iris → ii)"
+  ["panelFamily:set"]="Set specific family (\"ii\", \"waffle\", or \"iris\")"
   ["pill:open"]="Open a surface by name on the focused monitor"
   ["pill:close"]="Close the open surface"
   ["pill:toggle"]="Open a surface, or close it if already open"
@@ -523,6 +529,7 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["globalActions:runWithArgs"]="<actionId> <args>"
   ["globalActions:list"]="<category>"
   ["globalActions:search"]="<query>"
+  ["iris:design"]="<name>"
   ["mascot:setVoice"]="<mode>"
   ["mascot:appear"]="<pose> <edge>"
   ["mascot:appearContextual"]="<pose> <sourceWidget>"
@@ -589,8 +596,8 @@ bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; 
   [ytmusic]='bind "Mod+M+Space" { spawn "inir" "ytmusic" "playPause"; }'
 )
 
-IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev equalizer gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
-IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
+IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev equalizer gamemode globalActions iris keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
+IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions iris keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
 IPC_II_TARGETS=(equalizer)
 IPC_WAFFLE_TARGETS=(autostart customWidgets osd recordingOsd search wactionCenter waffleAltSwitcher wbar widgetpower wnotificationCenter wwidgets)
 

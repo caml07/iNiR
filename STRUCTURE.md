@@ -87,7 +87,7 @@ inir/
 - Key files: `modules/common/Config.qml`, `modules/common/Appearance.qml`, `modules/common/widgets/qmldir`
 
 **modules/common/:**
-- Purpose: Shared infrastructure used across both panel families
+- Purpose: Shared infrastructure used across panel families
 - Contains: Visual token definitions (Appearance.qml), config schema (Config.qml), reusable widget library (widgets/)
 - Key files: `modules/common/Config.qml`, `modules/common/Appearance.qml`, `modules/common/widgets/qmldir`
 

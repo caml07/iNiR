@@ -787,6 +787,17 @@ Singleton {
             }
         },
         {
+            id: "switch-family-iris",
+            name: Translation.tr("Switch to iRiS Panel Family"),
+            description: Translation.tr("Use the minimal iRiS shell layout"),
+            icon: "visibility",
+            category: "settings",
+            keywords: ["family", "panel", "iris", "minimal", "lightweight", "layout"],
+            execute: () => {
+                root.runLauncher(["panelFamily", "set", "iris"])
+            }
+        },
+        {
             id: "toggle-control-panel",
             name: Translation.tr("Toggle Quick Settings"),
             description: Translation.tr("Open or close the quick settings panel"),

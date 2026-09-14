@@ -65,10 +65,13 @@ Scope {
         onTriggered: root.recomputeOverlaySearchResults()
     }
 
-    function getWaffleSettingsPageIndex() {
+    function getFamilySettingsPageIndex(family: string) {
+        const componentName = family === "waffle" ? "WaffleConfig.qml"
+            : family === "iris" ? "IrisConfig.qml" : ""
+        if (!componentName.length) return -1
         for (var i = 0; i < overlayPages.length; i++) {
             var componentPath = String(overlayPages[i].component || "");
-            if (componentPath.indexOf("modules/settings/WaffleConfig.qml") >= 0) {
+            if (componentPath.indexOf(componentName) >= 0) {
                 return i;
             }
         }
@@ -84,17 +87,20 @@ Scope {
 
         var results = [];
 
-        var isWaffleActive = Config.options?.panelFamily === "waffle";
-        var wafflePageIndex = getWaffleSettingsPageIndex();
+        var activeFamily = Config.options?.panelFamily ?? "ii";
+        var wafflePageIndex = getFamilySettingsPageIndex("waffle");
+        var irisPageIndex = getFamilySettingsPageIndex("iris");
         var easyOn = root.easyMode;
 
         var staticResults = SettingsSearchRegistry.buildStaticResults(
             overlaySearchText, SettingsPageRegistry.searchIndex());
         staticResults = staticResults.filter(entry => {
             const family = String(entry.panelFamily || "")
-            if (family.length > 0 && family !== (isWaffleActive ? "waffle" : "ii"))
+            if (family.length > 0 && family !== activeFamily)
                 return false;
-            if (wafflePageIndex >= 0 && entry.pageIndex === wafflePageIndex && !isWaffleActive)
+            if (wafflePageIndex >= 0 && entry.pageIndex === wafflePageIndex && activeFamily !== "waffle")
+                return false;
+            if (irisPageIndex >= 0 && entry.pageIndex === irisPageIndex && activeFamily !== "iris")
                 return false;
             return !(easyOn && entry.pageIndex >= 0 && entry.pageIndex < overlayPages.length
                 && overlayPages[entry.pageIndex].essential !== true);
@@ -104,9 +110,11 @@ Scope {
         // 2. Dynamic widget registry
         if (typeof SettingsSearchRegistry !== "undefined") {
             var widgetResults = SettingsSearchRegistry.buildResults(overlaySearchText);
-            if (!isWaffleActive && wafflePageIndex >= 0) {
+            if (activeFamily !== "waffle" && wafflePageIndex >= 0) {
                 widgetResults = widgetResults.filter(r => r.pageIndex !== wafflePageIndex);
             }
+            if (activeFamily !== "iris" && irisPageIndex >= 0)
+                widgetResults = widgetResults.filter(r => r.pageIndex !== irisPageIndex);
             if (easyOn) {
                 widgetResults = widgetResults.filter(r =>
                     r.pageIndex >= 0 && r.pageIndex < overlayPages.length

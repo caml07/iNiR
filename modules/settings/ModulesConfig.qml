@@ -10,7 +10,10 @@ ContentPage {
     settingsPageIndex: 10
     settingsPageName: Translation.tr("Modules")
 
-    readonly property bool isWaffle: Config.options?.panelFamily === "waffle"
+    readonly property string activeFamily: Config.options?.panelFamily ?? "ii"
+    readonly property bool isIi: modulesPage.activeFamily === "ii"
+    readonly property bool isWaffle: modulesPage.activeFamily === "waffle"
+    readonly property bool isIris: modulesPage.activeFamily === "iris"
 
     readonly property var defaultPanels: ({
         "ii": [
@@ -24,6 +27,11 @@ ContentPage {
             "wBar", "wBackground", "wBackdrop", "wStartMenu", "wActionCenter", "wNotificationCenter", "wNotificationPopup", "wOnScreenDisplay", "wWidgets", "wTaskView", "wLock", "wPolkit", "wSessionScreen",
             "iiCheatsheet", "iiOnScreenKeyboard", "iiOverlay", "iiOverview",
             "iiRegionSelector", "iiScreenCorners", "iiWallpaperSelector", "iiWallpaperLauncher", "iiCoverflowSelector", "iiClipboard"
+        ],
+        "iris": [
+            "irisBar", "irisBackground", "irisPalette", "irisControlCenter",
+            "irisNotificationPopup", "irisOnScreenDisplay", "irisSessionScreen",
+            "irisLock", "irisPolkit"
         ]
     })
 
@@ -181,13 +189,13 @@ ContentPage {
                     Layout.fillWidth: true
                     implicitHeight: 64
                     buttonRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
-                    colBackground: !modulesPage.isWaffle
+                    colBackground: modulesPage.isIi
                         ? (Appearance.zzzEverywhere ? Appearance.zzz.sticker : Appearance.colors.colPrimaryContainer)
                         : Appearance.colors.colLayer1
-                    colBackgroundHover: !modulesPage.isWaffle
+                    colBackgroundHover: modulesPage.isIi
                         ? (Appearance.zzzEverywhere ? Appearance.colors.colPrimaryHover : Appearance.colors.colPrimaryContainerHover)
                         : Appearance.colors.colLayer1Hover
-                    colRipple: !modulesPage.isWaffle
+                    colRipple: modulesPage.isIi
                         ? (Appearance.zzzEverywhere ? Appearance.colors.colPrimaryActive : Appearance.colors.colPrimaryContainerActive)
                         : Appearance.colors.colLayer1Active
 
@@ -198,7 +206,7 @@ ContentPage {
                             Layout.alignment: Qt.AlignHCenter
                             text: "dashboard"
                             iconSize: Appearance.font.pixelSize.larger
-                            color: !modulesPage.isWaffle
+                            color: modulesPage.isIi
                                 ? (Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer)
                                 : Appearance.colors.colOnSurface
                         }
@@ -206,16 +214,13 @@ ContentPage {
                             Layout.alignment: Qt.AlignHCenter
                             text: "Material (ii)"
                             font.pixelSize: Appearance.font.pixelSize.small
-                            color: !modulesPage.isWaffle
+                            color: modulesPage.isIi
                                 ? (Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer)
                                 : Appearance.colors.colOnSurface
                         }
                     }
 
-                    onClicked: {
-                        Config.setNestedValue("panelFamily", "ii")
-                        Config.setNestedValue("enabledPanels", [...modulesPage.defaultPanels["ii"]])
-                    }
+                    onClicked: Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "panelFamily", "set", "ii"])
                 }
 
                 RippleButton {
@@ -243,10 +248,35 @@ ContentPage {
                         }
                     }
 
-                    onClicked: {
-                        Config.setNestedValue("panelFamily", "waffle")
-                        Config.setNestedValue("enabledPanels", [...modulesPage.defaultPanels["waffle"]])
+                    onClicked: Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "panelFamily", "set", "waffle"])
+                }
+
+                RippleButton {
+                    Layout.fillWidth: true
+                    implicitHeight: 64
+                    buttonRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
+                    colBackground: modulesPage.isIris ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer1
+                    colBackgroundHover: modulesPage.isIris ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer1Hover
+                    colRipple: modulesPage.isIris ? Appearance.colors.colPrimaryContainerActive : Appearance.colors.colLayer1Active
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "visibility"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: modulesPage.isIris ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurface
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "iRiS"
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            color: modulesPage.isIris ? Appearance.colors.colOnPrimaryContainer : Appearance.colors.colOnSurface
+                        }
                     }
+
+                    onClicked: Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "panelFamily", "set", "iris"])
                 }
             }
         }
@@ -532,7 +562,7 @@ ContentPage {
 
     // ==================== MATERIAL II ====================
     SettingsTaskLoader {
-        requested: !modulesPage.isWaffle && modulesPage.activeSection === "modules"
+        requested: modulesPage.isIi && modulesPage.activeSection === "modules"
         sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "modules"
@@ -610,7 +640,7 @@ ContentPage {
     }
 
     SettingsTaskLoader {
-        requested: !modulesPage.isWaffle && modulesPage.activeSection === "modules"
+        requested: modulesPage.isIi && modulesPage.activeSection === "modules"
         sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "modules"
@@ -648,7 +678,7 @@ ContentPage {
     }
 
     SettingsTaskLoader {
-        requested: !modulesPage.isWaffle && modulesPage.activeSection === "modules"
+        requested: modulesPage.isIi && modulesPage.activeSection === "modules"
         sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "modules"
@@ -734,7 +764,7 @@ ContentPage {
     }
 
     SettingsTaskLoader {
-        requested: !modulesPage.isWaffle && modulesPage.activeSection === "modules"
+        requested: modulesPage.isIi && modulesPage.activeSection === "modules"
         sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "modules"

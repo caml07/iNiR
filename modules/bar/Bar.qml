@@ -189,7 +189,7 @@ Scope {
                         reserve = Math.max(reserve, 12)
 
                     const orbitEnabled = CompositorService.isNiri
-                        && (Config.options?.panelFamily ?? "ii") !== "waffle"
+                        && (Config.options?.panelFamily ?? "ii") === "ii"
                         && (Config.options?.orbit?.enable ?? true)
                         && (Config.options?.orbit?.hotCornerEnable ?? true)
                     if (orbitEnabled && String(Config.options?.orbit?.hotCorner ?? "topRight") === corner)

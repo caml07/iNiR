@@ -11,11 +11,13 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
+import qs.modules.iris.style
 
 AbstractWidget {
     id: root
 
     required property string configEntryName
+    readonly property bool widgetIris: (Config.options?.panelFamily ?? "ii") === "iris" && IrisStyle.island
     required property int screenWidth
     required property int screenHeight
     required property int scaledScreenWidth
@@ -1919,6 +1921,14 @@ AbstractWidget {
     }
 
     function widgetSemanticSet(role: string): var {
+        if (root.widgetIris) {
+            const foreground = role === "surface" ? IrisStyle.text
+                : role === "signal" ? IrisStyle.danger
+                : role === "warning" || role === "tertiary" ? IrisStyle.secondaryAccent : IrisStyle.accent;
+            return { color: foreground, onColor: IrisStyle.surface,
+                container: role === "surface" ? IrisStyle.surface : IrisStyle.surfaceHigh,
+                onContainer: IrisStyle.text };
+        }
         const c = Appearance.colors;
         switch (role) {
         case "secondary":
@@ -1995,8 +2005,8 @@ AbstractWidget {
         ? ColorUtils.ensureReadable(ColorUtils.mix(root.widgetInk, root.widgetPlateColor, 0.72), root.widgetPlateColor, 4.5)
         : ColorUtils.applyAlpha(root.widgetInk, 0.66)
     readonly property color widgetInkSubtle: ColorUtils.applyAlpha(root.widgetInk, 0.58)
-    readonly property bool widgetEditorial: Appearance.editorialEverywhere
-    readonly property string widgetTitleFamily: root.widgetEditorial
+    readonly property bool widgetEditorial: !root.widgetIris && Appearance.editorialEverywhere
+    readonly property string widgetTitleFamily: root.widgetIris ? IrisStyle.fontMain : root.widgetEditorial
         ? Appearance.editorial.displayFamily : Appearance.font.family.main
     readonly property int widgetTitleWeight: root.widgetEditorial
         ? Appearance.editorial.titleWeight : Font.DemiBold
@@ -2008,8 +2018,8 @@ AbstractWidget {
         ? Appearance.editorial.spacing : 1
     readonly property int widgetLabelWeight: root.widgetEditorial ? Appearance.editorial.labelWeight : Font.Medium
     readonly property real widgetMetadataTracking: root.widgetEditorial ? Appearance.editorial.metadataTracking : 0
-    readonly property real widgetControlRadius: root.widgetEditorial ? Appearance.rounding.small : Appearance.rounding.normal
-    readonly property real widgetCardRadius: root.widgetEditorial ? Appearance.editorial.radius : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius
+    readonly property real widgetControlRadius: root.widgetIris ? IrisStyle.radiusSmall : root.widgetEditorial ? Appearance.rounding.small : Appearance.rounding.normal
+    readonly property real widgetCardRadius: root.widgetIris ? IrisStyle.radius : root.widgetEditorial ? Appearance.editorial.radius : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius
         : Appearance.cookieEverywhere ? Appearance.cookie.roundLarge
         : Appearance.angelEverywhere ? Appearance.angel.roundingNormal
         : Appearance.inirEverywhere ? Appearance.inir.roundingNormal

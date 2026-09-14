@@ -35,7 +35,8 @@ At a high level, the runtime works like this:
 4. The shell loads only one panel family at a time, in two phases:
    - ii critical host: `modules/ii/critical/ShellIiCriticalPanels.qml`
    - Waffle critical host: `modules/waffle/critical/ShellWaffleCriticalPanels.qml`
-   - after `GlobalStates.deferredPanelsReady`, the thin `ShellIiPanels.qml` / `ShellWafflePanels.qml` wrappers load `modules/ii/ShellIiPanelsImpl.qml` / `modules/waffle/ShellWafflePanelsImpl.qml`.
+   - iRiS critical host: `modules/iris/critical/ShellIrisCriticalPanels.qml`
+   - after `GlobalStates.deferredPanelsReady`, the thin `ShellIiPanels.qml` / `ShellWafflePanels.qml` / `ShellIrisPanels.qml` wrappers load their family `Shell*PanelsImpl.qml` roots.
 5. The implementation roots create deferred/on-demand user-facing modules only when the module is enabled in config and its runtime conditions are satisfied.
 6. Modules read shared state from services and singletons such as:
    - `Config`
@@ -92,6 +93,12 @@ It defines:
 - shared modules that also remain available under waffle
 
 A change in either Waffle composition owner affects the Windows-11-like family and, in many cases, the expectations of family switching/startup cost.
+
+### iRiS composition chain
+
+`modules/iris/critical/ShellIrisCriticalPanels.qml` owns only the iRiS background and modular bar. `ShellIrisPanels.qml` is the deferred wrapper and `modules/iris/ShellIrisPanelsImpl.qml` owns Palette, Controls, notification feedback, OSD, session/auth surfaces and shared utilities loaded on demand.
+
+iRiS deliberately has a smaller resident contract than the other families. Its visual owner is `modules/iris/style/IrisStyle.qml`; user-facing extension rules are documented in `modules/iris/DESIGN.md` and `defaults/widgets/IRIS-SDK.md`.
 
 ### `modules/`
 
@@ -264,10 +271,11 @@ If you move behavior earlier or later in the boot sequence, you can change:
 
 The panel-family system is central to the project.
 
-iNiR has two families:
+iNiR has three families:
 
 - `ii`
 - `waffle`
+- `iris`
 
 The active family is stored in config and switched through shell logic plus IPC.
 

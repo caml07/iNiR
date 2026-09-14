@@ -339,6 +339,7 @@ Singleton {
     // Panel family transition animation state
     property bool familyTransitionActive: false
     property string familyTransitionDirection: "left" // "left" = current exits left, new enters from right
+    property string familyTransitionTarget: ""
 
     signal requestRipple(real x, real y, string screenName)
 

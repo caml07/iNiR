@@ -6,6 +6,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.lock
 import qs.modules.waffle.lock
+import qs.modules.iris.lock
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -186,20 +187,30 @@ Scope {
     readonly property bool useWaffleLock: Config.ready && !GlobalStates.screenLocked 
         ? (Config.options?.panelFamily === "waffle")
         : root._cachedUseWaffleLock
+    readonly property bool useIrisLock: Config.ready && !GlobalStates.screenLocked
+        ? (Config.options?.panelFamily === "iris")
+        : root._cachedUseIrisLock
     
     // Cache the last known value to prevent switching during lock
     property bool _cachedUseWaffleLock: false
+    property bool _cachedUseIrisLock: false
     
     onUseWaffleLockChanged: {
         if (!GlobalStates.screenLocked) {
             root._cachedUseWaffleLock = root.useWaffleLock
         }
     }
+    onUseIrisLockChanged: {
+        if (!GlobalStates.screenLocked)
+            root._cachedUseIrisLock = root.useIrisLock
+    }
     
     Component.onCompleted: {
         // Initialize cache.
-        if (Config.ready)
+        if (Config.ready) {
             root._cachedUseWaffleLock = Config.options?.panelFamily === "waffle"
+            root._cachedUseIrisLock = Config.options?.panelFamily === "iris"
+        }
         root.initIfReady()
     }
     
@@ -223,6 +234,13 @@ Scope {
             context: lockContext
         }
     }
+
+    Component {
+        id: irisLockComponent
+        IrisLockSurface {
+            context: lockContext
+        }
+    }
     
     WlSessionLock {
         id: lock
@@ -242,6 +260,7 @@ Scope {
                     console.warn("[Lock] Lock surface failed to load after 2s — status:",
                                  lockSurfaceLoader.status, "active:", lockSurfaceLoader.active,
                                  "Config.ready:", Config.ready, "waffle:", root._cachedUseWaffleLock,
+                                 "iris:", root._cachedUseIrisLock,
                                  "isNiri:", CompositorService.isNiri)
                     root.useFallbackLock()
                 }
@@ -255,7 +274,7 @@ Scope {
                 opacity: active ? 1 : 0
                 sourceComponent: root._cachedUseWaffleLock
                     ? (CompositorService.isNiri ? waffleLockSafeComponent : waffleLockComponent)
-                    : iiLockComponent
+                    : root._cachedUseIrisLock ? irisLockComponent : iiLockComponent
                 
                 // Detect load errors
                 onStatusChanged: {

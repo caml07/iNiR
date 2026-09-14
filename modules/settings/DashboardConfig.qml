@@ -10,7 +10,7 @@ ContentPage {
     settingsPageIndex: 16
     settingsPageName: Translation.tr("Dashboard")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
     property string activeSection: "general"
 
     SettingsTaskNavigator {

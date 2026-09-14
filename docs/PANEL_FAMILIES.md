@@ -1,6 +1,6 @@
 # Panel Families
 
-iNiR has two completely separate UI families that share the same services and config backend. Switch between them at runtime with `Super+Shift+W`.
+iNiR has three separate UI families that share the same service/config foundation. Switch between them at runtime with `Super+Shift+W`.
 
 ## Material ii
 
@@ -126,6 +126,20 @@ Waffle composition is split between `modules/waffle/critical/ShellWaffleCritical
 
 Some panels are shared between families (cheatsheet, region selector, on-screen keyboard, screen corners) and keep their `ii` prefix even when running under waffle.
 
+## iRiS
+
+iRiS is the deliberately minimal family. It keeps only background + modular bar resident and creates Palette, Controls, notification feedback, OSD, session/auth surfaces and shared utilities when they are actually needed.
+
+### Layout and design
+
+- **Bar**: compact top/bottom bar with `left`, `center`, and `right` slots.
+- **Palette**: keyboard-first apps/actions/clipboard/math surface in place of separate resident launchers.
+- **Controls**: compact volume/brightness/toggle surface.
+- **Visual owner**: `modules/iris/style/IrisStyle.qml`.
+- **User modules**: reuse `CustomWidgets`; a manifest can provide `iris.main` plus allowed slots.
+
+iRiS composition is split between `modules/iris/critical/ShellIrisCriticalPanels.qml` and `modules/iris/ShellIrisPanelsImpl.qml` through `ShellIrisPanels.qml`. See `modules/iris/DESIGN.md` and `defaults/widgets/IRIS-SDK.md` for the family contract and extension API.
+
 ## Switching families
 
 `Super+Shift+W` triggers a family transition with an animated overlay. The transition:
@@ -140,7 +154,7 @@ The transition is handled by `FamilyTransitionOverlay.qml`. Config persists the 
 
 ## Panel loading
 
-Both families use the same staged loading idea, but not every surface uses the same loader. Critical first-frame surfaces use `CriticalPanelLoader`; the implementation roots use `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader` according to lifecycle needs.
+All families use the same staged loading idea, but not every surface uses the same loader. Critical first-frame surfaces use `CriticalPanelLoader`; the implementation roots use `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader` according to lifecycle needs.
 
 ```qml
 CriticalPanelLoader {
@@ -156,7 +170,7 @@ The common conditions are:
 3. **`extraCondition`** passes when the loader has one
 4. **Lifecycle gate** is satisfied (`shellEntryReady`, `deferredPanelsReady`, or an on-demand `open`/resident state)
 
-The critical host is deliberately tiny: ii starts background/bar/dock, while Waffle starts taskbar/background/backdrop. The heavier family tree becomes eligible after the first frame; many interactive surfaces stay unloaded until actually opened.
+The critical host is deliberately tiny: ii starts background/bar/dock, Waffle starts taskbar/background/backdrop, and iRiS starts only background/bar. The heavier family tree becomes eligible after the first frame; many interactive surfaces stay unloaded until actually opened.
 
 ## For contributors
 
@@ -167,4 +181,4 @@ If you're adding a new panel:
 3. Add the identifier to `enabledPanels` default in `defaults/config.json`
 4. If it has settings, add them to the correct Settings UI
 
-If your change affects both families, update both. If your change touches a shared component (notifications, lock screen, polkit), test under both families.
+If your change affects multiple families, update every affected family. Shared component changes must be tested in each family that actually consumes that component.

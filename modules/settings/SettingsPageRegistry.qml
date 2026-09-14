@@ -240,6 +240,14 @@ Singleton {
             desc: Translation.tr("Niri workspace navigator, Trail and Stash"),
             essential: true,
             component: "modules/settings/OrbitConfig.qml"
+        },
+        {
+            key: "iris",
+            name: "iRiS",
+            icon: "visibility",
+            desc: Translation.tr("Minimal shell family and modules"),
+            essential: true,
+            component: "modules/settings/IrisConfig.qml"
         }
     ]
 
@@ -248,7 +256,7 @@ Singleton {
     readonly property var defaultCategories: [
         { label: Translation.tr("Essentials"), pages: [0] },
         { label: Translation.tr("Appearance"), pages: [4, 25, 3, 14, 21] },
-        { label: Translation.tr("Shell"), pages: [2, 26, 27, 5, 22, 23, 16, 10, 11, 18, 19, 20] },
+        { label: Translation.tr("Shell"), pages: [2, 28, 26, 27, 5, 22, 23, 16, 10, 11, 18, 19, 20] },
         { label: Translation.tr("System"), pages: [1, 24, 7, 6, 12, 15, 8, 17] },
         { label: Translation.tr("Reference"), pages: [9, 13] }
     ]

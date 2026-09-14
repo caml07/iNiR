@@ -2324,6 +2324,55 @@
         "stylePreset": "material",
         "performancePreset": "balanced"
     },
+    "iris": {
+        "dock": {
+            "enable": true,
+            "autoHide": true,
+            "iconSize": 40
+        },
+        "appearance": {
+            "design": "island",
+            "fontFamily": "",
+            "titleFontFamily": "",
+            "density": 1.0,
+            "radius": 12,
+            "motion": true
+        },
+        "bar": {
+            "position": "top",
+            "height": 42,
+            "margin": 8,
+            "reserveSpace": true,
+            "screenList": [],
+            "leftModules": ["brand", "workspaces"],
+            "centerModules": ["activeWindow"],
+            "rightModules": ["status", "clock", "controls"]
+        },
+        "palette": {
+            "width": 640,
+            "maxResults": 8,
+            "showHints": true
+        },
+        "controlCenter": {
+            "width": 360
+        },
+        "notifications": {
+            "width": 380
+        },
+        "osd": {
+            "width": 320
+        },
+        "modules": {
+            "desktopWidgets": true,
+            "palette": true,
+            "controlCenter": true,
+            "notificationPopup": true,
+            "osd": true,
+            "sessionScreen": true,
+            "lock": true,
+            "polkit": true
+        }
+    },
     "waffles": {
         "settings": {
             "useMaterialStyle": false

@@ -14,7 +14,8 @@ ContentPage {
     settingsPageIndex: 3
     settingsPageName: Translation.tr("Background")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
+    property bool isWaffleActive: Config.options?.panelFamily === "waffle"
     property string activeSection: "source"
     readonly property bool screensTaskActive: root.isIiActive && root.activeSection === "screens"
 
@@ -66,7 +67,7 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: !root.isIiActive
+        visible: root.isWaffleActive
         expanded: true
         icon: "info"
         title: Translation.tr("Waffle Mode")

@@ -646,7 +646,7 @@ Scope {
         // True while ii is the family actually painting the screen. The family
         // LazyLoader can retain the inactive tree, so every heavy source in here
         // has to ask, not assume.
-        readonly property bool _familyOwnsScreen: (Config.options?.panelFamily ?? "ii") !== "waffle"
+        readonly property bool _familyOwnsScreen: ["ii", "iris"].includes(Config.options?.panelFamily ?? "ii")
         property bool wallpaperIsVideo: wallpaperPathRaw.endsWith(".mp4") || wallpaperPathRaw.endsWith(".webm") || wallpaperPathRaw.endsWith(".mkv") || wallpaperPathRaw.endsWith(".avi") || wallpaperPathRaw.endsWith(".mov")
         property bool wallpaperIsGif: wallpaperPathRaw.toLowerCase().endsWith(".gif")
         property string wallpaperPath: bgRoot.wallpaperPathRaw

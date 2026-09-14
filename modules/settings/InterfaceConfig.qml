@@ -18,7 +18,7 @@ ContentPage {
     settingsPageIndex: 5
     settingsPageName: Translation.tr("Panels")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
     property string activeSection: "control"
 
     function activateSettingsSearchSection(section: string): bool {

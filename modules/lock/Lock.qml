@@ -248,27 +248,17 @@ Scope {
 
         WlSessionLockSurface {
             id: lockSurface
-            // Use colLayer0 as transitional background - actual lock surface has its own bg
             color: Appearance.colors.colLayer0
-            
-            // Fallback timer - if lock surface doesn't load properly, use swaylock
-            Timer {
-                id: fallbackTimer
-                interval: 2000
-                running: GlobalStates.screenLocked && !lockSurfaceLoader.item
-                onTriggered: {
-                    console.warn("[Lock] Lock surface failed to load after 2s — status:",
-                                 lockSurfaceLoader.status, "active:", lockSurfaceLoader.active,
-                                 "Config.ready:", Config.ready, "waffle:", root._cachedUseWaffleLock,
-                                 "iris:", root._cachedUseIrisLock,
-                                 "isNiri:", CompositorService.isNiri)
-                    root.useFallbackLock()
-                }
+
+            Rectangle {
+                anchors.fill: parent
+                color: Appearance.colors.colLayer0
             }
-            
+
             Loader {
                 id: lockSurfaceLoader
                 active: GlobalStates.screenLocked && Config.ready
+                asynchronous: true
                 anchors.fill: parent
                 // Don't animate opacity - causes issues during hot-reload
                 opacity: active ? 1 : 0
@@ -303,6 +293,20 @@ Scope {
                             if (item) item.forceActiveFocus()
                         })
                     }
+                }
+            }
+
+            Timer {
+                id: fallbackTimer
+                interval: 2000
+                running: GlobalStates.screenLocked && !lockSurfaceLoader.item && lockSurfaceLoader.status !== Loader.Loading
+                onTriggered: {
+                    console.warn("[Lock] Lock surface failed to load after 2s — status:",
+                                 lockSurfaceLoader.status, "active:", lockSurfaceLoader.active,
+                                 "Config.ready:", Config.ready, "waffle:", root._cachedUseWaffleLock,
+                                 "iris:", root._cachedUseIrisLock,
+                                 "isNiri:", CompositorService.isNiri)
+                    root.useFallbackLock()
                 }
             }
             

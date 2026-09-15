@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -11,19 +12,11 @@ ContentPage {
     settingsPageName: "iRiS"
     property string activeSection: "design"
     readonly property bool familyActive: (Config.options?.panelFamily ?? "ii") === "iris"
+    // User modules live on the Island's Desktop page. They are stored in the
+    // established module lists; any list counts as "on".
     readonly property var slotOptions: [
         { displayName: Translation.tr("Off"), value: "off" },
-        { displayName: Translation.tr("Left"), value: "left" },
-        { displayName: Translation.tr("Center"), value: "center" },
-        { displayName: Translation.tr("Right"), value: "right" }
-    ]
-    readonly property var builtInModules: [
-        { id: "brand", icon: "visibility", label: "iRiS" },
-        { id: "workspaces", icon: "workspaces", label: Translation.tr("Workspaces") },
-        { id: "activeWindow", icon: "web_asset", label: Translation.tr("Active window") },
-        { id: "status", icon: "network_check", label: Translation.tr("Status") },
-        { id: "clock", icon: "schedule", label: Translation.tr("Clock") },
-        { id: "controls", icon: "tune", label: Translation.tr("Controls") }
+        { displayName: Translation.tr("On the Island"), value: "right" }
     ]
 
     function listFor(slot: string): var {
@@ -38,6 +31,7 @@ ContentPage {
         }
         return "off"
     }
+    function onIsland(moduleId: string): bool { return root.slotFor(moduleId) !== "off" }
     function setModuleSlot(moduleId: string, slot: string): void {
         const left = [...root.listFor("left")].filter(id => id !== moduleId)
         const center = [...root.listFor("center")].filter(id => id !== moduleId)
@@ -74,15 +68,16 @@ ContentPage {
     SettingsTaskNavigator {
         icon: "visibility"
         title: "iRiS"
-        description: Translation.tr("Apple-inspired Island shell with Dock, Palette and optional desktop widgets.")
-        summary: Translation.tr("Design · bar · modules · surfaces")
+        description: Translation.tr("iNiR's Island family: a living Island, Dock, Spotlight, side panels and desktop widgets.")
+        summary: Translation.tr("Design · Island · modules · surfaces")
         currentValue: root.activeSection
         onSelected: value => root.activeSection = value
         options: [
             { displayName: Translation.tr("Design"), icon: "palette", value: "design" },
-            { displayName: Translation.tr("Bar"), icon: "toolbar", value: "bar" },
+            { displayName: Translation.tr("Island"), icon: "toolbar", value: "bar" },
             { displayName: Translation.tr("Modules"), icon: "extension", value: "modules" },
-            { displayName: Translation.tr("Surfaces"), icon: "web_asset", value: "surfaces" }
+            { displayName: Translation.tr("Surfaces"), icon: "web_asset", value: "surfaces" },
+            { displayName: Translation.tr("Side panels"), icon: "dock_to_right", value: "sidebars" }
         ]
     }
 
@@ -149,20 +144,6 @@ ContentPage {
                 icon: "design_services"
                 title: Translation.tr("Visual system")
                 SettingsGroup {
-                    RowLayout {
-                        Layout.fillWidth: true
-                        StyledText { Layout.fillWidth: true; text: Translation.tr("Design") }
-                        StyledComboBox {
-                            Layout.preferredWidth: 180
-                            model: [
-                                { displayName: "Classic", value: "classic" },
-                                { displayName: "Island", value: "island" }
-                            ]
-                            textRole: "displayName"
-                            currentIndex: (Config.options?.iris?.appearance?.design ?? "island") === "classic" ? 0 : 1
-                            onActivated: index => Config.setNestedValue("iris.appearance.design", model[index].value)
-                        }
-                    }
                     ConfigRow {
                         uniform: true
                         ConfigSpinBox {
@@ -173,15 +154,6 @@ ContentPage {
                             to: 135
                             stepSize: 5
                             onValueChanged: Config.setNestedValue("iris.appearance.density", value / 100)
-                        }
-                        ConfigSpinBox {
-                            icon: "rounded_corner"
-                            text: Translation.tr("Classic radius")
-                            enabled: (Config.options?.iris?.appearance?.design ?? "island") === "classic"
-                            value: Config.options?.iris?.appearance?.radius ?? 12
-                            from: 4
-                            to: 28
-                            onValueChanged: Config.setNestedValue("iris.appearance.radius", value)
                         }
                     }
                     SettingsSwitch {
@@ -202,7 +174,7 @@ ContentPage {
                 settingsTaskSection: "bar"
                 expanded: true
                 icon: "toolbar"
-                title: Translation.tr("Bar geometry")
+                title: Translation.tr("Island geometry")
                 SettingsGroup {
                     RowLayout {
                         Layout.fillWidth: true
@@ -257,78 +229,13 @@ ContentPage {
         sourceComponent: Component {
             SettingsCardSection {
                 settingsTaskSection: "modules"
-                expanded: true
-                icon: "view_week"
-                title: Translation.tr("Bar slots")
-                SettingsGroup {
-                    StyledText {
-                        Layout.fillWidth: true
-                        text: Translation.tr("Off removes a module from the runtime bar tree.")
-                        color: Appearance.colors.colSubtext
-                        font.pixelSize: Appearance.font.pixelSize.smaller
-                    }
-                    Repeater {
-                        model: root.builtInModules
-                        RowLayout {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            spacing: Appearance.sizes.spacingMedium
-                            MaterialSymbol {
-                                text: modelData.icon
-                                iconSize: Appearance.font.pixelSize.larger
-                                color: Appearance.colors.colPrimary
-                            }
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: modelData.label
-                                font.weight: Font.DemiBold
-                            }
-                            StyledComboBox {
-                                Layout.preferredWidth: 140
-                                model: root.slotOptions
-                                textRole: "displayName"
-                                currentIndex: Math.max(0, root.slotOptions.findIndex(option => option.value === root.slotFor(modelData.id)))
-                                onActivated: index => root.setModuleSlot(modelData.id, root.slotOptions[index].value)
-                            }
-                            IconToolbarButton {
-                                visible: root.slotFor(modelData.id) !== "off"
-                                enabled: root.canMoveModule(modelData.id, -1)
-                                implicitWidth: 30
-                                implicitHeight: 30
-                                iconSize: 17
-                                text: "arrow_back"
-                                onClicked: root.moveModule(modelData.id, -1)
-                                StyledToolTip { text: Translation.tr("Move earlier") }
-                            }
-                            IconToolbarButton {
-                                visible: root.slotFor(modelData.id) !== "off"
-                                enabled: root.canMoveModule(modelData.id, 1)
-                                implicitWidth: 30
-                                implicitHeight: 30
-                                iconSize: 17
-                                text: "arrow_forward"
-                                onClicked: root.moveModule(modelData.id, 1)
-                                StyledToolTip { text: Translation.tr("Move later") }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    SettingsTaskLoader {
-        requested: root.activeSection === "modules"
-        sourceComponent: Component {
-            SettingsCardSection {
-                settingsTaskSection: "modules"
                 expanded: false
                 icon: "extension"
-                title: Translation.tr("User modules")
+                title: Translation.tr("Island modules")
                 SettingsGroup {
                     StyledText {
                         Layout.fillWidth: true
-                        text: Translation.tr("Widgets can expose a compact iRiS component without adding another plugin system.")
+                        text: Translation.tr("Custom widgets can expose a compact iRiS component; enabled ones appear on the Island's Desktop page, in this order.")
                         color: Appearance.colors.colSubtext
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         wrapMode: Text.WordWrap
@@ -361,12 +268,9 @@ ContentPage {
                             }
                             StyledComboBox {
                                 Layout.preferredWidth: 140
-                                readonly property var allowedSlots: modelData.irisSlots ?? []
-                                model: root.slotOptions.filter(option => option.value === "off"
-                                    || allowedSlots.length === 0
-                                    || allowedSlots.includes("bar." + option.value))
+                                model: root.slotOptions
                                 textRole: "displayName"
-                                currentIndex: Math.max(0, model.findIndex(option => option.value === root.slotFor(parent.moduleId)))
+                                currentIndex: root.onIsland(parent.moduleId) ? 1 : 0
                                 onActivated: index => root.setModuleSlot(parent.moduleId, model[index].value)
                             }
                             IconToolbarButton {
@@ -438,6 +342,12 @@ ContentPage {
                         text: Translation.tr("Dock blur")
                         checked: Config.options?.iris?.dock?.blur ?? false
                         onCheckedChanged: Config.setNestedValue("iris.dock.blur", checked)
+                    }
+                    SettingsSwitch {
+                        buttonIcon: "zoom_in"
+                        text: Translation.tr("Magnify icons on hover")
+                        checked: Config.options?.iris?.dock?.magnification ?? true
+                        onCheckedChanged: Config.setNestedValue("iris.dock.magnification", checked)
                     }
                     ConfigSpinBox {
                         icon: "photo_size_select_small"
@@ -557,6 +467,86 @@ ContentPage {
                         to: 480
                         stepSize: 10
                         onValueChanged: Config.setNestedValue("iris.osd.width", value)
+                    }
+                }
+            }
+        }
+    }
+
+    SettingsTaskLoader {
+        requested: root.activeSection === "sidebars"
+        sourceComponent: Component {
+            ColumnLayout {
+                Repeater {
+                    model: ["left", "right"]
+                    SettingsCardSection {
+                        id: sideSection
+                        required property string modelData
+                        readonly property string path: "iris.sidebars." + modelData
+                        readonly property var options: Config.options?.iris?.sidebars?.[modelData] ?? ({})
+                        Layout.fillWidth: true
+                        settingsTaskSection: "sidebars"
+                        expanded: true
+                        icon: modelData === "left" ? "dock_to_left" : "dock_to_right"
+                        title: modelData === "left" ? Translation.tr("Focus · left") : Translation.tr("Today · right")
+                        SettingsGroup {
+                            SettingsSwitch {
+                                text: Translation.tr("Enable panel")
+                                checked: sideSection.options.enable ?? true
+                                onCheckedChanged: Config.setNestedValue(sideSection.path + ".enable", checked)
+                            }
+                            ConfigSpinBox {
+                                text: Translation.tr("Width")
+                                value: sideSection.options.width ?? 380
+                                from: 300; to: 600; stepSize: 10
+                                onValueChanged: Config.setNestedValue(sideSection.path + ".width", value)
+                            }
+                            ConfigSpinBox {
+                                text: Translation.tr("Height (%)")
+                                value: sideSection.options.height ?? 88
+                                from: 45; to: 100
+                                onValueChanged: Config.setNestedValue(sideSection.path + ".height", value)
+                            }
+                            RowLayout {
+                                StyledText { Layout.fillWidth: true; text: Translation.tr("Alignment") }
+                                StyledComboBox {
+                                    model: [{displayName: Translation.tr("Top"), value:"top"}, {displayName: Translation.tr("Center"), value:"center"}, {displayName: Translation.tr("Bottom"), value:"bottom"}]
+                                    textRole: "displayName"
+                                    currentIndex: Math.max(0, model.findIndex(item => item.value === (sideSection.options.alignment ?? "center")))
+                                    onActivated: index => Config.setNestedValue(sideSection.path + ".alignment", model[index].value)
+                                }
+                            }
+                            SettingsSwitch {
+                                text: Translation.tr("Attach to the screen edge")
+                                checked: sideSection.options.notch ?? false
+                                onCheckedChanged: Config.setNestedValue(sideSection.path + ".notch", checked)
+                            }
+                            SettingsSwitch {
+                                text: Translation.tr("Reveal on hover")
+                                checked: sideSection.options.hoverReveal ?? false
+                                onCheckedChanged: Config.setNestedValue(sideSection.path + ".hoverReveal", checked)
+                            }
+                            SettingsSwitch {
+                                text: Translation.tr("Keep open")
+                                checked: sideSection.options.pinned ?? false
+                                onCheckedChanged: Config.setNestedValue(sideSection.path + ".pinned", checked)
+                            }
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: Translation.tr("Use Customize in each panel to choose and reorder its sections.")
+                                wrapMode: Text.WordWrap
+                                color: Appearance.colors.colSubtext
+                            }
+                            RippleButton {
+                                enabled: root.familyActive && (sideSection.options.enable ?? true)
+                                text: Translation.tr("Open and customize")
+                                onClicked: {
+                                    GlobalStates.settingsOverlayOpen = false
+                                    if (sideSection.modelData === "left") GlobalStates.openSidebarLeft("")
+                                    else GlobalStates.openSidebarRight("")
+                                }
+                            }
+                        }
                     }
                 }
             }

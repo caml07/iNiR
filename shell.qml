@@ -592,6 +592,9 @@ ShellRoot {
         function page(index: int): void {
             GlobalStates.openSettingsPage(index)
         }
+        function section(index: int, name: string): void {
+            GlobalStates.openSettingsPage(index, name)
+        }
         function count(): int { return SettingsPageRegistry.pages.length }
         function current(): int { return GlobalStates.settingsOverlayCurrentPage }
     }

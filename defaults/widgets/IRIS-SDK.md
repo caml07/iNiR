@@ -78,7 +78,7 @@ Use these first:
 - `IrisSurface`: normal/raised outlined surface;
 - `IrisButton` / `IrisIconButton`: hover/tap/selected states;
 - `IrisMark`: family mark;
-- `IrisSlider`: compact slider.
+- `IrisSlider`: compact slider (use `IrisCapsuleSlider` for Control Center style levels).
 
 Normal iNiR services remain available through `import qs.services`, but a compact module should
 import only what it actually needs. Avoid pulling in media visualizers, preview services or

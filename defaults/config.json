@@ -2325,6 +2325,23 @@
         "performancePreset": "balanced"
     },
     "iris": {
+        "sidebars": {
+            "left": {
+                "enable": true, "width": 380, "height": 88,
+                "alignment": "center", "pinned": false,
+                "notch": false, "hoverReveal": false,
+                "sections": ["media", "tasks", "notes"],
+                "expanded": []
+            },
+            "right": {
+                "enable": true, "width": 380, "height": 88,
+                "alignment": "center", "pinned": false,
+                "notch": false, "hoverReveal": false,
+                "sections": ["calendar", "weather", "notifications"],
+                "expanded": []
+            }
+        },
+        "widgets": { "radius": 22, "opacity": 100, "tint": "wallpaper", "material": "solid", "weight": "regular" },
         "dock": {
             "enable": true,
             "autoHide": true,
@@ -2333,16 +2350,19 @@
             "iconSize": 40,
             "magnification": true,
             "badges": true,
+            "launcher": true,
             "revealOnEmpty": true
         },
         "appearance": {
-            "design": "island",
             "fontFamily": "",
             "titleFontFamily": "",
+            "highlight": "orange",
+            "figureWeight": "bold",
+            "numbersFontFamily": "",
             "density": 1.0,
-            "radius": 12,
             "motion": true,
             "motionDuration": 220,
+            "accent": "blue",
             "expandedRadius": 28
         },
         "bar": {
@@ -2352,18 +2372,34 @@
             "hoverExpand": true,
             "hoverDelay": 160,
             "scrollAction": "volume",
+            "desktopBanner": "wallpaper",
+            "desktopProfile": true,
+            "clockStyle": "dateTime",
+            "auxiliary": "tray",
+            "events": true,
+            "scrollBubbles": true,
+            "trailing": "controls",
             "height": 42,
             "margin": 8,
             "reserveSpace": true,
             "screenList": [],
-            "leftModules": ["brand", "workspaces"],
-            "centerModules": ["activeWindow"],
-            "rightModules": ["status", "clock", "controls"]
+            "leftModules": [],
+            "centerModules": [],
+            "rightModules": []
         },
         "palette": {
             "width": 640,
             "maxResults": 8,
             "showHints": true
+        },
+        "tray": {
+            "hidePassive": false,
+            "labels": true,
+            "columns": 4
+        },
+        "wallpaper": {
+            "thumbnailSize": 228,
+            "width": 960
         },
         "player": {
             "roundCover": true,
@@ -2373,7 +2409,8 @@
             "width": 360
         },
         "notifications": {
-            "width": 380
+            "width": 380,
+            "duration": 4000
         },
         "osd": {
             "width": 320

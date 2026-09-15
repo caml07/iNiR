@@ -3805,6 +3805,37 @@ Singleton {
             }
 
             property JsonObject iris: JsonObject {
+                property JsonObject sidebars: JsonObject {
+                    property JsonObject left: JsonObject {
+                        property bool enable: true
+                        property int width: 380
+                        property int height: 88
+                        property string alignment: "center"
+                        property bool pinned: false
+                        property bool notch: false // attach to the screen edge
+                        property bool hoverReveal: false // open by resting at the screen edge
+                        property list<string> sections: ["media", "tasks", "notes"]
+                        property list<string> expanded: [] // Sections shown open; the rest rest compact
+                    }
+                    property JsonObject right: JsonObject {
+                        property bool enable: true
+                        property int width: 380
+                        property int height: 88
+                        property string alignment: "center"
+                        property bool pinned: false
+                        property bool notch: false // attach to the screen edge
+                        property bool hoverReveal: false // open by resting at the screen edge
+                        property list<string> sections: ["calendar", "weather", "notifications"]
+                        property list<string> expanded: [] // Sections shown open; the rest rest compact
+                    }
+                }
+                property JsonObject widgets: JsonObject {
+                    property int radius: 22
+                    property int opacity: 100
+                    property string tint: "wallpaper" // "wallpaper" or "system"
+                    property string material: "solid" // "solid" or "tinted"
+                    property string weight: "regular" // "light", "regular" or "bold"
+                }
                 property JsonObject dock: JsonObject {
                     property bool enable: true
                     property bool autoHide: true
@@ -3813,16 +3844,19 @@ Singleton {
                     property bool notch: false
                     property bool magnification: true
                     property bool badges: true // Unread notification counts on app icons
+                    property bool launcher: true // Applications button at the start of the Dock
                     property bool revealOnEmpty: true // Auto-hide keeps the dock shown on an empty workspace
                 }
                 property JsonObject appearance: JsonObject {
-                    property string design: "island" // "classic" or "island"
+                    property string accent: "blue" // "blue", "mint", "rose", "lilac" or "wallpaper"
+                    property string highlight: "orange" // "orange", "yellow", "red", "pink", "green" or "accent"
+                    property string figureWeight: "bold" // "light", "regular" or "bold"
                     property int expandedRadius: 28
                     property int motionDuration: 220
-                    property string fontFamily: "" // Empty = inherit the global UI font
-                    property string titleFontFamily: "" // Empty = inherit the global title font
+                    property string fontFamily: "" // Empty = Noto Sans
+                    property string titleFontFamily: "" // Empty = Readex Pro
+                    property string numbersFontFamily: "" // Empty = Rubik (clocks, timers, levels)
                     property real density: 1.0
-                    property int radius: 12
                     property bool motion: true
                 }
                 property JsonObject bar: JsonObject {
@@ -3832,18 +3866,34 @@ Singleton {
                     property bool hoverExpand: true
                     property int hoverDelay: 160
                     property string scrollAction: "volume" // "volume", "brightness" or "none"
+                    property string desktopBanner: "wallpaper" // Island Desktop page header: "wallpaper" or "none"
+                    property bool desktopProfile: true
+                    property string clockStyle: "dateTime" // resting clock: "time", "dateTime" or "weather"
+                    property string auxiliary: "tray" // "tray", "tools", "sound", "mic" or "none"
+                    property bool scrollBubbles: true // The scroll action also works over the bubbles beside the Island
+                    property bool events: true // Charger, Bluetooth, Do Not Disturb and keyboard events in the Island
+                    property string trailing: "controls" // Cluster trailing bubble: "controls", "notifications", "weather", "sound", "mic" or "none"
                     property int height: 42
                     property int margin: 8
                     property bool reserveSpace: true
                     property list<string> screenList: []
-                    property list<string> leftModules: ["brand", "workspaces"]
-                    property list<string> centerModules: ["activeWindow"]
-                    property list<string> rightModules: ["status", "clock", "controls"]
+                    property list<string> leftModules: []
+                    property list<string> centerModules: []
+                    property list<string> rightModules: [] // Island Desktop page: "custom:<widget-id>" modules
                 }
                 property JsonObject palette: JsonObject {
                     property int width: 640
                     property int maxResults: 8
                     property bool showHints: true
+                }
+                property JsonObject tray: JsonObject {
+                    property bool hidePassive: false
+                    property bool labels: true
+                    property int columns: 4
+                }
+                property JsonObject wallpaper: JsonObject {
+                    property int thumbnailSize: 228
+                    property int width: 960
                 }
                 property JsonObject player: JsonObject {
                     property bool roundCover: true
@@ -3854,6 +3904,7 @@ Singleton {
                 }
                 property JsonObject notifications: JsonObject {
                     property int width: 380
+                    property int duration: 4000 // Banner time on screen (ms) when the app does not set one
                 }
                 property JsonObject osd: JsonObject {
                     property int width: 320

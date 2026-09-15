@@ -394,8 +394,10 @@ bubble or Unified secondary activity) and `utility` — can be carried off it.
   Wayland handle's lagging `activated`) is a capsule, each other open window a dot up to three,
   an app whose windows are all minimised a hollow ring, a window asking for attention
   (`is_urgent`) pulses orange; pinned/running separator; unread badge counted from the whole notification
-  list, not live banners; it clears once seen — the app gets focus, or Today or the Control Center
-  opens — without dismissing anything (`iris.dock.badges`);
+  list, not live banners, without ever dismissing anything: the focused app shows none (what
+  arrives while you are in it is seen), leaving an app or opening Today / Control Center marks what
+  came before as seen, and notifications already present when the shell starts count as seen
+  (`iris.dock.badges`);
   launch bounce.
 - **Actions:** click activates/cycles, middle click opens a new window, scroll cycles an app's
   windows, right click morphs a menu out of the icon (windows, New window, Keep/Unpin, Close).

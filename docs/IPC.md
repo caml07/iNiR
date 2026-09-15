@@ -349,6 +349,7 @@ Navigate the settings overlay to a specific page (same as clicking the nav rail)
 | Function | Description |
 |----------|-------------|
 | `page(index)` | Open the overlay and jump to page `index` |
+| `section(index, name)` | Open a page at its named section; for example `inir settingsNav section 28 sidebars` |
 | `count` | Number of settings pages |
 | `current` | Current page index, or `-1` when no page is open |
 
@@ -416,7 +417,7 @@ Session-long mood state that flavors the mascot's idle lines (needs `mascot.pers
 
 ### sidebarLeft
 
-Left sidebar (AI chat, apps).
+Left sidebar: AI chat and apps in Material; the customizable Focus panel in iRiS. In iRiS, `open`, `close` and `toggle` use the family-owned panel; AI detach and expanded-layout actions apply to Material.
 
 | Function | Description |
 |----------|-------------|
@@ -433,7 +434,7 @@ Left sidebar (AI chat, apps).
 
 ### sidebarRight
 
-Right sidebar (quick toggles, notepad, settings).
+Right sidebar: quick toggles, notepad and settings in Material; the customizable Today panel in iRiS.
 
 | Function | Description |
 |----------|-------------|
@@ -723,11 +724,21 @@ iRiS bar and Island design. Available while the iRiS bar is enabled.
 |----------|-------------|
 | `open` | Expand the island on the focused output |
 | `close` | Collapse the island |
-| `design` | Select `island` or `classic` and persist the preference |
+| `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools` |
+| `toggle` | Expand or collapse the island on the focused output |
+| `dock` | `reveal`, `hide` or `toggle` the iRiS Dock (revealed stays until hidden or an app is chosen) |
+| `pin` | Keep the `left` (Focus) or `right` (Today) panel open beside windows, or stop |
+| `accent` | Set iRiS accent: `blue`, `mint`, `rose`, `lilac` or `wallpaper` |
+| `utility` | Set the utility satellite: `tray`, `tools`, `sound`, `mic` or `none` |
+| `status` | JSON with the Island, Dock, Control Center, Spotlight and side panel state |
 
 ```bash
-inir iris design island
 inir iris open
+inir iris page desktop
+inir iris toggle
+inir iris dock toggle
+inir iris pin right
+inir iris status
 inir iris close
 ```
 
@@ -970,6 +981,7 @@ Desktop background and widget controls.
 | Function | Description |
 |----------|-------------|
 | `toggleEditMode` | Toggle widget edit mode (drag, resize, configure desktop widgets) |
+| `toggleWidgetManager` | Enter edit mode if needed and toggle the widget manager on the focused output |
 | `setEditMode enabled` | Set widget edit mode explicitly |
 | `editState` | Report the active selection, physical panel insets, full desktop work area and panel-aware zone work area for each output |
 | `desktopItemsState` | Report desktop-item persistence, availability, item count, validation errors and undo state |

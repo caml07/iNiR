@@ -536,6 +536,24 @@ Scope {
             }
         }
 
+        // An OnDemand layer that took keyboard focus (a click on the desktop)
+        // keeps it across workspace switches and focus-window actions on Niri,
+        // so the new workspace's window never receives focus and the Dock needs
+        // a second click. Dropping to None for a moment hands focus back to the
+        // compositor's focused window; re-arming a mapped surface never grabs it.
+        property bool _keyboardReleased: false
+        function releaseKeyboard(): void {
+            if (bgRoot._menuOpen || (!bgRoot._needsKeyboardFocus && !bgRoot._keyboardReleased)) return
+            bgRoot._keyboardReleased = true
+            keyboardRearm.restart()
+        }
+        Timer { id: keyboardRearm; interval: 120; onTriggered: bgRoot._keyboardReleased = false }
+        Connections {
+            target: CompositorService.isNiri ? NiriService : null
+            function onFocusedWorkspaceIdChanged(): void { bgRoot.releaseKeyboard() }
+            function onWindowFocusRequested(): void { bgRoot.releaseKeyboard() }
+        }
+
         // True if any widget on this background needs keyboard input (sticky notes
         // today, future text-entry widgets later). Used to flip the layer-shell
         // surface to focusable=true so TextEdits actually receive key events.
@@ -544,7 +562,11 @@ Scope {
         // Desktop items remain pointer-driven until their focus contract is
         // owned by the background surface; do not make a stale global selection
         // turn the Bottom layer keyboard-focusable during reload.
+        // A desktop menu is a grabbing popup of this surface: its parent's keyboard
+        // mode never changes while one is open.
+        readonly property bool _menuOpen: irisDesktopMenu.active || desktopContextMenu.active || desktopItemContextMenu.active
         readonly property bool _needsKeyboardFocus: GlobalStates.deferredPanelsReady
+            && (bgRoot._menuOpen || !bgRoot._keyboardReleased)
             && (GlobalStates.widgetEditMode
                 || bgRoot._widgetEnabled("notes", false)
                 || bgRoot._widgetEnabled("todo", false))

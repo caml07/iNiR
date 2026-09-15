@@ -847,7 +847,12 @@ Singleton {
                     })
     }
 
+    // Emitted before the shell asks Niri to focus a window, so a surface holding
+    // on-demand keyboard focus (the desktop) can yield it to that window.
+    signal windowFocusRequested()
+
     function focusWindow(windowId) {
+        root.windowFocusRequested()
         return send({
                         "Action": {
                             "FocusWindow": {

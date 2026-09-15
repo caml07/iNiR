@@ -101,8 +101,7 @@ strong hairline     #48484a
 The system accent is selectable in Appearance: Blue (default), Mint, Rose, Lilac or Wallpaper.
 Accent containers derive from it; text on the accent remains dark. The accent marks what is
 selected or on, never decoration: `IrisButton` selection (`accent@0.20`, accent foreground), the
-Island's current page, active workspace dot and on-state status discs, the Dock's focused-app
-capsule, keyboard focus rings (Session, tray), sliders and switches. Activity colours (timer,
+Island's current page, active workspace dot and on-state status discs, keyboard focus rings (Session, tray), sliders and switches. Activity colours (timer,
 recording, success) retain their identity. Widgets in iRiS colour mode follow the system accent;
 Wallpaper mode uses the same shared legibility transform.
 
@@ -390,8 +389,9 @@ bubble or Unified secondary activity) and `utility` — can be carried off it.
   on the Dock's black at an icon's footprint (a cross while Spotlight is open) and magnifies like apps; cosine magnification pushes neighbours; without
   magnification, hover is a quiet platter plus a 2 px lift; name bubble rides above the hovered icon
   including its magnification and shows the window count in orange when more than one.
-- **Indicators**, one vocabulary under the icon: focused app (Niri's focused window, not the
-  Wayland handle's lagging `activated`) is a capsule, each other open window a dot up to three,
+- **Indicators**, one vocabulary under the icon: a dot per open window up to three, in the app's
+  window order; the focused window's own dot (Niri's focused window, not the Wayland handle's lagging
+  `activated`) stretches into a capsule in the text colour — neutral like the icon, not the accent —
   an app whose windows are all minimised a hollow ring, a window asking for attention
   (`is_urgent`) pulses orange; pinned/running separator; unread badge counted from the whole notification
   list, not live banners, without ever dismissing anything: the focused app shows none (what
@@ -399,7 +399,12 @@ bubble or Unified secondary activity) and `utility` — can be carried off it.
   came before as seen, and notifications already present when the shell starts count as seen
   (`iris.dock.badges`);
   launch bounce.
-- **Actions:** click activates/cycles, middle click opens a new window, scroll cycles an app's
+- **Windows island:** clicking an app with several windows grows a black surface out of its icon
+  (the context menu's morph, dismiss layer and frozen magnification) with one card per window — the
+  focused one ringed, its title below, close on hover, a click focuses it — and the app with a New
+  window button in the header. Niri exposes no per-window capture, so there a card is the app icon
+  on a plate with the window's workspace; compositors that can capture a toplevel show it live.
+- **Actions:** click activates (or opens the windows island), middle click opens a new window, scroll cycles an app's
   windows, right click morphs a menu out of the icon (windows, New window, Keep/Unpin, Close).
   Each button's hit area grows upward with its magnified icon.
 - **Icons** are rasterised once at the magnified size (`iconOversample`) and only scaled

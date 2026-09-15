@@ -402,8 +402,10 @@ bubble or Unified secondary activity) and `utility` — can be carried off it.
 - **Windows island:** clicking an app with several windows grows a black surface out of its icon
   (the context menu's morph, dismiss layer and frozen magnification) with one card per window — the
   focused one ringed, its title below, close on hover, a click focuses it — and the app with a New
-  window button in the header. Niri exposes no per-window capture, so there a card is the app icon
-  on a plate with the window's workspace; compositors that can capture a toplevel show it live.
+  window button in the header. The windows follow the app live while it is open (closing one removes
+  its card; the island closes with the last). A card is a glimpse, never a capture: the window's
+  real shape (its aspect), a title strip and skeleton lines patterned from its title, the app icon,
+  marks for floating and attention, and its workspace as a chip.
 - **Actions:** click activates (or opens the windows island), middle click opens a new window, scroll cycles an app's
   windows, right click morphs a menu out of the icon (windows, New window, Keep/Unpin, Close).
   Each button's hit area grows upward with its magnified icon.

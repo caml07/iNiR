@@ -66,7 +66,8 @@ The reference for every iRiS decision from here on is Apple's *Design dynamic Li
 **Motion**
 - The Island is organic: surfaces grow out of the part that opened them and collapse back into
   it; side panels slide out of their own edge; menus grow from the icon.
-- Numbers that change count (numeric transition); replaced content cross-fades with a small scale
+- Numbers that change count (numeric transition, `IrisNumber`: only the changed characters roll,
+  up for growing values, down for countdowns); replaced content cross-fades with a small scale
   (content replace). When list rows move, animate only the moving row; fade the rest.
 - Updates that need attention *expand the Island* (or drop a banner out of it) instead of appearing
   somewhere unrelated; the expanded state emphasises what caused it.
@@ -189,9 +190,13 @@ always uses `SmartAppIcon`. Glyph badges are plain circles — never Material ex
   into the Island's current shape.
 - `GlobalStates.irisMorphHandoff` is true while an Island-origin morph is in flight; the Island
   hides the published part (chassis or controls satellite) on that frame and fades back in after.
+  Handing off the chassis fades the whole Island, never the chassis item: an opacity animated on
+  the clipping chassis left it and the notch unpainted after hand-offs.
 - The chassis is visible from the open request (so fields can take focus) but transparent until
   armed (so the fallback rect never paints).
 - Layer surfaces never resize per frame: windows are stable canvases, input is limited by `mask`.
+- The chassis snaps to whole pixels in scene space: a clipping chassis draws its content through a
+  texture, and a half-pixel offset or size resamples it soft (text, glyphs and edges blur).
 
 ## 4. Layer-shell rules (hard-won)
 
@@ -236,15 +241,25 @@ always uses `SmartAppIcon`. Glyph badges are plain circles — never Material ex
 
 One black `ClippingRectangle` chassis owns the silhouette; everything is clipped by it.
 
-- **Live activities**, prioritised `record > timer > media`. The primary fills the chassis; a
+- **Live activities**, prioritised `record > timer > media`. A paused cover dims under a pause glyph in its
+  satellite and stays: it is the way into the player page, which lists the other players (paused
+  ones too; a chip hands the page to that player) and each app's level (slider + mute, up to four). Finished timers, Pomodoro phase changes and stopped
+  recordings take the event shape (below). The primary fills the chassis; a
   second detaches as a satellite that slides out from behind the edge.
 - **Compositions:** Unified (one chassis) or Cluster (clock chassis + activity satellite + controls
   satellite).
 - **Feedback HUD:** volume/brightness/mic morph into glyph + level capsule + value.
 - **Badges:** Caps Lock and keyboard layout never take the Island over: a small black pill (glyph +
   short text) drops out from behind its far edge, centred, for 1.6 s.
+- **Open / close:** the two layers never show through each other. Opening clears the compact
+  content first (70 ms) and fades the page in after a 70 ms hold; closing clears the page, and the
+  compact content and satellites wait 30 % of the settle until the chassis is nearly resting.
+  **Shared parts** travel instead of fading: the cover (satellite or compact row ↔ player) and the
+  clock (resting ↔ Desktop hero) fly as one live copy on the chassis curve, following the moving
+  destination every frame; both real parts hide while it flies, and page switches never fly.
 - **System events** (`iris.bar.events`): charger plugged/unplugged (level, time to full/empty), low
-  battery, a Bluetooth device connecting (battery when known) or disconnecting and Do Not Disturb take the resting shape
+  battery, a Bluetooth device connecting (battery when known) or disconnecting, Do Not Disturb, a finished countdown, a Pomodoro phase change and a stopped
+  recording (its length) take the resting shape
   for 2.6 s: identity-coloured glyph disc concentric with the capsule, title, detail, and a level
   figure + ring when the event has one. Priority below the HUD, above desktop editing. Silent for the
   first 4 s after load, on other outputs and over fullscreen. The keyboard daemon is only referenced
@@ -276,6 +291,10 @@ One black `ClippingRectangle` chassis owns the silhouette; everything is clipped
   Desktop page), sound or microphone (level ring + state glyph; the wheel adjusts that level without
   the HUD retiring the bubble, click mutes, a muted microphone is red) or none. The utility
   satellite offers the same Sound and Microphone bubbles.
+- **Static scene inside the chassis:** the clipping chassis has stopped painting its children after
+  live structural changes inside it (opacity animated on the chassis, layers toggled on and off,
+  clip or visibility toggled per frame). Content inside it changes by opacity, position and text,
+  with `clip`/`layer` fixed; figures that count (`IrisNumber`) keep `clip` on and only fade.
 - **Press feedback:** the resting content dips to 93 % under the pointer; satellites dip to 88 %.
   Never transform the clipping chassis itself — a live `scale` on the `ClippingRectangle` has left
   it unpainted while satellites and fillets stayed on screen.
@@ -302,6 +321,62 @@ One black `ClippingRectangle` chassis owns the silhouette; everything is clipped
   out from under the pointer before the click lands — hover-expand is suppressed while editing.
 - Hover preloads Control Center; expansion preloads Settings.
 
+### Media bubble card (`bubbles/IrisMediaBubbleCard.qml`)
+
+In Cluster, the media bubble can float out as a card instead of expanding the Island
+(`iris.player.bubbleOpens`: `card` | `island`). The Island publishes the bubble's screen-local rect
+(`GlobalStates.irisMediaBubble`, only once the bubble has fully emerged); the card morphs out of that
+rect, grows away from the Island with its top edge level with the bubble, and collapses back into
+it. While the card is on screen the bubble hides (`GlobalStates.irisMediaCardShown`), so only one
+shape exists. Content is `IrisMediaCard` over the artwork vibrancy, with a *keep* toggle and *open in
+the Island* (the player page with other players and app levels).
+
+- Opened from the bubble it is transient: outside click, Escape, or the Island expanding closes it
+  (Exclusive keyboard, full-output mask only while presented and armed).
+- Pinned (`iris.player.cardPinned`) it stays while a player is active, yields all input but its own,
+  and tucks into its bubble while the Island is expanded.
+- `inir iris card open|close|toggle|pin
+inir iris bubble left|right|utility|weather|notifications|controls|sound|mic|tools|media|tray \
+          island|off|top-left|top-right|left|right|bottom-left|bottom-right|x,y
+inir iris settings bar|player|bubbles|dock|appearance|desktop|sidebars|surfaces|system`.
+
+### Bubbles off the Island (`bubbles/IrisBubbleLayer.qml`)
+
+A bubble is one black disc with the minimal presentation of its kind (`IrisBubbleFace`), wherever
+it lives. The Island's three bubble slots — `left` (Cluster activity), `right` (Cluster trailing
+bubble or Unified secondary activity) and `utility` — can be carried off it.
+
+- **Carry:** holding a bubble (or pulling it away) lifts it (`IrisBubbleGrip`); the press keeps its
+  implicit grab, so `GlobalStates.irisBubbleDrag` follows the pointer past the Island's canvas. The
+  bubble layer draws the lifted bubble (12 % larger, deeper shadow) and quiet rings on the places it
+  can land; the ring under it answers in the accent.
+- **Land:** near its slot on the resting Island it glides back in and the Island's satellite takes
+  over on the same frame (the carried bubble hides it until then); near a corner or edge zone
+  (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`) it snaps there; anywhere
+  else it stays free (centre as fractions of the output). Placement persists per slot in
+  `iris.bubbles.<slot>.place` (`island`, a zone or `free` with `fx`/`fy`); `iris.bubbles.snap` turns
+  zone snapping off and `iris.bubbles.edgeGap` sets how far floating bubbles rest from the edges
+  (the top row also keeps clear of the Island's band). Settings › Bubbles exposes all of it.
+- **Floating bubbles** rest on a per-output Top layer (`quickshell:iris-bubbles`, mapped only while
+  something floats or is carried, input masked to one fixed item per slot — a slot that is not
+  floating has no size, so the surface never covers the desktop — never the keyboard) with a soft
+  shadow. Tapping does what the bubble does on the Island; surfaces grow out of the floating bubble
+  where they can (media card, Control Center), and the media card grows away from the nearest screen
+  edge. The Island closes the gap a floating bubble leaves.
+- Each Island publishes its slot kinds and resting geometry per output
+  (`GlobalStates.irisBubbleKinds`, `irisIslandGeometry`) for the layer.
+- **Extra bubbles** (`iris.bubbles.extras.<kind>`: weather, notifications, controls, sound, mic,
+  tools, media, tray) live off the Island only: each has its own switch and place, is carried like
+  the slots (no Island target), and hides while it has nothing to show (media without a player, an
+  empty tray). Bubbles sharing a zone line up — inward along the edge from a corner, centred on a
+  side edge — in slot order, then extras.
+- **Settings › Bubbles:** Placement (the three slots), Extra bubbles (a switch each; its place row
+  appears while it is on, via the rows' `visibleWhen`), Floating (edge gap, snapping).
+- **Carrying the Island:** holding the resting Island lifts a ghost of it; dropped on the other half
+  of the screen it moves the Island to that edge (`iris.bar.position`). The Island reserves its edge,
+  so it rests on an edge rather than anywhere.
+- `inir iris bubble left|right|utility island|<zone>|x,y`.
+
 ### Dock (`dock/IrisDock.qml`)
 
 - Centred on the edge opposite the Island; stable anchors and exclusive zone while visible.
@@ -319,7 +394,8 @@ One black `ClippingRectangle` chassis owns the silhouette; everything is clipped
   Wayland handle's lagging `activated`) is a capsule, each other open window a dot up to three,
   an app whose windows are all minimised a hollow ring, a window asking for attention
   (`is_urgent`) pulses orange; pinned/running separator; unread badge counted from the whole notification
-  list, not live banners, so it stays until the notifications are dismissed (`iris.dock.badges`);
+  list, not live banners; it clears once seen — the app gets focus, or Today or the Control Center
+  opens — without dismissing anything (`iris.dock.badges`);
   launch bounce.
 - **Actions:** click activates/cycles, middle click opens a new window, scroll cycles an app's
   windows, right click morphs a menu out of the icon (windows, New window, Keep/Unpin, Close).
@@ -465,7 +541,8 @@ ring, Enter/Space activates, Escape cancels the armed action then closes, clicki
 ### Lock (`lock/IrisLockSurface.qml`)
 
 Blurred wallpaper (MultiEffect, desaturated, respects `lock.blur.enable`) with a top/bottom
-gradient; date over a 112 px clock; now-playing card only while media plays; avatar (user avatar
+gradient; date over a 112 px clock; now-playing card only while media plays; recording and timer plates (glyph disc, label, counting
+figure in the activity colour, progress hairline for countdowns) while those activities run; avatar (user avatar
 paths with initial fallback), display name, password capsule with submit arrow, shake on failure,
 status line. PAM/context behaviour is shared and untouched.
 
@@ -480,7 +557,14 @@ tile. Tile tints are the documented fixed category palette, like Settings badges
 
 ### Notifications (`notificationPopup/IrisNotificationPopup.qml`)
 
-Island design shows banners centred under the Island, newest first, up to three:
+Island design shows banners centred under the Island, newest first, up to three. Banners are bubbles
+of the Island: a new one arrives as its sender's icon in a disc just under the Island and blooms into
+the banner (width, height and radius on one progress, the text arriving once the shape has formed);
+when it times out it folds back into that disc, rises into the resting Island and melts there. A
+swiped banner slides away instead. The surface is a stable canvas sized for three expanded banners
+(input limited to the list by `mask`), the list is a `ListView` over a `ScriptModel` keyed by
+`notificationId` (a new banner never recreates the others), and a leaving banner plays through the
+view's `remove` transition while the panel's close grace keeps the surface alive.
 
 - on screen for `iris.notifications.duration` (4 s) unless the app sets a timeout; critical keeps the
   shared policy;
@@ -488,7 +572,6 @@ Island design shows banners centred under the Island, newest first, up to three:
 - artwork: notification image with the app icon as a corner badge, the app icon alone, or a quiet
   glyph disc when the sender has no resolvable icon (never the missing-icon texture);
 - summary + relative time ("now", "5m"), body (2 lines, 8 on hover), app name, action capsules;
-- drop in from the Island (morph curve, short travel, slight scale);
 - click runs the default action or focuses the sender's window; hover cancels the timeout and shows
   a close button; horizontal swipe past 30 % dismisses;
 - the window's input mask covers only the banners.
@@ -564,9 +647,10 @@ left click activates, middle click invokes the secondary action, right click ope
 platform menu, and scrolling is forwarded to the app. App names, passive filtering and columns
 are independent preferences. Overflow scrolls inside the Island.
 
-Timers (config value `tools`) is one row of dials — 5/15/30-minute countdowns, Focus and
-Stopwatch through TimerService — that hands off to the existing activity page; a running kind wears
-an orange rim and an active countdown cannot be overwritten by the presets. It holds nothing that
+Timers (config value `tools`) is one row of round dials (neutral face, orange arc for the share of an
+hour a preset holds, closed and tinted while that kind runs; the wheel or a vertical drag changes a
+preset's minutes — 1-min steps to 10, then 5, up to 3 h — kept in `Persistent` timer state) — 5/15/30-minute countdowns, Focus and
+Stopwatch through TimerService — that hands off to the existing activity page; an active countdown cannot be overwritten by the presets. It holds nothing that
 lives elsewhere: clipboard is Spotlight, wallpaper is the Desktop hero and desktop menu, widgets are
 the desktop menu, and a running activity is already the navigation's activity button.
 Both pages are available from expanded navigation even when the utility satellite is hidden.
@@ -583,7 +667,9 @@ shell.qml
        -> IrisSidebarEdge ×2         (1 px strips, only while hoverReveal is on)
        -> Background/Backdrop       (deferred, Niri, if background.backdrop.enable)
        -> Background                (deferred, if desktop widgets are enabled)
-       -> on-demand: Spotlight, Control Center, Settings, Session, notifications, wallpaper picker
+       -> on-demand: Spotlight, Control Center, Settings, Session, notifications, wallpaper picker,
+          media bubble card (while opened or pinned)
+       -> IrisBubbleLayer ×outputs     (while a bubble floats or is carried)
        -> Lock, Polkit              (deferred)
 ```
 
@@ -604,11 +690,13 @@ iris.bar.position, composition, notch, height, margin, reserveSpace, events, scr
 iris.dock.enable, autoHide, revealOnEmpty, notch, blur, iconSize, magnification, badges, launcher
 iris.tray.hidePassive, labels, columns
 iris.wallpaper.width, thumbnailSize
-iris.player.roundCover, artworkBackground
+iris.player.roundCover, artworkBackground, bubbleOpens, cardPinned
 iris.sidebars.left|right.enable, width, height, alignment, pinned, notch, hoverReveal, sections, expanded
 iris.widgets.radius, opacity, tint, material, weight
 iris.palette.width, maxResults, showHints
 iris.notifications.width, duration
+iris.bubbles.left|right|utility.place, fx, fy; iris.bubbles.extras.<kind>.enable, place, fx, fy;
+         iris.bubbles.edgeGap, snap
 iris.controlCenter.width
 iris.modules.desktopWidgets, palette, controlCenter, notificationPopup, osd, sessionScreen, lock, polkit
 ```
@@ -635,6 +723,7 @@ inir iris open | close
 inir iris page media|activity|desktop|tray|tools
 inir iris toggle
 inir iris dock reveal|hide|toggle   # "reveal" stays until hidden or an app is chosen
+inir iris card open|close|toggle|pin
 inir iris pin left|right            # keep Focus/Today open beside windows
 inir iris accent blue|mint|rose|lilac|wallpaper
 inir iris utility tray|tools|sound|mic|none

@@ -2403,7 +2403,26 @@
         },
         "player": {
             "roundCover": true,
-            "artworkBackground": true
+            "artworkBackground": true,
+            "bubbleOpens": "card",
+            "cardPinned": false
+        },
+        "bubbles": {
+            "left": { "place": "island", "fx": 0.5, "fy": 0.5 },
+            "right": { "place": "island", "fx": 0.5, "fy": 0.5 },
+            "utility": { "place": "island", "fx": 0.5, "fy": 0.5 },
+            "extras": {
+                "weather": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "notifications": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "controls": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "sound": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "mic": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "tools": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "media": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "tray": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 }
+            },
+            "edgeGap": 20,
+            "snap": true
         },
         "controlCenter": {
             "width": 360

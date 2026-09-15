@@ -3898,6 +3898,86 @@ Singleton {
                 property JsonObject player: JsonObject {
                     property bool roundCover: true
                     property bool artworkBackground: true
+                    // What the media bubble becomes: a card floating out of it, or the Island page.
+                    property string bubbleOpens: "card"
+                    // Keep the card floating beside the Island while something is playing.
+                    property bool cardPinned: false
+                }
+                // Where each Island bubble slot rests: "island", a zone ("top-left",
+                // "top-right", "left", "right", "bottom-left", "bottom-right") or "free"
+                // at fx/fy (its centre as fractions of the output).
+                property JsonObject bubbles: JsonObject {
+                    property JsonObject left: JsonObject {
+                        property string place: "island"
+                        property real fx: 0.5
+                        property real fy: 0.5
+                    }
+                    property JsonObject right: JsonObject {
+                        property string place: "island"
+                        property real fx: 0.5
+                        property real fy: 0.5
+                    }
+                    property JsonObject utility: JsonObject {
+                        property string place: "island"
+                        property real fx: 0.5
+                        property real fy: 0.5
+                    }
+                    // Bubbles of their own, off the Island only: one per kind, placed like
+                    // the slots above (a zone or "free"); several in one zone line up.
+                    property JsonObject extras: JsonObject {
+                        property JsonObject weather: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject notifications: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject controls: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject sound: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject mic: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject tools: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject media: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject tray: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                    }
+                    // Distance (px) floating bubbles keep from the screen edges.
+                    property int edgeGap: 20
+                    // Dropped near a zone, a bubble snaps to it; off, it stays where it is let go.
+                    property bool snap: true
                 }
                 property JsonObject controlCenter: JsonObject {
                     property int width: 360

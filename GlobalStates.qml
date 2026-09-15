@@ -339,6 +339,22 @@ Singleton {
     // expanded Island (settings) instantiates those surfaces hidden, so the
     // morph starts on the click frame instead of after an async load.
     property bool irisControlsWarm: false
+    // iRiS media bubble card: opened from the bubble (transient), the bubble's
+    // screen-local rect published by the Island ({x, y, width, height, radius,
+    // screen}), and whether the card is on screen (the bubble hides meanwhile).
+    property bool irisMediaCardOpen: false
+    property var irisMediaBubble: null
+    property bool irisMediaCardShown: false
+    // Asks the focused Island to open a page ("media", "desktop", "activity",
+    // "tray", "tools") from a surface that is not the Island (card, floating bubble).
+    property string irisIslandPageRequest: ""
+    // A bubble being carried: { slot, kind, screen, x, y (screen-local centre),
+    // size, released }. The bubble layer draws it and resolves the drop.
+    property var irisBubbleDrag: null
+    // Per output name: what each bubble slot shows ({ left, right, utility }) and
+    // the resting Island's screen-local geometry, published by each Island.
+    property var irisBubbleKinds: ({})
+    property var irisIslandGeometry: ({})
     property bool irisSettingsWarm: false
     // iRiS side panel ("left"/"right") that was revealed by resting at its screen
     // edge: it closes when the pointer leaves until a press inside commits it.

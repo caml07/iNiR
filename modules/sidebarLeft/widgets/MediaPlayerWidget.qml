@@ -267,85 +267,78 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: 16
 
-                    Loader {
+                    StyledSlider {
+                        id: seekSlider
                         anchors.fill: parent
-                        active: root.effectiveCanSeek
-                        sourceComponent: StyledSlider {
-                            id: seekSlider
-                            configuration: StyledSlider.Configuration.Wavy
-                            stopIndicatorValues: []
-                            wavy: !Appearance.editorialEverywhere && root.effectiveIsPlaying
-                            animateWave: !Appearance.editorialEverywhere && root.effectiveIsPlaying
-                            highlightColor: root.mediaAccent
-                            trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
-                                : Appearance.inirEverywhere ? Appearance.inir.colLayer2
-                                : Appearance.auroraEverywhere ? Appearance.colInactiveControlSurface
-                                : (effectiveColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
-                            handleColor: root.mediaAccent
-                            property bool draggingSeek: false
-                            property bool awaitingSeek: false
-                            property real requestedValue: 0
-                            readonly property real sourceValue: root.effectiveLength > 0
-                                ? Math.max(0, Math.min(1, root.effectivePosition / root.effectiveLength)) : 0
-                            value: (draggingSeek || awaitingSeek) ? requestedValue : sourceValue
-                            onPressedChanged: {
-                                if (pressed) {
-                                    requestedValue = value
-                                    draggingSeek = true
-                                    awaitingSeek = false
-                                    seekSyncTimeout.stop()
+                        configuration: StyledSlider.Configuration.Wavy
+                        stopIndicatorValues: []
+                        wavy: !Appearance.editorialEverywhere && root.effectiveIsPlaying
+                        animateWave: !Appearance.editorialEverywhere && root.effectiveIsPlaying
+                        highlightColor: root.mediaAccent
+                        trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
+                            : Appearance.inirEverywhere ? Appearance.inir.colLayer2
+                            : Appearance.auroraEverywhere ? Appearance.colInactiveControlSurface
+                            : (effectiveColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
+                        handleColor: root.mediaAccent
+                        property bool draggingSeek: false
+                        property bool awaitingSeek: false
+                        property real requestedValue: 0
+                        readonly property real sourceValue: root.effectiveLength > 0
+                            ? Math.max(0, Math.min(1, root.effectivePosition / root.effectiveLength)) : 0
+                        value: (draggingSeek || awaitingSeek) ? requestedValue : sourceValue
+                        onPressedChanged: {
+                            if (!root.effectiveCanSeek) return
+                            if (pressed) {
+                                requestedValue = value
+                                draggingSeek = true
+                                awaitingSeek = false
+                                seekSyncTimeout.stop()
+                                return
+                            }
+                            if (!draggingSeek) return
+                            requestedValue = value
+                            draggingSeek = false
+                            awaitingSeek = true
+                            root.seekTo(requestedValue * root.effectiveLength)
+                            seekSyncTimeout.restart()
+                        }
+                        onMoved: {
+                            if (!root.effectiveCanSeek) return
+                            requestedValue = value
+                            awaitingSeek = true
+                            root.seekTo(requestedValue * root.effectiveLength)
+                            seekSyncTimeout.restart()
+                        }
+                        scrollable: root.effectiveCanSeek
+
+                        Connections {
+                            target: root
+                            function onEffectivePositionChanged() {
+                                if (!seekSlider.awaitingSeek || seekSlider.draggingSeek || root.effectiveLength <= 0)
                                     return
-                                }
-                                if (!draggingSeek) return
-                                requestedValue = value
-                                draggingSeek = false
-                                awaitingSeek = true
-                                root.seekTo(requestedValue * root.effectiveLength)
-                                seekSyncTimeout.restart()
-                            }
-                            onMoved: {
-                                requestedValue = value
-                                awaitingSeek = true
-                                root.seekTo(requestedValue * root.effectiveLength)
-                                seekSyncTimeout.restart()
-                            }
-                            scrollable: true
-
-                            Connections {
-                                target: root
-                                function onEffectivePositionChanged() {
-                                    if (!seekSlider.awaitingSeek || seekSlider.draggingSeek || root.effectiveLength <= 0)
-                                        return
-                                    const target = seekSlider.requestedValue * root.effectiveLength
-                                    if (Math.abs(root.effectivePosition - target) <= 1.25) {
-                                        seekSlider.awaitingSeek = false
-                                        seekSyncTimeout.stop()
-                                    }
+                                const target = seekSlider.requestedValue * root.effectiveLength
+                                if (Math.abs(root.effectivePosition - target) <= 1.25) {
+                                    seekSlider.awaitingSeek = false
+                                    seekSyncTimeout.stop()
                                 }
                             }
+                        }
 
-                            Timer {
-                                id: seekSyncTimeout
-                                interval: 1600
-                                repeat: false
-                                onTriggered: seekSlider.awaitingSeek = false
-                            }
+                        Timer {
+                            id: seekSyncTimeout
+                            interval: 1600
+                            repeat: false
+                            onTriggered: seekSlider.awaitingSeek = false
                         }
                     }
 
-                    Loader {
+                    MouseArea {
                         anchors.fill: parent
-                        active: !root.effectiveCanSeek
-                        sourceComponent: StyledProgressBar {
-                            wavy: !Appearance.editorialEverywhere && root.effectiveIsPlaying
-                            animateWave: !Appearance.editorialEverywhere && root.effectiveIsPlaying
-                            highlightColor: root.mediaAccent
-                            trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
-                                : Appearance.inirEverywhere ? Appearance.inir.colLayer2
-                                : Appearance.auroraEverywhere ? Appearance.colInactiveControlSurface
-                                : (effectiveColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
-                            value: root.effectiveLength > 0 ? root.effectivePosition / root.effectiveLength : 0
-                        }
+                        visible: !root.effectiveCanSeek
+                        acceptedButtons: Qt.AllButtons
+                        preventStealing: true
+                        cursorShape: Qt.ArrowCursor
+                        onWheel: event => event.accepted = true
                     }
                 }
 

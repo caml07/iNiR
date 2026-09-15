@@ -245,7 +245,7 @@ AbstractBackgroundWidget {
                 visible: root.instrument
                 text: String(root.upcomingEvents.length).padStart(2, "0")
                 color: root.widgetAccentVisible
-                font.family: Appearance.font.family.numbers
+                font.family: root.widgetNumbersFamily
                 font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
                 font.weight: Font.Bold
             }
@@ -268,7 +268,7 @@ AbstractBackgroundWidget {
                     text: root._dayHeading(eventDelegate.modelData)
                     color: root.instrument ? root.widgetInkMuted : root.widgetAccentVisible
                     font {
-                        family: root.instrument ? Appearance.font.family.monospace : Appearance.font.family.main
+                        family: root.instrument ? Appearance.font.family.monospace : root.widgetBodyFamily
                         pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.small
                             : Appearance.font.pixelSize.smaller) * root.scaleFactor)
                         weight: Font.DemiBold
@@ -297,7 +297,7 @@ AbstractBackgroundWidget {
                             text: eventDelegate.modelData?.title || Translation.tr("Untitled")
                             color: root.widgetInk
                             font.family: root.widgetEditorial
-                                ? root.widgetTitleFamily : Appearance.font.family.main
+                                ? root.widgetTitleFamily : root.widgetBodyFamily
                             font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.normal
                                 : Appearance.font.pixelSize.small) * root.scaleFactor)
                             font.weight: root.instrument ? Font.DemiBold
@@ -314,7 +314,7 @@ AbstractBackgroundWidget {
                             color: root.instrument ? root.widgetAccentVisible : root.widgetInkMuted
                             font.pixelSize: Math.round((root.instrument ? Appearance.font.pixelSize.small
                                 : Appearance.font.pixelSize.smaller) * root.scaleFactor)
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
                         }
@@ -367,7 +367,7 @@ AbstractBackgroundWidget {
                         : Translation.tr("No upcoming events")
                     color: root.instrument ? root.widgetInk : root.widgetInkMuted
                     font.family: root.instrument ? Appearance.font.family.monospace
-                        : Appearance.font.family.main
+                        : root.widgetBodyFamily
                     font.pixelSize: Math.round((root.instrument
                         ? Appearance.font.pixelSize.large
                         : Appearance.font.pixelSize.small) * root.scaleFactor)

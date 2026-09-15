@@ -224,7 +224,7 @@ AbstractBackgroundWidget {
                                 text: Math.round(metric.currentValue) + metric.suffix
                                 color: Appearance.colors.colOnLayer2
                                 font.pixelSize: Appearance.font.pixelSize.smaller
-                                font.family: Appearance.font.family.numbers
+                                font.family: root.widgetNumbersFamily
                                 font.weight: Font.DemiBold
                             }
                         }

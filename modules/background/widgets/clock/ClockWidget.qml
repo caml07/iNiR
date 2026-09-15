@@ -614,7 +614,7 @@ AbstractBackgroundWidget {
                         y: dialClock.height / 2 + labelRadius * Math.sin(modelData.angle) - height / 2
                         color: modelData.hero ? root.widgetAccentVisible : root.widgetInkMuted
                         font {
-                            family: Appearance.font.family.numbers
+                            family: root.widgetNumbersFamily
                             pixelSize: Math.round(dialClock.side * (modelData.hero ? 0.08 : 0.052))
                             weight: modelData.hero ? Font.Bold : Font.DemiBold
                             features: ({ "tnum": 1 })
@@ -654,7 +654,7 @@ AbstractBackgroundWidget {
                         fontSizeMode: Text.Fit
                         minimumPixelSize: Math.round(16 * root.scaleFactor)
                         font {
-                            family: Appearance.font.family.numbers
+                            family: root.widgetNumbersFamily
                             pixelSize: Math.round(dialClock.side * 0.175)
                             weight: Font.Bold
                             features: ({ "tnum": 1 })
@@ -667,15 +667,15 @@ AbstractBackgroundWidget {
                         Layout.topMargin: Math.round(6 * root.scaleFactor)
                         visible: root.showDate
                         Layout.maximumWidth: dialClock.side * 0.64
-                        text: Qt.locale().toString(displayClock.date, "ddd d MMM").toUpperCase()
+                        text: root.widgetCase(Qt.locale().toString(displayClock.date, "ddd d MMM"))
                         elide: Text.ElideRight
                         color: root.widgetInkMuted
                         font {
-                            family: Appearance.font.family.main
+                            family: root.widgetBodyFamily
                             pixelSize: Math.round(Math.max(9, dialClock.side * 0.048))
                             weight: root.widgetLabelWeight
-                            letterSpacing: Math.max(1, Math.round(1.6 * root.scaleFactor))
-                            capitalization: Font.AllUppercase
+                            letterSpacing: root.widgetIris ? 0 : Math.max(1, Math.round(1.6 * root.scaleFactor))
+                            capitalization: root.widgetCapitalization
                         }
                     }
                 }

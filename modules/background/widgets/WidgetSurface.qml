@@ -18,8 +18,8 @@ Rectangle {
     opacity: shown ? 1 : 0
     visible: opacity > 0
     Behavior on opacity {
-        enabled: Appearance.animationsEnabled && root.powerActive
-        NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        enabled: (root._iris ? IrisStyle.motionEnabled : Appearance.animationsEnabled) && root.powerActive
+        NumberAnimation { duration: root._iris ? IrisStyle.revealDuration : Appearance.animation.elementMoveFast.duration }
     }
 
     property real screenX: 0
@@ -39,7 +39,8 @@ Rectangle {
     // The widget's accent identity (usually root.widgetAccent) — gives the plate
     // an actual color seat instead of a neutral wallpaper-luminance scrim.
     property color surfaceAccent: Appearance.colors.colPrimary
-    property real surfaceRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
+    property real surfaceRadius: root._iris ? Math.round(Math.max(0, Math.min(40, Config.options?.iris?.widgets?.radius ?? 22)) * IrisStyle.density)
+        : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
     // Allows per-widget blur override for styles that do not explicitly own
     // their material. Ricelin Island glass follows the shared Island setting.
     property bool surfaceUseBlur: true
@@ -58,7 +59,7 @@ Rectangle {
     // otherwise blur twice as wide) and the layer is smoothed on upscale.
     readonly property real _blurScale: 0.5
 
-    readonly property bool _iris: (Config.options?.panelFamily ?? "ii") === "iris" && IrisStyle.island
+    readonly property bool _iris: (Config.options?.panelFamily ?? "ii") === "iris"
     readonly property string _surfaceDialect: root._iris ? "iris" : (Config.options?.background?.widgets?.style ?? "panel") === "island"
         ? "island" : Appearance.globalStyle
     readonly property bool _angel: root._surfaceDialect === "angel"
@@ -111,6 +112,14 @@ Rectangle {
     readonly property color _plate: root._plateIsDark ? root._plateDark : root._plateLight
     readonly property color _flatFill: ColorUtils.applyAlpha(
         root.colorMode === "auto" ? root.surfaceFill : root._plate, root._plateAlpha)
+    // iRiS plates are the Island material (optionally carrying the wallpaper's
+    // hue); a widget's own semantic fill would bring Material tones back in.
+    readonly property color _irisMaterial: String(Config.options?.iris?.widgets?.material ?? "solid") === "tinted"
+        ? ColorUtils.mix(IrisStyle.surface, Appearance.colors.colPrimary, 0.82) : IrisStyle.surface
+    readonly property color _irisFill: ColorUtils.applyAlpha(
+        root.colorMode === "dark" ? ColorUtils.mix(IrisStyle.text, IrisStyle.accent, 0.98) : root._irisMaterial,
+        root._backgroundVisible ? Math.min(1, 0.72 + root._surfaceStrength * 0.28)
+            * Math.max(0, Math.min(100, Config.options?.iris?.widgets?.opacity ?? 100)) / 100 : 0)
     readonly property color _cookieFillBase: root.colorMode === "auto"
         ? root.surfaceFill : root._plate
     readonly property color _cookieFill: root._backgroundVisible
@@ -119,7 +128,7 @@ Rectangle {
     readonly property color _cookieStrokeBase: root.colorMode === "auto"
         ? Appearance.cookie.onColor : ColorUtils.contrastColor(root._plate)
     readonly property string surfaceReport: JSON.stringify({
-        style: root._cookie ? "cookie"
+        style: root._iris ? "iris" : root._cookie ? "cookie"
             : root._zzz ? "zzz"
             : root._regalia ? "regalia"
             : root._editorial ? "editorial"
@@ -137,12 +146,12 @@ Rectangle {
         borderWidth: root.surfaceBorderWidth,
         borderOpacity: root.surfaceBorderOpacity,
         radius: root.radius,
-        fill: String(root._cookie ? root._cookieFill : root._flatFill)
+        fill: String(root._iris ? root._irisFill : root._cookie ? root._cookieFill : root._flatFill)
     })
 
     // iRiS widget plates share one continuous corner, tighter than the Island.
-    radius: root._iris ? Math.round(22 * IrisStyle.density) : surfaceRadius
-    color: root._iris ? (root._backgroundVisible ? IrisStyle.surface : "transparent")
+    radius: surfaceRadius
+    color: root._iris ? root._irisFill
         : _editorialStack ? "transparent"
         : _island ? "transparent"
         : _glass ? "transparent"
@@ -193,20 +202,20 @@ Rectangle {
     }
 
     Behavior on radius {
-        enabled: Appearance.animationsEnabled
-        NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+        enabled: (root._iris ? IrisStyle.motionEnabled : Appearance.animationsEnabled)
+        NumberAnimation { duration: root._iris ? IrisStyle.revealDuration : Appearance.animation.elementMoveFast.duration; easing.type: root._iris ? Easing.BezierSpline : Appearance.animation.elementMoveFast.type; easing.bezierCurve: root._iris ? IrisStyle.morphCurve : Appearance.animation.elementMoveFast.bezierCurve }
     }
     Behavior on color {
-        enabled: Appearance.animationsEnabled
-        ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+        enabled: (root._iris ? IrisStyle.motionEnabled : Appearance.animationsEnabled)
+        ColorAnimation { duration: root._iris ? IrisStyle.revealDuration : Appearance.animation.elementMoveFast.duration; easing.type: root._iris ? Easing.BezierSpline : Appearance.animation.elementMoveFast.type; easing.bezierCurve: root._iris ? IrisStyle.morphCurve : Appearance.animation.elementMoveFast.bezierCurve }
     }
     Behavior on border.width {
-        enabled: Appearance.animationsEnabled
-        NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+        enabled: (root._iris ? IrisStyle.motionEnabled : Appearance.animationsEnabled)
+        NumberAnimation { duration: root._iris ? IrisStyle.revealDuration : Appearance.animation.elementMoveFast.duration; easing.type: root._iris ? Easing.BezierSpline : Appearance.animation.elementMoveFast.type; easing.bezierCurve: root._iris ? IrisStyle.morphCurve : Appearance.animation.elementMoveFast.bezierCurve }
     }
     Behavior on border.color {
-        enabled: Appearance.animationsEnabled
-        ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+        enabled: (root._iris ? IrisStyle.motionEnabled : Appearance.animationsEnabled)
+        ColorAnimation { duration: root._iris ? IrisStyle.revealDuration : Appearance.animation.elementMoveFast.duration; easing.type: root._iris ? Easing.BezierSpline : Appearance.animation.elementMoveFast.type; easing.bezierCurve: root._iris ? IrisStyle.morphCurve : Appearance.animation.elementMoveFast.bezierCurve }
     }
 
     // Separate border overlay — avoids Qt's interior bleed when border.width > 0 on a transparent Rectangle
@@ -225,6 +234,7 @@ Rectangle {
                 : root._editorial
                     ? ColorUtils.applyAlpha(Appearance.editorial.edge,
                         Math.min(1, root.surfaceBorderOpacity * 2))
+                : root._iris ? ColorUtils.applyAlpha(root.surfaceColor, root.surfaceBorderOpacity)
                 : ColorUtils.applyAlpha(
                     ColorUtils.ensureReadable(root.surfaceAccent, root._flatFill, 3),
                     Math.min(1, root.surfaceBorderOpacity * 2))

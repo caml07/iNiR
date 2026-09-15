@@ -86,7 +86,7 @@ AbstractBackgroundWidget {
 
     function cityDateText(index: int): string {
         const cityDate = WorldClock.cityDisplayDate(index)
-        return cityDate ? Qt.locale().toString(cityDate, "ddd d MMM").toUpperCase() : ""
+        return cityDate ? root.widgetCase(Qt.locale().toString(cityDate, "ddd d MMM")) : ""
     }
 
     editPopoverContent: Component {
@@ -291,7 +291,7 @@ AbstractBackgroundWidget {
                 visible: root.cities.length > 1
                 text: Translation.tr("%1 zones").arg(root.cities.length)
                 color: root.widgetInkMuted
-                font.family: Appearance.font.family.main
+                font.family: root.widgetBodyFamily
                 font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                 font.weight: Font.Medium
                 font.letterSpacing: root.widgetMetadataTracking
@@ -336,10 +336,10 @@ AbstractBackgroundWidget {
                         StyledText {
                             Layout.fillWidth: true
                             visible: referenceZone.modelData
-                            text: referenceZone.modelData ? String(referenceZone.modelData.name).toUpperCase() : ""
+                            text: referenceZone.modelData ? root.widgetCase(String(referenceZone.modelData.name)) : ""
                             color: root.widgetInkMuted
                             elide: Text.ElideRight
-                            font.family: Appearance.font.family.main
+                            font.family: root.widgetBodyFamily
                             font.pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                             font.weight: root.widgetLabelWeight
                             font.letterSpacing: root.widgetMetadataTracking
@@ -349,7 +349,7 @@ AbstractBackgroundWidget {
                             visible: root.showOffsets && referenceZone.modelData
                             text: referenceZone.modelData ? referenceZone.modelData.offset : ""
                             color: root.widgetInkMuted
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             font.weight: Font.Medium
                             font.features: ({ "tnum": 1 })
@@ -364,7 +364,7 @@ AbstractBackgroundWidget {
                         color: root.widgetInk
                         fontSizeMode: Text.Fit
                         minimumPixelSize: Math.max(26, Math.round(26 * root.scaleFactor))
-                        font.family: Appearance.font.family.numbers
+                        font.family: root.widgetNumbersFamily
                         font.pixelSize: Math.round(48 * root.scaleFactor)
                         font.weight: root.widgetEditorial ? Appearance.editorial.titleWeight : Font.Bold
                         font.features: ({ "tnum": 1 })
@@ -386,7 +386,7 @@ AbstractBackgroundWidget {
                             visible: root.showDate && referenceZone.dayDelta !== 0
                             text: (referenceZone.dayDelta > 0 ? "+" : "") + referenceZone.dayDelta + "D"
                             color: referenceZone.accent
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             font.weight: Font.Bold
                         }
@@ -395,7 +395,7 @@ AbstractBackgroundWidget {
                             visible: root.showDate
                             text: root.cityDateText(0)
                             color: root.widgetInkMuted
-                            font.family: Appearance.font.family.main
+                            font.family: root.widgetBodyFamily
                             font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             font.weight: Font.Medium
                             font.letterSpacing: root.widgetMetadataTracking
@@ -443,7 +443,7 @@ AbstractBackgroundWidget {
                                     text: String(comparisonZone.modelData.name)
                                     color: root.widgetInk
                                     elide: Text.ElideRight
-                                    font.family: Appearance.font.family.main
+                                    font.family: root.widgetBodyFamily
                                     font.pixelSize: Math.max(11, Math.round(11 * root.scaleFactor))
                                     font.weight: root.widgetLabelWeight
                                     font.letterSpacing: root.widgetMetadataTracking
@@ -457,7 +457,7 @@ AbstractBackgroundWidget {
                                         visible: root.showDate && comparisonZone.dayDelta !== 0
                                         text: (comparisonZone.dayDelta > 0 ? "+" : "") + comparisonZone.dayDelta + "D"
                                         color: comparisonZone.accent
-                                        font.family: Appearance.font.family.numbers
+                                        font.family: root.widgetNumbersFamily
                                         font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                                         font.weight: Font.Bold
                                     }
@@ -467,7 +467,7 @@ AbstractBackgroundWidget {
                                         text: root.cityDateText(comparisonZone.cityIndex)
                                         color: root.widgetInkMuted
                                         elide: Text.ElideRight
-                                        font.family: Appearance.font.family.main
+                                        font.family: root.widgetBodyFamily
                                         font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                                         font.weight: Font.Medium
                                         font.letterSpacing: root.widgetMetadataTracking
@@ -477,7 +477,7 @@ AbstractBackgroundWidget {
                                         visible: root.showOffsets
                                         text: comparisonZone.modelData.offset
                                         color: root.widgetInkMuted
-                                        font.family: Appearance.font.family.numbers
+                                        font.family: root.widgetNumbersFamily
                                         font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                                         font.weight: Font.Medium
                                     }
@@ -492,7 +492,7 @@ AbstractBackgroundWidget {
                             StyledText {
                                 text: comparisonZone.modelData.time
                                 color: root.widgetInk
-                                font.family: Appearance.font.family.numbers
+                                font.family: root.widgetNumbersFamily
                                 font.pixelSize: Math.max(20, Math.round(24 * root.scaleFactor))
                                 font.weight: root.widgetEditorial ? Appearance.editorial.titleWeight : Font.DemiBold
                                 font.features: ({ "tnum": 1 })
@@ -546,10 +546,10 @@ AbstractBackgroundWidget {
                             StyledText {
                                 Layout.fillWidth: true
                                 visible: true
-                                text: String(ledgerZone.modelData.name).toUpperCase()
+                                text: root.widgetCase(String(ledgerZone.modelData.name))
                                 color: index === 0 ? root.widgetInk : root.widgetInkMuted
                                 elide: Text.ElideRight
-                                font.family: Appearance.font.family.main
+                                font.family: root.widgetBodyFamily
                                 font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                                 font.weight: index === 0 ? root.widgetLabelWeight : Font.Medium
                                 font.letterSpacing: root.widgetMetadataTracking
@@ -563,7 +563,7 @@ AbstractBackgroundWidget {
                                     visible: root.showDate && ledgerZone.dayDelta !== 0
                                     text: (ledgerZone.dayDelta > 0 ? "+" : "") + ledgerZone.dayDelta + "D"
                                     color: ledgerZone.accent
-                                    font.family: Appearance.font.family.numbers
+                                    font.family: root.widgetNumbersFamily
                                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                                     font.weight: Font.Bold
                                 }
@@ -573,7 +573,7 @@ AbstractBackgroundWidget {
                                     text: root.cityDateText(index)
                                     color: root.widgetInkMuted
                                     elide: Text.ElideRight
-                                    font.family: Appearance.font.family.main
+                                    font.family: root.widgetBodyFamily
                                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                                     font.weight: Font.Medium
                                     font.letterSpacing: root.widgetMetadataTracking
@@ -583,7 +583,7 @@ AbstractBackgroundWidget {
                                     visible: root.showOffsets
                                     text: ledgerZone.modelData.offset
                                     color: root.widgetInkMuted
-                                    font.family: Appearance.font.family.numbers
+                                    font.family: root.widgetNumbersFamily
                                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                                     font.weight: Font.Medium
                                 }
@@ -598,7 +598,7 @@ AbstractBackgroundWidget {
                         StyledText {
                             text: ledgerZone.modelData.time
                             color: root.widgetInk
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: index === 0
                                 ? Math.max(22, Math.round(27 * root.scaleFactor))
                                 : Math.max(20, Math.round(24 * root.scaleFactor))
@@ -660,7 +660,7 @@ AbstractBackgroundWidget {
             color: root.surfaceInk
             elide: Text.ElideRight
             font {
-                family: Appearance.font.family.numbers
+                family: root.widgetNumbersFamily
                 pixelSize: Math.round(Appearance.font.pixelSize.huge * root.scaleFactor)
                 weight: Font.DemiBold
             }
@@ -744,7 +744,7 @@ AbstractBackgroundWidget {
                                 elide: Text.ElideRight
                                 color: cityCell.cellInk
                                 font {
-                                    family: Appearance.font.family.numbers
+                                    family: root.widgetNumbersFamily
                                     pixelSize: Math.round(Appearance.font.pixelSize.large * root.scaleFactor)
                                     weight: Font.Bold
                                 }

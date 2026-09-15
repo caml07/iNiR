@@ -37,6 +37,7 @@ import qs.modules.background.widgets.newsTicker
 import qs.modules.background.widgets.mascot
 import qs.modules.background.widgets.japaneseTypography
 import qs.modules.background.desktopItems
+import qs.modules.iris.components
 import "root:modules/common/functions/parallax.js" as ParallaxMath
 import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 
@@ -92,6 +93,12 @@ Scope {
         function toggleEditMode(): string {
             GlobalStates.setWidgetEditMode(!GlobalStates.widgetEditMode)
             return GlobalStates.widgetEditMode ? "edit mode on" : "edit mode off"
+        }
+
+        function toggleWidgetManager(): string {
+            if (!GlobalStates.widgetEditMode) GlobalStates.setWidgetEditMode(true)
+            GlobalStates.desktopWidgetManagerToggleRequested(GlobalStates.focusedScreen?.name ?? "")
+            return "widget manager toggled"
         }
 
         function setEditMode(enabled: bool): string {
@@ -1655,12 +1662,14 @@ Scope {
                         GlobalStates.clearDesktopItemSelection()
                         if (desktopContextMenu.active) desktopContextMenu.close()
                         if (desktopItemContextMenu.active) desktopItemContextMenu.close()
+                        if (irisDesktopMenu.active) irisDesktopMenu.close()
                         return
                     }
                     if (desktopItemContextMenu.active) desktopItemContextMenu.close()
                     desktopMenuAnchor.x = mouse.x
                     desktopMenuAnchor.y = mouse.y
-                    desktopContextMenu.requestOpen()
+                    if ((Config.options?.panelFamily ?? "ii") === "iris") irisDesktopMenu.requestOpen()
+                    else desktopContextMenu.requestOpen()
                 }
             }
 
@@ -1718,6 +1727,57 @@ Scope {
                         action: () => { ShellEditSession.toggle() } },
                     { type: "separator" },
                     { text: Translation.tr("Reload shell"), iconName: "refresh", monochromeIcon: true,
+                        action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
+                ]
+            }
+
+            // iRiS desktop menu: the Island's material, quick-action tiles and
+            // keyboard, growing out of the pointer. Only the actions that drive
+            // something under iRiS (shell layout editing is ii/Waffle-only).
+            IrisDesktopMenu {
+                id: irisDesktopMenu
+                z: 27
+                anchorItem: desktopMenuAnchor
+                readonly property int gridSize: Config.getNestedValue("background.widgets.editGrid.size", 32)
+                readonly property bool gridSnap: Config.getNestedValue("background.widgets.editGrid.snap", true)
+                model: GlobalStates.widgetEditMode ? [
+                    { type: "quick", items: [
+                        { text: Translation.tr("Widgets"), iconName: "dashboard_customize",
+                            action: () => { widgetManagerPanel.shown = true } },
+                        { text: irisDesktopMenu.gridSnap ? Translation.tr("Snap on") : Translation.tr("Snap off"),
+                            iconName: irisDesktopMenu.gridSnap ? "grid_on" : "grid_off",
+                            action: () => Config.setNestedValue("background.widgets.editGrid.snap", !irisDesktopMenu.gridSnap) },
+                        { text: Translation.tr("Done"), iconName: "check", accent: true,
+                            action: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) } }
+                    ] },
+                    { type: "separator" },
+                    { text: Translation.tr("Grid size"), iconName: "grid_4x4", detail: irisDesktopMenu.gridSize + " px",
+                        action: () => {
+                            const sizes = [16, 32, 48, 64]
+                            Config.setNestedValue("background.widgets.editGrid.size",
+                                sizes[(sizes.indexOf(irisDesktopMenu.gridSize) + 1) % sizes.length])
+                        } },
+                    { text: Translation.tr("Widget settings"), iconName: "settings",
+                        action: () => GlobalStates.openSettingsPage(14) }
+                ] : [
+                    { type: "quick", items: [
+                        { text: Translation.tr("Wallpaper"), iconName: "wallpaper",
+                            action: () => {
+                                GlobalStates.wallpaperSelectorTargetMonitor = bgRoot.screenName
+                                GlobalActions.runLauncher(["wallpaperSelector", "toggle"])
+                            } },
+                        { text: Translation.tr("Widgets"), iconName: "widgets",
+                            action: () => GlobalStates.setWidgetEditMode(true) },
+                        { text: Translation.tr("Search"), iconName: "search",
+                            action: () => { GlobalStates.searchOpen = true } }
+                    ] },
+                    { type: "separator" },
+                    { text: Translation.tr("Quick controls"), iconName: "tune",
+                        action: () => { GlobalStates.controlPanelOpen = true } },
+                    { text: Translation.tr("Settings"), iconName: "settings",
+                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "settings"]) } },
+                    { type: "separator" },
+                    { text: Translation.tr("Reload shell"), iconName: "refresh",
                         action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
                 ]
             }
@@ -2382,8 +2442,13 @@ Scope {
                         libraryOpen: widgetManagerPanel.shown
                         x: Math.round(editGridOverlay.safeLeft
                             + (editGridOverlay.safeWidth - width) / 2)
-                        y: Math.max(editGridOverlay.safeTop,
-                            editGridOverlay.safeBottom - height - 12)
+                        // iRiS: the Dock steps aside while editing and the toolbar takes the
+                        // edge opposite the Island, so it never lands on the Island.
+                        readonly property bool irisTopEdge: (Config.options?.panelFamily ?? "ii") === "iris"
+                            && editGridOverlay.workArea?.insets?.barEdge === "bottom"
+                        attachedTopEdge: irisTopEdge
+                        y: editControlsBar.iris ? (irisTopEdge ? 0 : parent.height - height)
+                            : Math.max(editGridOverlay.safeTop, editGridOverlay.safeBottom - height - 12)
                         onLibraryRequested: widgetManagerPanel.shown = !widgetManagerPanel.shown
                         onEdgeSettingsRequested: GlobalStates.openSettingsPage(14, "Organic edge")
                         onSettingsRequested: GlobalStates.openSettingsPage(14)
@@ -2397,11 +2462,33 @@ Scope {
                     Loader {
                         id: widgetManagerPanel
                         property bool shown: false
+                        property bool geometryReady: false
+                        Connections {
+                            target: GlobalStates
+                            function onDesktopWidgetManagerToggleRequested(outputName: string): void {
+                                if (outputName.length === 0 || outputName === bgRoot.screenName)
+                                    widgetManagerPanel.shown = !widgetManagerPanel.shown
+                            }
+                            function onWidgetEditModeChanged(): void {
+                                if (!GlobalStates.widgetEditMode) widgetManagerPanel.shown = false
+                            }
+                        }
                         active: shown
                         visible: shown
+                        enabled: shown && (!editControlsBar.iris || geometryReady)
+                        opacity: editControlsBar.iris && !geometryReady ? 0 : 1
                         z: 150
                         x: 0
                         y: 0
+
+                        Behavior on opacity {
+                            enabled: editControlsBar.iris && IrisStyle.motionEnabled
+                            NumberAnimation {
+                                duration: IrisStyle.revealDuration
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: IrisStyle.morphCurve
+                            }
+                        }
 
                         function restoreGeometry(): void {
                             if (!widgetManagerPanel.shown)
@@ -2421,18 +2508,19 @@ Scope {
                                     Number(Persistent.states?.desktopWidgets?.managerYRatio ?? 0.48)))
                                 widgetManagerPanel.x = inset + Math.round(spanX * rx)
                                 widgetManagerPanel.y = inset + Math.round(spanY * ry)
+                                widgetManagerPanel.geometryReady = true
                             })
                         }
 
-                        Timer {
-                            id: managerGeometryRestore
-                            interval: 80
-                            repeat: false
-                            onTriggered: widgetManagerPanel.restoreGeometry()
+                        onShownChanged: {
+                            if (!shown) {
+                                geometryReady = false
+                                return
+                            }
+                            geometryReady = false
+                            restoreGeometry()
                         }
-
-                        onShownChanged: if (shown) managerGeometryRestore.restart()
-                        onLoaded: managerGeometryRestore.restart()
+                        onLoaded: restoreGeometry()
 
                         sourceComponent: WidgetManagerPanel {
                             outputName: bgRoot.screen?.name ?? ""
@@ -2445,7 +2533,7 @@ Scope {
                                 GlobalStates.selectDesktopWidget(
                                     bgRoot.screenName + "::" + layoutKey)
                             }
-                            Component.onCompleted: managerGeometryRestore.restart()
+                            Component.onCompleted: widgetManagerPanel.restoreGeometry()
                         }
                     }
                 }

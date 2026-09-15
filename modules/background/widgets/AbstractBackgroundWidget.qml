@@ -17,7 +17,7 @@ AbstractWidget {
     id: root
 
     required property string configEntryName
-    readonly property bool widgetIris: (Config.options?.panelFamily ?? "ii") === "iris" && IrisStyle.island
+    readonly property bool widgetIris: (Config.options?.panelFamily ?? "ii") === "iris"
     required property int screenWidth
     required property int screenHeight
     required property int scaledScreenWidth
@@ -95,17 +95,17 @@ AbstractWidget {
     Behavior on implicitWidth {
         enabled: root.animateGeometry
         NumberAnimation {
-            duration: Appearance.animation.elementMove.duration
-            easing.type: Appearance.animation.elementMove.type
-            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+            duration: root.widgetIris ? IrisStyle.morphDuration : Appearance.animation.elementMove.duration
+            easing.type: root.widgetIris ? Easing.BezierSpline : Appearance.animation.elementMove.type
+            easing.bezierCurve: root.widgetIris ? IrisStyle.morphCurve : Appearance.animation.elementMove.bezierCurve
         }
     }
     Behavior on implicitHeight {
         enabled: root.animateGeometry
         NumberAnimation {
-            duration: Appearance.animation.elementMove.duration
-            easing.type: Appearance.animation.elementMove.type
-            easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
+            duration: root.widgetIris ? IrisStyle.morphDuration : Appearance.animation.elementMove.duration
+            easing.type: root.widgetIris ? Easing.BezierSpline : Appearance.animation.elementMove.type
+            easing.bezierCurve: root.widgetIris ? IrisStyle.morphCurve : Appearance.animation.elementMove.bezierCurve
         }
     }
     readonly property real widgetOpacity: {
@@ -125,7 +125,7 @@ AbstractWidget {
     readonly property bool _widgetIslandStyle: !Appearance.zzzEverywhere && !Appearance.cookieEverywhere
         && !Appearance.angelEverywhere && !Appearance.auroraEverywhere && !Appearance.inirEverywhere
         && (Config.options?.background?.widgets?.style ?? "panel") === "island"
-    readonly property bool blurAvailable: Appearance.effectsEnabled
+    readonly property bool blurAvailable: !root.widgetIris && Appearance.effectsEnabled
         && (Appearance.angelEverywhere
             || (Appearance.auroraEverywhere && !Appearance.inirEverywhere)
             || (root._widgetIslandStyle
@@ -504,7 +504,7 @@ AbstractWidget {
     readonly property bool powerReduced: WidgetPowerManager.reducedModeForOutput(root.outputName)
 
     // Effective animation state: animations enabled AND power active
-    readonly property bool animationsActive: Appearance.animationsEnabled && root.powerActive
+    readonly property bool animationsActive: (root.widgetIris ? IrisStyle.motionEnabled : Appearance.animationsEnabled) && root.powerActive
 
     // Visual feedback when paused - desaturation + slight dim
     // Config option to disable visual effect if user only wants GPU savings
@@ -1061,8 +1061,17 @@ AbstractWidget {
             anchors.fill: parent
             padding: 0
             spacing: 0
+            transparent: root.widgetIris
             screenX: root.x + editToolbar.x
             screenY: root.y + editToolbar.y
+        }
+        Rectangle {
+            anchors.fill: parent
+            visible: root.widgetIris
+            radius: height / 2
+            color: IrisStyle.surface
+            border.width: 1
+            border.color: IrisStyle.hairlineStrong
         }
 
         Flow {
@@ -1171,9 +1180,18 @@ AbstractWidget {
                 propagateComposedEvents: false
             }
 
+            Rectangle {
+                anchors.fill: parent
+                visible: root.widgetIris
+                radius: Math.round(18 * IrisStyle.density)
+                color: IrisStyle.surface
+                border.width: 1
+                border.color: IrisStyle.hairlineStrong
+            }
             PanelSurface {
                 id: editPopoverSurface
                 anchors.fill: parent
+                visible: !root.widgetIris
                 elevation: 2
                 // Floats straight on the wallpaper like the widget manager panel:
                 // without a backdrop the aurora/angel fill is a hole, not glass.
@@ -1920,13 +1938,30 @@ AbstractWidget {
         });
     }
 
+    // iRiS widgets keep the black Island material but can borrow the wallpaper:
+    // its generated hues are lifted into a range that reads on black, and the
+    // plate can carry a trace of the same hue. Greyscale seeds keep iRiS blue.
+    readonly property var irisWidgetOptions: Config.options?.iris?.widgets ?? ({})
+    readonly property bool irisWallpaperTint: String(root.irisWidgetOptions.tint ?? "wallpaper") === "wallpaper"
+    readonly property color irisAccent: root.irisWallpaperTint
+        ? IrisStyle.legibleAccent(Appearance.colors.colPrimary, IrisStyle.accent) : IrisStyle.accent
+    readonly property color irisAccent2: root.irisWallpaperTint
+        ? IrisStyle.legibleAccent(Appearance.colors.colSecondary, IrisStyle.success) : IrisStyle.success
+    readonly property color irisAccent3: root.irisWallpaperTint
+        ? IrisStyle.legibleAccent(Appearance.colors.colTertiary, IrisStyle.secondaryAccent) : IrisStyle.secondaryAccent
+    readonly property color irisPlate: String(root.irisWidgetOptions.material ?? "solid") === "tinted"
+        ? ColorUtils.mix(IrisStyle.surface, root.irisAccent, 0.82) : IrisStyle.surface
+
     function widgetSemanticSet(role: string): var {
         if (root.widgetIris) {
             const foreground = role === "surface" ? IrisStyle.text
                 : role === "signal" ? IrisStyle.danger
-                : role === "warning" || role === "tertiary" ? IrisStyle.secondaryAccent : IrisStyle.accent;
+                : role === "success" ? IrisStyle.success
+                : role === "warning" ? IrisStyle.secondaryAccent
+                : role === "tertiary" ? root.irisAccent3
+                : role === "secondary" ? root.irisAccent2 : root.irisAccent;
             return { color: foreground, onColor: IrisStyle.surface,
-                container: role === "surface" ? IrisStyle.surface : IrisStyle.surfaceHigh,
+                container: role === "surface" ? root.irisPlate : ColorUtils.mix(root.irisPlate, IrisStyle.text, 0.9),
                 onContainer: IrisStyle.text };
         }
         const c = Appearance.colors;
@@ -1995,7 +2030,10 @@ AbstractWidget {
 
     // Surfaces use semantic containers directly. This removes the old HSL
     // wallpaper-region re-toning that could turn generated warm palettes muddy.
-    readonly property color widgetPlateColor: root.widgetSemanticContainer(root.widgetSurfaceRole)
+    readonly property color widgetPlateColor: root.widgetIris && root.forceDarkInk
+        ? ColorUtils.mix(IrisStyle.text, IrisStyle.accent, 0.98)
+        : root.widgetIris && root.forceLightInk ? IrisStyle.surface
+        : root.widgetSemanticContainer(root.widgetSurfaceRole)
     readonly property bool widgetPlateIsDark: ColorUtils.relativeLuminance(root.widgetPlateColor) < 0.38
     readonly property color widgetSurfaceInk: root.forceLightInk ? root._inkLight
         : root.forceDarkInk ? root._inkDark
@@ -2006,12 +2044,26 @@ AbstractWidget {
         : ColorUtils.applyAlpha(root.widgetInk, 0.66)
     readonly property color widgetInkSubtle: ColorUtils.applyAlpha(root.widgetInk, 0.58)
     readonly property bool widgetEditorial: !root.widgetIris && Appearance.editorialEverywhere
+    // Family-owned type: iRiS widgets speak the Island's typeface; every other
+    // family keeps the shell fonts it always used.
+    readonly property string widgetBodyFamily: root.widgetIris ? IrisStyle.fontMain : Appearance.font.family.main
+    readonly property string widgetNumbersFamily: root.widgetIris ? IrisStyle.fontNumbers : Appearance.font.family.numbers
+    // Metadata labels: shouting caps are Material/Instrument grammar; iRiS uses
+    // sentence case (first letter up, the rest as written by the locale).
+    function widgetCase(text): string {
+        const value = String(text ?? "")
+        return root.widgetIris ? value.charAt(0).toUpperCase() + value.slice(1) : value.toUpperCase()
+    }
+    readonly property int widgetCapitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
     readonly property string widgetTitleFamily: root.widgetIris ? IrisStyle.fontMain : root.widgetEditorial
         ? Appearance.editorial.displayFamily : Appearance.font.family.main
-    readonly property int widgetTitleWeight: root.widgetEditorial
-        ? Appearance.editorial.titleWeight : Font.DemiBold
-    readonly property real widgetTitleTracking: root.widgetEditorial
-        ? Appearance.editorial.titleTracking : 0
+    // iRiS display type: one chosen weight for titles and figures, with the
+    // slight negative tracking large system numerals use.
+    readonly property int widgetTitleWeight: root.widgetIris
+        ? ({ light: Font.Light, regular: Font.Medium, bold: Font.Bold })[String(root.irisWidgetOptions.weight ?? "regular")] ?? Font.Medium
+        : root.widgetEditorial ? Appearance.editorial.titleWeight : Font.DemiBold
+    readonly property real widgetTitleTracking: root.widgetIris ? -0.4
+        : root.widgetEditorial ? Appearance.editorial.titleTracking : 0
     readonly property real widgetTitleScale: root.widgetEditorial
         ? Appearance.editorial.titleScale : 1
     readonly property real widgetSpacingScale: root.widgetEditorial
@@ -2019,7 +2071,7 @@ AbstractWidget {
     readonly property int widgetLabelWeight: root.widgetEditorial ? Appearance.editorial.labelWeight : Font.Medium
     readonly property real widgetMetadataTracking: root.widgetEditorial ? Appearance.editorial.metadataTracking : 0
     readonly property real widgetControlRadius: root.widgetIris ? Math.round(12 * IrisStyle.density) : root.widgetEditorial ? Appearance.rounding.small : Appearance.rounding.normal
-    readonly property real widgetCardRadius: root.widgetIris ? Math.round(22 * IrisStyle.density) : root.widgetEditorial ? Appearance.editorial.radius : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius
+    readonly property real widgetCardRadius: root.widgetIris ? Math.round(Math.max(0, Math.min(40, Config.options?.iris?.widgets?.radius ?? 22)) * IrisStyle.density) : root.widgetEditorial ? Appearance.editorial.radius : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius
         : Appearance.cookieEverywhere ? Appearance.cookie.roundLarge
         : Appearance.angelEverywhere ? Appearance.angel.roundingNormal
         : Appearance.inirEverywhere ? Appearance.inir.roundingNormal

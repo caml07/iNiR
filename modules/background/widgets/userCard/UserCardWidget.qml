@@ -452,7 +452,7 @@ AbstractBackgroundWidget {
             StyledText {
                 visible: root.showHostname && root.hostname.length > 0
                 Layout.fillWidth: true
-                text: root.hostname.toUpperCase()
+                text: root.widgetIris ? root.hostname : root.hostname.toUpperCase()
                 color: root.widgetInkMuted
                 elide: Text.ElideRight
                 font.family: Appearance.font.family.monospace
@@ -466,7 +466,7 @@ AbstractBackgroundWidget {
                 ColumnLayout {
                     spacing: 0
                     StyledText { text: "SESSION"; color: root.widgetInkMuted; font.family: Appearance.font.family.monospace; font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor)) }
-                    StyledText { text: DateTime.uptime || "--"; color: root.widgetInk; font.family: Appearance.font.family.numbers; font.pixelSize: Math.max(13, Math.round(15 * root.scaleFactor)); font.weight: Font.DemiBold }
+                    StyledText { text: DateTime.uptime || "--"; color: root.widgetInk; font.family: root.widgetNumbersFamily; font.pixelSize: Math.max(13, Math.round(15 * root.scaleFactor)); font.weight: Font.DemiBold }
                 }
                 ColumnLayout {
                     visible: root.showWeather && root.weatherLine.text !== ""

@@ -305,7 +305,7 @@ AbstractBackgroundWidget {
                     text: root.articleMeta.length > 0
                         ? root.articleMeta : Translation.tr("News")
                     color: root.instrument ? root.widgetAccentVisible : root.widgetInkMuted
-                    font.family: root.instrument ? Appearance.font.family.monospace : Appearance.font.family.main
+                    font.family: root.instrument ? Appearance.font.family.monospace : root.widgetBodyFamily
                     font.pixelSize: Math.round((root.instrument
                         ? Appearance.font.pixelSize.smallest : Appearance.font.pixelSize.smaller) * root.scaleFactor)
                     font.weight: root.instrument ? Font.DemiBold : Font.Normal
@@ -319,7 +319,7 @@ AbstractBackgroundWidget {
                     text: ((root.headlineIndex % Math.max(1, root.articleCount)) + 1)
                         + "/" + root.articleCount
                     color: root.instrument ? root.widgetInkMuted : root.widgetInkSubtle
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.round(
                         Appearance.font.pixelSize.smallest * root.scaleFactor)
                 }

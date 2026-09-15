@@ -162,7 +162,7 @@ AbstractBackgroundWidget {
                     Layout.fillWidth: true
                     text: Translation.tr("Battery")
                     color: root.widgetInkMuted
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: Math.round(11 * root.scaleFactor)
                     font.weight: Font.DemiBold
                     font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
@@ -181,7 +181,7 @@ AbstractBackgroundWidget {
                 StyledText {
                     text: Battery.available ? String(Math.round(Battery.percentage * 100)) : "—"
                     color: root.widgetInk
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.round(52 * root.scaleFactor)
                     font.weight: root.widgetEditorial ? Appearance.editorial.titleWeight : Font.Bold
                     font.features: ({ "tnum": 1 })
@@ -193,7 +193,7 @@ AbstractBackgroundWidget {
                     visible: Battery.available
                     text: "%"
                     color: root.widgetInkMuted
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: Math.round(16 * root.scaleFactor)
                     font.weight: Font.DemiBold
                 }
@@ -204,7 +204,7 @@ AbstractBackgroundWidget {
                     visible: root.showEnergyRate && Battery.available && Battery.energyRate > 0
                     text: Number(Battery.energyRate).toFixed(1) + " W"
                     color: root.widgetSemanticForeground(root._batteryRole)
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.round(12 * root.scaleFactor)
                     font.weight: Font.DemiBold
                 }
@@ -223,7 +223,7 @@ AbstractBackgroundWidget {
                     : root.timeLabel || (Battery.isCharging ? Translation.tr("Charging") : Translation.tr("Battery"))
                 color: root.widgetInkMuted
                 elide: Text.ElideRight
-                font.family: Appearance.font.family.main
+                font.family: root.widgetBodyFamily
                 font.pixelSize: Math.round(11 * root.scaleFactor)
             }
         }
@@ -260,7 +260,7 @@ AbstractBackgroundWidget {
                     color: root.widgetInk
                     font {
                         pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
-                        family: Appearance.font.family.numbers
+                        family: root.widgetNumbersFamily
                         weight: Font.DemiBold
                     }
                 }
@@ -274,7 +274,7 @@ AbstractBackgroundWidget {
                 visible: root.timeLabel !== ""
                 font {
                     pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
-                    family: Appearance.font.family.main
+                    family: root.widgetBodyFamily
                 }
             }
         }
@@ -352,13 +352,13 @@ AbstractBackgroundWidget {
             StyledText {
                 text: root.percentText
                 color: root.widgetInk
-                font { pixelSize: Math.round(Appearance.font.pixelSize.small * root.scaleFactor); family: Appearance.font.family.numbers; weight: Font.DemiBold }
+                font { pixelSize: Math.round(Appearance.font.pixelSize.small * root.scaleFactor); family: root.widgetNumbersFamily; weight: Font.DemiBold }
             }
             StyledText {
                 text: root.timeLabel
                 color: root.widgetInkMuted
                 visible: root.timeLabel !== ""
-                font { pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor); family: Appearance.font.family.main }
+                font { pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor); family: root.widgetBodyFamily }
                 anchors.baseline: parent.children[0].baseline
             }
         }
@@ -387,13 +387,13 @@ AbstractBackgroundWidget {
             StyledText {
                 text: root.percentText
                 color: root.widgetInk
-                font { pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor); family: Appearance.font.family.numbers; weight: Font.DemiBold }
+                font { pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor); family: root.widgetNumbersFamily; weight: Font.DemiBold }
             }
             StyledText {
                 text: root.timeLabel
                 color: root.widgetInkMuted
                 visible: root.timeLabel !== ""
-                font { pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor); family: Appearance.font.family.main }
+                font { pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor); family: root.widgetBodyFamily }
                 anchors.baseline: parent.children[0].baseline
             }
         }

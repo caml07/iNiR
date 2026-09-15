@@ -122,7 +122,7 @@ AbstractBackgroundWidget {
         }
     }
 
-    readonly property bool nativeIrisPlayer: root.widgetIris && ["full", "compact"].includes(root.effectiveRenderedPreset)
+    readonly property bool nativeIrisPlayer: root.widgetIris && ["full", "compact", "minimal", "classic"].includes(root.effectiveRenderedPreset)
 
     readonly property real widgetHeight: root.nativeIrisPlayer
         ? Math.round((root.effectiveRenderedPreset === "compact" ? 126 : 204) * scaleFactor * Appearance.fontSizeScale)
@@ -340,7 +340,7 @@ AbstractBackgroundWidget {
                                 text: Math.round(mediaVizMetric.currentValue) + mediaVizMetric.suffix
                                 color: Appearance.colors.colOnLayer2
                                 font.pixelSize: Appearance.font.pixelSize.smaller
-                                font.family: Appearance.font.family.numbers
+                                font.family: root.widgetNumbersFamily
                                 font.weight: Font.DemiBold
                             }
                         }
@@ -576,7 +576,7 @@ AbstractBackgroundWidget {
     Component {
         id: irisPlayerComponent
         IrisMediaCard {
-            compact: root.effectiveRenderedPreset === "compact"
+            compact: ["compact", "minimal"].includes(root.effectiveRenderedPreset)
             active: root.visible && root.powerActive
             showBackground: false
         }

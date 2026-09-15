@@ -8,6 +8,8 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.iris.style
+import qs.modules.iris.components
 
 Item {
     id: root
@@ -18,6 +20,13 @@ Item {
     required property string outputName
     signal closeRequested()
     signal focusWidgetRequested(string layoutKey)
+
+    // iRiS dresses the manager in the Island material; other families keep their
+    // layer tokens untouched.
+    readonly property bool iris: (Config.options?.panelFamily ?? "ii") === "iris"
+    readonly property color ink: root.iris ? IrisStyle.text : Appearance.colors.colOnLayer1
+    readonly property color accentInk: root.iris ? IrisStyle.accent : Appearance.colors.colPrimary
+    readonly property color dangerInk: root.iris ? IrisStyle.danger : Appearance.colors.colError
 
     property string searchText: ""
     readonly property string filterMode: Persistent.states?.desktopWidgets?.managerFilter ?? "all"
@@ -269,12 +278,13 @@ Item {
     // ── Shadow + Background card ──
     StyledRectangularShadow {
         target: _bgCard
-        visible: !Appearance.zzzEverywhere && !Appearance.auroraEverywhere
+        visible: !root.iris && !Appearance.zzzEverywhere && !Appearance.auroraEverywhere
     }
 
     PanelSurface {
         id: _bgCard
         anchors.fill: parent
+        visible: !root.iris
         elevation: 1
         wallpaperBackdrop: true
         // mapToItem is a plain call, not a tracked dependency: the panel is
@@ -295,6 +305,13 @@ Item {
         // No frameLabel: the header right below already titles the panel; the
         // corner tape label overlapped it (registration marks alone suffice).
         techFrame: Appearance.zzzEverywhere
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: root.iris
+        radius: Math.round(22 * IrisStyle.density)
+        color: IrisStyle.surface
     }
 
     // ZZZ alone owns the technical drafting language. Other global styles
@@ -355,7 +372,7 @@ Item {
                 MaterialSymbol {
                     text: "widgets"
                     iconSize: 22
-                    color: Appearance.colors.colPrimary
+                    color: root.accentInk
                 }
 
                 Column {
@@ -365,12 +382,12 @@ Item {
                         text: Translation.tr("Widget library")
                         font.pixelSize: Appearance.font.pixelSize.normal
                         font.weight: Font.DemiBold
-                        color: Appearance.colors.colOnLayer1
+                        color: root.ink
                     }
                     StyledText {
                         text: Translation.tr("%1 active on this display").arg(root._activeCount)
                         font.pixelSize: Appearance.font.pixelSize.smaller
-                        color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.55)
+                        color: ColorUtils.applyAlpha(root.ink, 0.55)
                     }
                 }
 
@@ -389,7 +406,52 @@ Item {
                 }
             }
 
+            Rectangle {
+                visible: root.iris
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.round(36 * IrisStyle.density)
+                radius: height / 2
+                color: ColorUtils.applyAlpha(IrisStyle.text, irisSearch.activeFocus ? 0.12 : 0.075)
+                Behavior on color { ColorAnimation { duration: IrisStyle.duration(120) } }
+
+                MaterialSymbol {
+                    id: irisSearchGlyph
+                    anchors.left: parent.left
+                    anchors.leftMargin: Math.round(12 * IrisStyle.density)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "search"
+                    iconSize: Math.round(16 * IrisStyle.density)
+                    color: irisSearch.text.length > 0 ? IrisStyle.accent : IrisStyle.subtext
+                }
+
+                TextInput {
+                    id: irisSearch
+                    anchors.left: irisSearchGlyph.right
+                    anchors.leftMargin: Math.round(8 * IrisStyle.density)
+                    anchors.right: parent.right
+                    anchors.rightMargin: Math.round(12 * IrisStyle.density)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.searchText
+                    color: IrisStyle.text
+                    selectionColor: IrisStyle.accentContainer
+                    selectedTextColor: IrisStyle.onAccentContainer
+                    font.family: IrisStyle.fontMain
+                    font.pixelSize: 13 * IrisStyle.typeScale
+                    clip: true
+                    onTextChanged: if (root.searchText !== text) root.searchText = text
+
+                    IrisText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: irisSearch.text.length === 0
+                        text: Translation.tr("Search widgets")
+                        color: IrisStyle.muted
+                        font.pixelSize: irisSearch.font.pixelSize
+                    }
+                }
+            }
+
             RowLayout {
+                visible: !root.iris
                 Layout.fillWidth: true
                 Layout.preferredHeight: 34
                 spacing: 6
@@ -397,7 +459,7 @@ Item {
                 MaterialSymbol {
                     text: "search"
                     iconSize: 17
-                    color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.52)
+                    color: ColorUtils.applyAlpha(root.ink, 0.52)
                 }
                 MaterialTextField {
                     Layout.fillWidth: true
@@ -410,7 +472,41 @@ Item {
                 }
             }
 
+            Rectangle {
+                id: irisFilterSwitch
+                visible: root.iris
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.round(34 * IrisStyle.density)
+                radius: height / 2
+                color: ColorUtils.applyAlpha(IrisStyle.text, 0.06)
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Math.round(3 * IrisStyle.density)
+                    Repeater {
+                        model: [
+                            { key: "all", label: Translation.tr("All") },
+                            { key: "active", label: Translation.tr("Active") },
+                            { key: "locked", label: Translation.tr("Locked") },
+                            { key: "custom", label: Translation.tr("Custom") }
+                        ]
+                        IrisButton {
+                            required property var modelData
+                            width: irisFilterSwitch.width / 4 - Math.round(1.5 * IrisStyle.density)
+                            height: parent.height
+                            text: modelData.label
+                            selected: root.filterMode === modelData.key
+                            quiet: !selected
+                            buttonRadius: height / 2
+                            buttonRadiusPressed: height / 2
+                            onClicked: root._setFilter(modelData.key)
+                        }
+                    }
+                }
+            }
+
             Flow {
+                visible: !root.iris
                 Layout.fillWidth: true
                 spacing: 4
 
@@ -439,7 +535,7 @@ Item {
         Rectangle {
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 16; rightMargin: 16 }
             height: 1
-            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.06)
+            color: ColorUtils.applyAlpha(root.ink, 0.06)
         }
     }
 
@@ -531,7 +627,7 @@ Item {
                 width: 3; height: 3; radius: 1.5
                 x: 2 + index * 4
                 y: 10 - index * 4
-                color: Appearance.colors.colOnLayer1
+                color: root.ink
             }
         }
     }
@@ -554,7 +650,7 @@ Item {
                 text: Translation.tr("Built-in")
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 font.weight: Font.Medium
-                color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.45)
+                color: ColorUtils.applyAlpha(root.ink, 0.45)
                 leftPadding: 4
                 bottomPadding: 4
             }
@@ -618,16 +714,16 @@ Item {
                     text: Translation.tr("More mascots")
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     font.weight: Font.Medium
-                    color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.45)
+                    color: ColorUtils.applyAlpha(root.ink, 0.45)
                     anchors.verticalCenter: parent.verticalCenter
                     leftPadding: 4
                 }
                 RippleButton {
                     anchors { right: parent.right; verticalCenter: parent.verticalCenter }
                     width: 28; height: 28; buttonRadius: Appearance.rounding.full
-                    colBackground: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.08)
-                    colBackgroundHover: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.14)
-                    colRipple: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.12)
+                    colBackground: ColorUtils.applyAlpha(root.accentInk, 0.08)
+                    colBackgroundHover: ColorUtils.applyAlpha(root.accentInk, 0.14)
+                    colRipple: ColorUtils.applyAlpha(root.accentInk, 0.12)
                     releaseAction: () => {
                         const n = root._mascotInstanceIds.length
                         // Perch-flavored poses read as "sitting on something" out of
@@ -640,7 +736,7 @@ Item {
                         })
                     }
                     cancelAction: () => {}
-                    contentItem: MaterialSymbol { anchors.centerIn: parent; text: "add"; iconSize: 16; color: Appearance.colors.colPrimary }
+                    contentItem: MaterialSymbol { anchors.centerIn: parent; text: "add"; iconSize: 16; color: root.accentInk }
                     StyledToolTip { text: Translation.tr("Add another mascot") }
                 }
             }
@@ -665,7 +761,7 @@ Item {
                 StyledText {
                     anchors.centerIn: parent
                     text: Translation.tr("Add a second, third… mascot, each posed independently")
-                    color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5)
+                    color: ColorUtils.applyAlpha(root.ink, 0.5)
                     font.pixelSize: Appearance.font.pixelSize.smaller
                 }
             }
@@ -681,7 +777,7 @@ Item {
                     text: Translation.tr("Custom")
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     font.weight: Font.Medium
-                    color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.45)
+                    color: ColorUtils.applyAlpha(root.ink, 0.45)
                     anchors.verticalCenter: parent.verticalCenter
                     leftPadding: 4
                 }
@@ -692,32 +788,32 @@ Item {
                     RippleButton {
                         width: 28; height: 28; buttonRadius: Appearance.rounding.full
                         colBackground: "transparent"
-                        colBackgroundHover: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.06)
-                        colRipple: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.10)
+                        colBackgroundHover: ColorUtils.applyAlpha(root.ink, 0.06)
+                        colRipple: ColorUtils.applyAlpha(root.ink, 0.10)
                         releaseAction: () => CustomWidgets.reload()
                         cancelAction: () => {}
-                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "refresh"; iconSize: 16; color: Appearance.colors.colOnLayer1 }
+                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "refresh"; iconSize: 16; color: root.ink }
                         StyledToolTip { text: Translation.tr("Reload custom widgets") }
                     }
                     RippleButton {
                         width: 28; height: 28; buttonRadius: Appearance.rounding.full
                         colBackground: "transparent"
-                        colBackgroundHover: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.06)
-                        colRipple: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.10)
+                        colBackgroundHover: ColorUtils.applyAlpha(root.ink, 0.06)
+                        colRipple: ColorUtils.applyAlpha(root.ink, 0.10)
                         releaseAction: () => CustomWidgets.openWidgetDir("")
                         cancelAction: () => {}
-                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "folder_open"; iconSize: 16; color: Appearance.colors.colOnLayer1 }
+                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "folder_open"; iconSize: 16; color: root.ink }
                         StyledToolTip { text: Translation.tr("Open widgets folder") }
                     }
                     RippleButton {
                         visible: !root._exampleInstalled
                         width: 28; height: 28; buttonRadius: Appearance.rounding.full
-                        colBackground: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.08)
-                        colBackgroundHover: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.14)
-                        colRipple: ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.12)
+                        colBackground: ColorUtils.applyAlpha(root.accentInk, 0.08)
+                        colBackgroundHover: ColorUtils.applyAlpha(root.accentInk, 0.14)
+                        colRipple: ColorUtils.applyAlpha(root.accentInk, 0.12)
                         releaseAction: () => { CustomWidgets.installExample(); CustomWidgets.reload() }
                         cancelAction: () => {}
-                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "download"; iconSize: 16; color: Appearance.colors.colPrimary }
+                        contentItem: MaterialSymbol { anchors.centerIn: parent; text: "download"; iconSize: 16; color: root.accentInk }
                         StyledToolTip { text: Translation.tr("Install example widget") }
                     }
                 }
@@ -749,13 +845,13 @@ Item {
                     StyledText {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: Translation.tr("No custom widgets found")
-                        color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.65)
+                        color: ColorUtils.applyAlpha(root.ink, 0.65)
                         font.pixelSize: Appearance.font.pixelSize.small
                     }
                     StyledText {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: "~/.config/inir/widgets/"
-                        color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.48)
+                        color: ColorUtils.applyAlpha(root.ink, 0.48)
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         font.family: Appearance.font.family.monospace
                     }
@@ -776,14 +872,14 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: root.filterMode === "locked" ? "lock_open" : "search_off"
                         iconSize: 22
-                        color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.45)
+                        color: ColorUtils.applyAlpha(root.ink, 0.45)
                     }
                     StyledText {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: root.filterMode === "locked"
                             ? Translation.tr("No locked widgets on this display")
                             : Translation.tr("No widgets match this view")
-                        color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.62)
+                        color: ColorUtils.applyAlpha(root.ink, 0.62)
                         font.pixelSize: Appearance.font.pixelSize.small
                     }
                 }
@@ -842,13 +938,17 @@ Item {
         width: parent.width
         implicitHeight: visible ? _cardCol.implicitHeight : 0
         height: implicitHeight
-        radius: Appearance.rounding.small
-        color: card._selected ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.12) : card._enabled
-            ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.04)
-            : ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.02)
+        radius: root.iris ? Math.round(14 * IrisStyle.density) : Appearance.rounding.small
+        color: root.iris
+            ? (card._selected ? ColorUtils.applyAlpha(IrisStyle.accent, 0.16)
+                : card._enabled ? ColorUtils.applyAlpha(IrisStyle.text, 0.055)
+                : ColorUtils.applyAlpha(IrisStyle.text, 0.025))
+            : card._selected ? ColorUtils.applyAlpha(root.accentInk, 0.12) : card._enabled
+                ? ColorUtils.applyAlpha(root.accentInk, 0.04)
+                : ColorUtils.applyAlpha(root.ink, 0.02)
         border {
-            width: card._selected ? 2 : card._enabled ? 1 : 0
-            color: ColorUtils.applyAlpha(Appearance.colors.colPrimary, card._selected ? 0.55 : 0.10)
+            width: root.iris ? 0 : card._selected ? 2 : card._enabled ? 1 : 0
+            color: ColorUtils.applyAlpha(root.accentInk, card._selected ? 0.55 : 0.10)
         }
 
         Behavior on color {
@@ -877,14 +977,17 @@ Item {
                     spacing: 10
 
                     Rectangle {
-                        width: 52; height: 38
-                        radius: Appearance.regaliaEverywhere ? Appearance.regalia.controlRadius
+                        width: root.iris ? 40 : 52
+                        height: root.iris ? 40 : 38
+                        radius: root.iris ? Math.round(width * 0.26)
+                            : Appearance.regaliaEverywhere ? Appearance.regalia.controlRadius
                             : Appearance.zzzEverywhere ? Appearance.zzz.controlRadius
                             : Appearance.editorialEverywhere ? Appearance.rounding.verysmall
                             : Appearance.rounding.small
-                        color: card._enabled
-                            ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.08)
-                            : ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.035)
+                        color: root.iris
+                            ? (card._enabled ? ColorUtils.applyAlpha(IrisStyle.accent, 0.18) : IrisStyle.surfaceHighest)
+                            : card._enabled ? ColorUtils.applyAlpha(root.accentInk, 0.08)
+                                : ColorUtils.applyAlpha(root.ink, 0.035)
                         anchors.verticalCenter: parent.verticalCenter
 
                         StyledText {
@@ -894,15 +997,15 @@ Item {
                             font.family: Appearance.font.family.numbers
                             font.pixelSize: Appearance.font.pixelSize.smaller
                             font.weight: Font.DemiBold
-                            color: card._enabled ? Appearance.colors.colPrimary
-                                : ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.42)
+                            color: card._enabled ? root.accentInk
+                                : ColorUtils.applyAlpha(root.ink, 0.42)
                         }
                         MaterialSymbol {
                             anchors.centerIn: parent
                             visible: card.widgetKey !== "clock"
                             text: card.widgetIcon
                             iconSize: 20
-                            color: card._enabled ? Appearance.colors.colPrimary : ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.4)
+                            color: card._enabled ? root.accentInk : ColorUtils.applyAlpha(root.ink, 0.4)
                         }
                     }
 
@@ -916,7 +1019,7 @@ Item {
                             text: card.widgetLabel
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
-                            color: card._enabled ? Appearance.colors.colOnLayer1 : ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.68)
+                            color: card._enabled ? root.ink : ColorUtils.applyAlpha(root.ink, 0.68)
                             font.pixelSize: Appearance.font.pixelSize.small
                             font.weight: Font.Medium
                         }
@@ -928,13 +1031,13 @@ Item {
                                 visible: card._locked
                                 text: "lock"
                                 iconSize: 10
-                                color: Appearance.colors.colError
+                                color: root.dangerInk
                                 anchors.verticalCenter: parent.verticalCenter
                             }
                             StyledText {
                                 visible: card._locked
                                 text: Translation.tr("Locked")
-                                color: ColorUtils.applyAlpha(Appearance.colors.colError, 0.7)
+                                color: ColorUtils.applyAlpha(root.dangerInk, 0.7)
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                             }
                             StyledText {
@@ -943,7 +1046,7 @@ Item {
                                 text: Math.round(card._scale) + "% · " + Translation.tr("Opacity") + " "
                                     + Math.round(DesktopWidgetLayout.value(root.outputName, card._layoutKey,
                                         "widgetOpacity", Config.getNestedValue(card._cfgPrefix + ".widgetOpacity", 100))) + "%"
-                                color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.58)
+                                color: ColorUtils.applyAlpha(root.ink, 0.58)
                                 font.pixelSize: Appearance.font.pixelSize.smaller
                                 font.family: Appearance.font.family.numbers
                                 elide: Text.ElideRight
@@ -1065,18 +1168,18 @@ Item {
                     spacing: 8
 
                     // Divider
-                    Rectangle { width: parent.width; height: 1; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.06) }
+                    Rectangle { width: parent.width; height: 1; color: ColorUtils.applyAlpha(root.ink, 0.06) }
 
                     // Scale slider
                     RowLayout {
                         width: parent.width
                         spacing: 8
 
-                        MaterialSymbol { text: "zoom_in"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "zoom_in"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             text: Translation.tr("Scale")
                             Layout.preferredWidth: 80
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSlider {
@@ -1097,11 +1200,11 @@ Item {
                         width: parent.width
                         spacing: 8
 
-                        MaterialSymbol { text: "opacity"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "opacity"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             text: Translation.tr("Opacity")
                             Layout.preferredWidth: 80
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSlider {
@@ -1120,11 +1223,11 @@ Item {
                         width: parent.width
                         spacing: 8
 
-                        MaterialSymbol { text: "contrast"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "contrast"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             text: Translation.tr("Dimming")
                             Layout.preferredWidth: 80
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSlider {
@@ -1139,7 +1242,7 @@ Item {
                     }
 
                     // Divider before appearance toggles
-                    Rectangle { visible: card._supportsAppearance; width: parent.width; height: 1; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.06) }
+                    Rectangle { visible: card._supportsAppearance; width: parent.width; height: 1; color: ColorUtils.applyAlpha(root.ink, 0.06) }
 
                     // Background toggle (per-widget granularity — some users want a flat
                     // resources widget but a frosted-glass clock, etc.)
@@ -1147,11 +1250,11 @@ Item {
                         visible: card._supportsAppearance
                         width: parent.width
                         spacing: 8
-                        MaterialSymbol { text: "format_color_fill"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "format_color_fill"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             Layout.fillWidth: true
                             text: Translation.tr("Background")
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSwitch {
@@ -1170,11 +1273,11 @@ Item {
                         spacing: 8
                         visible: card._supportsAppearance && root._widgetBlurAvailable
                             && Config.getNestedValue(card._cfgPrefix + ".showBackground", true)
-                        MaterialSymbol { text: "blur_on"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "blur_on"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             Layout.fillWidth: true
                             text: Translation.tr("Blur background")
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSwitch {
@@ -1191,11 +1294,11 @@ Item {
                         width: parent.width
                         spacing: 8
                         visible: card._supportsAppearance && Config.getNestedValue(card._cfgPrefix + ".showBackground", true)
-                        MaterialSymbol { text: "opacity"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "opacity"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             text: Translation.tr("Background")
                             Layout.preferredWidth: 80
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSlider {
@@ -1218,11 +1321,11 @@ Item {
                         visible: card._supportsAppearance
                         width: parent.width
                         spacing: 8
-                        MaterialSymbol { text: "border_style"; iconSize: 16; color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.5) }
+                        MaterialSymbol { text: "border_style"; iconSize: 16; color: ColorUtils.applyAlpha(root.ink, 0.5) }
                         StyledText {
                             Layout.fillWidth: true
                             text: Translation.tr("Border")
-                            color: ColorUtils.applyAlpha(Appearance.colors.colOnLayer1, 0.7)
+                            color: ColorUtils.applyAlpha(root.ink, 0.7)
                             font.pixelSize: Appearance.font.pixelSize.smaller
                         }
                         StyledSwitch {

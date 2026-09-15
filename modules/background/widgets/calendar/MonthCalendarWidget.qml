@@ -215,7 +215,7 @@ AbstractBackgroundWidget {
                     text: String(root.viewingDate.getFullYear())
                     color: root.inkMuted
                     font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                 }
             }
 
@@ -274,7 +274,7 @@ AbstractBackgroundWidget {
                     color: root.inkMuted
                     font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
                     font.weight: Font.DemiBold
-                    font.capitalization: root.instrument ? Font.AllUppercase : Font.MixedCase
+                    font.capitalization: root.instrument && !root.widgetIris ? Font.AllUppercase : Font.MixedCase
                     font.letterSpacing: root.instrument
                         ? Math.round(1.4 * root.scaleFactor) : 0
                 }
@@ -318,7 +318,7 @@ AbstractBackgroundWidget {
                             opacity: dayCell.modelData.currentMonth ? 1 : 0.32
                             font.pixelSize: Math.round(Appearance.font.pixelSize.small * root.scaleFactor)
                             font.weight: dayCell.modelData.isToday ? Font.Bold : Font.Normal
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                         }
                     }
                 }

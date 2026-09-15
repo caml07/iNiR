@@ -280,7 +280,7 @@ AbstractBackgroundWidget {
             visible: root.instrument
             text: String(textEdit.text.length).padStart(3, "0")
             color: root.widgetAccentVisible
-            font.family: Appearance.font.family.numbers
+            font.family: root.widgetNumbersFamily
             font.pixelSize: Appearance.font.pixelSize.smaller * root.scaleFactor
             font.weight: Font.DemiBold
         }
@@ -333,7 +333,7 @@ AbstractBackgroundWidget {
 
             font.pixelSize: root.fontSize
             font.family: root.fontFamily === "mono"
-                ? Appearance.font.family.monospace : Appearance.font.family.main
+                ? Appearance.font.family.monospace : root.widgetBodyFamily
             font.weight: root.instrument ? Font.Medium : Font.Normal
 
             horizontalAlignment: root.textAlign === "center"

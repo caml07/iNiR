@@ -112,7 +112,7 @@ AbstractBackgroundWidget {
                 elide: Text.ElideRight
                 wrapMode: Text.NoWrap
                 font {
-                    family: Appearance.font.family.numbers
+                    family: root.widgetNumbersFamily
                     pixelSize: Math.round(Appearance.font.pixelSize.large * root.scaleFactor)
                     weight: Font.DemiBold
                 }
@@ -153,7 +153,7 @@ AbstractBackgroundWidget {
                         Layout.fillWidth: true
                         text: Translation.tr("System uptime")
                         color: root.widgetInkMuted
-                        font.family: Appearance.font.family.main
+                        font.family: root.widgetBodyFamily
                         font.pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         font.weight: root.widgetLabelWeight
                         font.letterSpacing: root.widgetMetadataTracking
@@ -169,7 +169,7 @@ AbstractBackgroundWidget {
                     elide: Text.ElideRight
                     fontSizeMode: Text.Fit
                     minimumPixelSize: Math.max(20, Math.round(20 * root.scaleFactor))
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.round(42 * root.scaleFactor)
                     font.weight: root.widgetEditorial ? Appearance.editorial.titleWeight : Font.Bold
                     font.features: ({ "tnum": 1 })
@@ -197,7 +197,7 @@ AbstractBackgroundWidget {
                     visible: root.showBreakdown
                     text: Translation.tr("Day") + " " + root.sessionDay
                     color: root.widgetAccent3Visible
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.max(15, Math.round(18 * root.scaleFactor))
                     font.weight: Font.Bold
                     font.features: ({ "tnum": 1 })
@@ -208,7 +208,7 @@ AbstractBackgroundWidget {
                     text: Translation.tr("Since") + " " + root.bootLabel
                     color: root.widgetInkMuted
                     elide: Text.ElideRight
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: Math.max(10, Math.round(11 * root.scaleFactor))
                     font.weight: Font.Medium
                     font.letterSpacing: root.widgetMetadataTracking

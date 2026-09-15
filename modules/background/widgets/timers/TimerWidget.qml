@@ -215,13 +215,13 @@ AbstractBackgroundWidget {
                     Layout.fillWidth: true
                     text: timerCard.label
                     color: timerCard.mutedInk
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: timerCard.instrumentMode
                         ? Math.max(10, Math.round(11 * root.scaleFactor))
                         : Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
                     font.weight: root.widgetLabelWeight
                     font.letterSpacing: timerCard.instrumentMode ? root.widgetMetadataTracking : 0
-                    font.capitalization: timerCard.instrumentMode ? Font.AllUppercase : Font.MixedCase
+                    font.capitalization: timerCard.instrumentMode ? root.widgetCapitalization : Font.MixedCase
                     elide: Text.ElideRight
                 }
 
@@ -229,7 +229,7 @@ AbstractBackgroundWidget {
                     visible: timerCard.instrumentMode && root.showState && timerCard.paused
                     text: Translation.tr("Paused")
                     color: timerCard.signal
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor))
                     font.weight: Font.DemiBold
                     font.letterSpacing: root.widgetMetadataTracking
@@ -273,7 +273,7 @@ AbstractBackgroundWidget {
                 font.weight: timerCard.instrumentMode
                     ? (root.widgetEditorial ? Appearance.editorial.titleWeight : Font.Bold)
                     : Font.Bold
-                font.family: Appearance.font.family.numbers
+                font.family: root.widgetNumbersFamily
                 font.features: ({ "tnum": 1 })
                 font.letterSpacing: timerCard.instrumentMode ? -0.45 : 0
             }
@@ -459,7 +459,7 @@ AbstractBackgroundWidget {
                             anchors.centerIn: parent
                             text: "+" + modelData + "m"
                             color: root.instrument ? root.widgetInkMuted : root.primaryInk
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: Math.max(10, Math.round(11 * root.scaleFactor))
                             font.weight: root.instrument || root.widgetEditorial
                                 ? root.widgetLabelWeight : Font.DemiBold

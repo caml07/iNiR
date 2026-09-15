@@ -122,7 +122,7 @@ AbstractBackgroundWidget {
                     minimumPixelSize: 12
                     color: root.ink
                     font {
-                        family: Appearance.font.family.numbers
+                        family: root.widgetNumbersFamily
                         pixelSize: Math.round(ringArea.size * 0.205 * root.textScale)
                         weight: Font.DemiBold
                     }
@@ -139,7 +139,7 @@ AbstractBackgroundWidget {
                         text: Math.round(root.dayFraction * 100) + "%"
                         color: root.accentSoft
                         font {
-                            family: Appearance.font.family.numbers
+                            family: root.widgetNumbersFamily
                             pixelSize: Math.round(ringArea.size * 0.075 * root.textScale)
                             weight: Font.DemiBold
                             letterSpacing: 0.4
@@ -150,7 +150,7 @@ AbstractBackgroundWidget {
                         text: Translation.tr("of the day")
                         color: root.inkMuted
                         font {
-                            family: Appearance.font.family.main
+                            family: root.widgetBodyFamily
                             pixelSize: Math.round(ringArea.size * 0.062 * root.textScale)
                             weight: Font.DemiBold
                             letterSpacing: Math.round(1.2 * root.scaleFactor)
@@ -167,7 +167,7 @@ AbstractBackgroundWidget {
             text: DateTime.date
             color: root.inkMuted
             font {
-                family: Appearance.font.family.numbers
+                family: root.widgetNumbersFamily
                 pixelSize: Math.round(13 * root.scaleFactor * root.textScale)
                 weight: Font.Medium
                 letterSpacing: 0.6
@@ -254,7 +254,7 @@ AbstractBackgroundWidget {
                     text: Math.round(textSizeSlider.value) + "%"
                     color: root.inkMuted
                     font {
-                        family: Appearance.font.family.numbers
+                        family: root.widgetNumbersFamily
                         pixelSize: Appearance.font.pixelSize.smaller
                         weight: Font.DemiBold
                     }

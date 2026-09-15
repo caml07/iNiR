@@ -250,7 +250,7 @@ AbstractBackgroundWidget {
                         font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
                         font.letterSpacing: root.instrument
                             ? Math.round(1.2 * root.scaleFactor) : 0
-                        font.capitalization: root.instrument ? Font.AllUppercase : Font.MixedCase
+                        font.capitalization: root.instrument && !root.widgetIris ? Font.AllUppercase : Font.MixedCase
                     }
                 }
 

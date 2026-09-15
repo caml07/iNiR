@@ -103,7 +103,7 @@ AbstractBackgroundWidget {
         verticalAlignment: Text.AlignVCenter
         color: root.horizontal ? root.widgetSemanticOnContainer(root.widgetPrimaryRole)
             : root.widgetAccentVisible
-        font.family: Appearance.font.family.numbers
+        font.family: root.widgetNumbersFamily
         font.pixelSize: Math.min(height, 80 * root.scaleFactor)
         font.weight: root.widgetTitleWeight
         fontSizeMode: Text.Fit
@@ -202,7 +202,7 @@ AbstractBackgroundWidget {
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     color: root.widgetInk
-                    font.family: Appearance.font.family.numbers
+                    font.family: root.widgetNumbersFamily
                     font.pixelSize: Math.round(parent.height * 0.7)
                     font.weight: Font.Bold
                     font.features: ({ "tnum": 1 })
@@ -219,14 +219,14 @@ AbstractBackgroundWidget {
                 StyledText {
                     Layout.fillWidth: true
                     visible: root.showWeekday
-                    text: Qt.locale().toString(root.today, "dddd").toUpperCase()
+                    text: root.widgetCase(Qt.locale().toString(root.today, "dddd"))
                     elide: Text.ElideRight
                     color: root.widgetAccentVisible
                     font {
-                        family: Appearance.font.family.main
+                        family: root.widgetBodyFamily
                         pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         weight: Font.DemiBold
-                        letterSpacing: Math.round(1.5 * root.scaleFactor)
+                        letterSpacing: root.widgetIris ? 0 : Math.round(1.5 * root.scaleFactor)
                         capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     }
                 }
@@ -235,7 +235,7 @@ AbstractBackgroundWidget {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     verticalAlignment: Text.AlignVCenter
-                    text: Qt.locale().toString(root.today, "MMMM").toUpperCase()
+                    text: root.widgetCase(Qt.locale().toString(root.today, "MMMM"))
                     elide: Text.ElideRight
                     color: root.widgetInk
                     fontSizeMode: Text.Fit
@@ -256,7 +256,7 @@ AbstractBackgroundWidget {
                         visible: root.showYear
                         text: String(root.today.getFullYear())
                         color: root.widgetInkMuted
-                        font.family: Appearance.font.family.numbers
+                        font.family: root.widgetNumbersFamily
                         font.pixelSize: Math.round(11 * root.scaleFactor)
                         font.weight: Font.DemiBold
                     }
@@ -268,10 +268,10 @@ AbstractBackgroundWidget {
                         text: Translation.tr("Day") + " " + root.dayOfYear + " / " + root.daysInYear
                         color: root.widgetInkMuted
                         font {
-                            family: Appearance.font.family.main
+                            family: root.widgetBodyFamily
                             pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
                             weight: Font.DemiBold
-                            letterSpacing: Math.round(1.0 * root.scaleFactor)
+                            letterSpacing: root.widgetIris ? 0 : Math.round(1.0 * root.scaleFactor)
                             capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                         }
                     }

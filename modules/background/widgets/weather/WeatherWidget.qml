@@ -545,14 +545,14 @@ AbstractBackgroundWidget {
                 StyledText {
                     Layout.fillWidth: true
                     visible: root.showLocation && Weather.showVisibleCity
-                    text: String(Weather.visibleCity || "").toUpperCase()
+                    text: root.widgetCase(String(Weather.visibleCity || ""))
                     elide: Text.ElideRight
                     color: root.widgetInkMuted
                     font {
-                        family: Appearance.font.family.main
+                        family: root.widgetBodyFamily
                         pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
                         weight: Font.DemiBold
-                        letterSpacing: Math.round(1.4 * root.scaleFactor)
+                        letterSpacing: root.widgetIris ? 0 : Math.round(1.4 * root.scaleFactor)
                         capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
                     }
                 }
@@ -569,7 +569,7 @@ AbstractBackgroundWidget {
                         visible: root.showTemp
                         text: root.temperatureText
                         color: root.widgetInk
-                        font.family: Appearance.font.family.numbers
+                        font.family: root.widgetNumbersFamily
                         font.pixelSize: Math.round(instrumentArea.side * 0.31)
                         font.weight: Font.Bold
                         font.features: ({ "tnum": 1 })
@@ -591,11 +591,11 @@ AbstractBackgroundWidget {
                     text: Weather.data?.description ?? ""
                     elide: Text.ElideRight
                     color: root.widgetInkMuted
-                    font.family: Appearance.font.family.main
+                    font.family: root.widgetBodyFamily
                     font.pixelSize: Math.max(10, Math.round(instrumentArea.side * 0.055))
                     font.weight: Font.DemiBold
                     font.capitalization: root.widgetIris ? Font.MixedCase : Font.AllUppercase
-                    font.letterSpacing: Math.round(1.1 * root.scaleFactor)
+                    font.letterSpacing: root.widgetIris ? 0 : Math.round(1.1 * root.scaleFactor)
                 }
             }
 
@@ -663,16 +663,16 @@ AbstractBackgroundWidget {
                         Layout.fillWidth: true
                         spacing: 0
                         StyledText {
-                            text: Translation.tr("Rise").toUpperCase()
+                            text: root.widgetCase(Translation.tr("Rise"))
                             color: root.widgetInkMuted
                             font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                             font.weight: Font.DemiBold
-                            font.letterSpacing: Math.round(1.1 * root.scaleFactor)
+                            font.letterSpacing: root.widgetIris ? 0 : Math.round(1.1 * root.scaleFactor)
                         }
                         StyledText {
                             text: Weather.data?.sunrise ?? ""
                             color: root.widgetInk
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: Math.round(10 * root.scaleFactor)
                             font.weight: Font.DemiBold
                         }
@@ -683,17 +683,17 @@ AbstractBackgroundWidget {
                         spacing: 0
                         StyledText {
                             Layout.alignment: Qt.AlignRight
-                            text: Translation.tr("Set").toUpperCase()
+                            text: root.widgetCase(Translation.tr("Set"))
                             color: root.widgetInkMuted
                             font.pixelSize: Math.max(10, Math.round(10 * root.scaleFactor))
                             font.weight: Font.DemiBold
-                            font.letterSpacing: Math.round(1.1 * root.scaleFactor)
+                            font.letterSpacing: root.widgetIris ? 0 : Math.round(1.1 * root.scaleFactor)
                         }
                         StyledText {
                             Layout.alignment: Qt.AlignRight
                             text: Weather.data?.sunset ?? ""
                             color: root.widgetInk
-                            font.family: Appearance.font.family.numbers
+                            font.family: root.widgetNumbersFamily
                             font.pixelSize: Math.round(10 * root.scaleFactor)
                             font.weight: Font.DemiBold
                         }

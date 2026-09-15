@@ -726,6 +726,9 @@ iRiS bar and Island design. Available while the iRiS bar is enabled.
 | `close` | Collapse the island |
 | `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools` |
 | `toggle` | Expand or collapse the island on the focused output |
+| `card` | `open`, `close` or `toggle` the media bubble's floating card, or `pin` to keep it open |
+| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system` |
+| `bubble` | Place an Island bubble (`left`, `right`, `utility`) or an extra bubble (`weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media`, `tray`): a zone (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`), `x,y` fractions of the output, `island` (slots) or `off` (extras) |
 | `dock` | `reveal`, `hide` or `toggle` the iRiS Dock (revealed stays until hidden or an app is chosen) |
 | `pin` | Keep the `left` (Focus) or `right` (Today) panel open beside windows, or stop |
 | `accent` | Set iRiS accent: `blue`, `mint`, `rose`, `lilac` or `wallpaper` |
@@ -737,6 +740,8 @@ inir iris open
 inir iris page desktop
 inir iris toggle
 inir iris dock toggle
+inir iris card toggle
+inir iris bubble right top-right
 inir iris pin right
 inir iris status
 inir iris close

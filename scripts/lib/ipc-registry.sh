@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 3cddc6ff4fcb4a4f
+# IPC.md hash: 2feb5c64f68fe8ae
 # Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
@@ -158,7 +158,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [equalizer]="toggle close open refresh ensure status setBand preset configure"
   [gamemode]="toggle activate deactivate status"
   [globalActions]="run runWithArgs list search open"
-  [iris]="open page close toggle dock pin accent utility status"
+  [iris]="open page close toggle card settings bubble dock pin accent utility status"
   [keyboard]="switchLayout switchLayoutPrevious getCurrentLayout getLayouts"
   [lock]="activate prepareSleep deactivate status focus"
   [mascot]="poke status setVoice romp chase hideSeek tidy appear appearContextual appearWithLine hide snooze"
@@ -306,6 +306,9 @@ declare -gA IPC_FUNCTION_DESC=(
   ["iris:page"]="Expand the island on a page: \`media\`, \`activity\`, \`desktop\`, \`tray\` or \`tools\`"
   ["iris:close"]="Collapse the island"
   ["iris:toggle"]="Expand or collapse the island on the focused output"
+  ["iris:card"]="\`open\`, \`close\` or \`toggle\` the media bubble's floating card, or \`pin\` to keep it open"
+  ["iris:settings"]="Open iRiS Settings on a section: \`bar\`, \`player\`, \`bubbles\`, \`dock\`, \`appearance\`, \`desktop\`, \`sidebars\`, \`surfaces\` or \`system\`"
+  ["iris:bubble"]="Place an Island bubble (\`left\`, \`right\`, \`utility\`) or an extra bubble (\`weather\`, \`notifications\`, \`controls\`, \`sound\`, \`mic\`, \`tools\`, \`media\`, \`tray\`): a zone (\`top-left\`, \`top-right\`, \`left\`, \`right\`, \`bottom-left\`, \`bottom-right\`), \`x,y\` fractions of the output, \`island\` (slots) or \`off\` (extras)"
   ["iris:dock"]="\`reveal\`, \`hide\` or \`toggle\` the iRiS Dock (revealed stays until hidden or an app is chosen)"
   ["iris:pin"]="Keep the \`left\` (Focus) or \`right\` (Today) panel open beside windows, or stop"
   ["iris:accent"]="Set iRiS accent: \`blue\`, \`mint\`, \`rose\`, \`lilac\` or \`wallpaper\`"
@@ -538,6 +541,9 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["globalActions:list"]="<category>"
   ["globalActions:search"]="<query>"
   ["iris:page"]="<name>"
+  ["iris:card"]="<action>"
+  ["iris:settings"]="<section>"
+  ["iris:bubble"]="<slot> <place>"
   ["iris:dock"]="<action>"
   ["iris:pin"]="<side>"
   ["iris:accent"]="<name>"

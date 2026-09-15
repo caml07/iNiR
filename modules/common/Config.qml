@@ -3894,6 +3894,8 @@ Singleton {
                 property JsonObject wallpaper: JsonObject {
                     property int thumbnailSize: 228
                     property int width: 960
+                    // The highlighted wallpaper shows on the desktop while browsing.
+                    property bool livePreview: true
                 }
                 property JsonObject player: JsonObject {
                     property bool roundCover: true

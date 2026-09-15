@@ -433,20 +433,30 @@ bubble or Unified secondary activity) and `utility` — can be carried off it.
 ### Wallpaper picker (`wallpaper/IrisWallpaperPicker.qml`)
 
 Replaces the shared grid selector's presentation under iRiS (`GlobalStates.wallpaperSelectorOpen`;
-the carousel launcher and coverflow stay shared). Morphs out of the Island into a centred black
-gallery (`30·d`): title with the folder count in orange, the folder path muted, a search capsule,
-parent-folder and shuffle discs; a 16:10 thumbnail grid (`13·d` tiles inside a concentric accent
-selection ring), folders as tiles, the name melting in over the selected tile and a *Current*
-accent badge on the applied wallpaper. Below a hairline, one selection row: a 16:10 preview
-concentric with the surface corner, the name, the target output (or preview progress) and the keys
-as keycaps, and the only accent button in the gallery (Apply; a folder gets a quiet Open). Browsing, thumbnails and applying are the shared
-`Wallpapers` service with the shared selector's apply semantics (target, monitor, selector state
-reset). A click selects without changing the wallpaper; double-click, Enter or Apply applies. Gallery width and preview size are configurable.
-Horizontal arrows edit nonempty search text; Up/Down and horizontal arrows navigate the grid.
-Tab/Shift+Tab switch between the local Library and Wallhaven without moving the gallery selection.
-Keys: arrows move, Tab switches source, Enter applies or enters a folder, Backspace on an empty search goes
-up, Escape clears then closes. The Island's Desktop hero has a wallpaper disc that opens it for
-that output.
+the carousel launcher and coverflow stay shared). Morphs out of the Island and hangs under it as a
+compact black strip (`28·d`), sized by `iris.wallpaper.width` and `thumbnailSize`:
+
+- **Where:** back and forward (`FolderListModelWithHistory`, also Alt+←/→, Alt+↑ and Backspace on an
+  empty search go up) and the path as breadcrumbs — quiet places under Home, the current folder in a
+  capsule with its wallpaper count in orange — each a way back; a wallpaper-frame disc returns to the
+  wallpapers folder when elsewhere. Wallhaven replaces the path with its title and discovery chips.
+- **Search** capsule ("Search in <folder>"), the live-preview eye and shuffle (a random wallpaper
+  from this folder).
+- **Subfolders** as one row of folder chips above the gallery, apart from the wallpapers (the gallery
+  is a `ScriptModel` of files keyed by path; the folder model is read once per settle).
+- **Gallery:** two rows scrolling sideways, 16:10 tiles inside a concentric accent selection ring,
+  the name melting in on hover/selection, a check badge on the applied wallpaper. The empty state
+  says why (no matches, nothing here, or wallpapers living in the folders above).
+- **Selection line:** name and a hint (applying, previewing, previews being prepared, or the online
+  resolution), the target display as a quiet chip, Esc keycap and the only accent button, Apply.
+- **Live preview** (`iris.wallpaper.livePreview`): once the selection is moved, the highlighted
+  wallpaper shows on the desktop through `Wallpapers.previewWallpaper`; closing without applying
+  cancels it, applying adopts it — the shared launcher's rules.
+
+Browsing, thumbnails and applying are the shared `Wallpapers` service; Wallhaven results download into
+the wallpapers folder before applying the same way. A click selects, double-click or Enter applies;
+Tab/Shift+Tab switch between Library and Wallhaven; Escape clears the search, then closes. The
+Island's Desktop hero has a wallpaper disc that opens it for that output.
 
 ### Control Center (`control/IrisQuickPanel.qml`)
 
@@ -689,7 +699,7 @@ iris.bar.position, composition, notch, height, margin, reserveSpace, events, scr
          desktopProfile, screenList, left/center/rightModules (custom modules only)
 iris.dock.enable, autoHide, revealOnEmpty, notch, blur, iconSize, magnification, badges, launcher
 iris.tray.hidePassive, labels, columns
-iris.wallpaper.width, thumbnailSize
+iris.wallpaper.width, thumbnailSize, livePreview
 iris.player.roundCover, artworkBackground, bubbleOpens, cardPinned
 iris.sidebars.left|right.enable, width, height, alignment, pinned, notch, hoverReveal, sections, expanded
 iris.widgets.radius, opacity, tint, material, weight

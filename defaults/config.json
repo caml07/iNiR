@@ -2399,7 +2399,8 @@
         },
         "wallpaper": {
             "thumbnailSize": 228,
-            "width": 960
+            "width": 960,
+            "livePreview": true
         },
         "player": {
             "roundCover": true,

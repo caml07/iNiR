@@ -223,6 +223,8 @@ Singleton {
                     property bool paused: false
                     property int start: 0
                     property int duration: 60
+                    // Minutes on the iRiS Timers dials, adjusted in place.
+                    property list<int> presets: [5, 15, 30]
                 }
             }
 

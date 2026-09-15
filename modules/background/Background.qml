@@ -565,6 +565,8 @@ Scope {
         // A desktop menu is a grabbing popup of this surface: its parent's keyboard
         // mode never changes while one is open.
         readonly property bool _menuOpen: irisDesktopMenu.active || desktopContextMenu.active || desktopItemContextMenu.active
+        // Once a desktop menu has closed, the keyboard its right-click took goes back too.
+        on_MenuOpenChanged: if (!bgRoot._menuOpen) Qt.callLater(bgRoot.releaseKeyboard)
         readonly property bool _needsKeyboardFocus: GlobalStates.deferredPanelsReady
             && (bgRoot._menuOpen || !bgRoot._keyboardReleased)
             && (GlobalStates.widgetEditMode
@@ -1682,6 +1684,10 @@ Scope {
                 onClicked: function(mouse) {
                     if (mouse.button === Qt.LeftButton) {
                         desktopFocusSink.forceActiveFocus()
+                        // A click on the bare desktop is not typing: Niri gave this
+                        // OnDemand surface the keyboard for it, so hand it straight
+                        // back to the window that had it.
+                        bgRoot.releaseKeyboard()
                         GlobalStates.clearDesktopItemSelection()
                         if (desktopContextMenu.active) desktopContextMenu.close()
                         if (desktopItemContextMenu.active) desktopItemContextMenu.close()

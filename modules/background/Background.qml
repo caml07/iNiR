@@ -38,6 +38,7 @@ import qs.modules.background.widgets.mascot
 import qs.modules.background.widgets.japaneseTypography
 import qs.modules.background.desktopItems
 import qs.modules.iris.components
+import qs.modules.iris.style
 import "root:modules/common/functions/parallax.js" as ParallaxMath
 import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 

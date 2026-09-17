@@ -572,7 +572,9 @@ WSettingsPage {
         WSettingsDropdown {
             label: Translation.tr("Style")
             icon: "eyedropper"
-            description: Translation.tr("Choose the visual language used across the shell")
+            description: globalStyleCard.currentStyle === "editorial"
+                ? Translation.tr("Choose the visual language used across the shell. Editorial composition is refined in ii Settings → Themes → Style.")
+                : Translation.tr("Choose the visual language used across the shell")
             currentValue: globalStyleCard.currentStyle
             options: [
                 {
@@ -606,6 +608,10 @@ WSettingsPage {
                 {
                     value: "cookie",
                     displayName: Translation.tr("Cookie Shapes")
+                },
+                {
+                    value: "editorial",
+                    displayName: Translation.tr("Editorial")
                 }
             ]
             onSelected: newValue => {
@@ -713,8 +719,11 @@ WSettingsPage {
             label: Translation.tr("Use Material colors")
             icon: "dark-theme"
             description: Translation.tr("Apply Material color scheme instead of Windows 11 grey")
-            checked: Config.options?.waffles?.theming?.useMaterialColors ?? false
-            onCheckedChanged: Config.setNestedValue("waffles.theming.useMaterialColors", checked)
+            enabled: !Appearance.editorialEverywhere
+            checked: Appearance.editorialEverywhere || (Config.options?.waffles?.theming?.useMaterialColors ?? false)
+            onCheckedChanged: {
+                if (!Appearance.editorialEverywhere) Config.setNestedValue("waffles.theming.useMaterialColors", checked)
+            }
         }
 
         WSettingsSlider {

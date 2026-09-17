@@ -30,19 +30,24 @@ Rectangle {
          : Appearance.angelEverywhere ? Appearance.angel.colGlassCard
          : Appearance.inirEverywhere ? Appearance.inir.colLayer1
          : Appearance.auroraEverywhere ? "transparent"
+         : Appearance.editorialEverywhere && Appearance.editorial.sidebarFullGlass ? Appearance.editorial.glassPaper
          : Appearance.colors.colLayer1
     Behavior on color {
         enabled: Appearance.animationsEnabled
         ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
     }
-    border.width: Appearance.zzzEverywhere ? 0 : (Appearance.angelEverywhere ? 0 : (Appearance.inirEverywhere ? 1 : 0))
+    border.width: Appearance.zzzEverywhere ? 0 : (Appearance.angelEverywhere ? 0
+        : (Appearance.inirEverywhere ? 1
+            : Appearance.editorialEverywhere && Appearance.editorial.sidebarFullGlass ? 1 : 0))
     Behavior on border.width {
         enabled: Appearance.animationsEnabled
         NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
     }
     border.color: Appearance.zzzEverywhere ? "transparent"
         : Appearance.angelEverywhere ? "transparent"
-        : Appearance.inirEverywhere ? Appearance.inir.colBorder : "transparent"
+        : Appearance.inirEverywhere ? Appearance.inir.colBorder
+        : Appearance.editorialEverywhere && Appearance.editorial.sidebarFullGlass
+            ? Qt.alpha(Appearance.editorial.edge, 0.28) : "transparent"
     Behavior on border.color {
         enabled: Appearance.animationsEnabled
         ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
@@ -191,8 +196,10 @@ Rectangle {
     }
 
     // The thing when collapsed
-    RowLayout {
+    Item {
         id: collapsedBottomWidgetGroupRow
+        anchors.fill: parent
+        implicitHeight: Math.max(collapsedExpandButton.implicitHeight + 20, collapsedSummary.implicitHeight + 20)
         opacity: collapsed ? 1 : 0
         visible: opacity > 0
         Behavior on opacity {
@@ -205,13 +212,11 @@ Rectangle {
             }
         }
 
-        spacing: 15
-
         CalendarHeaderButton {
-            Layout.topMargin: 10
-            Layout.bottomMargin: 10
-            Layout.leftMargin: 25
-            Layout.rightMargin: 0
+            id: collapsedExpandButton
+            anchors.left: parent.left
+            anchors.leftMargin: 25
+            anchors.verticalCenter: parent.verticalCenter
             forceCircle: true
             downAction: () => {
                 root.setCollapsed(false)
@@ -231,9 +236,10 @@ Rectangle {
         }
 
         StyledText {
+            id: collapsedSummary
             property int remainingTasks: Todo.list.filter(task => !task.done).length;
-            Layout.margins: 10
-            Layout.leftMargin: 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
             text: Translation.tr("%1   •   %2 tasks").arg(DateTime.collapsedCalendarFormat).arg(remainingTasks)
             font.pixelSize: Appearance.font.pixelSize.large
             font.family: Appearance.zzzEverywhere ? Appearance.font.family.numbers : Appearance.font.family.main
@@ -270,7 +276,7 @@ Rectangle {
             Layout.fillWidth: false
             Layout.leftMargin: 10
             Layout.topMargin: 10
-            width: tabBar.implicitWidth + 5
+            implicitWidth: tabBar.implicitWidth + 5
 
             // Collapse button (Fixed at top)
             CalendarHeaderButton {

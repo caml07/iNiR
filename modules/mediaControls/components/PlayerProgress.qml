@@ -42,35 +42,35 @@ Item {
         NumberAnimation { duration: 250; easing.type: Easing.Linear }
     }
 
-    // Seekable slider
-    Loader {
+    // Keep the same visual primitive alive while providers briefly toggle
+    // canSeek during a track change. Swapping Slider/ProgressBar changes the
+    // track thickness and endpoint geometry for a frame.
+    StyledSlider {
+        id: progressSlider
         anchors.fill: parent
-        active: root.canSeek
-        sourceComponent: StyledSlider {
-            configuration: root.enableWavy ? StyledSlider.Configuration.Wavy : StyledSlider.Configuration.S
-            trackWidth: root.enableWavy ? 2 : StyledSlider.Configuration.S
-            handleHeight: Math.min(14, root.height)
-            wavy: root.enableWavy && root.isPlaying
-            animateWave: root.waveAnimationActive
-            highlightColor: root.highlightColor
-            trackColor: root.trackColor
-            handleColor: root.highlightColor
-            value: root.displayedProgress
-            onMoved: root.seekRequested(value * root.length)
-            scrollable: root.scrollable
+        configuration: root.enableWavy ? StyledSlider.Configuration.Wavy : StyledSlider.Configuration.S
+        trackWidth: root.enableWavy ? 2 : StyledSlider.Configuration.S
+        handleHeight: Math.min(14, root.height)
+        stopIndicatorValues: []
+        wavy: root.enableWavy && root.isPlaying
+        animateWave: root.waveAnimationActive
+        highlightColor: root.highlightColor
+        trackColor: root.trackColor
+        handleColor: root.highlightColor
+        value: root.displayedProgress
+        onMoved: {
+            if (root.canSeek)
+                root.seekRequested(value * root.length)
         }
+        scrollable: root.canSeek && root.scrollable
     }
-    
-    // Non-seekable progress bar
-    Loader {
+
+    MouseArea {
         anchors.fill: parent
-        active: !root.canSeek
-        sourceComponent: StyledProgressBar {
-            wavy: root.enableWavy && root.isPlaying
-            animateWave: root.waveAnimationActive
-            highlightColor: root.highlightColor
-            trackColor: root.trackColor
-            value: root.progressValue
-        }
+        visible: !root.canSeek
+        acceptedButtons: Qt.AllButtons
+        preventStealing: true
+        cursorShape: Qt.ArrowCursor
+        onWheel: event => event.accepted = true
     }
 }

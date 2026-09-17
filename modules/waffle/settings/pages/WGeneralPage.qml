@@ -151,15 +151,10 @@ WSettingsPage {
             currentValue: Config.options?.language?.ui ?? "auto"
             options: [
                 { value: "auto", displayName: Translation.tr("Auto") },
-                { value: "en_US", displayName: "English" },
-                { value: "es_AR", displayName: "Español" },
-                { value: "pt_BR", displayName: "Português" },
-                { value: "de_DE", displayName: "Deutsch" },
-                { value: "fr_FR", displayName: "Français" },
-                { value: "it_IT", displayName: "Italiano" },
-                { value: "ru_RU", displayName: "Русский" },
-                { value: "zh_CN", displayName: "简体中文" },
-                { value: "ja_JP", displayName: "日本語" }
+                ...Translation.allAvailableLanguages.map(lang => ({
+                    value: lang,
+                    displayName: Translation.languageDisplayName(lang)
+                }))
             ]
             onSelected: newValue => Config.setNestedValue("language.ui", newValue)
         }
@@ -422,7 +417,15 @@ WSettingsPage {
             checked: Config.options?.gameMode?.disableEffects ?? true
             onCheckedChanged: Config.setNestedValue("gameMode.disableEffects", checked)
         }
-        
+
+        WSettingsSwitch {
+            label: Translation.tr("Disable audio visualizers")
+            icon: "music-note-2"
+            description: Translation.tr("Stop Cava and hide audio visualizers while game mode is active")
+            checked: Config.options?.gameMode?.disableVisualizers ?? true
+            onCheckedChanged: Config.setNestedValue("gameMode.disableVisualizers", checked)
+        }
+
         WSettingsSwitch {
             label: Translation.tr("Disable Niri animations")
             icon: "pulse"

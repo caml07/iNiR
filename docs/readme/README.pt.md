@@ -111,7 +111,7 @@ Queria que meu desktop tivesse uma cara e funcionasse de um jeito, e nada mais f
 ## Funcionalidades
 
 **Duas famílias de painéis**, alternáveis em tempo real com `Super+Shift+W`:
-- **Material ii** — barra flutuante, sidebars, dock, 6 estilos visuais (material, cards, aurora, inir, angel, zzz)
+- **Material ii** — barra flutuante, sidebars, dock, 9 estilos globais (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra de tarefas estilo Windows 11, menu iniciar, centro de ações, centro de notificações
 
 **Tematização automática** — escolha um wallpaper e tudo se adapta:
@@ -128,7 +128,7 @@ Queria que meu desktop tivesse uma cara e funcionasse de um jeito, e nada mais f
 
 Escolha um wallpaper e o sistema inteiro acompanha — shell, apps GTK/Qt, terminais, Firefox, Discord, tela de login SDDM. Tudo automático.
 
-- **6 estilos visuais** — Material (sólido), Cards, Aurora (blur de vidro), iNiR (inspirado em TUI), Angel (neo-brutalismo), ZZZ
+- **9 estilos globais** — Material (sólido), Cards, Aurora (blur de vidro), iNiR (inspirado em TUI), Angel (neo-brutalismo), Regalia, ZZZ, Cookie Shapes, Editorial
 - **Cores dinâmicas do wallpaper** via Material You — propagadas para todo o sistema
 - **10 ferramentas de terminal com tema automático** — foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, yazi
 - **Tematização de apps** — GTK3/4, Qt (via plasma-integration + darkly), Firefox (MaterialFox), Discord/Vesktop (System24)
@@ -175,7 +175,7 @@ Sidebar direito:
 - **Atualizações automáticas** — `inir update` com rollback, migrações e preservação de mudanças do usuário
 - **Tela de bloqueio** e **tela de sessão** (logout/reboot/shutdown/suspend)
 - **Agente polkit**, **teclado na tela**, **gerenciador de autostart**
-- **9 idiomas** — detecção automática, com geração de traduções assistida por IA
+- **17 locales** — detecção automática, com geração de traduções assistida por IA
 - **Luz noturna** — agendada ou manual
 - **Clima** — Open-Meteo, suporte a GPS, coordenadas manuais ou nome da cidade
 - **Gerenciamento de bateria** — limiares configuráveis, auto-suspend em nível crítico

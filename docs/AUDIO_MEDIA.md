@@ -24,6 +24,14 @@ The OSD (on-screen display) appears for volume and brightness changes, showing t
 
 The right sidebar (ii) and action center (waffle) include a per-app volume mixer. Each app that's outputting audio appears with its own volume slider. You can mute individual apps or adjust their volume independently.
 
+### Visualizer source filters
+
+Visualizer app filters are exclusions, not an allowlist. In **Settings → Quick → Filters**, enabling a filter for an audio app prevents that app from being selected to drive Cava/visualizers. With no visualizer filters enabled, iNiR follows the active player automatically. Cava captures the monitor of the selected playback sink rather than a recording source, so source resolution never falls through to the system microphone. The list is populated from live PipeWire applications, and manual desktop-entry filters can be added when an app is not currently producing audio.
+
+### Organic visualizer
+
+Bars, M3, Pill and Vertical layouts can use the **Organic** visualizer mode. Instead of drawing a conventional spectrum inside the panel, Organic grows from the panel edges and follows the host geometry while keeping the bar's layout and exclusive zone unchanged. Its response, reach, glow, idle motion and related controls live with the normal visualizer settings.
+
 ### EasyEffects
 
 If EasyEffects is installed, iNiR detects its virtual sink and controls the physical sink behind it instead. This means volume control works correctly whether EasyEffects is running or not. A toggle in the right sidebar/action center lets you enable/disable EasyEffects.

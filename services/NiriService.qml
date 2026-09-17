@@ -393,10 +393,22 @@ Singleton {
 
         for (const ws of data.workspaces) {
             const oldWs = root.workspaces[ws.id]
-            newWorkspaces[ws.id] = ws
-            if (oldWs && oldWs.active_window_id !== undefined) {
-                newWorkspaces[ws.id].active_window_id = oldWs.active_window_id
-            }
+            const updatedWs = {}
+            for (const prop in ws)
+                updatedWs[prop] = ws[prop]
+
+            // Current Niri includes active_window_id in WorkspacesChanged and
+            // that snapshot is authoritative. The original integration predates
+            // that field and always copied the cached value over the fresh one;
+            // once the cache held null, fullscreen/output ownership could stay
+            // stale even while `niri msg workspaces` reported the real active
+            // window. Preserve the cached value only for older event payloads
+            // that genuinely omit the field.
+            if (updatedWs.active_window_id === undefined
+                    && oldWs && oldWs.active_window_id !== undefined)
+                updatedWs.active_window_id = oldWs.active_window_id
+
+            newWorkspaces[ws.id] = updatedWs
         }
 
         root.workspaces = newWorkspaces
@@ -580,6 +592,12 @@ Singleton {
     property var _pendingWindows: []
     property bool _windowOrderDirty: false
     property var _latestFocusedWindowId
+
+    // WindowLayoutsChanged is applied to _pendingWindows immediately, while the
+    // public sorted list is intentionally batched for UI consumers. Behavioural
+    // gates such as fullscreen detection must not wait for that presentation
+    // batching or an edge interaction can observe the previous geometry.
+    readonly property var liveWindows: _windowsDirty ? _pendingWindows : windows
 
     Timer {
         id: windowsUpdateTimer
@@ -829,7 +847,12 @@ Singleton {
                     })
     }
 
+    // Emitted before the shell asks Niri to focus a window, so a surface holding
+    // on-demand keyboard focus (the desktop) can yield it to that window.
+    signal windowFocusRequested()
+
     function focusWindow(windowId) {
+        root.windowFocusRequested()
         return send({
                         "Action": {
                             "FocusWindow": {

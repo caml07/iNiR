@@ -111,7 +111,7 @@ Quería que mi escritorio se vea y funcione de cierta forma y nada lo hacía exa
 ## Features
 
 **Dos familias de paneles**, intercambiables al vuelo con `Super+Shift+W`:
-- **Material ii** — barra flotante, sidebars, dock, 6 estilos visuales (material, cards, aurora, inir, angel, zzz)
+- **Material ii** — barra flotante, sidebars, dock, 9 estilos globales (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra de tareas estilo Windows 11, menú inicio, centro de acciones, centro de notificaciones
 
 **Tematización automática** — elegís un wallpaper y todo se adapta:
@@ -128,7 +128,7 @@ Quería que mi escritorio se vea y funcione de cierta forma y nada lo hacía exa
 
 Elegís un wallpaper y todo el sistema sigue — shell, apps GTK/Qt, terminales, Firefox, Discord, pantalla de login SDDM. Todo automático.
 
-- **6 estilos visuales** — Material (sólido), Cards, Aurora (blur de vidrio), iNiR (inspirado en TUI), Angel (neo-brutalismo), ZZZ
+- **9 estilos globales** — Material (sólido), Cards, Aurora (blur de vidrio), iNiR (inspirado en TUI), Angel (neo-brutalismo), Regalia, ZZZ, Cookie Shapes, Editorial
 - **Colores dinámicos del wallpaper** vía Material You — se propagan a todo el sistema
 - **10 herramientas de terminal auto-tematizadas** — foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, yazi
 - **Tematización de apps** — GTK3/4, Qt (vía plasma-integration + darkly), Firefox (MaterialFox), Discord/Vesktop (System24)
@@ -175,7 +175,7 @@ Sidebar derecho:
 - **Auto-updates** — `inir update` con rollback, migraciones y preservación de cambios del usuario
 - **Pantalla de bloqueo** y **pantalla de sesión** (logout/reboot/shutdown/suspend)
 - **Agente polkit**, **teclado en pantalla**, **gestor de autostart**
-- **9 idiomas** — detección automática, con generación de traducciones asistida por IA
+- **17 configuraciones regionales** — detección automática, con generación de traducciones asistida por IA
 - **Luz nocturna** — programada o manual
 - **Clima** — Open-Meteo, soporta GPS, coordenadas manuales o nombre de ciudad
 - **Gestión de batería** — umbrales configurables, auto-suspend en crítico

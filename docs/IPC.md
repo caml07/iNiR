@@ -330,7 +330,11 @@ Open or toggle the settings window. GUI config so you don't have to edit JSON by
 | Function | Description |
 |----------|-------------|
 | `open` | Open the settings window |
-| `toggle` | Toggle settings (overlay mode toggles, window mode opens) |
+| `toggle` | Toggle settings in the active host (overlay or window) |
+| `openOverlay` | Switch to overlay mode and open Settings |
+| `openOverlayAt index` | Switch to overlay mode, open Settings and preserve/jump to page `index` |
+| `openWindowAt index` | Switch to standalone Window mode and open page `index` |
+| `setOverlayStyle style index` | Switch overlay chrome while preserving page `index` |
 
 ```kdl
 bind "Super+Comma" { spawn "inir" "settings"; }
@@ -340,11 +344,12 @@ bind "Super+Comma" { spawn "inir" "settings"; }
 
 ### settingsNav
 
-Navigate the settings overlay to a specific page (same as clicking the nav rail). Opening the window itself is the `inir settings` CLI command (target `settings` above).
+Navigate the settings overlay to a specific page (same as clicking the nav rail). `inir settings` toggles the current Settings host; use the `settings` IPC target above when you need explicit open/toggle semantics.
 
 | Function | Description |
 |----------|-------------|
 | `page(index)` | Open the overlay and jump to page `index` |
+| `section(index, name)` | Open a page at its named section; for example `inir settingsNav section 28 sidebars` |
 | `count` | Number of settings pages |
 | `current` | Current page index, or `-1` when no page is open |
 
@@ -394,7 +399,8 @@ Playful mascot companion (needs `mascot.enable` and the companion switch in Sett
 | `chase` | Chase game: she hunts your mouse, every click is a spot she pounces on; click *her* to catch her and win |
 | `hideSeek` | Hide-and-seek: she tucks into a spot on the desktop. Click her before the 20s timeout to find her, otherwise she wins by default |
 | `tidy` | Undo the chaos: every displaced widget returns to its pre-chaos position |
-| `hide` | Send her away immediately |
+| `hide` | Dismiss the peek or active chaos, cancel follow-ups, tidy widgets and pause automatic visits for 30 minutes |
+| `snooze <minutes>` | Dismiss Kira and pause automatic visits for 1–480 minutes |
 
 ---
 
@@ -411,7 +417,7 @@ Session-long mood state that flavors the mascot's idle lines (needs `mascot.pers
 
 ### sidebarLeft
 
-Left sidebar (AI chat, apps).
+Left sidebar: AI chat and apps in Material; the customizable Focus panel in iRiS. In iRiS, `open`, `close` and `toggle` use the family-owned panel; AI detach and expanded-layout actions apply to Material.
 
 | Function | Description |
 |----------|-------------|
@@ -428,7 +434,7 @@ Left sidebar (AI chat, apps).
 
 ### sidebarRight
 
-Right sidebar (quick toggles, notepad, settings).
+Right sidebar: quick toggles, notepad and settings in Material; the customizable Today panel in iRiS.
 
 | Function | Description |
 |----------|-------------|
@@ -710,14 +716,45 @@ bind "Super+F12" { spawn "inir" "gamemode" "toggle"; }
 
 ---
 
-### panelFamily
+### iris
 
-Switch between panel styles. ii supports two visual styles: Material ii (default) and Waffle (Windows 11-like).
+iRiS bar and Island design. Available while the iRiS bar is enabled.
 
 | Function | Description |
 |----------|-------------|
-| `cycle` | Cycle to next panel family (ii → waffle → ii) |
-| `set` | Set specific family ("ii" or "waffle") |
+| `open` | Expand the island on the focused output |
+| `close` | Collapse the island |
+| `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools` |
+| `toggle` | Expand or collapse the island on the focused output |
+| `card` | `open`, `close` or `toggle` the media bubble's floating card, or `pin` to keep it open |
+| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system` |
+| `bubble` | Place an Island bubble (`left`, `right`, `utility`) or an extra bubble (`weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media`, `tray`): a zone (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`), `x,y` fractions of the output, `island` (slots) or `off` (extras) |
+| `dock` | `reveal`, `hide` or `toggle` the iRiS Dock (revealed stays until hidden or an app is chosen) |
+| `pin` | Keep the `left` (Focus) or `right` (Today) panel open beside windows, or stop |
+| `accent` | Set iRiS accent: `blue`, `mint`, `rose`, `lilac` or `wallpaper` |
+| `utility` | Set the utility satellite: `tray`, `tools`, `sound`, `mic` or `none` |
+| `status` | JSON with the Island, Dock, Control Center, Spotlight and side panel state |
+
+```bash
+inir iris open
+inir iris page desktop
+inir iris toggle
+inir iris dock toggle
+inir iris card toggle
+inir iris bubble right top-right
+inir iris pin right
+inir iris status
+inir iris close
+```
+
+### panelFamily
+
+Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight).
+
+| Function | Description |
+|----------|-------------|
+| `cycle` | Cycle to next panel family (ii → waffle → iris → ii) |
+| `set` | Set specific family ("ii", "waffle", or "iris") |
 
 ```kdl
 bind "Mod+Shift+W" { spawn "inir" "panelFamily" "cycle"; }
@@ -949,6 +986,7 @@ Desktop background and widget controls.
 | Function | Description |
 |----------|-------------|
 | `toggleEditMode` | Toggle widget edit mode (drag, resize, configure desktop widgets) |
+| `toggleWidgetManager` | Enter edit mode if needed and toggle the widget manager on the focused output |
 | `setEditMode enabled` | Set widget edit mode explicitly |
 | `editState` | Report the active selection, physical panel insets, full desktop work area and panel-aware zone work area for each output |
 | `desktopItemsState` | Report desktop-item persistence, availability, item count, validation errors and undo state |
@@ -956,6 +994,12 @@ Desktop background and widget controls.
 | `promoteWidget widgetName` | Move a desktop widget to the top of the persistent layer order |
 | `resetLayerOrder` | Reset desktop widgets to their built-in stacking order |
 | `setWidgetEnabled widgetName enabled` | Enable or disable a built-in desktop widget |
+| `applyOrganicEdgePreset name` | Apply an Organic Edge scene by name without changing enabled displays |
+| `applyOrganicEdgeComposition name` | Apply only an Organic Edge topology/geometry preset |
+| `applyOrganicEdgeMaterial name` | Apply only an Organic Edge material/light preset |
+| `applyOrganicEdgeResponse name` | Apply only an Organic Edge music-response preset |
+| `organicEdgeState` | Report each Organic Edge output, selected edges, frame, audio subscription and shader status |
+| `setOrganicEdgeEnabled enabled` | Enable or disable the independent Organic Edge screen field |
 | `clockDebugState` | Report clock palette, renderer and quick-control geometry diagnostics |
 | `clockDebugSetMode digital\|cookie adaptToWallpaper` | Temporarily select a diagnostic clock mode |
 | `clockDebugSetRegion color brightness spread` | Inject a temporary wallpaper-region sample |
@@ -992,7 +1036,7 @@ Desktop-widget power management (pauses widget rendering on game mode, fullscree
 
 | Function | Description |
 |----------|-------------|
-| `status` | Returns JSON: `enabled`, `widgetsActive`, and the active `triggers` (gameMode, fullscreen, windowsPresent, editMode) |
+| `status` | Returns JSON: `enabled`, `widgetsActive`, `pauseReason`, and the active `triggers` (gameMode, fullscreen, windowsPresent, editMode) |
 
 ---
 

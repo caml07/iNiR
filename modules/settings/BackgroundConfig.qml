@@ -14,7 +14,8 @@ ContentPage {
     settingsPageIndex: 3
     settingsPageName: Translation.tr("Background")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
+    property bool isWaffleActive: Config.options?.panelFamily === "waffle"
     property string activeSection: "source"
     readonly property bool screensTaskActive: root.isIiActive && root.activeSection === "screens"
 
@@ -26,6 +27,12 @@ ContentPage {
         summary: Translation.tr("Source · motion · screens · effects · notifications")
         currentValue: root.activeSection
         onSelected: value => root.activeSection = value
+        searchAliases: ({
+            "parallax": "motion",
+            "wallpaper effects": "effects",
+            "fullscreen behavior": "screens",
+            "multi-monitor": "screens"
+        })
         options: [
             { displayName: Translation.tr("Source"), icon: "wallpaper", value: "source" },
             { displayName: Translation.tr("Motion"), icon: "transition_fade", value: "motion" },
@@ -60,7 +67,7 @@ ContentPage {
     }
 
     SettingsCardSection {
-        visible: !root.isIiActive
+        visible: root.isWaffleActive
         expanded: true
         icon: "info"
         title: Translation.tr("Waffle Mode")
@@ -76,10 +83,12 @@ ContentPage {
         }
     }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "motion"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "motion"
-        visible: root.isIiActive && root.activeSection === "motion"
-        expanded: true
+        expanded: false
         icon: "sync_alt"
         title: Translation.tr("Parallax")
 
@@ -227,10 +236,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "screens"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "screens"
-        visible: root.isIiActive && root.activeSection === "screens"
         expanded: true
         icon: "fullscreen"
         title: Translation.tr("Fullscreen behavior")
@@ -255,11 +268,15 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "screens"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "screens"
-        visible: root.isIiActive && root.activeSection === "screens"
-        expanded: true
+        expanded: false
         icon: "devices"
         title: Translation.tr("Multi-monitor")
 
@@ -1100,10 +1117,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: !root.isIiActive || root.activeSection === "source"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "source"
-        visible: !root.isIiActive || root.activeSection === "source"
         expanded: true
         icon: "wallpaper"
         title: Translation.tr("Wallpaper renderer")
@@ -1216,11 +1237,15 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: !root.isIiActive || root.activeSection === "source"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "source"
-        visible: !root.isIiActive || root.activeSection === "source"
-        expanded: true
+        expanded: false
         icon: "folder"
         title: Translation.tr("Wallpapers folder")
 
@@ -1238,11 +1263,15 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: !root.isIiActive || root.activeSection === "source"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "source"
-        visible: !root.isIiActive || root.activeSection === "source"
-        expanded: true
+        expanded: false
         icon: "shuffle"
         title: Translation.tr("Shuffle wallpapers")
 
@@ -1296,10 +1325,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "motion"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "motion"
-        visible: root.isIiActive && root.activeSection === "motion"
         expanded: true
         icon: "transition_fade"
         title: Translation.tr("Wallpaper transitions")
@@ -1490,11 +1523,15 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "screens"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "screens"
-        visible: root.isIiActive && root.activeSection === "screens"
-        expanded: true
+        expanded: false
         icon: "aspect_ratio"
         title: Translation.tr("Wallpaper scaling")
 
@@ -1858,10 +1895,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && root.activeSection === "effects"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "effects"
-        visible: root.isIiActive && root.activeSection === "effects"
         expanded: true
         icon: "wallpaper"
         title: Translation.tr("Wallpaper effects")
@@ -2345,12 +2386,16 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
     // Desktop widget settings moved to DesktopWidgetsConfig.qml (settingsPageIndex: 14)
 
+    SettingsTaskLoader {
+        requested: !root.isIiActive || root.activeSection === "notifications"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "notifications"
-        visible: !root.isIiActive || root.activeSection === "notifications"
         expanded: true
         icon: "notifications"
         title: Translation.tr("Notifications")
@@ -2365,6 +2410,8 @@ ContentPage {
                     text: Translation.tr("Suppress the notification that appears when a wallpaper has lower resolution than your monitor")
                 }
             }
+        }
+    }
         }
     }
 }

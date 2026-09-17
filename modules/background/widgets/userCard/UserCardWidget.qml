@@ -30,6 +30,10 @@ AbstractBackgroundWidget {
             borderOpacity: 0.2,
             cornerRadius: -1,
             useBlur: false,
+            style: "card",
+            showAvatar: true,
+            showWeather: true,
+            showHostname: true,
             x: 80,
             y: 420
         })
@@ -43,11 +47,18 @@ AbstractBackgroundWidget {
     resizeMinWidth: 240
     resizeMinHeight: 170
     needsColText: true
+    readonly property string cardStyle: root._readConfigKey("style") ?? "card"
+    readonly property bool instrument: root.cardStyle === "instrument"
+    readonly property bool showAvatar: root._readConfigKey("showAvatar") ?? true
+    readonly property bool showWeather: root._readConfigKey("showWeather") ?? true
+    readonly property bool showHostname: root._readConfigKey("showHostname") ?? true
+    widgetSurfaceEnabled: !root.instrument
 
     readonly property color surfaceInk: root.widgetInk
     readonly property string username: SystemInfo.displayName || SystemInfo.username
     readonly property string hostname: SystemInfo.hostname
-    readonly property string userDisplay: root.hostname.length > 0 ? `${root.username}@${root.hostname}` : root.username
+    readonly property string userDisplay: root.showHostname && root.hostname.length > 0
+        ? `${root.username}@${root.hostname}` : root.username
 
     readonly property var weatherLine: {
         const desc = (Weather.data?.description ?? "").toLowerCase();
@@ -81,6 +92,48 @@ AbstractBackgroundWidget {
         Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "lock", "activate"]);
     }
 
+    editPopoverContent: Component {
+        ColumnLayout {
+            spacing: 7
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
+                Repeater {
+                    model: [
+                        { label: Translation.tr("Card"), value: "card" },
+                        { label: Translation.tr("Instrument"), value: "instrument" }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonText: modelData.label
+                        toggled: root.cardStyle === modelData.value
+                        onClicked: root._setOutputValue("style", modelData.value)
+                    }
+                }
+            }
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
+                Repeater {
+                    model: [
+                        { label: Translation.tr("Avatar"), icon: "person", key: "showAvatar", value: root.showAvatar },
+                        { label: Translation.tr("Weather"), icon: "cloud", key: "showWeather", value: root.showWeather },
+                        { label: Translation.tr("Host"), icon: "computer", key: "showHostname", value: root.showHostname }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonIcon: modelData.icon
+                        buttonText: modelData.label
+                        toggled: modelData.value
+                        onClicked: root._setOutputValue(modelData.key, !modelData.value)
+                    }
+                }
+            }
+        }
+    }
+
     WidgetSurface {
         regionBrightness: root.regionBrightness
         anchors.fill: parent
@@ -97,11 +150,18 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
+        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     ColumnLayout {
         id: cardColumn
+        visible: opacity > 0
+        opacity: root.instrument ? 0 : 1
+        enabled: !root.instrument
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
         anchors.fill: parent
         anchors.margins: Math.round(14 * root.scaleFactor)
         spacing: Math.round(10 * root.scaleFactor)
@@ -112,6 +172,7 @@ AbstractBackgroundWidget {
 
             Item {
                 id: avatarContainer
+                visible: root.showAvatar
                 readonly property int size: Math.round(48 * root.scaleFactor)
                 Layout.preferredWidth: size
                 Layout.preferredHeight: size
@@ -184,8 +245,11 @@ AbstractBackgroundWidget {
                     text: root.userDisplay
                     elide: Text.ElideRight
                     color: root.surfaceInk
-                    font.pixelSize: Math.round(Appearance.font.pixelSize.normal * root.scaleFactor)
-                    font.weight: Font.DemiBold
+                    font.family: root.widgetTitleFamily
+                    font.pixelSize: Math.round(Appearance.font.pixelSize.normal
+                        * root.widgetTitleScale * root.scaleFactor)
+                    font.weight: root.widgetTitleWeight
+                    font.letterSpacing: root.widgetTitleTracking
                 }
 
                 StyledText {
@@ -201,12 +265,12 @@ AbstractBackgroundWidget {
         Rectangle {
             Layout.alignment: Qt.AlignLeft
             Layout.maximumWidth: parent.width
-            visible: root.weatherLine.text !== ""
+            visible: root.showWeather && root.weatherLine.text !== ""
                 && root.height >= Math.round(170 * root.scaleFactor)
             implicitWidth: Math.min(parent.width,
                 weatherChip.implicitWidth + Math.round(18 * root.scaleFactor))
             implicitHeight: weatherChip.implicitHeight + Math.round(9 * root.scaleFactor)
-            radius: height / 2
+            radius: root.widgetEditorial ? root.widgetControlRadius : height / 2
             color: root.widgetSemanticContainer(root.widgetTertiaryRole)
 
             RowLayout {
@@ -229,7 +293,7 @@ AbstractBackgroundWidget {
                     elide: Text.ElideRight
                     color: root.widgetSemanticOnContainer(root.widgetTertiaryRole)
                     font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
-                    font.weight: Font.Medium
+                    font.weight: root.widgetLabelWeight
                 }
             }
         }
@@ -267,7 +331,7 @@ AbstractBackgroundWidget {
                         text: Translation.tr("Lock")
                         color: root.widgetSemanticOnContainer(root.widgetPrimaryRole)
                         font.pixelSize: Math.round(Appearance.font.pixelSize.smaller * root.scaleFactor)
-                        font.weight: Font.Medium
+                        font.weight: root.widgetLabelWeight
                     }
                     Item {
                         Layout.fillWidth: true
@@ -284,7 +348,7 @@ AbstractBackgroundWidget {
                     root.widgetSemanticOnContainer(root.widgetSecondaryRole), 0.90)
                 colRipple: ColorUtils.mix(root.widgetSemanticContainer(root.widgetSecondaryRole),
                     root.widgetSemanticOnContainer(root.widgetSecondaryRole), 0.80)
-                onClicked: GlobalStates.settingsOverlayOpen = true
+                onClicked: GlobalStates.openSettings()
                 contentItem: MaterialSymbol {
                     anchors.centerIn: parent
                     text: "settings"
@@ -316,6 +380,123 @@ AbstractBackgroundWidget {
                 }
                 StyledToolTip {
                     text: Translation.tr("Power")
+                }
+            }
+        }
+    }
+
+    RowLayout {
+        id: instrumentPlate
+        anchors.fill: parent
+        anchors.margins: Math.round(12 * root.scaleFactor)
+        spacing: Math.round(12 * root.scaleFactor)
+        visible: opacity > 0
+        opacity: root.instrument ? 1 : 0
+        enabled: root.instrument
+        Behavior on opacity {
+            enabled: root.animationsActive
+            NumberAnimation { duration: Appearance.animation.elementMoveFast.duration }
+        }
+
+        Item {
+            visible: root.showAvatar
+            Layout.preferredWidth: Math.round(58 * root.scaleFactor)
+            Layout.preferredHeight: Layout.preferredWidth
+            Layout.alignment: Qt.AlignVCenter
+
+            Rectangle {
+                id: instrumentAvatarMask
+                anchors.fill: parent
+                radius: Math.round(8 * root.scaleFactor)
+                visible: false
+            }
+            Image {
+                anchors.fill: parent
+                source: avatarResolver.resolvedSource
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: true
+                smooth: true
+                mipmap: true
+                layer.enabled: status === Image.Ready
+                layer.effect: GE.OpacityMask { maskSource: instrumentAvatarMask }
+            }
+            Rectangle { width: Math.round(13 * root.scaleFactor); height: 2; color: root.widgetAccentVisible; anchors { left: parent.left; top: parent.top } }
+            Rectangle { width: 2; height: Math.round(13 * root.scaleFactor); color: root.widgetAccentVisible; anchors { left: parent.left; top: parent.top } }
+            Rectangle { width: Math.round(13 * root.scaleFactor); height: 2; color: root.widgetAccentVisible; anchors { right: parent.right; bottom: parent.bottom } }
+            Rectangle { width: 2; height: Math.round(13 * root.scaleFactor); color: root.widgetAccentVisible; anchors { right: parent.right; bottom: parent.bottom } }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: Math.round(3 * root.scaleFactor)
+
+            StyledText {
+                text: "IDENTITY / SESSION"
+                color: root.widgetAccentVisible
+                font.family: Appearance.font.family.monospace
+                font.pixelSize: Math.max(8, Math.round(9 * root.scaleFactor))
+                font.weight: Font.DemiBold
+                font.letterSpacing: Math.round(1 * root.scaleFactor)
+            }
+            StyledText {
+                Layout.fillWidth: true
+                text: root.username
+                color: root.widgetInk
+                elide: Text.ElideRight
+                font.family: root.widgetTitleFamily
+                font.pixelSize: Math.max(20, Math.round(26 * root.scaleFactor))
+                font.weight: Font.Bold
+            }
+            StyledText {
+                visible: root.showHostname && root.hostname.length > 0
+                Layout.fillWidth: true
+                text: root.widgetIris ? root.hostname : root.hostname.toUpperCase()
+                color: root.widgetInkMuted
+                elide: Text.ElideRight
+                font.family: Appearance.font.family.monospace
+                font.pixelSize: Math.max(9, Math.round(10 * root.scaleFactor))
+                font.letterSpacing: Math.round(0.8 * root.scaleFactor)
+            }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Math.round(10 * root.scaleFactor)
+                ColumnLayout {
+                    spacing: 0
+                    StyledText { text: "SESSION"; color: root.widgetInkMuted; font.family: Appearance.font.family.monospace; font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor)) }
+                    StyledText { text: DateTime.uptime || "--"; color: root.widgetInk; font.family: root.widgetNumbersFamily; font.pixelSize: Math.max(13, Math.round(15 * root.scaleFactor)); font.weight: Font.DemiBold }
+                }
+                ColumnLayout {
+                    visible: root.showWeather && root.weatherLine.text !== ""
+                    Layout.fillWidth: true
+                    spacing: 0
+                    StyledText { text: "CONDITION"; color: root.widgetInkMuted; font.family: Appearance.font.family.monospace; font.pixelSize: Math.max(7, Math.round(8 * root.scaleFactor)) }
+                    StyledText { Layout.fillWidth: true; text: root.weatherLine.text; color: root.widgetInk; elide: Text.ElideRight; font.pixelSize: Math.max(11, Math.round(12 * root.scaleFactor)); font.weight: Font.Medium }
+                }
+            }
+        }
+
+        ColumnLayout {
+            Layout.alignment: Qt.AlignVCenter
+            spacing: Math.round(5 * root.scaleFactor)
+            Repeater {
+                model: [
+                    { icon: "lock", action: () => root.lockScreen() },
+                    { icon: "settings", action: () => GlobalStates.openSettings() },
+                    { icon: "power_settings_new", action: () => GlobalStates.sessionOpen = true }
+                ]
+                RippleButton {
+                    required property var modelData
+                    implicitWidth: Math.round(30 * root.scaleFactor)
+                    implicitHeight: implicitWidth
+                    buttonRadius: Math.round(6 * root.scaleFactor)
+                    colBackground: "transparent"
+                    colBackgroundHover: ColorUtils.applyAlpha(root.widgetAccent, 0.14)
+                    colRipple: ColorUtils.applyAlpha(root.widgetAccent, 0.22)
+                    downAction: modelData.action
+                    contentItem: MaterialSymbol { anchors.centerIn: parent; text: modelData.icon; iconSize: Math.round(16 * root.scaleFactor); color: root.widgetInk }
                 }
             }
         }

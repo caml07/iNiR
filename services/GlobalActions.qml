@@ -201,7 +201,7 @@ Singleton {
             icon: "settings",
             category: "system",
             keywords: ["settings", "config", "preferences", "configure"],
-            execute: () => { GlobalStates.settingsOverlayOpen = true }
+            execute: () => { GlobalStates.openSettings() }
         },
         {
             id: "toggle-dashboard",
@@ -375,6 +375,15 @@ Singleton {
             category: "appearance",
             keywords: ["style", "zzz", "zenless", "theme", "yellow", "hazard"],
             execute: () => { root.applyGlobalStyle("zzz") }
+        },
+        {
+            id: "style-editorial",
+            name: Translation.tr("Style: Editorial"),
+            description: Translation.tr("Paper surfaces, expressive typography and floral accents"),
+            icon: "auto_stories",
+            category: "appearance",
+            keywords: ["style", "editorial", "paper", "serif", "flower", "poster"],
+            execute: () => { root.applyGlobalStyle("editorial") }
         },
         {
             id: "style-cookie",
@@ -775,6 +784,17 @@ Singleton {
             keywords: ["family", "panel", "waffle", "win11", "windows", "layout"],
             execute: () => {
                 root.runLauncher(["panelFamily", "set", "waffle"])
+            }
+        },
+        {
+            id: "switch-family-iris",
+            name: Translation.tr("Switch to iRiS Panel Family"),
+            description: Translation.tr("Use the minimal iRiS shell layout"),
+            icon: "visibility",
+            category: "settings",
+            keywords: ["family", "panel", "iris", "minimal", "lightweight", "layout"],
+            execute: () => {
+                root.runLauncher(["panelFamily", "set", "iris"])
             }
         },
         {

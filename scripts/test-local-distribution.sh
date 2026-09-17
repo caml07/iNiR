@@ -1991,6 +1991,9 @@ fi
 if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-ipc-registry.py" ]]; then
     step "IPC registry freshness"
     python3 "$runtime_root/scripts/lib/generate-ipc-registry.py" --check
+
+    step "iRiS style tokens"
+    python3 "$runtime_root/scripts/test-iris-style-tokens.py"
 fi
 
 if [[ "$run_runtime" == true ]]; then

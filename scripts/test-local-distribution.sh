@@ -1791,9 +1791,9 @@ for warp_toggle in \
     "$runtime_root/modules/common/models/quickToggles/CloudflareWarpToggle.qml" \
     "$runtime_root/modules/sidebarRight/quickToggles/androidStyle/AndroidCloudflareWarpToggle.qml" \
     "$runtime_root/modules/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml"; do
-    if ! grep -Fq '/run/systemd/system' "$warp_toggle" \
-            || ! grep -Fq 'exit 125' "$warp_toggle"; then
-        printf 'FAIL: WARP toggle can issue systemctl outside systemd: %s\n' "$warp_toggle" >&2
+    if grep -Fq 'systemctl start warp-svc' "$warp_toggle" \
+            || grep -Fq 'registration", "new' "$warp_toggle"; then
+        printf 'FAIL: WARP toggle starts services or registers accounts: %s\n' "$warp_toggle" >&2
         exit 1
     fi
 done

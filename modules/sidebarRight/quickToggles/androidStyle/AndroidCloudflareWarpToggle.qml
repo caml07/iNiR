@@ -11,8 +11,8 @@ AndroidQuickToggleButton {
 
     name: Translation.tr("Cloudflare WARP")
 
-    readonly property string warpCliPath: "/usr/bin/warp-cli"
-    readonly property string notifySendPath: "/usr/bin/notify-send"
+    readonly property string warpCliPath: "warp-cli"
+    readonly property string notifySendPath: "notify-send"
 
     property bool _daemonRunning: true
 
@@ -23,10 +23,14 @@ AndroidQuickToggleButton {
         fetchActiveState.running = false;
         fetchActiveState.running = true;
     }
+
+    function showServiceInstructions() {
+        Quickshell.execDetached([root.notifySendPath, Translation.tr("Cloudflare WARP"), Translation.tr("The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."), "-a", "Shell"])
+    }
     
     mainAction: () => {
         if (!root._daemonRunning) {
-            startServiceProc.running = true;
+            root.showServiceInstructions();
             return;
         }
         if (toggled) disconnectProc.running = true;
@@ -34,7 +38,7 @@ AndroidQuickToggleButton {
     }
 
     altAction: () => {
-        startServiceProc.running = true;
+        root.showServiceInstructions();
     }
 
     Process {
@@ -68,23 +72,6 @@ AndroidQuickToggleButton {
     }
 
     Process {
-        id: registrationProc
-        command: [root.warpCliPath, "registration", "new"]
-        onExited: (exitCode, exitStatus) => {
-            if (Quickshell.env("QS_DEBUG") === "1") console.log("Warp registration exited with code and status:", exitCode, exitStatus)
-            if (exitCode === 0) {
-                connectProc.running = true
-            } else {
-                Quickshell.execDetached([root.notifySendPath,
-                    Translation.tr("Cloudflare WARP"), 
-                    Translation.tr("Registration failed. Please inspect manually with the <tt>warp-cli</tt> command"),
-                    "-a", "Shell"
-                ])
-            }
-        }
-    }
-
-    Process {
         id: fetchActiveState
         running: false
         command: ["/bin/sh", "-c", root.warpCliPath + " status"]
@@ -109,9 +96,7 @@ AndroidQuickToggleButton {
                 }
 
                 root._daemonRunning = true
-                if (out.includes("Unable")) {
-                    registrationProc.running = true
-                } else if (out.includes("Connected")) {
+                if (out.includes("Connected")) {
                     root.toggled = true
                 } else if (out.includes("Disconnected")) {
                     root.toggled = false
@@ -120,22 +105,6 @@ AndroidQuickToggleButton {
         }
     }
 
-    Process {
-        id: startServiceProc
-        command: ["/bin/sh", "-c", "if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then exec systemctl start warp-svc.service; fi; exit 125"]
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0) {
-                Quickshell.execDetached([root.notifySendPath,
-                    Translation.tr("Cloudflare WARP"),
-                    exitCode === 125
-                        ? Translation.tr("warp-svc is not managed by iNiR on this system yet")
-                        : Translation.tr("Failed to start warp-svc. You may need to run: <tt>sudo systemctl start warp-svc</tt>"),
-                    "-a", "Shell"
-                ])
-            }
-            root.refreshStatus();
-        }
-    }
 
     Timer {
         id: warpPollTimer

@@ -105,6 +105,7 @@ function setup_systemd_services(){
         log_warning "Bluetooth service directory missing (/etc/sv/bluetoothd); reinstall the bluez package"
       fi
       configure_void_ydotool_uinput || return 1
+      configure_void_warp_service || return 1
     fi
     return 0
   fi

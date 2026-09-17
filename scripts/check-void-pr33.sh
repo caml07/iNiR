@@ -68,10 +68,11 @@ for warp_toggle in \
   "$repo_root/modules/common/models/quickToggles/CloudflareWarpToggle.qml" \
   "$repo_root/modules/sidebarRight/quickToggles/androidStyle/AndroidCloudflareWarpToggle.qml" \
   "$repo_root/modules/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml"; do
-  if grep -Fq '/run/systemd/system' "$warp_toggle" && grep -Fq 'exit 125' "$warp_toggle"; then
-    printf 'PASS: WARP systemd guard: %s\n' "${warp_toggle#"$repo_root/"}"
+  if ! grep -Fq 'systemctl start warp-svc' "$warp_toggle" \
+      && ! grep -Fq 'registration", "new' "$warp_toggle"; then
+    printf 'PASS: WARP avoids privileged auto-start and registration: %s\n' "${warp_toggle#"$repo_root/"}"
   else
-    printf 'FAIL: WARP systemd guard: %s\n' "${warp_toggle#"$repo_root/"}" >&2
+    printf 'FAIL: WARP auto-start or registration remains: %s\n' "${warp_toggle#"$repo_root/"}" >&2
     failures=$((failures + 1))
   fi
 done

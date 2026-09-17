@@ -112,7 +112,7 @@ check_dependencies() {
         cmds+=("checkupdates:pacman-contrib")
     fi
     if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
-        cmds+=("ydotool:ydotool")
+        cmds+=("ydotool:ydotool" "warp-cli:cloudflare-warp")
     fi
 
     # Check required commands
@@ -128,7 +128,7 @@ check_dependencies() {
     # Void's source provider is version-pinned, so an old binary is also a
     # repairable dependency rather than merely an available command.
     if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
-        local doctor_repo_root void_ydotool_version installed_ydotool_version
+        local doctor_repo_root void_ydotool_version installed_ydotool_version void_warp_version installed_warp_version
         doctor_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
         void_ydotool_version="$(sed -n 's/^YDOTOOL_VERSION="\([^"]*\)"/\1/p' "$doctor_repo_root/sdata/dist-void/install-deps.sh")"
         installed_ydotool_version="$(ydotoold --version 2>/dev/null || true)"
@@ -136,6 +136,13 @@ check_dependencies() {
                 && [[ " ${missing_cmds[*]} " != *" ydotool "* ]]; then
             missing+=("ydotool v${void_ydotool_version}")
             missing_cmds+=("ydotool")
+        fi
+        void_warp_version="$(sed -n 's/^WARP_VERSION="\([^"]*\)"/\1/p' "$doctor_repo_root/sdata/dist-void/install-deps.sh")"
+        installed_warp_version="$(warp-cli --version 2>/dev/null || true)"
+        if [[ -n "$void_warp_version" && "$installed_warp_version" != *"$void_warp_version"* ]] \
+                && [[ " ${missing_cmds[*]} " != *" warp-cli "* ]]; then
+            missing+=("Cloudflare WARP v${void_warp_version}")
+            missing_cmds+=("warp-cli")
         fi
     fi
 
@@ -1858,6 +1865,8 @@ run_doctor_with_fixes() {
                         doctor_fail "Dependency installation failed"
                     elif [[ "$OS_GROUP_ID" == void ]] && ! configure_void_ydotool_uinput; then
                         doctor_fail "Could not configure the ydotool provider"
+                    elif [[ "$OS_GROUP_ID" == void ]] && ! configure_void_warp_service; then
+                        doctor_fail "Could not configure the Cloudflare WARP provider"
                     elif [[ "$OS_GROUP_ID" == void ]] && ! reconcile_inir_supervisor >/dev/null; then
                         doctor_fail "Could not activate the ydotool provider"
                     else

@@ -635,6 +635,43 @@ configure_void_ydotool_uinput() {
   log_info "Then add a udev rule granting group input mode 0660 on /dev/uinput and load the uinput module"
 }
 
+# Install only iNiR-owned service files; never replace a local WARP service.
+configure_void_warp_service() {
+  [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0
+  [[ -x /usr/local/bin/warp-svc ]] || return 0
+
+  local run_file=/etc/sv/warp-svc/run service_link=/var/service/warp-svc
+  if [[ -e /etc/sv/warp-svc && ! -f "$run_file" ]]; then
+    log_warning "Existing WARP service directory is not managed by iNiR; leaving it unchanged"
+    return 0
+  fi
+  if [[ -e "$run_file" ]] && ! grep -q '^# Managed by iNiR\.' "$run_file"; then
+    log_warning "Existing WARP service is not managed by iNiR; leaving it unchanged"
+    return 0
+  fi
+  if [[ -e "$service_link" || -L "$service_link" ]] \
+      && [[ ! -L "$service_link" || "$(readlink "$service_link")" != /etc/sv/warp-svc ]]; then
+    log_warning "Existing WARP service link is not managed by iNiR; leaving it unchanged"
+    return 0
+  fi
+  if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file" \
+      && [[ -L "$service_link" ]] && [[ "$(readlink "$service_link")" == /etc/sv/warp-svc ]]; then
+    log_success "Cloudflare WARP runit service already enabled"
+    return 0
+  fi
+
+  if [[ "${ask:-true}" != true ]] || tui_confirm "Enable Cloudflare WARP system service?" "yes"; then
+    if elevate sh -c 'mkdir -p /etc/sv/warp-svc /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp && printf "#!/bin/sh\n# Managed by iNiR.\nmkdir -p /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp\nexec /usr/local/bin/warp-svc\n" > /etc/sv/warp-svc/run && chmod 755 /etc/sv/warp-svc/run && ln -sfn /etc/sv/warp-svc /var/service/warp-svc'; then
+      log_success "Cloudflare WARP runit service enabled"
+    else
+      log_warning "Could not enable Cloudflare WARP runit service"
+      return 1
+    fi
+  else
+    log_info "Enable Cloudflare WARP with: sudo ln -s /etc/sv/warp-svc /var/service/"
+  fi
+}
+
 # Reconcile PipeWire user services for non-systemd supervisors.
 # Void ships pipewire without activating it; recording needs pipewire,
 # wireplumber, and pipewire-pulse supervised in ~/.config/service.

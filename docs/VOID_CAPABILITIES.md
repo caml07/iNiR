@@ -16,7 +16,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | Screenshots | screencapture | XBPS `grim`, `slurp`, `swappy`, `wl-clipboard`, `jq` | direct session processes | VM validated: clipboard fallback roundtrip (`wl-paste`); capture binaries present | PR3.3 |
 | Screen recording | screencapture | XBPS `wf-recorder`, `ffmpeg`; audio profile provides `pipewire` | direct session processes | VM validated: `pipewire`/`wireplumber`/`pipewire-pulse` user services run; `pactl` reports PulseAudio on PipeWire 1.6.7 | PR3.3 |
 | Clipboard history and paste | base/toolkit | XBPS `wl-clipboard`, `cliphist`; verified upstream `ydotool` v1.0.4 source | session watchers + predicate-selected ydotool user service | ydotool provider VM validated: provision, permissions, service, socket, direct injection, idempotency, and lock-screen keyboard UI; Superpaste not separately exercised | PR4.2 |
-| Cloudflare WARP | toolkit | upstream provider TBD | runit system service | visible UI exists; provider and lifecycle pending | PR4 |
+| Cloudflare WARP | toolkit | verified upstream `cloudflare-warp` v2026.7.1377.0, extracted without Debian scripts | iNiR-owned `warp-svc` runit service | pending: provider/daemon gate passed; implementation idempotency, account registration, connection, and trace verification remain | PR4.3 |
 | Mission Center | toolkit | maintained Flatpak | Flatpak application | provisioning/launcher pending | PR5 |
 | OCR | toolkit | XBPS Tesseract + user-space language download | direct process | English/Spanish VM validated; full language flow pending | PR5 |
 | Themes, icons, cursors | fonts/theme | XBPS first, pinned upstream fallback | files/config only | unavailable Arch defaults need Void providers | PR5 |
@@ -28,8 +28,8 @@ after provider, provisioning, activation, operation, and verification pass.
 - Profiles exposed by the Void installer match the Arch installer model.
 - Missing optional profiles do not block the base shell, but selecting a
   profile must install all providers required by that profile.
-- WARP remains visible while its provider is developed, but it must report an
-  unavailable provider rather than issue a systemd command on Void.
+- WARP never starts a privileged service or creates an account from QML. It
+  reports the stopped daemon and requires explicit operator registration.
 - Packaging iNiR itself as an XBPS package remains outside V1. This matrix
   covers the per-user installer.
 - Exact package names and upstream versions move from **TBD** only after they

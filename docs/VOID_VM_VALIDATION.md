@@ -531,6 +531,16 @@ turnstile or iNiR failure.
   (package plus provider-file snapshot). The on-screen keyboard was exercised
   in the lock screen and typed successfully. Superpaste was not separately
   exercised; it shares the validated ydotool path.
+- PR4.3 WARP provider gate passed on 2026-09-10. Void had no XBPS
+  `cloudflare-warp` provider, so the verified upstream Bookworm artifact
+  `cloudflare-warp_2026.7.1377.0_amd64.deb` (SHA-256
+  `95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55`) was
+  extracted without executing Debian scripts. `warp-cli` and `warp-svc` ran on
+  Void's glibc loader with XBPS-provided `tpm2-tss`, `dbus-libs`, `nss`, and
+  `libpcap`. A temporary root runit service opened
+  `/run/cloudflare-warp/warp_service`; `warp-cli status` reached it and asked
+  for explicit TOS acceptance. No account was available, so registration,
+  connection, and `warp=on` trace validation remain pending.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002

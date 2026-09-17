@@ -353,7 +353,8 @@ Singleton {
         result.sunrise = sunrise ? sunrise.split("T")[1] ?? sunrise : "--:--"
         result.sunset = sunset ? sunset.split("T")[1] ?? sunset : "--:--"
         result.windDir = root._degToCompass(current.wind_direction_10m)
-        result.wCode = String(current.weather_code ?? 113)
+        // Current conditions speak wttr codes too, like the daily and hourly rows.
+        result.wCode = root._wmoToWttr(current.weather_code ?? 0)
         result.description = root.describeWeather(result.wCode)
         result.city = root.location.name || "Unknown"
 

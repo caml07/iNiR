@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Wayland
 import Quickshell.Widgets
 import qs
 import qs.services
@@ -15,8 +14,15 @@ import qs.modules.iris.frame
 import qs.modules.iris.style
 import qs.modules.iris.components
 
-PanelWindow {
+Item {
     id: root
+    property var screenData: null
+    readonly property string screenName: root.screenData?.name ?? ""
+    readonly property bool fullscreenHere: CompositorService.isNiri && GameMode.hasFullscreenOnOutput(root.screenName) && !NiriService.inOverview
+    readonly property bool present: root.screenName === (GlobalStates.focusedScreen?.name ?? "") && !root.fullscreenHere
+        && (root.popups.length > 0 || exitLinger.running)
+    readonly property var hitRect: root.present && popupColumn.contentHeight > 0
+        ? { x: popupColumn.x, y: popupColumn.y, width: popupColumn.width, height: popupColumn.height } : null
     readonly property var options: Config.options?.iris?.notifications ?? ({})
     readonly property var barOptions: Config.options?.iris?.bar ?? ({})
     readonly property bool barTop: String(root.barOptions?.position ?? "top") === "top"
@@ -26,35 +32,12 @@ PanelWindow {
         ? (Number(root.barOptions?.height ?? 42) + ((root.barOptions?.notch ?? false) ? 0 : Number(root.barOptions?.margin ?? 8) * 2) + 10) * root.d
         : 10 * root.d
 
-    visible: root.popups.length > 0 || exitLinger.running
+    visible: root.present
     onPopupsChanged: if (root.popups.length === 0) exitLinger.restart()
     Timer { id: exitLinger; interval: IrisStyle.settleDuration * 2 + 80 }
-    IrisOutputHold {
-        id: outputHold
-        wanted: GlobalStates.focusedScreen
-        live: root.visible
-    }
-    screen: outputHold.output
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell:iris-notifications"
-    anchors {
-        top: true
-        left: true
-        right: true
-    }
-    margins {
-        left: IrisFrame.band
-        right: IrisFrame.band
-        top: IrisFrame.band
-    }
-    readonly property real popupWidth: Math.min(Math.max(260, (root.screen?.width ?? 1920) - 16),
+    readonly property real popupWidth: Math.min(Math.max(260, root.width - 2 * IrisFrame.band - 16),
         Math.max(340, Number(root.options?.width ?? 380) * root.d) + 16)
-    implicitWidth: root.screen?.width ?? root.popupWidth
-    implicitHeight: Math.min((root.screen?.height ?? 1080) * 0.8, root.topOffset + 3 * 250 * root.d)
-    mask: Region { item: popupColumn }
-    readonly property var island: GlobalStates.irisIslandGeometry?.[root.screen?.name ?? ""] ?? null
+    readonly property var island: GlobalStates.irisIslandGeometry?.[root.screenName] ?? null
     readonly property real bubbleSize: Math.round(44 * root.d)
 
     property real now: Date.now()
@@ -79,7 +62,7 @@ PanelWindow {
         id: popupColumn
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.topMargin: root.topOffset
+        anchors.topMargin: root.topOffset + IrisFrame.band
         width: Math.min(root.popupWidth - 16, parent.width - 16)
         height: Math.max(1, popupColumn.contentHeight)
         spacing: 8 * root.d

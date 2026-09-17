@@ -727,11 +727,24 @@ iRiS bar and Island design. Available while the iRiS bar is enabled.
 | `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools` |
 | `toggle` | Expand or collapse the island on the focused output |
 | `card` | `open`, `close` or `toggle` the media bubble's floating card, or `pin` to keep it open |
-| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system` |
+| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system`; add `/<group>` to scroll to a group, e.g. `bubbles/behaviour` |
 | `bubble` | Place an Island bubble (`left`, `right`, `utility`) or an extra bubble (`weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media`, `tray`): a zone (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`), `x,y` fractions of the output, `island` (slots) or `off` (extras) |
 | `dock` | `reveal`, `hide` or `toggle` the iRiS Dock (revealed stays until hidden or an app is chosen) |
+| `dockApp` | Open a Dock app's `windows` or `menu` by app id (e.g. `kitty windows`), or `<any> close` |
+| `appBubble` | Carry a Dock app out as a bubble of its own (e.g. `kitty right`): a zone, `x,y` fractions of the output, or `dock` to send it back |
 | `pin` | Keep the `left` (Focus) or `right` (Today) panel open beside windows, or stop |
 | `accent` | Set iRiS accent: `blue`, `mint`, `rose`, `lilac` or `wallpaper` |
+| `arrange` | Arrange the Island's desktop page in place — move, remove and add its blocks: `on`, `off` or `toggle` |
+| `studio` | Open iRiS Studio, the live editor for the whole family's appearance: `on`, `off`, `toggle`, or a target to open it on (`material`, `colour`, `type`, `motion`, `island`, `pieces`, `bodies`, `places`, `transients`, `dock`, `desktop`, `themes`) |
+| `barPiece` | Turn one of the Island's own pieces on or off: `weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media` or `tray`, plus `on`, `off` or `toggle` |
+| `notch` | Melt the Island into its edge (or into the Surround band): `on`, `off` or `toggle` |
+| `surround` | Close the shell around the screen with a band on every edge: `on`, `off` or `toggle` |
+| `layout` | How the Island sits on its edge: `island`, `left`, `right` or `full` |
+| `preset` | Set the iRiS appearance preset: `iris`, `soft`, `crisp` or `contrast` |
+| `morph` | Set how iRiS morphs: `liquid`, `glide`, `snap`, `elastic` or `instant` |
+| `spotlight` | Open Spotlight with a query already typed, e.g. `firefox` or `12*7` (empty for suggestions) |
+| `bubbleCard` | Grow a bubble's own card: `weather`, `notifications`, `sound`, `mic`, `tools` or `tray` (from the bubble showing it, else the Island), or `close` |
+| `bubbleMenu` | Open a floating bubble's own menu — what it opens, where it rests and how to put it away — by kind (`weather`, `sound`, …) or piece id (`app:kitty`) |
 | `utility` | Set the utility satellite: `tray`, `tools`, `sound`, `mic` or `none` |
 | `status` | JSON with the Island, Dock, Control Center, Spotlight and side panel state |
 
@@ -742,6 +755,7 @@ inir iris toggle
 inir iris dock toggle
 inir iris card toggle
 inir iris bubble right top-right
+inir iris appBubble kitty top-right
 inir iris pin right
 inir iris status
 inir iris close

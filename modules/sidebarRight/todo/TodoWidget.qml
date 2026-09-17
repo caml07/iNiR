@@ -86,9 +86,9 @@ Item {
                 z: 5
                 implicitWidth: 32
                 implicitHeight: 32
-                buttonRadius: Appearance.rounding.full
+                buttonRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : Appearance.rounding.full
                 colBackground: "transparent"
-                colBackgroundHover: Appearance.colors.colLayer2Hover
+                colBackgroundHover: Appearance.colLayer2Hover
                 onClicked: root.requestExpand()
                 contentItem: MaterialSymbol {
                     anchors.centerIn: parent
@@ -285,6 +285,9 @@ Item {
                     color: Appearance.colors.colOnSurface
                     font.pixelSize: Appearance.font.pixelSize.larger
                     text: Translation.tr("Add task")
+                    font.family: Appearance.editorialEverywhere ? Appearance.font.family.title : Appearance.font.family.main
+                    font.weight: Appearance.editorialEverywhere ? Appearance.editorial.titleWeight : Font.Normal
+                    font.letterSpacing: Appearance.editorialEverywhere ? Appearance.editorial.titleTracking : 0
                 }
 
                 TextField {
@@ -293,7 +296,7 @@ Item {
                     Layout.leftMargin: 16
                     Layout.rightMargin: 16
                     padding: 10
-                    color: activeFocus ? Appearance.colors.colOnSurface : Appearance.colors.colOnSurfaceVariant
+                    color: activeFocus ? Appearance.colors.colOnSurface : Appearance.colMetadataText
                     renderType: Text.NativeRendering
                     selectedTextColor: Appearance.colors.colOnSecondaryContainer
                     selectionColor: Appearance.colors.colSecondaryContainer

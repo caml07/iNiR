@@ -111,7 +111,7 @@ Je voulais que mon bureau ressemble et fonctionne d'une certaine façon, et rien
 ## Fonctionnalités
 
 **Deux familles de panneaux**, interchangeables à la volée avec `Super+Shift+W` :
-- **Material ii** — barre flottante, barres latérales, dock, 6 styles visuels (material, cards, aurora, inir, angel, zzz)
+- **Material ii** — barre flottante, barres latérales, dock, 9 styles globaux (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barre des tâches style Windows 11, menu démarrer, centre d'actions, centre de notifications
 
 **Thématisation automatique** — choisissez un fond d'écran et tout s'adapte :
@@ -128,7 +128,7 @@ Je voulais que mon bureau ressemble et fonctionne d'une certaine façon, et rien
 
 Choisissez un fond d'écran et tout le système suit — shell, apps GTK/Qt, terminaux, Firefox, Discord, écran de connexion SDDM. Entièrement automatique.
 
-- **6 styles visuels** — Material (uni), Cards, Aurora (flou de verre), iNiR (inspiré TUI), Angel (néo-brutalisme), ZZZ
+- **9 styles globaux** — Material (uni), Cards, Aurora (flou de verre), iNiR (inspiré TUI), Angel (néo-brutalisme), Regalia, ZZZ, Cookie Shapes, Editorial
 - **Couleurs dynamiques du fond d'écran** via Material You — propagées à tout le système
 - **10 outils de terminal auto-thématisés** — foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, yazi
 - **Thématisation d'apps** — GTK3/4, Qt (via plasma-integration + darkly), Firefox (MaterialFox), Discord/Vesktop (System24)
@@ -175,7 +175,7 @@ Barre latérale droite :
 - **Mises à jour auto** — `inir update` avec retour arrière, migrations et préservation des modifications utilisateur
 - **Écran de verrouillage** et **écran de session** (déconnexion/redémarrage/arrêt/veille)
 - **Agent polkit**, **clavier virtuel**, **gestionnaire de démarrage automatique**
-- **9 langues** — détection automatique, avec génération de traductions assistée par IA
+- **17 paramètres régionaux** — détection automatique, avec génération de traductions assistée par IA
 - **Veilleuse** — programmée ou manuelle
 - **Météo** — Open-Meteo, supporte GPS, coordonnées manuelles ou nom de ville
 - **Gestion de batterie** — seuils configurables, mise en veille automatique en niveau critique

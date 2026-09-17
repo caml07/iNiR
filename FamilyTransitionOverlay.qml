@@ -17,6 +17,7 @@ import qs.services
 // Each family has its own visual identity:
 //   Waffle  → Fluent acrylic card with decelerate curve and accent shimmer
 //   Material → Ink ripple with Material emphasized curves and container badge
+//   iRiS    → Minimal optical mark with restrained type and no blur
 Scope {
     id: root
 
@@ -33,6 +34,8 @@ Scope {
 
     // ── State ───────────────────────────────────────────────────────────
     property bool _isWaffle: false
+    property bool _isIris: false
+    property string _targetFamily: "ii"
     property bool _phase: false   // false = enter/hold, true = exit
     property bool _active: false
 
@@ -116,7 +119,9 @@ Scope {
             fadeOut.stop()
             bgScaleOut.stop()
 
-            root._isWaffle = GlobalStates.familyTransitionDirection === "left"
+            root._targetFamily = GlobalStates.familyTransitionTarget || "ii"
+            root._isWaffle = root._targetFamily === "waffle"
+            root._isIris = root._targetFamily === "iris"
             root._phase = false
             root._active = true
 
@@ -168,7 +173,7 @@ Scope {
     NumberAnimation {
         id: blurIn
         target: root; property: "_blurAmount"
-        from: 0; to: 0.8
+        from: 0; to: root._isIris ? 0 : 0.8
         duration: _animated ? 360 : 5
         easing.type: Easing.OutQuad
     }
@@ -310,7 +315,7 @@ Scope {
                         anchors.fill: parent
                         source: wallpaperImg
                         visible: wallpaperImg.status === Image.Ready
-                        blurEnabled: Appearance.effectsEnabled
+                        blurEnabled: Appearance.effectsEnabled && !root._isIris
                         blur: root._blurAmount
                         blurMax: 64
                         saturation: 0.25
@@ -320,7 +325,7 @@ Scope {
                     Rectangle {
                         anchors.fill: parent
                         color: root._snapBackground
-                        opacity: root._isWaffle ? 0.08 : 0.28
+                        opacity: root._isWaffle ? 0.08 : root._isIris ? 0.16 : 0.28
                     }
                 }
 
@@ -337,7 +342,92 @@ Scope {
                 // ── Family-specific transition effect ──
                 Loader {
                     anchors.fill: parent
-                    sourceComponent: root._isWaffle ? waffleTransition : materialTransition
+                    sourceComponent: root._isWaffle ? waffleTransition
+                        : root._isIris ? irisTransition : materialTransition
+                }
+            }
+        }
+    }
+
+    Component {
+        id: irisTransition
+
+        Item {
+            id: irisRoot
+            anchors.fill: parent
+            property bool entered: false
+            Component.onCompleted: Qt.callLater(() => entered = true)
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 13
+                opacity: root._phase ? 0 : (irisRoot.entered ? 1 : 0)
+                scale: root._phase ? 0.96 : (irisRoot.entered ? 1 : 0.92)
+
+                Behavior on opacity {
+                    NumberAnimation { duration: root._phase ? 120 : 220; easing.type: Easing.OutCubic }
+                }
+                Behavior on scale {
+                    NumberAnimation { duration: root._phase ? 150 : 260; easing.type: Easing.OutCubic }
+                }
+
+                Item {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 58
+                    height: 58
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 50
+                        height: 50
+                        radius: 25
+                        color: "transparent"
+                        border.width: 4
+                        border.color: root._snapPrimary
+                    }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 16
+                        height: 16
+                        radius: 8
+                        color: root._snapPrimary
+                    }
+                    Rectangle {
+                        x: 41
+                        y: 8
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: Appearance.m3colors.m3tertiary
+                    }
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "iRiS"
+                    font.family: Appearance.font.family.title
+                    font.pixelSize: 25
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0.8
+                    color: root._snapOnSurface
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 38
+                    height: 2
+                    radius: 1
+                    color: root._snapPrimary
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "minimal · modular"
+                    font.family: Appearance.font.family.main
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    font.letterSpacing: 0.5
+                    color: ColorUtils.applyAlpha(root._snapOnSurface, 0.72)
                 }
             }
         }

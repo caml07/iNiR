@@ -60,6 +60,8 @@ TextField {
             return;
         if (typeof SettingsSearchRegistry === "undefined")
             return;
+        if (!SettingsSearchRegistry.dynamicRegistrationEnabled)
+            return;
 
         var ctx = _findSettingsContext();
         var page = ctx.page;
@@ -107,9 +109,18 @@ TextField {
         Rectangle {
             anchors.fill: parent
             visible: !Appearance.regaliaEverywhere
-            color: Appearance.colors.colLayer1
-            topLeftRadius: 4
-            topRightRadius: 4
+            color: Appearance.editorialEverywhere
+                ? (root.activeFocus ? Appearance.editorial.inputFocus : root.hovered ? Appearance.editorial.inputHover : Appearance.editorial.input)
+                : Appearance.colors.colLayer1
+            topLeftRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : 4
+            topRightRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : 4
+            bottomLeftRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : 0
+            bottomRightRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : 0
+            border.width: Appearance.editorialEverywhere ? (root.activeFocus ? 2 : 1) : 0
+            border.color: Appearance.editorialEverywhere
+                ? (root.activeFocus ? Appearance.editorial.focusRing : root.hovered ? Appearance.editorial.edge : Appearance.editorial.rule) : "transparent"
+            Behavior on color { enabled: Appearance.animationsEnabled; ColorAnimation { duration: Appearance.animation.elementMoveFast.duration } }
+            Behavior on border.color { enabled: Appearance.animationsEnabled; ColorAnimation { duration: Appearance.animation.elementMoveFast.duration } }
 
             Rectangle {
                 anchors {
@@ -117,8 +128,12 @@ TextField {
                     right: parent.right
                     bottom: parent.bottom
                 }
-                height: 1
-                color: root.activeFocus ? Appearance.colors.colPrimary
+                visible: !Appearance.editorialEverywhere
+                height: Appearance.editorialEverywhere && root.activeFocus ? 2 : 1
+                color: Appearance.editorialEverywhere
+                    ? (root.activeFocus ? Appearance.editorial.accent
+                        : root.hovered ? Appearance.editorial.edge : Appearance.editorial.rule)
+                    : root.activeFocus ? Appearance.colors.colPrimary
                     : root.hovered ? Appearance.colors.colOutline : Appearance.colors.colOutlineVariant
 
                 Behavior on color {

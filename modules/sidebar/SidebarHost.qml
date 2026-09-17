@@ -114,6 +114,20 @@ Scope {
         root.reportRuntime()
     })
 
+    // If this output transitions into a covering fullscreen window while its
+    // semantic sidebar is already open, dismiss that sidebar. Do this here,
+    // per output, instead of restoring GameMode's old global transient-surface
+    // sweep: an explicit sidebar open while already fullscreen must remain
+    // possible, and fullscreen on another monitor must not close this one.
+    onFullscreenCoveredChanged: {
+        if (!root.fullscreenCovered || !root.roleOpen)
+            return
+        if (root.featureRole)
+            GlobalStates.closeSidebarLeft()
+        else if (root.systemRole)
+            GlobalStates.closeSidebarRight()
+    }
+
     onPresentationOpenChanged: {
         if (root.presentationOpen) {
             contentUnloadTimer.stop()

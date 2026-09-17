@@ -136,7 +136,7 @@ AbstractBackgroundWidget {
                         { label: Translation.tr("Wave"), icon: "graphic_eq", value: "wave" },
                         { label: Translation.tr("Organic"), icon: "bubble_chart", value: "organic" }
                     ]
-                    SelectionGroupButton {
+                    WidgetChoiceButton {
                         required property var modelData
                         required property int index
                         Layout.fillWidth: true
@@ -176,7 +176,7 @@ AbstractBackgroundWidget {
                                 { label: Translation.tr("Primary"), icon: "format_color_fill", value: "primary" },
                                 { label: Translation.tr("Album"), icon: "album", value: "album" }
                             ]
-                            SelectionGroupButton {
+                            WidgetChoiceButton {
                                 required property var modelData
                                 required property int index
                                 Layout.fillWidth: true
@@ -224,7 +224,7 @@ AbstractBackgroundWidget {
                                 text: Math.round(metric.currentValue) + metric.suffix
                                 color: Appearance.colors.colOnLayer2
                                 font.pixelSize: Appearance.font.pixelSize.smaller
-                                font.family: Appearance.font.family.numbers
+                                font.family: root.widgetNumbersFamily
                                 font.weight: Font.DemiBold
                             }
                         }
@@ -259,7 +259,7 @@ AbstractBackgroundWidget {
                                 { label: Translation.tr("Line"), icon: "line_weight", value: "line" },
                                 { label: Translation.tr("Ribbon"), icon: "unfold_more", value: "ribbon" }
                             ]
-                            SelectionGroupButton {
+                            WidgetChoiceButton {
                                 required property var modelData
                                 required property int index
                                 readonly property int groupColumns: root.vizType === "bars"
@@ -330,6 +330,8 @@ AbstractBackgroundWidget {
                         VisualizerMetric { labelText: Translation.tr("Idle"); configKey: "background.widgets.visualizer.organicIdleMotion"; minimum: 0; maximum: 100 }
                         VisualizerMetric { labelText: Translation.tr("Range"); configKey: "background.widgets.visualizer.organicRange"; minimum: 20; maximum: 100 }
                     }
+
+
                 }
             }
         }
@@ -469,7 +471,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
+        shown: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
     }
 
     // ── Visualizer rendering ─────────────────────────────────────

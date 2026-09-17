@@ -11,6 +11,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 import qs.modules.common.models
+import qs.modules.mediaControls.components
 import "root:"
 
 Item {
@@ -259,52 +260,22 @@ Item {
                 Item { Layout.fillHeight: true }
 
                 // Progress bar
-                Item {
+                PlayerProgress {
                     Layout.fillWidth: true
                     implicitHeight: root.compactMode ? 12 : 16
-
-                    Loader {
-                        anchors.fill: parent
-                        active: root.player?.canSeek ?? false
-                        sourceComponent: StyledSlider {
-                            configuration: StyledSlider.Configuration.Wavy
-                            wavy: root.player?.isPlaying ?? false
-                            animateWave: root.player?.isPlaying ?? false
-                            highlightColor: Appearance.angelEverywhere ? Appearance.angel.colPrimary
-                                : root.inirEverywhere ? root.jiraColPrimary
-                                : Appearance.zzzEverywhere ? Appearance.zzz.accentSoft
-                                : (root.blendedColors?.colPrimary ?? Appearance.colors.colPrimary)
-                            trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
-                                : root.inirEverywhere ? Appearance.inir.colLayer2
-                                : Appearance.zzzEverywhere ? Appearance.zzz.metricTrack
-                                : (root.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
-                            handleColor: Appearance.angelEverywhere ? Appearance.angel.colPrimary
-                                : root.inirEverywhere ? root.jiraColPrimary
-                                : Appearance.zzzEverywhere ? "transparent"
-                                : (root.blendedColors?.colPrimary ?? Appearance.colors.colPrimary)
-                            value: root.player?.length > 0 ? root.player.position / root.player.length : 0
-                            onMoved: root.player.position = value * root.player.length
-                            scrollable: true
-                        }
-                    }
-
-                    Loader {
-                        anchors.fill: parent
-                        active: !(root.player?.canSeek ?? false)
-                        sourceComponent: StyledProgressBar {
-                            wavy: root.player?.isPlaying ?? false
-                            animateWave: root.player?.isPlaying ?? false
-                            highlightColor: Appearance.angelEverywhere ? Appearance.angel.colPrimary
-                                : root.inirEverywhere ? root.jiraColPrimary
-                                : Appearance.zzzEverywhere ? Appearance.zzz.accentSoft
-                                : (root.blendedColors?.colPrimary ?? Appearance.colors.colPrimary)
-                            trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
-                                : root.inirEverywhere ? Appearance.inir.colLayer2
-                                : Appearance.zzzEverywhere ? Appearance.zzz.metricTrack
-                                : (root.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
-                            value: root.player?.length > 0 ? root.player.position / root.player.length : 0
-                        }
-                    }
+                    position: root.player?.position ?? 0
+                    length: root.player?.length ?? 0
+                    canSeek: root.player?.canSeek ?? false
+                    isPlaying: root.player?.isPlaying ?? false
+                    highlightColor: Appearance.angelEverywhere ? Appearance.angel.colPrimary
+                        : root.inirEverywhere ? root.jiraColPrimary
+                        : Appearance.zzzEverywhere ? Appearance.zzz.accentSoft
+                        : (root.blendedColors?.colPrimary ?? Appearance.colors.colPrimary)
+                    trackColor: Appearance.angelEverywhere ? Appearance.angel.colGlassCard
+                        : root.inirEverywhere ? Appearance.inir.colLayer2
+                        : Appearance.zzzEverywhere ? Appearance.zzz.metricTrack
+                        : (root.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
+                    onSeekRequested: seconds => { if (root.player) root.player.position = seconds }
                 }
 
                 // Time + controls

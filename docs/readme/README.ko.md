@@ -111,7 +111,7 @@ Wayland → GPU
 ## 기능
 
 **두 가지 패널 패밀리**, `Super+Shift+W`로 즉시 전환:
-- **Material ii** — 플로팅 바, 사이드바, 독, 6가지 비주얼 스타일 (material, cards, aurora, inir, angel, zzz)
+- **Material ii** — 플로팅 바, 사이드바, 독, 9가지 글로벌 스타일 (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — Windows 11 스타일 작업 표시줄, 시작 메뉴, 알림 센터, 액션 센터
 
 **자동 테마** — 배경화면을 고르면 모든 것이 맞춰짐:
@@ -128,7 +128,7 @@ Wayland → GPU
 
 배경화면을 고르면 전체 시스템이 따라감 — 셸, GTK/Qt 앱, 터미널, Firefox, Discord, SDDM 로그인 화면. 전부 자동.
 
-- **6가지 비주얼 스타일** — Material (솔리드), Cards, Aurora (유리 블러), iNiR (TUI 영감), Angel (네오 브루탈리즘), ZZZ
+- **9가지 글로벌 스타일** — Material (솔리드), Cards, Aurora (유리 블러), iNiR (TUI 영감), Angel (네오 브루탈리즘), Regalia, ZZZ, Cookie Shapes, Editorial
 - **배경화면 동적 색상** — Material You로 시스템 전체에 전파
 - **10개 터미널 도구 자동 테마** — foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, yazi
 - **앱 테마 적용** — GTK3/4, Qt (plasma-integration + darkly), Firefox (MaterialFox), Discord/Vesktop (System24)
@@ -175,7 +175,7 @@ Wayland → GPU
 - **자동 업데이트** — `inir update`, 롤백·마이그레이션·사용자 변경 보존 포함
 - **잠금 화면** 및 **세션 화면** (로그아웃/재시작/종료/절전)
 - **Polkit 에이전트**, **화면 키보드**, **자동 시작 관리자**
-- **9개 언어** — 자동 감지, AI 지원 번역 생성
+- **17개 로케일** — 자동 감지, AI 지원 번역 생성
 - **야간 모드** — 예약 또는 수동
 - **날씨** — Open-Meteo, GPS·수동 좌표·도시명 지원
 - **배터리 관리** — 설정 가능한 임계값, 위험 수준에서 자동 절전

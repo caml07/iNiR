@@ -74,6 +74,7 @@ Scope {
                 readonly property real organicAuraAllowance:
                     (Config.options?.bar?.visualizer?.enable ?? false)
                         && (Config.options?.bar?.visualizer?.type ?? "bars") === "organic"
+                        && (Config.options?.bar?.visualizer?.organicFit ?? "auto") === "aura"
                     ? Math.ceil(Appearance.sizes.barHeight * 1.75) : 0
                 property bool contextMenuHold: false
                 property bool leftSidebarHold: false
@@ -146,7 +147,7 @@ Scope {
                     if (CompositorService.isNiri && NiriService.isOverviewHotCornerActive(outputName, corner))
                         reserve = Math.max(reserve, 12)
                     const orbitEnabled = CompositorService.isNiri
-                        && (Config.options?.panelFamily ?? "ii") !== "waffle"
+                        && (Config.options?.panelFamily ?? "ii") === "ii"
                         && (Config.options?.orbit?.enable ?? true)
                         && (Config.options?.orbit?.hotCornerEnable ?? true)
                     if (orbitEnabled && String(Config.options?.orbit?.hotCorner ?? "topRight") === corner)

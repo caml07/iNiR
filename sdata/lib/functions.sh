@@ -448,6 +448,9 @@ function elevate() {
   if [[ -t 0 ]] && [[ -t 1 ]]; then
     # Interactive terminal available — use sudo
     sudo "$@"
+  elif sudo -n true 2>/dev/null; then
+    # No terminal but passwordless sudo works (automation, VM checkers)
+    sudo "$@"
   elif command -v pkexec &>/dev/null; then
     # No terminal but pkexec available — use graphical auth dialog
     pkexec "$@"
@@ -462,6 +465,8 @@ function elevate() {
 function can_elevate() {
   if [[ -t 0 ]] && [[ -t 1 ]]; then
     return 0  # Terminal available for sudo
+  elif sudo -n true 2>/dev/null; then
+    return 0  # Passwordless sudo available (automation)
   elif command -v pkexec &>/dev/null && [[ -n "$DISPLAY" || -n "$WAYLAND_DISPLAY" ]]; then
     return 0  # Graphical session with pkexec available
   else

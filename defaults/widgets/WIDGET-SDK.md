@@ -5,6 +5,9 @@ Custom desktop widgets that run on the iNiR shell. Full QML access to 73 service
 
 Widgets live in `~/.config/inir/widgets/<name>/` and are loaded automatically.
 
+Widgets may also expose a lightweight iRiS bar component. See `IRIS-SDK.md` for the compact
+manifest/slot contract.
+
 ## Quick Start
 
 ```bash

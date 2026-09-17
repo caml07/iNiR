@@ -469,6 +469,9 @@ Item {
         readonly property bool auroraEverywhere: surfaceDialect === "aurora" || angelEverywhere
         readonly property bool inirEverywhere: surfaceDialect === "inir"
         readonly property bool gameModeMinimal: Appearance.gameModeMinimal
+        readonly property bool editorialGlassActive: surfaceDialect === "editorial"
+            && Appearance.editorial.sidebarFullGlass
+            && !gameModeMinimal && !islandStyle
         readonly property string wallpaperUrl: {
             const _dep1 = WallpaperListener.multiMonitorEnabled
             const _dep2 = WallpaperListener.effectivePerMonitor
@@ -476,10 +479,12 @@ Item {
             return WallpaperListener.wallpaperUrlForScreen(root.panelScreen)
         }
         readonly property bool useWallpaperBackdrop: root.panelVisible
-            && auroraEverywhere
+            && (auroraEverywhere || editorialGlassActive)
             && !inirEverywhere
             && !gameModeMinimal
             && wallpaperUrl.length > 0
+        readonly property bool editorialBackdropReady: editorialGlassActive
+            && useWallpaperBackdrop && sidebarRightBlurredWallpaper.status === Image.Ready
 
         ColorQuantizer {
             id: sidebarRightWallpaperQuantizer
@@ -496,6 +501,7 @@ Item {
         color: (gameModeMinimal || islandStyle) ? "transparent"
             : zzzEverywhere ? Appearance.zzz.chrome
             : regaliaEverywhere ? "transparent"
+            : editorialGlassActive ? (editorialBackdropReady ? "transparent" : Appearance.editorial.paper)
             : inirEverywhere ? (cardStyle ? Appearance.inir.colLayer1 : Appearance.inir.colLayer0)
             : auroraEverywhere ? ColorUtils.applyAlpha((blendedColors?.colLayer0 ?? Appearance.colors.colLayer0), 1)
             : (cardStyle ? Appearance.colors.colLayer1 : Appearance.colors.colLayer0)
@@ -505,7 +511,8 @@ Item {
             : angelEverywhere ? Appearance.angel.colPanelBorder
             : inirEverywhere ? Appearance.inir.colBorder
             : Appearance.colors.colLayer0Border
-        radius: zzzEverywhere ? Appearance.zzz.panelRadius
+        radius: islandStyle ? (Config.options?.appearance?.island?.radius ?? 18)
+            : zzzEverywhere ? Appearance.zzz.panelRadius
             : regaliaEverywhere ? Appearance.regalia.panelRadius
             : angelEverywhere ? Appearance.angel.roundingNormal
             : inirEverywhere ? (cardStyle ? Appearance.inir.roundingLarge : Appearance.inir.roundingNormal)
@@ -526,6 +533,18 @@ Item {
         Behavior on color {
             enabled: Appearance.animationsEnabled
             ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
+        }
+
+
+        EditorialPaperStack {
+            anchors.fill: parent
+            z: 1
+            visible: Appearance.editorialEverywhere && Appearance.editorial.paperStack
+                && !sidebarRightBackground.islandStyle && !sidebarRightBackground.gameModeMinimal
+            faceColor: Appearance.editorial.paper
+            radius: sidebarRightBackground.radius
+            materialOpacity: sidebarRightBackground.editorialBackdropReady ? Appearance.editorial.glassOpacity : 1
+            backingOpacity: sidebarRightBackground.editorialBackdropReady ? Appearance.editorial.glassBackingOpacity : 1
         }
 
         RegaliaPlate {
@@ -554,11 +573,12 @@ Item {
 
         Image {
             id: sidebarRightBlurredWallpaper
+            z: 0
             x: -(root.screenWidth - sidebarRightBackground.width - Appearance.sizes.hyprlandGapsOut)
             y: -Appearance.sizes.hyprlandGapsOut
             width: root.screenWidth ?? 1920
             height: root.screenHeight ?? 1080
-            visible: sidebarRightBackground.useWallpaperBackdrop
+            visible: sidebarRightBackground.useWallpaperBackdrop && status === Image.Ready
             source: sidebarRightBackground.useWallpaperBackdrop ? sidebarRightBackground.wallpaperUrl : ""
             fillMode: Image.PreserveAspectCrop
             cache: true
@@ -573,11 +593,13 @@ Item {
                 anchors.fill: source
                 saturation: sidebarRightBackground.angelEverywhere
                     ? (Appearance.angel.blurSaturation * Appearance.angel.colorStrength)
+                    : sidebarRightBackground.editorialGlassActive ? 0.04
                     : (Appearance.effectsEnabled ? 0.2 : 0)
                 blurEnabled: Appearance.effectsEnabled
                 blurMax: 64
                 blur: Appearance.effectsEnabled
-                    ? (sidebarRightBackground.angelEverywhere ? Appearance.angel.blurIntensity : 1)
+                    ? (sidebarRightBackground.angelEverywhere ? Appearance.angel.blurIntensity
+                        : sidebarRightBackground.editorialGlassActive ? Appearance.editorial.glassBlur : 1)
                     : 0
             }
 
@@ -585,6 +607,8 @@ Item {
                 anchors.fill: parent
                 color: sidebarRightBackground.angelEverywhere
                     ? ColorUtils.transparentize((sidebarRightBackground.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base), Appearance.angel.overlayOpacity * Appearance.angel.panelTransparentize)
+                    : sidebarRightBackground.editorialGlassActive
+                        ? (Appearance.editorial.paperStack ? "transparent" : Appearance.editorial.glassPaper)
                     : ColorUtils.transparentize((sidebarRightBackground.blendedColors?.colLayer0 ?? Appearance.colors.colLayer0Base), Appearance.aurora.overlayTransparentize)
             }
         }
@@ -640,6 +664,7 @@ Item {
 
         ColumnLayout {
             id: contentColumn
+            z: 2
             anchors.fill: parent
             anchors.margins: sidebarPadding
             spacing: sidebarPadding
@@ -745,7 +770,7 @@ Item {
                         z: 20
                         radius: Appearance.inirEverywhere ? Appearance.inir.roundingSmall : Appearance.rounding.verysmall
                         color: sectionHandleArea.containsMouse || sectionLoader.isBeingDragged
-                            ? (Appearance.inirEverywhere ? Appearance.inir.colLayer1Hover : Appearance.colors.colLayer1Hover)
+                            ? (Appearance.inirEverywhere ? Appearance.inir.colLayer1Hover : Appearance.colLayer1Hover)
                             : (Appearance.inirEverywhere ? Appearance.inir.colLayer1 : Appearance.colors.colLayer1)
                         border.width: Appearance.inirEverywhere ? 1 : 0
                         border.color: Appearance.inirEverywhere ? Appearance.inir.colBorder : "transparent"
@@ -920,7 +945,13 @@ Item {
         Component { id: classicTogglesComponent; ClassicQuickPanel {} }
         Component { id: androidTogglesComponent; AndroidQuickPanel { editMode: root.editMode } }
         Component { id: centerSectionComponent; CenterWidgetGroup { collapsed: root.notifsCollapsed } }
-        Component { id: widgetsSectionComponent; BottomWidgetGroup {} }
+        Component {
+            id: widgetsSectionComponent
+            BottomWidgetGroup {
+                anchors.left: parent.left
+                anchors.right: parent.right
+            }
+        }
 
     }
 
@@ -995,7 +1026,7 @@ Item {
                 MaterialSymbol {
                     text: root.detailMeta[root.expandedWidgetType]?.icon ?? ""
                     iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.inirEverywhere ? Appearance.inir.colPrimary : Appearance.colors.colPrimary
+                    color: Appearance.colActionIcon
                 }
                 StyledText {
                     Layout.fillWidth: true
@@ -1007,16 +1038,16 @@ Item {
                 RippleButton {
                     implicitWidth: 34
                     implicitHeight: 34
-                    buttonRadius: Appearance.rounding.full
+                    buttonRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : Appearance.rounding.full
                     colBackground: "transparent"
-                    colBackgroundHover: Appearance.colors.colLayer2Hover
-                    colRipple: Appearance.colors.colLayer2Active
+                    colBackgroundHover: Appearance.colLayer2Hover
+                    colRipple: Appearance.colLayer2Active
                     onClicked: root.closeWidgetDetail()
                     contentItem: MaterialSymbol {
                         anchors.centerIn: parent
                         text: "close_fullscreen"
                         iconSize: Appearance.font.pixelSize.normal
-                        color: Appearance.inirEverywhere ? Appearance.inir.colText : Appearance.colors.colOnLayer1
+                        color: Appearance.colSecondaryActionIcon
                     }
                     StyledToolTip { text: Translation.tr("Back to sidebar") }
                 }
@@ -1164,13 +1195,15 @@ Item {
                 : sidebarRightBackground.angelEverywhere ? Appearance.angel.colGlassCard
                 : sidebarRightBackground.auroraEverywhere
                 ? Appearance.aurora.colSubSurface
+                : sidebarRightBackground.editorialGlassActive ? Appearance.editorial.glassPaper
                 : Appearance.colors.colLayer1
             Behavior on color {
                 enabled: Appearance.animationsEnabled
                 ColorAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
             }
             radius: Appearance.zzzEverywhere ? Appearance.zzz.cardRadius
-                : sidebarRightBackground.angelEverywhere ? Appearance.angel.roundingSmall : height / 2
+                : sidebarRightBackground.angelEverywhere ? Appearance.angel.roundingSmall
+                : Appearance.editorialEverywhere ? Appearance.rounding.small : height / 2
             Behavior on radius {
                 enabled: Appearance.animationsEnabled
                 NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
@@ -1237,6 +1270,7 @@ Item {
                 : sidebarRightBackground.angelEverywhere ? Appearance.angel.colGlassCard
                 : sidebarRightBackground.auroraEverywhere
                 ? Appearance.aurora.colSubSurface
+                : sidebarRightBackground.editorialGlassActive ? Appearance.editorial.glassPaper
                 : Appearance.colors.colLayer1
             Behavior on color {
                 enabled: Appearance.animationsEnabled

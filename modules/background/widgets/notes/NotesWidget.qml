@@ -22,6 +22,8 @@ AbstractBackgroundWidget {
         fontSize: 14,
         fontFamily: "sans",
         textAlign: "left",
+        style: "card",
+        showRules: true,
         widgetScale: 100, widgetOpacity: 100,
         showBackground: true, useBlur: false, showBorder: true,
         backgroundOpacity: 0.10, borderWidth: 1, borderOpacity: 0.12,
@@ -54,7 +56,11 @@ AbstractBackgroundWidget {
         root._readConfigKey("fontFamily") ?? "sans"
     readonly property string textAlign:
         root._readConfigKey("textAlign") ?? "left"
+    readonly property string noteStyle: root._readConfigKey("style") ?? "card"
+    readonly property bool instrument: root.noteStyle === "instrument"
+    readonly property bool showRules: root._readConfigKey("showRules") ?? true
     readonly property real cardRadius: root.widgetCardRadius
+    widgetSurfaceEnabled: !root.instrument
     property bool _syncingText: false
 
     function _loadPersistedText(): void {
@@ -68,7 +74,7 @@ AbstractBackgroundWidget {
     function _commitText(): void {
         saveDebounce.stop()
         if (!root._syncingText && textEdit.text !== root.noteText)
-            Config.setNestedValue("background.widgets.notes.text", textEdit.text)
+            root._setOutputValue("text", textEdit.text)
     }
 
     function _beginEditing(localX: real, localY: real): void {
@@ -119,16 +125,33 @@ AbstractBackgroundWidget {
                 Layout.alignment: Qt.AlignHCenter
                 Repeater {
                     model: [
+                        { label: Translation.tr("Card"), value: "card" },
+                        { label: Translation.tr("Instrument"), value: "instrument" }
+                    ]
+                    WidgetChoiceButton {
+                        required property var modelData
+                        leftmost: true; rightmost: true
+                        buttonText: modelData.label
+                        toggled: root.noteStyle === modelData.value
+                        onClicked: root._setOutputValue("style", modelData.value)
+                    }
+                }
+            }
+
+            RowLayout {
+                spacing: 4
+                Layout.alignment: Qt.AlignHCenter
+                Repeater {
+                    model: [
                         { label: Translation.tr("Sans"), value: "sans" },
                         { label: Translation.tr("Mono"), value: "mono" }
                     ]
-                    SelectionGroupButton {
+                    WidgetChoiceButton {
                         required property var modelData
                         leftmost: true; rightmost: true
                         buttonText: modelData.label
                         toggled: root.fontFamily === modelData.value
-                        onClicked: Config.setNestedValue(
-                            "background.widgets.notes.fontFamily", modelData.value)
+                        onClicked: root._setOutputValue("fontFamily", modelData.value)
                     }
                 }
             }
@@ -148,8 +171,7 @@ AbstractBackgroundWidget {
                     to: 48
                     stepSize: 1
                     value: Number(root._readConfigKey("fontSize") ?? 14)
-                    onValueModified: Config.setNestedValue(
-                        "background.widgets.notes.fontSize", value)
+                    onValueModified: root._setOutputValue("fontSize", value)
                 }
             }
 
@@ -162,15 +184,24 @@ AbstractBackgroundWidget {
                         { icon: "format_align_center", value: "center" },
                         { icon: "format_align_right", value: "right" }
                     ]
-                    SelectionGroupButton {
+                    WidgetChoiceButton {
                         required property var modelData
                         leftmost: true; rightmost: true
                         buttonIcon: modelData.icon
                         toggled: root.textAlign === modelData.value
-                        onClicked: Config.setNestedValue(
-                            "background.widgets.notes.textAlign", modelData.value)
+                        onClicked: root._setOutputValue("textAlign", modelData.value)
                     }
                 }
+            }
+
+            WidgetChoiceButton {
+                Layout.alignment: Qt.AlignHCenter
+                visible: root.instrument
+                leftmost: true; rightmost: true
+                buttonIcon: "horizontal_rule"
+                buttonText: Translation.tr("Writing guides")
+                toggled: root.showRules
+                onClicked: root._setOutputValue("showRules", !root.showRules)
             }
         }
     }
@@ -192,8 +223,8 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0
-            || root.effectiveBlur
+        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0
+            || root.effectiveBlur)
     }
 
     Rectangle {
@@ -201,7 +232,7 @@ AbstractBackgroundWidget {
         color: "transparent"
         radius: root.cornerRadiusOverride >= 0
             ? root.cornerRadiusOverride : root.cardRadius
-        border.width: textEdit.activeFocus ? 2 : 0
+        border.width: textEdit.activeFocus ? (root.instrument ? 1 : 2) : 0
         border.color: ColorUtils.applyAlpha(root.widgetAccentVisible, 0.72)
 
         Behavior on border.width {
@@ -221,15 +252,70 @@ AbstractBackgroundWidget {
         focus: false
     }
 
+    RowLayout {
+        id: noteHeading
+        x: 14 * root.scaleFactor
+        y: 10 * root.scaleFactor
+        width: root.width - 28 * root.scaleFactor
+        visible: root.height >= 120 * root.scaleFactor
+        spacing: 6 * root.scaleFactor
+        MaterialSymbol {
+            visible: !root.instrument
+            text: "edit_note"
+            iconSize: 18 * root.scaleFactor
+            color: root.widgetAccentVisible
+        }
+        StyledText {
+            Layout.fillWidth: true
+            text: root.instrument ? Translation.tr("NOTE") : Translation.tr("Notes")
+            color: root.instrument ? root.widgetInk : root.widgetInkMuted
+            font.family: root.instrument ? Appearance.font.family.monospace : root.widgetTitleFamily
+            font.pixelSize: (root.instrument ? Appearance.font.pixelSize.smaller
+                : Appearance.font.pixelSize.smallest) * root.scaleFactor
+            font.weight: root.instrument ? Font.DemiBold : root.widgetLabelWeight
+            font.letterSpacing: root.instrument ? Math.round(1.2 * root.scaleFactor) : 0
+            elide: Text.ElideRight
+        }
+        StyledText {
+            visible: root.instrument
+            text: String(textEdit.text.length).padStart(3, "0")
+            color: root.widgetAccentVisible
+            font.family: root.widgetNumbersFamily
+            font.pixelSize: Appearance.font.pixelSize.smaller * root.scaleFactor
+            font.weight: Font.DemiBold
+        }
+        Rectangle {
+            visible: !root.instrument
+            Layout.preferredWidth: 24 * root.scaleFactor
+            Layout.preferredHeight: 3 * root.scaleFactor
+            radius: height / 2
+            color: root.widgetAccentVisible
+        }
+    }
+
     Flickable {
         id: editorFlick
         anchors.fill: parent
-        anchors.margins: Math.round(13 * root.scaleFactor)
+        anchors.margins: Math.round(14 * root.scaleFactor)
+        anchors.topMargin: noteHeading.visible ? noteHeading.y + noteHeading.height + 10 * root.scaleFactor : anchors.margins
         clip: true
         contentWidth: width
         contentHeight: Math.max(height, textEdit.contentHeight)
         boundsBehavior: Flickable.StopAtBounds
         interactive: !GlobalStates.widgetEditMode
+
+        Repeater {
+            model: root.instrument && root.showRules
+                ? Math.max(0, Math.floor(editorFlick.height / Math.max(18, root.fontSize * 1.55))) : 0
+            Rectangle {
+                required property int index
+                x: 0
+                y: Math.round((index + 1) * Math.max(18, root.fontSize * 1.55))
+                width: editorFlick.width
+                height: 1
+                color: ColorUtils.applyAlpha(root.widgetInk, 0.13)
+            }
+        }
 
         TextEdit {
             id: textEdit
@@ -247,7 +333,8 @@ AbstractBackgroundWidget {
 
             font.pixelSize: root.fontSize
             font.family: root.fontFamily === "mono"
-                ? Appearance.font.family.monospace : Appearance.font.family.main
+                ? Appearance.font.family.monospace : root.widgetBodyFamily
+            font.weight: root.instrument ? Font.Medium : Font.Normal
 
             horizontalAlignment: root.textAlign === "center"
                 ? TextEdit.AlignHCenter

@@ -2363,17 +2363,20 @@
             "motion": true,
             "motionDuration": 220,
             "accent": "blue",
-            "expandedRadius": 28
+            "expandedRadius": 28,
+            "preset": "iris"
         },
         "bar": {
             "position": "top",
             "composition": "unified",
             "notch": false,
+            "layout": "island",
+            "pieces": [],
             "hoverExpand": true,
             "hoverDelay": 160,
             "scrollAction": "volume",
             "desktopBanner": "wallpaper",
-            "desktopProfile": true,
+            "desktopBlocks": ["profile", "context", "vitals", "modules"],
             "clockStyle": "dateTime",
             "auxiliary": "tray",
             "events": true,
@@ -2423,10 +2426,21 @@
                 "tray": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 }
             },
             "edgeGap": 20,
-            "snap": true
+            "opens": "card",
+            "snap": true,
+            "cluster": true,
+            "attach": true,
+            "reserve": true,
+            "apps": []
+        },
+        "surround": {
+            "enable": false,
+            "thickness": 10,
+            "radius": 22
         },
         "controlCenter": {
-            "width": 360
+            "width": 360,
+            "sections": ["connectivity", "media", "shortcuts", "levels", "notifications"]
         },
         "notifications": {
             "width": 380,

@@ -207,7 +207,7 @@ install_void_warp() {
   fi
 
   tui_info "Installing Cloudflare WARP v${WARP_VERSION} from verified upstream package..."
-  local temp_dir archive data_archive payload_dir warp_cli warp_svc
+  local temp_dir archive data_archive payload_dir warp_cli warp_svc tar_flag
   temp_dir="$(mktemp -d)" || return 1
   archive="$temp_dir/cloudflare-warp.deb"
   payload_dir="$temp_dir/payload"
@@ -216,8 +216,18 @@ install_void_warp() {
       || ! printf '%s  %s\n' "$WARP_DEB_SHA256" "$archive" | sha256sum -c - >/dev/null \
       || ! data_archive="$(ar t "$archive" | grep '^data\.tar\.' | head -n1)" \
       || [[ -z "$data_archive" ]] \
-      || ! mkdir -p "$payload_dir" \
-      || ! ar p "$archive" "$data_archive" | tar -x -C "$payload_dir" \
+      || ! mkdir -p "$payload_dir"; then
+    rm -rf "$temp_dir"
+    log_warning "Cloudflare WARP v${WARP_VERSION} installation failed"
+    return 1
+  fi
+  case "${data_archive##*.}" in
+    gz) tar_flag=-z ;;
+    xz) tar_flag=-J ;;
+    bz2) tar_flag=-j ;;
+    *) tar_flag= ;;
+  esac
+  if ! ar p "$archive" "$data_archive" | tar -x$tar_flag -C "$payload_dir" \
       || ! warp_cli="$(find "$payload_dir" -type f -name warp-cli -print -quit)" \
       || ! warp_svc="$(find "$payload_dir" -type f -name warp-svc -print -quit)" \
       || [[ -z "$warp_cli" || -z "$warp_svc" ]] \

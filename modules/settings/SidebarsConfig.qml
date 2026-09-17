@@ -20,7 +20,7 @@ ContentPage {
     settingsPageIndex: 23
     settingsPageName: Translation.tr("Sidebars")
 
-    property bool isIiActive: Config.options?.panelFamily !== "waffle"
+    property bool isIiActive: (Config.options?.panelFamily ?? "ii") === "ii"
 
     property string activeSection: "general"
     property string pendingProfileAvatarPath: ""
@@ -72,9 +72,11 @@ ContentPage {
         ]
     }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "general"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "general"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "general"
         expanded: true
         icon: "tune"
         title: Translation.tr("General")
@@ -105,15 +107,19 @@ ContentPage {
                 SettingsSwitch {
                     buttonIcon: "branding_watermark"
                     text: Translation.tr("Use Card style")
-                    enabled: Appearance.globalStyle === "material" || Appearance.globalStyle === "inir"
+                    enabled: Appearance.globalStyle === "material"
+                        || Appearance.globalStyle === "inir"
+                        || Appearance.editorialEverywhere
                     checked: Config.options.sidebar?.cardStyle ?? false
                     onCheckedChanged: {
                         Config.setNestedValue("sidebar.cardStyle", checked);
                     }
                     StyledToolTip {
-                        text: (Appearance.globalStyle === "material" || Appearance.globalStyle === "inir")
+                        text: (Appearance.globalStyle === "material"
+                            || Appearance.globalStyle === "inir"
+                            || Appearance.editorialEverywhere)
                             ? Translation.tr("Apply rounded card styling to sidebars")
-                            : Translation.tr("Only available with Material or Inir global style")
+                            : Translation.tr("Only available with Material, Editorial, or Inir global style")
                     }
                 }
 
@@ -226,10 +232,14 @@ ContentPage {
 
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "left"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "left"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "left"
         expanded: true
         icon: "first_page"
         title: Translation.tr("Left sidebar")
@@ -363,10 +373,14 @@ ContentPage {
 
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "right"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "right"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "right"
         expanded: true
         icon: "last_page"
         title: Translation.tr("Right sidebar")
@@ -757,10 +771,14 @@ ContentPage {
 
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "media"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "media"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "media"
         expanded: true
         icon: "music_note"
         title: Translation.tr("Media & content")
@@ -987,10 +1005,14 @@ ContentPage {
 
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "open"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "open"
-        visible: root.isIiActive && !(Config.options?.settingsUi?.easyMode ?? false) && root.activeSection === "open"
         expanded: true
         icon: "swipe"
         title: Translation.tr("Opening")
@@ -1150,6 +1172,8 @@ ContentPage {
                     }
                 }
             }
+        }
+    }
         }
     }
 

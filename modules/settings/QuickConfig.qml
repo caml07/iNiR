@@ -141,6 +141,11 @@ ContentPage {
         showIntro: false
         currentValue: root.activeSection
         onSelected: value => root.activeSection = value
+        searchAliases: ({
+            "wallpaper & colors": "wallpaper",
+            "capture locations": "capture",
+            "app filters": "filters"
+        })
         options: [
             { displayName: Translation.tr("Wallpaper"), icon: "format_paint", value: "wallpaper" },
             { displayName: Translation.tr("Bar & screen"), icon: "screenshot_monitor", value: "screen" },
@@ -190,9 +195,11 @@ ContentPage {
     }
 
     // Wallpaper selection
+    SettingsTaskLoader {
+        requested: root.activeSection === "wallpaper"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "wallpaper"
-        visible: root.activeSection === "wallpaper"
         expanded: true
         icon: "format_paint"
         title: Translation.tr("Wallpaper & Colors")
@@ -1684,10 +1691,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.activeSection === "screen"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "screen"
-        visible: root.activeSection === "screen"
         expanded: true
         icon: "screenshot_monitor"
         title: Translation.tr("Bar & screen")
@@ -1824,10 +1835,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.activeSection === "game"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "game"
-        visible: root.activeSection === "game"
         expanded: true
         icon: "sports_esports"
         title: Translation.tr("Game Mode")
@@ -1870,6 +1885,18 @@ ContentPage {
             }
 
             SettingsSwitch {
+                buttonIcon: "graphic_eq"
+                text: Translation.tr("Disable audio visualizers")
+                checked: Config.options?.gameMode?.disableVisualizers ?? true
+                onCheckedChanged: {
+                    Config.setNestedValue("gameMode.disableVisualizers", checked)
+                }
+                StyledToolTip {
+                    text: Translation.tr("Stop Cava and hide audio visualizers while Game Mode is active")
+                }
+            }
+
+            SettingsSwitch {
                 buttonIcon: "desktop_windows"
                 text: Translation.tr("Disable Niri animations")
                 checked: Config.options?.gameMode?.disableNiriAnimations ?? true
@@ -1906,10 +1933,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.activeSection === "capture"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "capture"
-        visible: root.activeSection === "capture"
         expanded: true
         icon: "photo_camera"
         title: Translation.tr("Capture locations")
@@ -1982,10 +2013,14 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
+    SettingsTaskLoader {
+        requested: root.activeSection === "filters"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "filters"
-        visible: root.activeSection === "filters"
         expanded: true
         icon: "filter_alt"
         title: Translation.tr("App filters")
@@ -2440,11 +2475,15 @@ ContentPage {
             }
         }
     }
+        }
+    }
 
     // Quick Actions
+    SettingsTaskLoader {
+        requested: root.activeSection === "actions"
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "actions"
-        visible: root.activeSection === "actions"
         expanded: true
         icon: "bolt"
         title: Translation.tr("Quick Actions")
@@ -2513,6 +2552,8 @@ ContentPage {
                     text: Translation.tr("Show a confirmation dialog when closing windows with Super+Q")
                 }
             }
+        }
+    }
         }
     }
 

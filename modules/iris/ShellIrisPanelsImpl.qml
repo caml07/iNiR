@@ -1,0 +1,266 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import qs
+import qs.services
+import qs.modules.common
+import qs.modules.iris.palette
+import qs.modules.iris.control
+import qs.modules.iris.notificationPopup
+import qs.modules.iris.onScreenDisplay
+import qs.modules.iris.session
+import qs.modules.iris.polkit
+import qs.modules.iris.style
+import qs.modules.iris.dock
+import qs.modules.iris.settings
+import qs.modules.iris.sidebar
+import qs.modules.iris.wallpaper
+import qs.modules.iris.bubbles
+import qs.modules.background
+import qs.modules.lock
+
+Item {
+    id: root
+
+    component PanelLoader: LazyLoader {
+        required property string identifier
+        property bool extraCondition: true
+        readonly property bool enabledPanel: Config.ready
+            && (Config.options?.enabledPanels ?? []).includes(identifier)
+            && extraCondition
+        loading: enabledPanel
+        activeAsync: enabledPanel
+    }
+
+    component DeferredPanelLoader: LazyLoader {
+        required property string identifier
+        property bool extraCondition: true
+        readonly property bool enabledPanel: Config.ready
+            && (Config.options?.enabledPanels ?? []).includes(identifier)
+            && extraCondition
+        loading: enabledPanel && GlobalStates.shellEntryReady
+        activeAsync: enabledPanel && GlobalStates.deferredPanelsReady
+    }
+
+    component OnDemandPanelLoader: LazyLoader {
+        id: loader
+        required property string identifier
+        required property bool open
+        property bool extraCondition: true
+        property bool requireEnabledPanel: true
+        property int closeGraceMs: IrisStyle.revealDuration + 30
+        property bool resident: open
+        property Timer closeGrace: Timer {
+            interval: loader.closeGraceMs
+            onTriggered: loader.resident = loader.open
+        }
+        readonly property bool enabledPanel: Config.ready
+            && (!requireEnabledPanel || (Config.options?.enabledPanels ?? []).includes(identifier))
+            && extraCondition
+
+        onOpenChanged: {
+            if (open) {
+                closeGrace.stop()
+                resident = true
+            } else {
+                closeGrace.restart()
+            }
+        }
+
+        loading: enabledPanel && resident
+        activeAsync: enabledPanel && GlobalStates.deferredPanelsReady && resident
+    }
+
+    IrisSidebarEdge { side: "left" }
+    IrisSidebarEdge { side: "right" }
+
+    OnDemandPanelLoader {
+        identifier: "irisSidebarLeft"
+        requireEnabledPanel: false
+        open: GlobalStates.sidebarLeftOpen
+        extraCondition: Config.options?.iris?.sidebars?.left?.enable ?? true
+        closeGraceMs: IrisStyle.settleDuration + 80
+        component: IrisSidebar { side: "left" }
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisSidebarRight"
+        requireEnabledPanel: false
+        open: GlobalStates.sidebarRightOpen
+        extraCondition: Config.options?.iris?.sidebars?.right?.enable ?? true
+        closeGraceMs: IrisStyle.settleDuration + 80
+        component: IrisSidebar { side: "right" }
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisNotificationPopup"
+        open: (Notifications.popupList?.length ?? 0) > 0
+        // The last banner folds back into the Island after it leaves the list.
+        closeGraceMs: IrisStyle.settleDuration * 2 + 160
+        extraCondition: Config.options?.iris?.modules?.notificationPopup ?? true
+        component: IrisNotificationPopup {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisSettings"
+        requireEnabledPanel: false
+        open: GlobalStates.settingsOverlayOpen || GlobalStates.irisSettingsWarm
+        closeGraceMs: IrisStyle.settleDuration + 120
+        component: IrisSettings {}
+    }
+
+    LazyLoader {
+        activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+            && (Config.options?.iris?.dock?.enable ?? true)
+        component: IrisDock {}
+    }
+
+    // Niri overview backdrop: the shared iNiR backdrop surface and its
+    // `background.backdrop` settings (exposed in iRiS Settings › Desktop).
+    LazyLoader {
+        activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+            && CompositorService.isNiri
+            && (Config.options?.background?.backdrop?.enable ?? false)
+        source: "../background/Backdrop.qml"
+    }
+
+    LazyLoader {
+        activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+            && (Config.options?.enabledPanels ?? []).includes("irisBackground")
+            && (Config.options?.iris?.modules?.desktopWidgets ?? true)
+        component: Background {}
+    }
+
+    PanelLoader {
+        identifier: "irisOnScreenDisplay"
+        extraCondition: (Config.options?.iris?.modules?.osd ?? true)
+            && (!GlobalStates.barOpen
+                || !(Config.options?.enabledPanels ?? []).includes("irisBar")
+                || ((Config.options?.iris?.bar?.screenList ?? []).length > 0
+                    && !(Config.options.iris.bar.screenList).includes(GlobalStates.focusedScreen?.name ?? "")))
+        component: IrisOSD {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisPalette"
+        open: GlobalStates.searchOpen
+        closeGraceMs: IrisStyle.settleDuration + 120
+        extraCondition: Config.options?.iris?.modules?.palette ?? true
+        component: IrisPalette {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisControlCenter"
+        open: GlobalStates.controlPanelOpen || GlobalStates.irisControlsWarm
+        closeGraceMs: IrisStyle.settleDuration + 120
+        extraCondition: Config.options?.iris?.modules?.controlCenter ?? true
+        component: IrisControlCenter {}
+    }
+
+    // Bubbles carried off the Island, one layer per output: mapped only while
+    // something floats or a bubble is being carried.
+    Variants {
+        model: Quickshell.screens
+        delegate: LazyLoader {
+            id: bubbleLayerLoader
+            required property var modelData
+            activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+                && (["left", "right", "utility"].some(slot => String(Config.options?.iris?.bubbles?.[slot]?.place ?? "island") !== "island")
+                    || ["weather", "notifications", "controls", "sound", "mic", "tools", "media", "tray"]
+                        .some(kind => Config.options?.iris?.bubbles?.extras?.[kind]?.enable ?? false)
+                    || GlobalStates.irisBubbleDrag !== null)
+            component: IrisBubbleLayer { modelData: bubbleLayerLoader.modelData }
+        }
+    }
+
+    // The media bubble's floating card: resident while opened or pinned.
+    OnDemandPanelLoader {
+        identifier: "irisMediaCard"
+        requireEnabledPanel: false
+        open: GlobalStates.irisMediaCardOpen || (Config.options?.iris?.player?.cardPinned ?? false)
+        closeGraceMs: IrisStyle.settleDuration + 120
+        component: IrisMediaBubbleCard {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisSessionScreen"
+        open: GlobalStates.sessionOpen
+        extraCondition: Config.options?.iris?.modules?.sessionScreen ?? true
+        component: IrisSessionScreen {}
+    }
+
+    DeferredPanelLoader {
+        identifier: "irisLock"
+        extraCondition: Config.options?.iris?.modules?.lock ?? true
+        component: Lock {}
+    }
+
+    DeferredPanelLoader {
+        identifier: "irisPolkit"
+        extraCondition: Config.options?.iris?.modules?.polkit ?? true
+        component: IrisPolkit {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisCheatsheet"
+        open: GlobalStates.cheatsheetOpen
+        requireEnabledPanel: false
+        source: "../cheatsheet/Cheatsheet.qml"
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisOnScreenKeyboard"
+        open: GlobalStates.oskOpen
+        requireEnabledPanel: false
+        source: "../onScreenKeyboard/OnScreenKeyboard.qml"
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisRegionSelector"
+        open: GlobalStates.regionSelectorOpen
+        requireEnabledPanel: false
+        source: "../regionSelector/RegionSelector.qml"
+    }
+
+    // iRiS owns the grid picker's presentation; the carousel launcher and
+    // coverflow stay shared.
+    OnDemandPanelLoader {
+        identifier: "irisWallpaperSelector"
+        open: GlobalStates.wallpaperSelectorOpen
+        requireEnabledPanel: false
+        closeGraceMs: IrisStyle.settleDuration + 120
+        component: IrisWallpaperPicker {}
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisWallpaperLauncher"
+        open: GlobalStates.wallpaperLauncherOpen
+        requireEnabledPanel: false
+        source: "../wallpaperLauncher/WallpaperLauncher.qml"
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisCoverflowSelector"
+        open: GlobalStates.coverflowSelectorOpen
+        requireEnabledPanel: false
+        source: "../wallpaperSelector/WallpaperCoverflow.qml"
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisRecordingOsd"
+        open: RecorderStatus.isRecording
+        requireEnabledPanel: false
+        // The Dynamic Island owns recording as a live activity while it is shown.
+        extraCondition: !(GlobalStates.barOpen
+            && (Config.options?.enabledPanels ?? []).includes("irisBar"))
+        source: "../recordingOsd/RecordingOsd.qml"
+    }
+
+    OnDemandPanelLoader {
+        identifier: "irisTilingOverlay"
+        open: GlobalStates.tilingOverlayPickerOpen || GlobalStates.tilingOverlayOsdOpen
+        requireEnabledPanel: false
+        source: "../tilingOverlay/TilingOverlay.qml"
+    }
+}

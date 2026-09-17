@@ -89,9 +89,10 @@ FFmpeg when available in nixpkgs. They do not need to be duplicated in
 EasyEffects remains an opt-in audio feature. To use the native iNiR equalizer on NixOS,
 make EasyEffects visible to the iNiR service, for example with
 `programs.inir.extraPackages = [ pkgs.easyeffects ];` in addition to your compositor package.
-The nixpkgs EasyEffects wrapper owns its plugin search path; iNiR only verifies that the LSP
-Equalizer is actually available at runtime. The equalizer controls the existing EasyEffects
-pipeline and does not add or replace effects on its own.
+The nixpkgs EasyEffects wrapper owns its plugin search path; iNiR verifies that the LSP
+Equalizer is actually available at runtime. On a fresh EasyEffects setup with an empty output
+pipeline, iNiR can bootstrap its neutral 10-band `iNiR Equalizer` preset. Existing non-empty
+effect chains are never replaced automatically.
 
 For useful default shortcuts, merge iNiR actions into `programs.niri.settings.binds`:
 

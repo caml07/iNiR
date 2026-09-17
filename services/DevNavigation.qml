@@ -45,6 +45,9 @@ Singleton {
         { id: "wallpaper/coverflow", family: "ii", surface: "wallpaper-coverflow", view: "", safe: true, settleMs: 500 },
         { id: "tiling/picker", family: "shared", surface: "tiling", view: "picker", safe: true, settleMs: 350 },
         { id: "tiling/osd", family: "shared", surface: "tiling", view: "osd", safe: true, settleMs: 350 },
+        { id: "iris/palette", family: "iris", surface: "iris-palette", view: "", safe: true, settleMs: 300 },
+        { id: "iris/controls", family: "iris", surface: "iris-controls", view: "", safe: true, settleMs: 300 },
+        { id: "iris/session", family: "iris", surface: "iris-session", view: "", safe: true, settleMs: 300 },
         { id: "waffle/start", family: "waffle", surface: "waffle-search", view: "start", safe: true, settleMs: 350 },
         { id: "waffle/all-apps", family: "waffle", surface: "waffle-search", view: "all-apps", safe: true, settleMs: 350 },
         { id: "waffle/search", family: "waffle", surface: "waffle-search", view: "search", safe: true, settleMs: 450 },
@@ -79,6 +82,7 @@ Singleton {
         GlobalStates.sidebarRightOpen = false
         GlobalStates.controlPanelOpen = false
         GlobalStates.dashboardOpen = false
+        GlobalStates.sessionOpen = false
         GlobalStates.mediaControlsOpen = false
         GlobalStates.clipboardOpen = false
         GlobalStates.cheatsheetOpen = false
@@ -131,6 +135,9 @@ Singleton {
             GlobalStates.tilingOverlayPickerOpen = entry.view === "picker"
             GlobalStates.tilingOverlayOsdOpen = entry.view === "osd"
             break
+        case "iris-palette": GlobalStates.searchOpen = true; break
+        case "iris-controls": GlobalStates.controlPanelOpen = true; break
+        case "iris-session": GlobalStates.sessionOpen = true; break
         case "settings":
             if ((Config.options?.panelFamily ?? "ii") === "waffle"
                     && Config.options?.waffles?.settings?.useMaterialStyle !== true) {

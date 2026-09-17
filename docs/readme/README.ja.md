@@ -111,7 +111,7 @@ Wayland → GPU
 ## 機能
 
 **2つのパネルファミリー**、`Super+Shift+W` でオンザフライ切り替え：
-- **Material ii** — フローティングバー、サイドバー、ドック、5つのビジュアルスタイル（material、cards、aurora、inir、angel）
+- **Material ii** — フローティングバー、サイドバー、ドック、9つのグローバルスタイル（material、cards、aurora、inir、angel、regalia、zzz、cookie、editorial）
 - **Waffle** — Windows 11 スタイルのタスクバー、スタートメニュー、アクションセンター、通知センター
 
 **自動テーマ** — 壁紙を選ぶだけですべてが適応：
@@ -128,7 +128,7 @@ Wayland → GPU
 
 壁紙を選ぶとシステム全体が追従 — シェル、GTK/Qt アプリ、ターミナル、Firefox、Discord、SDDM ログイン画面。すべて自動。
 
-- **5つのビジュアルスタイル** — Material（ソリッド）、Cards、Aurora（ガラスブラー）、iNiR（TUI 風）、Angel（ネオブルータリズム）
+- **9つのグローバルスタイル** — Material（ソリッド）、Cards、Aurora（ガラスブラー）、iNiR（TUI 風）、Angel（ネオブルータリズム）、Regalia、ZZZ、Cookie Shapes、Editorial
 - **壁紙からの動的カラー** — Material You でシステム全体に伝播
 - **10のターミナルツール自動テーマ化** — foot、kitty、alacritty、starship、fuzzel、pywalfox、btop、lazygit、yazi
 - **アプリテーマ化** — GTK3/4、Qt（plasma-integration + darkly）、Firefox（MaterialFox）、Discord/Vesktop（System24）
@@ -175,7 +175,7 @@ Wayland → GPU
 - **自動アップデート** — `inir update`、ロールバック・マイグレーション・ユーザー変更保持付き
 - **ロック画面** と **セッション画面**（ログアウト/再起動/シャットダウン/サスペンド）
 - **Polkit エージェント**、**オンスクリーンキーボード**、**自動起動マネージャー**
-- **9言語** — 自動検出、AI 支援翻訳生成
+- **17ロケール** — 自動検出、AI 支援翻訳生成
 - **ナイトライト** — スケジュールまたは手動
 - **天気** — Open-Meteo、GPS・手動座標・都市名に対応
 - **バッテリー管理** — 設定可能なしきい値、クリティカル時の自動サスペンド

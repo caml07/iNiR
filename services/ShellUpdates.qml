@@ -238,19 +238,21 @@ Singleton {
         const useTerminal = Config.options?.shellUpdates?.openTerminalOnUpdate ?? true
 
         // Bash one-liner: writes the initial 'updating' marker, runs setup, captures
-        // exit code. Terminal mode pipes through tee so both the user and the log
-        // file see everything; detached mode redirects to the log file only.
+        // its exit code. Terminal mode mirrors output through tee with process
+        // substitution instead of a pipeline, so `$?` always belongs to setup and
+        // does not depend on PIPESTATUS surviving the terminal/scope launch path.
+        // Detached mode redirects to the log file only.
         // Terminal always stays open with a summary so people can read what happened.
         const teeCmd = useTerminal
-            ? "./setup -y update 2>&1 | tee '" + logPath + "'; rc=${PIPESTATUS[0]}"
+            ? "./setup -y update > >(tee '" + logPath + "') 2>&1; rc=$?"
             : "./setup -y -q update > '" + logPath + "' 2>&1; rc=$?"
         const preserveFailureStatus =
             "status=$(cat '" + statusPath + "' 2>/dev/null || true); " +
-            "if [ $rc -ne 0 ] && [[ $status != failed:* ]]; then echo \"failed:$rc\" > '" + statusPath + "'; fi; "
+            "if (( rc != 0 )) && [[ $status != failed:* ]]; then echo \"failed:$rc\" > '" + statusPath + "'; fi; "
         const termTail =
             "echo; " +
             preserveFailureStatus +
-            "if [ $rc -eq 0 ]; then " +
+            "if (( rc == 0 )); then " +
                 "echo 'All good — iNiR updated successfully. The shell will restart on its own.'; " +
                 "echo 'You can close this window whenever you want.'; " +
             "else " +

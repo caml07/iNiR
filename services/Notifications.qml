@@ -394,7 +394,10 @@ Singleton {
             return maxLifetime;
         }
 
-        // 3) Defaults by urgency (use enum comparison, not fragile toString)
+        // 3) Defaults by urgency (use enum comparison, not fragile toString).
+        // iRiS banners have their own, shorter, duration for low and normal.
+        if (Config.options?.panelFamily === "iris" && notification.urgency !== NotificationUrgency.Critical)
+            return Math.max(1000, Number(Config.options?.iris?.notifications?.duration ?? 4000));
         if (notification.urgency === NotificationUrgency.Low) {
             return Config.options?.notifications?.timeoutLow ?? 5000;
         } else if (notification.urgency === NotificationUrgency.Critical) {

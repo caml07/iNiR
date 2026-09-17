@@ -139,14 +139,23 @@ Singleton {
         wpctlSetMicMute.exec(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", muteVal])
     }
 
+    function _isVirtualSource(dev): bool {
+        const props = dev?.properties ?? {}
+        const nodeName = String(props["node.name"] ?? dev?.name ?? "")
+        const appId = String(props["application.id"] ?? "")
+        return nodeName === "easyeffects_source" || appId === "com.github.wwmm.easyeffects"
+            || String(props["node.virtual"] ?? "false") === "true"
+    }
+
     function _hardwareSourceId(): int {
+        // The default source is the one setSourceVolume() writes; read it back
+        // whenever it is a real device. Reading the first hardware input instead
+        // snapped the level back to an unrelated device (e.g. a USB mic as default
+        // beside an onboard input at 100 %) after every adjustment.
+        const defaultId = Number(root.source?.id ?? 0)
+        if (defaultId > 0 && !root._isVirtualSource(root.source)) return defaultId
         for (const dev of root.inputDevices) {
-            const props = dev.properties ?? {}
-            const nodeName = String(props["node.name"] ?? dev.name ?? "")
-            const appId = String(props["application.id"] ?? "")
-            const isVirtual = String(props["node.virtual"] ?? "false") === "true"
-            if (nodeName === "easyeffects_source" || appId === "com.github.wwmm.easyeffects" || isVirtual)
-                continue
+            if (root._isVirtualSource(dev)) continue
             const id = Number(dev.id ?? 0)
             if (id > 0) return id
         }

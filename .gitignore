@@ -26,6 +26,8 @@ mcp.json
 Session.md*
 session-*.md
 **/codemap.md
+# Private design contracts (kept local by the maintainer)
+modules/iris/DESIGN.md
 
 # AI tool directories
 .design-system/

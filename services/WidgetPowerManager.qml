@@ -28,6 +28,7 @@ Singleton {
     // Global summary for settings and callers without an output context.
     readonly property bool widgetsActive: !root.shouldPauseForOutput("")
     readonly property bool reducedMode: root.shouldPauseForOutput("")
+    readonly property string pauseReason: root.pauseReasonForOutput("")
 
     // ══════════════════════════════════════════════════════════════════════
     // CONFIGURATION
@@ -104,6 +105,20 @@ Singleton {
         return root.shouldPauseForOutput(outputName);
     }
 
+    function pauseReasonForOutput(outputName: string): string {
+        const scopedOutput = String(outputName ?? "");
+        if (scopedOutput.length > 0
+                && !DesktopWidgetLayout.outputAllowed(scopedOutput))
+            return "outputDisabled";
+        if (!root.enabled || GlobalStates.widgetEditMode)
+            return "";
+        const triggers = root._triggersForOutput(scopedOutput);
+        if (triggers.gameMode) return "gameMode";
+        if (triggers.fullscreen) return "fullscreen";
+        if (triggers.windowsPresent) return "windowsPresent";
+        return "";
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // IPC HANDLER
     // ══════════════════════════════════════════════════════════════════════
@@ -126,6 +141,7 @@ Singleton {
             return JSON.stringify({
                 enabled: root.enabled,
                 widgetsActive: root.widgetsActive,
+                pauseReason: root.pauseReason,
                 triggers: root._triggersForOutput(""),
                 outputs: outputs
             }, null, 2)

@@ -219,7 +219,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        visible: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
+        shown: root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur
     }
 
     ColumnLayout {
@@ -347,7 +347,7 @@ AbstractBackgroundWidget {
                 font.pixelSize: Math.round(Appearance.font.pixelSize.small * root.scaleFactor)
             }
 
-            SelectionGroupButton {
+            WidgetChoiceButton {
                 Layout.fillWidth: true
                 leftmost: true
                 rightmost: true

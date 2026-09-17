@@ -295,7 +295,9 @@ Scope {
                 color: "transparent"
 
                 WlrLayershell.namespace: "quickshell:onScreenDisplay"
-            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.layer: root.currentIndicator === "keyboardLayout"
+                ? WlrLayer.Top
+                : WlrLayer.Overlay
             anchors {
                 top: root.currentIndicator === "keyboardLayout" ? true : !(Config.options?.bar?.bottom ?? false)
                 bottom: root.currentIndicator === "keyboardLayout" ? false : Config.options?.bar?.bottom ?? false
@@ -421,22 +423,6 @@ Scope {
             }
         }
     }
-    }
-
-    IpcHandler {
-        target: "osdVolume"
-
-        function trigger(): void {
-            root.triggerOsd();
-        }
-
-        function hide(): void {
-            root.hideOsd();
-        }
-
-        function toggle(): void {
-            GlobalStates.osdVolumeOpen = !GlobalStates.osdVolumeOpen;
-        }
     }
 
     Loader {

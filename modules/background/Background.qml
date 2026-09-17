@@ -27,17 +27,24 @@ import qs.modules.background.widgets.notes
 import qs.modules.background.widgets.calendar
 import qs.modules.background.widgets.todo
 import qs.modules.background.widgets.timers
+import qs.modules.background.widgets.shape
+import qs.modules.background.widgets.dateBadge
 import qs.modules.background.widgets.uptime
+import qs.modules.background.widgets.dayProgress
 import qs.modules.background.widgets.worldClock
 import qs.modules.background.widgets.userCard
 import qs.modules.background.widgets.newsTicker
 import qs.modules.background.widgets.mascot
 import qs.modules.background.widgets.japaneseTypography
 import qs.modules.background.desktopItems
+import qs.modules.iris.components
+import qs.modules.iris.style
 import "root:modules/common/functions/parallax.js" as ParallaxMath
+import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 
 Scope {
     id: backgroundScope
+    property var organicEdgeHosts: ({})
 
     // Bounded diagnostics for the desktop clock. They are inert unless the
     // supervised shell is loaded with INIR_REGION_DEBUG=1.
@@ -72,11 +79,27 @@ Scope {
         return order
     }
 
+    function applyOrganicEdgeNamedPreset(presets, name: string, label: string): string {
+        const preset = presets.find(p => p.name.toLowerCase() === name.toLowerCase())
+        if (!preset) return "Unknown Organic edge " + label.toLowerCase()
+        const updates = {}
+        for (const key of Object.keys(preset.values))
+            updates[OrganicEdgeConfig.path + "." + key] = preset.values[key]
+        Config.setNestedValues(updates)
+        return "Organic edge " + label + ": " + preset.name
+    }
+
     IpcHandler {
         target: "background"
         function toggleEditMode(): string {
             GlobalStates.setWidgetEditMode(!GlobalStates.widgetEditMode)
             return GlobalStates.widgetEditMode ? "edit mode on" : "edit mode off"
+        }
+
+        function toggleWidgetManager(): string {
+            if (!GlobalStates.widgetEditMode) GlobalStates.setWidgetEditMode(true)
+            GlobalStates.desktopWidgetManagerToggleRequested(GlobalStates.focusedScreen?.name ?? "")
+            return "widget manager toggled"
         }
 
         function setEditMode(enabled: bool): string {
@@ -107,6 +130,32 @@ Scope {
             })
         }
 
+        function applyOrganicEdgePreset(name: string): string {
+            return backgroundScope.applyOrganicEdgeNamedPreset(OrganicEdgeConfig.presets, name, "scene")
+        }
+
+        function applyOrganicEdgeComposition(name: string): string {
+            return backgroundScope.applyOrganicEdgeNamedPreset(OrganicEdgeConfig.compositionPresets, name, "composition")
+        }
+
+        function applyOrganicEdgeMaterial(name: string): string {
+            return backgroundScope.applyOrganicEdgeNamedPreset(OrganicEdgeConfig.materialPresets, name, "material")
+        }
+
+        function applyOrganicEdgeResponse(name: string): string {
+            return backgroundScope.applyOrganicEdgeNamedPreset(OrganicEdgeConfig.responsePresets, name, "response")
+        }
+
+        function organicEdgeState(): string {
+            return JSON.stringify(Object.values(backgroundScope.organicEdgeHosts)
+                .map(host => host.diagnostics()))
+        }
+
+        function setOrganicEdgeEnabled(enabled: bool): string {
+            Config.setNestedValue("background.edgeWidgets.organic.enable", enabled)
+            return enabled ? "Organic edge enabled" : "Organic edge disabled"
+        }
+
         function desktopItemsState(): string {
             return DesktopItems.diagnostics()
         }
@@ -121,7 +170,7 @@ Scope {
                 imageConverter: false, mediaControls: false,
                 visualizer: false, systemMonitor: false, battery: false,
                 notes: false, calendarUpcoming: false, monthCalendar: false,
-                todo: false, timers: false, uptime: false,
+                todo: false, timers: false, dayProgress: false, uptime: false, shape: false, dateBadge: false, editorial: false,
                 newsTicker: false, mascot: false, japaneseTypography: false,
                 worldClock: false, userCard: false
             })
@@ -188,7 +237,7 @@ Scope {
         function setWidgetEnabled(widgetName: string, enabled: bool): string {
             const knownWidgets = ["weather", "clock", "customImage", "imageConverter",
                 "mediaControls", "visualizer", "systemMonitor", "battery", "notes",
-                "calendarUpcoming", "monthCalendar", "todo", "timers", "uptime",
+                "calendarUpcoming", "monthCalendar", "todo", "timers", "dayProgress", "uptime", "shape", "dateBadge", "editorial",
                 "newsTicker", "mascot", "japaneseTypography",
                 "worldClock", "userCard"];
             if (!knownWidgets.includes(widgetName))
@@ -487,6 +536,24 @@ Scope {
             }
         }
 
+        // An OnDemand layer that took keyboard focus (a click on the desktop)
+        // keeps it across workspace switches and focus-window actions on Niri,
+        // so the new workspace's window never receives focus and the Dock needs
+        // a second click. Dropping to None for a moment hands focus back to the
+        // compositor's focused window; re-arming a mapped surface never grabs it.
+        property bool _keyboardReleased: false
+        function releaseKeyboard(): void {
+            if (bgRoot._menuOpen || (!bgRoot._needsKeyboardFocus && !bgRoot._keyboardReleased)) return
+            bgRoot._keyboardReleased = true
+            keyboardRearm.restart()
+        }
+        Timer { id: keyboardRearm; interval: 120; onTriggered: bgRoot._keyboardReleased = false }
+        Connections {
+            target: CompositorService.isNiri ? NiriService : null
+            function onFocusedWorkspaceIdChanged(): void { bgRoot.releaseKeyboard() }
+            function onWindowFocusRequested(): void { bgRoot.releaseKeyboard() }
+        }
+
         // True if any widget on this background needs keyboard input (sticky notes
         // today, future text-entry widgets later). Used to flip the layer-shell
         // surface to focusable=true so TextEdits actually receive key events.
@@ -495,8 +562,16 @@ Scope {
         // Desktop items remain pointer-driven until their focus contract is
         // owned by the background surface; do not make a stale global selection
         // turn the Bottom layer keyboard-focusable during reload.
-        readonly property bool _needsKeyboardFocus: bgRoot._widgetEnabled("notes", false)
-            || bgRoot._widgetEnabled("todo", false)
+        // A desktop menu is a grabbing popup of this surface: its parent's keyboard
+        // mode never changes while one is open.
+        readonly property bool _menuOpen: irisDesktopMenu.active || desktopContextMenu.active || desktopItemContextMenu.active
+        // Once a desktop menu has closed, the keyboard its right-click took goes back too.
+        on_MenuOpenChanged: if (!bgRoot._menuOpen) Qt.callLater(bgRoot.releaseKeyboard)
+        readonly property bool _needsKeyboardFocus: GlobalStates.deferredPanelsReady
+            && (bgRoot._menuOpen || !bgRoot._keyboardReleased)
+            && (GlobalStates.widgetEditMode
+                || bgRoot._widgetEnabled("notes", false)
+                || bgRoot._widgetEnabled("todo", false))
 
         // Zone occupancy: map zone name → array of widget names
         readonly property var _builtinWidgets: [
@@ -514,6 +589,9 @@ Scope {
             { key: "todo",               defaultOn: false, icon: "checklist" },
             { key: "timers",             defaultOn: false, icon: "timer" },
             { key: "uptime",             defaultOn: false, icon: "avg_pace" },
+            { key: "shape", defaultOn: false, icon: "category" },
+            { key: "dateBadge", defaultOn: false, icon: "today" },
+            { key: "editorial", defaultOn: false, icon: "text_fields" },
             { key: "newsTicker",         defaultOn: false, icon: "newspaper" },
             { key: "mascot",             defaultOn: false, icon: "pets" },
             { key: "japaneseTypography", defaultOn: false, icon: "translate" },
@@ -600,7 +678,7 @@ Scope {
         // True while ii is the family actually painting the screen. The family
         // LazyLoader can retain the inactive tree, so every heavy source in here
         // has to ask, not assume.
-        readonly property bool _familyOwnsScreen: (Config.options?.panelFamily ?? "ii") !== "waffle"
+        readonly property bool _familyOwnsScreen: ["ii", "iris"].includes(Config.options?.panelFamily ?? "ii")
         property bool wallpaperIsVideo: wallpaperPathRaw.endsWith(".mp4") || wallpaperPathRaw.endsWith(".webm") || wallpaperPathRaw.endsWith(".mkv") || wallpaperPathRaw.endsWith(".avi") || wallpaperPathRaw.endsWith(".mov")
         property bool wallpaperIsGif: wallpaperPathRaw.toLowerCase().endsWith(".gif")
         property string wallpaperPath: bgRoot.wallpaperPathRaw
@@ -914,11 +992,11 @@ Scope {
         // Keep background behind the lock surface. Moving this to Overlay can capture input.
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:background"
-        // Make the desktop layer focusable only when an interactive widget needs it
-        // (sticky notes today). With OnDemand the compositor only routes keyboard
-        // input to us when the user clicks on the surface, so it doesn't steal
-        // focus from real apps. When no interactive widget is enabled we stay
-        // None to keep things lean.
+        // Map the desktop keyboard-inert during startup, then arm OnDemand after
+        // the first-frame/deferred lifecycle has settled. Niri can temporarily
+        // focus a newly mapped OnDemand layer surface during shell restart, which
+        // loses the previously focused app. Changing an already-mapped surface to
+        // OnDemand is safe and still lets Notes/Todo receive keyboard input.
         WlrLayershell.keyboardFocus: bgRoot._needsKeyboardFocus
             ? WlrKeyboardFocus.OnDemand
             : WlrKeyboardFocus.None
@@ -1606,15 +1684,21 @@ Scope {
                 onClicked: function(mouse) {
                     if (mouse.button === Qt.LeftButton) {
                         desktopFocusSink.forceActiveFocus()
+                        // A click on the bare desktop is not typing: Niri gave this
+                        // OnDemand surface the keyboard for it, so hand it straight
+                        // back to the window that had it.
+                        bgRoot.releaseKeyboard()
                         GlobalStates.clearDesktopItemSelection()
                         if (desktopContextMenu.active) desktopContextMenu.close()
                         if (desktopItemContextMenu.active) desktopItemContextMenu.close()
+                        if (irisDesktopMenu.active) irisDesktopMenu.close()
                         return
                     }
                     if (desktopItemContextMenu.active) desktopItemContextMenu.close()
                     desktopMenuAnchor.x = mouse.x
                     desktopMenuAnchor.y = mouse.y
-                    desktopContextMenu.requestOpen()
+                    if ((Config.options?.panelFamily ?? "ii") === "iris") irisDesktopMenu.requestOpen()
+                    else desktopContextMenu.requestOpen()
                 }
             }
 
@@ -1657,15 +1741,7 @@ Scope {
                         } },
                     { type: "separator" },
                     { text: Translation.tr("Widget settings"), iconName: "settings", monochromeIcon: true,
-                        action: () => {
-                            if (Config.options?.settingsUi?.overlayMode !== false) {
-                                GlobalStates.settingsOverlayRequestedPage = 14
-                                GlobalStates.settingsOverlayOpen = true
-                            } else {
-                                Quickshell.execDetached(["/usr/bin/env", "QS_SETTINGS_PAGE=14",
-                                    Quickshell.shellPath("scripts/inir"), "settings-window"])
-                            }
-                        } },
+                        action: () => GlobalStates.openSettingsPage(14) },
                     { text: Translation.tr("Done editing"), iconName: "check", monochromeIcon: true,
                         action: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) } }
                 ] : [
@@ -1684,6 +1760,57 @@ Scope {
                 ]
             }
 
+            // iRiS desktop menu: the Island's material, quick-action tiles and
+            // keyboard, growing out of the pointer. Only the actions that drive
+            // something under iRiS (shell layout editing is ii/Waffle-only).
+            IrisDesktopMenu {
+                id: irisDesktopMenu
+                z: 27
+                anchorItem: desktopMenuAnchor
+                readonly property int gridSize: Config.getNestedValue("background.widgets.editGrid.size", 32)
+                readonly property bool gridSnap: Config.getNestedValue("background.widgets.editGrid.snap", true)
+                model: GlobalStates.widgetEditMode ? [
+                    { type: "quick", items: [
+                        { text: Translation.tr("Widgets"), iconName: "dashboard_customize",
+                            action: () => { widgetManagerPanel.shown = true } },
+                        { text: irisDesktopMenu.gridSnap ? Translation.tr("Snap on") : Translation.tr("Snap off"),
+                            iconName: irisDesktopMenu.gridSnap ? "grid_on" : "grid_off",
+                            action: () => Config.setNestedValue("background.widgets.editGrid.snap", !irisDesktopMenu.gridSnap) },
+                        { text: Translation.tr("Done"), iconName: "check", accent: true,
+                            action: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) } }
+                    ] },
+                    { type: "separator" },
+                    { text: Translation.tr("Grid size"), iconName: "grid_4x4", detail: irisDesktopMenu.gridSize + " px",
+                        action: () => {
+                            const sizes = [16, 32, 48, 64]
+                            Config.setNestedValue("background.widgets.editGrid.size",
+                                sizes[(sizes.indexOf(irisDesktopMenu.gridSize) + 1) % sizes.length])
+                        } },
+                    { text: Translation.tr("Widget settings"), iconName: "settings",
+                        action: () => GlobalStates.openSettingsPage(14) }
+                ] : [
+                    { type: "quick", items: [
+                        { text: Translation.tr("Wallpaper"), iconName: "wallpaper",
+                            action: () => {
+                                GlobalStates.wallpaperSelectorTargetMonitor = bgRoot.screenName
+                                GlobalActions.runLauncher(["wallpaperSelector", "toggle"])
+                            } },
+                        { text: Translation.tr("Widgets"), iconName: "widgets",
+                            action: () => GlobalStates.setWidgetEditMode(true) },
+                        { text: Translation.tr("Search"), iconName: "search",
+                            action: () => { GlobalStates.searchOpen = true } }
+                    ] },
+                    { type: "separator" },
+                    { text: Translation.tr("Quick controls"), iconName: "tune",
+                        action: () => { GlobalStates.controlPanelOpen = true } },
+                    { text: Translation.tr("Settings"), iconName: "settings",
+                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "settings"]) } },
+                    { type: "separator" },
+                    { text: Translation.tr("Reload shell"), iconName: "refresh",
+                        action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
+                ]
+            }
+
             // Managed items use the same stable screen-level popup path as the
             // proven bare-desktop menu. Do not anchor a PopupWindow inside the
             // transformed WidgetCanvas delegate tree.
@@ -1696,6 +1823,15 @@ Scope {
                 closeOnHoverLost: true
                 closeOnHoverLostAfterEntered: true
                 closeOnHoverLostDelay: 700
+            }
+
+            OrganicEdgeWidget {
+                id: organicEdge
+                Component.onCompleted: backgroundScope.organicEdgeHosts[screenName] = organicEdge
+                Component.onDestruction: delete backgroundScope.organicEdgeHosts[screenName]
+                anchors.fill: parent
+                z: 19
+                screenName: modelData?.name ?? ""
             }
 
             WidgetCanvas {
@@ -1741,7 +1877,7 @@ Scope {
                 width: parent.width
                 height: parent.height
                 // Disable parallax transform when locked/safe/backdrop
-                readonly property bool _parallaxActive: useParallax
+                readonly property bool _parallaxActive: useParallax && !GlobalStates.widgetEditMode
                     && !GlobalStates.screenLocked && !bgRoot.wallpaperSafetyTriggered && !bgRoot.backdropActive
 
                 // Managed desktop items are a separate, lightweight canvas model.
@@ -2105,6 +2241,11 @@ Scope {
                     readonly property real zoneHeight: zoneWorkArea.height ?? safeHeight
                     readonly property bool hasSelection: GlobalStates.selectedDesktopWidget
                         .startsWith((bgRoot.screen?.name ?? "") + "::")
+                    readonly property bool manipulating: {
+                        if (!hasSelection) return false
+                        const widget = bgRoot._loadedWidget(GlobalStates.selectedDesktopWidget.split("::")[1])
+                        return widget !== null && (widget.isDragging || widget._isResizing)
+                    }
 
                     // Grid dots at intersections. The lattice uses the same
                     // panel-aware bounds as drag snapping, so moving the bar or
@@ -2241,7 +2382,8 @@ Scope {
                             width: zw - 8
                             height: zh - 8
                             radius: Appearance.rounding.small
-                            opacity: editGridOverlay.hasSelection ? 1 : 0.32
+                            visible: editGridOverlay.manipulating
+                            opacity: 0.65
                             color: occupied
                                 ? CF.ColorUtils.applyAlpha(hasLocked ? Appearance.colors.colError : editGridOverlay.gridColor, 0.04)
                                 : "transparent"
@@ -2312,379 +2454,36 @@ Scope {
                     anchors.fill: parent
                     visible: opacity > 0
                     opacity: GlobalStates.widgetEditMode ? 1 : 0
-                    z: 200
+                    z: 20000
+                    enabled: GlobalStates.widgetEditMode
 
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled
                         NumberAnimation { duration: Appearance.animation.elementMoveEnter.duration; easing.type: Appearance.animation.elementMoveEnter.type; easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve }
                     }
 
-                    // ── Floating Edit Controls Bar ────────────────────
-                    Item {
+                    DesktopEditToolbar {
                         id: editControlsBar
+                        availableWidth: Math.max(0, editGridOverlay.safeWidth - 16)
+                        availableHeight: editGridOverlay.safeHeight
+                        outputName: bgRoot.screenName
+                        hasSelection: editGridOverlay.hasSelection
+                        libraryOpen: widgetManagerPanel.shown
                         x: Math.round(editGridOverlay.safeLeft
                             + (editGridOverlay.safeWidth - width) / 2)
-                        y: Math.round(Math.max(editGridOverlay.safeTop,
-                            editGridOverlay.safeBottom - height - 12))
-                        width: Math.min(editGridOverlay.safeWidth,
-                            editBarRow.implicitWidth + 24)
-                        height: 52
-
-                        Toolbar {
-                            anchors.fill: parent
-                            padding: 6
-                            spacing: 4
-                            screenX: editControlsBar.x
-                            screenY: editControlsBar.y
-                        }
-
-                        // Prevent clicks from falling through
-                        MouseArea {
-                            anchors.fill: parent
-                            z: -1
-                            acceptedButtons: Qt.AllButtons
-                        }
-
-                        Row {
-                            id: editBarRow
-                            anchors.centerIn: parent
-                            spacing: 4
-
-                            // Grid snap toggle
-                            RippleButton {
-                                id: gridSnapBtn
-                                width: 36; height: 36
-                                buttonRadius: Appearance.rounding.full
-                                toggled: Config.getNestedValue("background.widgets.editGrid.snap", true)
-                                colBackground: "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colBackgroundToggled: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.16)
-                                colBackgroundToggledHover: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.24)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                downAction: () => {
-                                    const current = Config.getNestedValue("background.widgets.editGrid.snap", true);
-                                    Config.setNestedValue("background.widgets.editGrid.snap", !current);
-                                }
-                                contentItem: MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "grid_3x3"
-                                    iconSize: 20
-                                    color: gridSnapBtn.toggled ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                                }
-                                StyledToolTip { text: Translation.tr("Snap to grid") }
-                            }
-
-                            // Grid size cycle
-                            RippleButton {
-                                id: gridSizeBtn
-                                readonly property int _gridSize: Config.getNestedValue("background.widgets.editGrid.size", 32)
-                                readonly property bool _isCustom: _gridSize !== 32
-                                width: gridSizeBtnRow.implicitWidth + 12; height: 36
-                                buttonRadius: Appearance.rounding.full
-                                colBackground: _isCustom ? CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.10) : "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                downAction: () => {
-                                    const sizes = [16, 32, 48, 64];
-                                    const current = gridSizeBtn._gridSize;
-                                    const idx = sizes.indexOf(current);
-                                    const next = sizes[(idx + 1) % sizes.length];
-                                    Config.setNestedValue("background.widgets.editGrid.size", next);
-                                }
-                                contentItem: Row {
-                                    id: gridSizeBtnRow
-                                    anchors.centerIn: parent
-                                    spacing: 2
-                                    MaterialSymbol {
-                                        text: "grid_4x4"
-                                        iconSize: 14
-                                        color: gridSizeBtn._isCustom ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                    StyledText {
-                                        text: gridSizeBtn._gridSize + ""
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        font.family: Appearance.font.family.numbers
-                                        font.weight: Font.Medium
-                                        color: gridSizeBtn._isCustom ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                }
-                                StyledToolTip { text: Translation.tr("Grid size: %1px — click to cycle").arg(gridSizeBtn._gridSize) }
-                            }
-
-                            // Separator
-                            Rectangle {
-                                width: 1; height: 24
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                            }
-
-                            MaterialSymbol {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "widgets"
-                                iconSize: 16
-                                color: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.62)
-                            }
-
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: editGridOverlay.safeWidth >= 900
-                                text: Translation.tr("Widgets")
-                                font.pixelSize: Appearance.font.pixelSize.smaller
-                                font.weight: Font.Medium
-                                color: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.72)
-                            }
-
-                            RippleButton {
-                                width: 26; height: 36
-                                enabled: widgetToggleRail.contentX > 1
-                                opacity: enabled ? 1 : 0.28
-                                buttonRadius: Appearance.rounding.full
-                                colBackground: "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                releaseAction: () => widgetToggleRail.scrollBy(-144)
-                                cancelAction: () => {}
-                                contentItem: MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "chevron_left"
-                                    iconSize: 18
-                                    color: Appearance.colors.colOnLayer2
-                                }
-                                StyledToolTip { text: Translation.tr("Previous widgets") }
-                            }
-
-                            Flickable {
-                                id: widgetToggleRail
-                                width: Math.max(72, Math.min(420,
-                                    editGridOverlay.safeWidth - 530,
-                                    widgetToggleRow.implicitWidth))
-                                height: 36
-                                contentWidth: widgetToggleRow.implicitWidth
-                                contentHeight: height
-                                clip: true
-                                interactive: contentWidth > width
-                                boundsBehavior: Flickable.StopAtBounds
-                                flickableDirection: Flickable.HorizontalFlick
-
-                                function scrollBy(delta: real): void {
-                                    const maxX = Math.max(0, contentWidth - width)
-                                    contentX = Math.max(0, Math.min(maxX, contentX + delta))
-                                }
-
-                                WheelHandler {
-                                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                    onWheel: event => {
-                                        const horizontal = event.angleDelta.x
-                                        const vertical = event.angleDelta.y
-                                        const delta = Math.abs(horizontal) > Math.abs(vertical)
-                                            ? -horizontal : -vertical
-                                        widgetToggleRail.scrollBy(delta === 0 ? 0
-                                            : (delta > 0 ? 120 : -120))
-                                        event.accepted = true
-                                    }
-                                }
-
-                                Row {
-                                    id: widgetToggleRow
-                                    spacing: 2
-
-                                    Repeater {
-                                model: [
-                                    { key: "weather", icon: "cloud", label: "Weather", defaultOn: false },
-                                    { key: "customImage", icon: "add_photo_alternate", label: "Custom Image", defaultOn: false },
-                                    { key: "imageConverter", icon: "transform", label: "Image Converter", defaultOn: false },
-                                    { key: "clock", icon: "schedule", label: "Clock", defaultOn: true },
-                                    { key: "mediaControls", icon: "album", label: "Media", defaultOn: false },
-                                    { key: "japaneseTypography", icon: "translate", label: "Japanese Typography", defaultOn: false },
-                                    { key: "visualizer", icon: "graphic_eq", label: "Visualizer", defaultOn: false },
-                                    { key: "systemMonitor", icon: "monitor_heart", label: "System Monitor", defaultOn: false },
-                                    { key: "battery", icon: "battery_full", label: "Battery", defaultOn: false },
-                                    { key: "notes", icon: "sticky_note_2", label: "Notes", defaultOn: false },
-                                    { key: "calendarUpcoming", icon: "event", label: "Upcoming Events", defaultOn: false },
-                                    { key: "monthCalendar", icon: "calendar_month", label: "Month Calendar", defaultOn: false },
-                                    { key: "todo", icon: "checklist", label: "Todo", defaultOn: false },
-                                    { key: "timers", icon: "timer", label: "Timers", defaultOn: false },
-                                    { key: "uptime", icon: "avg_pace", label: "System Uptime", defaultOn: false },
-                                    { key: "mascot", icon: "pets", label: "Mascot", defaultOn: false },
-                                    { key: "newsTicker", icon: "newspaper", label: "News Ticker", defaultOn: false },
-                                    { key: "worldClock", icon: "public", label: "World Clock", defaultOn: false },
-                                    { key: "userCard", icon: "account_circle", label: "User Card", defaultOn: false }
-                                ]
-                                RippleButton {
-                                    id: quickWidgetButton
-                                    required property var modelData
-                                    readonly property bool widgetEnabled: bgRoot._widgetEnabled(modelData.key, modelData.defaultOn)
-                                    width: 36; height: 36
-                                    buttonRadius: Appearance.rounding.full
-                                    toggled: widgetEnabled
-                                    colBackground: "transparent"
-                                    colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                    colBackgroundToggled: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.16)
-                                    colBackgroundToggledHover: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.24)
-                                    colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                    releaseAction: () => DesktopWidgetLayout.setGloballyEnabled(
-                                        quickWidgetButton.modelData.key,
-                                        !quickWidgetButton.widgetEnabled)
-                                    cancelAction: () => {}
-                                    contentItem: MaterialSymbol {
-                                        anchors.centerIn: parent
-                                        text: quickWidgetButton.modelData.icon
-                                        iconSize: 18
-                                        color: quickWidgetButton.toggled ? Appearance.colors.colPrimary : CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.5)
-                                    }
-                                    StyledToolTip { text: quickWidgetButton.modelData.label }
-                                }
-                            }
-
-                            // Custom widget toggles
-                            Repeater {
-                                model: CustomWidgets.ready ? CustomWidgets.widgets : []
-                                RippleButton {
-                                    id: customWidgetButton
-                                    required property var modelData
-                                    readonly property bool widgetEnabled: DesktopWidgetLayout.enabled(
-                                        bgRoot.screenName, "custom." + modelData.id,
-                                        Config.getNestedValue("background.widgets.custom." + modelData.id + ".enable", false))
-                                    width: 36; height: 36
-                                    buttonRadius: Appearance.rounding.full
-                                    toggled: widgetEnabled
-                                    colBackground: "transparent"
-                                    colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                    colBackgroundToggled: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.16)
-                                    colBackgroundToggledHover: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.24)
-                                    colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                    releaseAction: () => DesktopWidgetLayout.setGloballyEnabled(
-                                        "custom." + customWidgetButton.modelData.id,
-                                        !customWidgetButton.widgetEnabled)
-                                    cancelAction: () => {}
-                                    contentItem: MaterialSymbol {
-                                        anchors.centerIn: parent
-                                        text: customWidgetButton.modelData.icon || "widgets"
-                                        iconSize: 18
-                                        color: customWidgetButton.toggled ? Appearance.colors.colPrimary : CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.5)
-                                    }
-                                    StyledToolTip { text: customWidgetButton.modelData.name }
-                                }
-                            }
-                                }
-                            }
-
-                            RippleButton {
-                                width: 26; height: 36
-                                enabled: widgetToggleRail.contentX
-                                    < Math.max(0, widgetToggleRail.contentWidth - widgetToggleRail.width) - 1
-                                opacity: enabled ? 1 : 0.28
-                                buttonRadius: Appearance.rounding.full
-                                colBackground: "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                releaseAction: () => widgetToggleRail.scrollBy(144)
-                                cancelAction: () => {}
-                                contentItem: MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "chevron_right"
-                                    iconSize: 18
-                                    color: Appearance.colors.colOnLayer2
-                                }
-                                StyledToolTip { text: Translation.tr("More widgets") }
-                            }
-
-                            // Separator
-                            Rectangle {
-                                width: 1; height: 24
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                            }
-
-                            // Toggle the richer widget manager. Keep a visible
-                            // label here: this is the primary navigation path,
-                            // not an ambiguous add button.
-                            RippleButton {
-                                id: manageWidgetsButton
-                                width: manageWidgetsContent.implicitWidth + 16
-                                height: 36
-                                buttonRadius: Appearance.rounding.full
-                                toggled: widgetManagerPanel.shown
-                                colBackground: "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colBackgroundToggled: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.16)
-                                colBackgroundToggledHover: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.24)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                releaseAction: () => { widgetManagerPanel.shown = !widgetManagerPanel.shown }
-                                cancelAction: () => {}
-                                contentItem: Row {
-                                    id: manageWidgetsContent
-                                    anchors.centerIn: parent
-                                    spacing: 4
-                                    MaterialSymbol {
-                                        text: "tune"
-                                        iconSize: 17
-                                        color: manageWidgetsButton.toggled
-                                            ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                    StyledText {
-                                        visible: editGridOverlay.safeWidth >= 1000
-                                        text: Translation.tr("Manage widgets")
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        font.weight: Font.Medium
-                                        color: manageWidgetsButton.toggled
-                                            ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-                                }
-                                StyledToolTip { text: Translation.tr("Search, filter, lock and configure widgets") }
-                            }
-
-                            // Open full settings
-                            RippleButton {
-                                width: 36; height: 36
-                                buttonRadius: Appearance.rounding.full
-                                colBackground: "transparent"
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.08)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                                downAction: () => {
-                                    if (Config.options?.settingsUi?.overlayMode !== false) {
-                                        GlobalStates.settingsOverlayRequestedPage = 14
-                                        GlobalStates.settingsOverlayOpen = true
-                                    } else {
-                                        Quickshell.execDetached(["/usr/bin/env", "QS_SETTINGS_PAGE=14", Quickshell.shellPath("scripts/inir"), "settings-window"])
-                                    }
-                                }
-                                contentItem: MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "settings"
-                                    iconSize: 18
-                                    color: Appearance.colors.colOnLayer2
-                                }
-                                StyledToolTip { text: Translation.tr("Widget settings") }
-                            }
-
-                            // Separator
-                            Rectangle {
-                                width: 1; height: 24
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: CF.ColorUtils.applyAlpha(Appearance.colors.colOnLayer2, 0.12)
-                            }
-
-                            // Exit edit mode
-                            RippleButton {
-                                width: 36; height: 36
-                                buttonRadius: Appearance.rounding.full
-                                colBackground: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.12)
-                                colBackgroundHover: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.20)
-                                colRipple: CF.ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.24)
-                                downAction: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) }
-                                contentItem: MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "check"
-                                    iconSize: 20
-                                    color: Appearance.colors.colPrimary
-                                }
-                                StyledToolTip { text: Translation.tr("Done editing") }
-                            }
+                        // iRiS: the Dock steps aside while editing and the toolbar takes the
+                        // edge opposite the Island, so it never lands on the Island.
+                        readonly property bool irisTopEdge: (Config.options?.panelFamily ?? "ii") === "iris"
+                            && editGridOverlay.workArea?.insets?.barEdge === "bottom"
+                        attachedTopEdge: irisTopEdge
+                        y: editControlsBar.iris ? (irisTopEdge ? 0 : parent.height - height)
+                            : Math.max(editGridOverlay.safeTop, editGridOverlay.safeBottom - height - 12)
+                        onLibraryRequested: widgetManagerPanel.shown = !widgetManagerPanel.shown
+                        onEdgeSettingsRequested: GlobalStates.openSettingsPage(14, "Organic edge")
+                        onSettingsRequested: GlobalStates.openSettingsPage(14)
+                        onDoneRequested: {
+                            widgetManagerPanel.shown = false
+                            GlobalStates.setWidgetEditMode(false)
                         }
                     }
 
@@ -2692,11 +2491,33 @@ Scope {
                     Loader {
                         id: widgetManagerPanel
                         property bool shown: false
+                        property bool geometryReady: false
+                        Connections {
+                            target: GlobalStates
+                            function onDesktopWidgetManagerToggleRequested(outputName: string): void {
+                                if (outputName.length === 0 || outputName === bgRoot.screenName)
+                                    widgetManagerPanel.shown = !widgetManagerPanel.shown
+                            }
+                            function onWidgetEditModeChanged(): void {
+                                if (!GlobalStates.widgetEditMode) widgetManagerPanel.shown = false
+                            }
+                        }
                         active: shown
                         visible: shown
+                        enabled: shown && (!editControlsBar.iris || geometryReady)
+                        opacity: editControlsBar.iris && !geometryReady ? 0 : 1
                         z: 150
                         x: 0
                         y: 0
+
+                        Behavior on opacity {
+                            enabled: editControlsBar.iris && IrisStyle.motionEnabled
+                            NumberAnimation {
+                                duration: IrisStyle.revealDuration
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: IrisStyle.morphCurve
+                            }
+                        }
 
                         function restoreGeometry(): void {
                             if (!widgetManagerPanel.shown)
@@ -2705,20 +2526,30 @@ Scope {
                                 const panel = widgetManagerPanel.item
                                 if (!panel)
                                     return
-                                const maxX = Math.max(0,
-                                    (widgetManagerPanel.parent?.width ?? 0) - panel.width)
-                                const maxY = Math.max(0,
-                                    (widgetManagerPanel.parent?.height ?? 0) - panel.height)
+                                const inset = 12
+                                const canvasWidth = widgetManagerPanel.parent?.width ?? 0
+                                const canvasHeight = widgetManagerPanel.parent?.height ?? 0
+                                const spanX = Math.max(0, canvasWidth - panel.width - inset * 2)
+                                const spanY = Math.max(0, canvasHeight - panel.height - inset * 2)
                                 const rx = Math.max(0, Math.min(1,
-                                    Number(Persistent.states?.desktopWidgets?.managerXRatio ?? 0.76)))
+                                    Number(Persistent.states?.desktopWidgets?.managerXRatio ?? 0.68)))
                                 const ry = Math.max(0, Math.min(1,
-                                    Number(Persistent.states?.desktopWidgets?.managerYRatio ?? 0.42)))
-                                widgetManagerPanel.x = Math.round(maxX * rx)
-                                widgetManagerPanel.y = Math.round(maxY * ry)
+                                    Number(Persistent.states?.desktopWidgets?.managerYRatio ?? 0.48)))
+                                widgetManagerPanel.x = inset + Math.round(spanX * rx)
+                                widgetManagerPanel.y = inset + Math.round(spanY * ry)
+                                widgetManagerPanel.geometryReady = true
                             })
                         }
 
-                        onShownChanged: if (shown) restoreGeometry()
+                        onShownChanged: {
+                            if (!shown) {
+                                geometryReady = false
+                                return
+                            }
+                            geometryReady = false
+                            restoreGeometry()
+                        }
+                        onLoaded: restoreGeometry()
 
                         sourceComponent: WidgetManagerPanel {
                             outputName: bgRoot.screen?.name ?? ""
@@ -2740,7 +2571,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("weather", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask : null
-                    Item { id: _hitMask; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask; loader: parent }
                     sourceComponent: WeatherWidget {
                         widgetIndex: 0
                         outputName: bgRoot.screen?.name ?? ""
@@ -2756,7 +2587,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("customImage", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMaskCustomImage : null
-                    Item { id: _hitMaskCustomImage; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMaskCustomImage; loader: parent }
                     sourceComponent: CustomImageWidget {
                         widgetIndex: 16
                         outputName: bgRoot.screen?.name ?? ""
@@ -2772,7 +2603,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("imageConverter", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMaskImageConverter : null
-                    Item { id: _hitMaskImageConverter; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMaskImageConverter; loader: parent }
                     sourceComponent: ImageConverterWidget {
                         widgetIndex: 17
                         outputName: bgRoot.screen?.name ?? ""
@@ -2788,7 +2619,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("clock", true)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask2 : null
-                    Item { id: _hitMask2; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask2; loader: parent }
                     sourceComponent: ClockWidget {
                         widgetIndex: 1
                         outputName: bgRoot.screen?.name ?? ""
@@ -2815,7 +2646,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("mediaControls", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask3 : null
-                    Item { id: _hitMask3; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask3; loader: parent }
                     sourceComponent: MediaControlsWidget {
                         widgetIndex: 2
                         outputName: bgRoot.screen?.name ?? ""
@@ -2831,7 +2662,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("visualizer", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask4 : null
-                    Item { id: _hitMask4; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask4; loader: parent }
                     sourceComponent: VisualizerWidget {
                         widgetIndex: 3
                         outputName: bgRoot.screen?.name ?? ""
@@ -2847,7 +2678,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("systemMonitor", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask5 : null
-                    Item { id: _hitMask5; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask5; loader: parent }
                     sourceComponent: SystemMonitorWidget {
                         widgetIndex: 4
                         outputName: bgRoot.screen?.name ?? ""
@@ -2863,7 +2694,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("battery", false) && Battery.available
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask6 : null
-                    Item { id: _hitMask6; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask6; loader: parent }
                     sourceComponent: BatteryWidget {
                         widgetIndex: 5
                         outputName: bgRoot.screen?.name ?? ""
@@ -2879,7 +2710,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("notes", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask7 : null
-                    Item { id: _hitMask7; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask7; loader: parent }
                     sourceComponent: NotesWidget {
                         widgetIndex: 6
                         outputName: bgRoot.screen?.name ?? ""
@@ -2895,7 +2726,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("calendarUpcoming", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask8 : null
-                    Item { id: _hitMask8; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask8; loader: parent }
                     sourceComponent: CalendarUpcomingWidget {
                         widgetIndex: 7
                         outputName: bgRoot.screen?.name ?? ""
@@ -2911,7 +2742,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("monthCalendar", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMaskMonthCalendar : null
-                    Item { id: _hitMaskMonthCalendar; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMaskMonthCalendar; loader: parent }
                     sourceComponent: MonthCalendarWidget {
                         widgetIndex: 8
                         outputName: bgRoot.screen?.name ?? ""
@@ -2927,7 +2758,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("todo", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMaskTodo : null
-                    Item { id: _hitMaskTodo; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMaskTodo; loader: parent }
                     sourceComponent: TodoWidget {
                         widgetIndex: 10
                         outputName: bgRoot.screen?.name ?? ""
@@ -2943,9 +2774,25 @@ Scope {
                     shown: bgRoot._widgetEnabled("timers", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMaskTimers : null
-                    Item { id: _hitMaskTimers; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMaskTimers; loader: parent }
                     sourceComponent: TimerWidget {
                         widgetIndex: 18
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("dayProgress", false)
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskDayProgress : null
+                    WidgetInputMask { id: _hitMaskDayProgress; loader: parent }
+                    sourceComponent: DayProgressWidget {
+                        widgetIndex: 8
                         outputName: bgRoot.screen?.name ?? ""
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -2959,7 +2806,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("uptime", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask10 : null
-                    Item { id: _hitMask10; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask10; loader: parent }
                     sourceComponent: UptimeWidget {
                         widgetIndex: 9
                         outputName: bgRoot.screen?.name ?? ""
@@ -2972,10 +2819,59 @@ Scope {
                 }
 
                 FadeLoader {
+                    shown: bgRoot._widgetEnabled("editorial", false)
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? editorialHitMask : null
+                    WidgetInputMask { id: editorialHitMask; loader: parent }
+                    sourceComponent: EditorialWidget {
+                        widgetIndex: 22
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("shape", false)
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskshape : null
+                    WidgetInputMask { id: _hitMaskshape; loader: parent }
+                    sourceComponent: ShapeWidget {
+                        widgetIndex: 20
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("dateBadge", false)
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskdateBadge : null
+                    WidgetInputMask { id: _hitMaskdateBadge; loader: parent }
+                    sourceComponent: DateBadgeWidget {
+                        widgetIndex: 21
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+
+                FadeLoader {
                     shown: bgRoot._widgetEnabled("worldClock", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask15 : null
-                    Item { id: _hitMask15; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask15; loader: parent }
                     sourceComponent: WorldClockWidget {
                         widgetIndex: 14
                         outputName: bgRoot.screen?.name ?? ""
@@ -2991,7 +2887,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("userCard", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask16 : null
-                    Item { id: _hitMask16; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask16; loader: parent }
                     sourceComponent: UserCardWidget {
                         widgetIndex: 15
                         outputName: bgRoot.screen?.name ?? ""
@@ -3007,7 +2903,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("newsTicker", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask12 : null
-                    Item { id: _hitMask12; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask12; loader: parent }
                     sourceComponent: NewsTickerWidget {
                         widgetIndex: 11
                         outputName: bgRoot.screen?.name ?? ""
@@ -3023,7 +2919,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("mascot", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask13 : null
-                    Item { id: _hitMask13; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask13; loader: parent }
                     sourceComponent: MascotWidget {
                         widgetIndex: 12
                         outputName: bgRoot.screen?.name ?? ""
@@ -3039,7 +2935,7 @@ Scope {
                     shown: bgRoot._widgetEnabled("japaneseTypography", false)
                     z: item?.desktopStackZ ?? 0
                     containmentMask: GlobalStates.widgetEditMode ? _hitMask14 : null
-                    Item { id: _hitMask14; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                    WidgetInputMask { id: _hitMask14; loader: parent }
                     sourceComponent: JapaneseTypographyWidget {
                         widgetIndex: 13
                         outputName: bgRoot.screen?.name ?? ""
@@ -3066,7 +2962,7 @@ Scope {
                         required property int index
                         z: item?.desktopStackZ ?? 0
                         containmentMask: GlobalStates.widgetEditMode ? _hitMaskInst : null
-                        Item { id: _hitMaskInst; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                        WidgetInputMask { id: _hitMaskInst; loader: parent }
 
                         active: false
 
@@ -3079,7 +2975,7 @@ Scope {
                             active = true;
                             setSource(Quickshell.shellPath("modules/background/widgets/mascot/MascotWidget.qml"), {
                                 configEntryName: "mascotInstances." + modelData,
-                                widgetIndex: 20 + index,
+                                widgetIndex: 23 + index,
                                 outputName: bgRoot.screen?.name ?? "",
                                 screenWidth: bgRoot.screen.width,
                                 screenHeight: bgRoot.screen.height,
@@ -3130,7 +3026,7 @@ Scope {
                         id: customWidgetLoader
                         z: item?.desktopStackZ ?? 0
                         containmentMask: GlobalStates.widgetEditMode ? _customHitMask : null
-                        Item { id: _customHitMask; x: parent?.item?.editInputX ?? -8; y: parent?.item?.editInputY ?? -8; width: parent?.item?.editInputWidth ?? ((parent?.width ?? 0) + 16); height: parent?.item?.editInputHeight ?? ((parent?.height ?? 0) + 16) }
+                        WidgetInputMask { id: _customHitMask; loader: parent }
                         required property var modelData
                         required property int index
 

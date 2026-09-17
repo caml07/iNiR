@@ -136,8 +136,8 @@ def read_vrr_modes():
         return {}
 
     modes = {}
-    for match in re.finditer(r'output\s+"([^"]+)"\s*\{(.*?)\}', content, re.DOTALL):
-        name, block = match.group(1), match.group(2)
+    flattened = _strip_kdl_line_comments(content)
+    for name, block in _iter_output_blocks(flattened):
         vrr = re.search(r"^\s*variable-refresh-rate([^\n]*)", block, re.MULTILINE)
         if not vrr:
             modes[name] = "off"
@@ -312,13 +312,11 @@ def cmd_persist_output(args):
 
     existing = outputs_file.read_text() if outputs_file.exists() else ""
 
-    # Find existing output block for this name
-    pattern = rf'(output\s+"{re.escape(output_name)}"\s*\{{)(.*?)(\}})'
-    match = re.search(pattern, existing, re.DOTALL)
+    bounds = _find_output_block_bounds(existing, output_name)
 
-    if match:
-        # Surgical edit within existing block
-        block_content = match.group(2)
+    if bounds:
+        _, inner_start, inner_end, _ = bounds
+        block_content = existing[inner_start:inner_end]
 
         for key, value in changes.items():
             if key == "mode":
@@ -348,13 +346,7 @@ def cmd_persist_output(args):
                         block_content, "position", f"x={parts[0]} y={parts[1]}"
                     )
 
-        result = (
-            existing[: match.start()]
-            + match.group(1)
-            + block_content
-            + match.group(3)
-            + existing[match.end() :]
-        )
+        result = existing[:inner_start] + block_content + existing[inner_end:]
     else:
         # Create new output block
         lines = []
@@ -565,7 +557,7 @@ def cmd_get_input():
         print(json.dumps(result))
         return 0
 
-    content = input_file.read_text()
+    content = _strip_kdl_line_comments(input_file.read_text())
 
     # Extract subsections — handle nested braces properly
     input_block = _extract_block(content, "input", top_level=True)
@@ -1030,7 +1022,7 @@ def cmd_get_layout():
         print(json.dumps(result))
         return 0
 
-    content = layout_file.read_text()
+    content = _strip_kdl_line_comments(layout_file.read_text())
     layout_block = _extract_block(content, "layout", top_level=True)
 
     if layout_block:
@@ -1211,7 +1203,7 @@ def cmd_get_animations():
         print(json.dumps(result))
         return 0
 
-    content = anim_file.read_text()
+    content = _strip_kdl_line_comments(anim_file.read_text())
     anim_block = _extract_block(content, "animations", top_level=True)
 
     if anim_block:
@@ -1281,7 +1273,7 @@ def cmd_get_window_rules():
         print(json.dumps(result))
         return 0
 
-    content = rules_file.read_text()
+    content = _strip_kdl_line_comments(rules_file.read_text())
 
     # Find all window-rule blocks
     pos = 0
@@ -2030,34 +2022,21 @@ def _set_animations(config_dir, key, value):
             print(json.dumps({"error": "animations block not found"}))
             return 1
 
-        has_off = _has_top_level_flag(anim_block, "off")
+        has_off = _has_top_level_flag(_strip_kdl_line_comments(anim_block), "off")
 
         if value == "on" and has_off:
-            content = re.sub(
-                r"(animations\s*\{)\s*\n\s*off\s*\n",
-                r"\g<1>\n",
-                content,
-                count=1,
+            content = _remove_key_from_section(
+                content, "animations", "off", top_level=True
             )
         elif value == "off" and not has_off:
-            content = re.sub(
-                r"(animations\s*\{)\s*\n",
-                r"\g<1>\n    off\n",
-                content,
-                count=1,
+            content = _set_value_in_block(
+                content, "animations", "off", "", top_level=True
             )
 
     elif key == "slowdown":
-        anim_block = _extract_block(content, "animations", top_level=True)
-        if anim_block and "slowdown" in anim_block:
-            content = re.sub(r"(slowdown\s+)[\d.]+", rf"\g<1>{value}", content, count=1)
-        else:
-            content = re.sub(
-                r"(animations\s*\{)\s*\n",
-                rf"\g<1>\n    slowdown {value}\n",
-                content,
-                count=1,
-            )
+        content = _set_value_in_block(
+            content, "animations", "slowdown", value, top_level=True
+        )
 
     elif "." in key:
         # Per-type spring param: e.g. "window-open.damping-ratio" "0.98"

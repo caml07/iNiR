@@ -111,7 +111,7 @@ Volevo che il mio desktop avesse un certo aspetto e funzionasse in un certo modo
 ## Funzionalità
 
 **Due famiglie di pannelli**, commutabili al volo con `Super+Shift+W`:
-- **Material ii** — barra flottante, barre laterali, dock, 6 stili visivi (material, cards, aurora, inir, angel, zzz)
+- **Material ii** — barra flottante, barre laterali, dock, 9 stili globali (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra delle applicazioni stile Windows 11, menu start, centro azioni, centro notifiche
 
 **Tematizzazione automatica** — scegli uno sfondo e tutto si adatta:
@@ -128,7 +128,7 @@ Volevo che il mio desktop avesse un certo aspetto e funzionasse in un certo modo
 
 Scegli uno sfondo e l'intero sistema segue — shell, app GTK/Qt, terminali, Firefox, Discord, schermata di login SDDM. Tutto automatico.
 
-- **6 stili visivi** — Material (pieno), Cards, Aurora (sfocatura vetro), iNiR (ispirato TUI), Angel (neo-brutalismo), ZZZ
+- **9 stili globali** — Material (pieno), Cards, Aurora (sfocatura vetro), iNiR (ispirato TUI), Angel (neo-brutalismo), Regalia, ZZZ, Cookie Shapes, Editorial
 - **Colori dinamici dallo sfondo** via Material You — propagati a tutto il sistema
 - **10 strumenti terminale auto-tematizzati** — foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, yazi
 - **Tematizzazione app** — GTK3/4, Qt (via plasma-integration + darkly), Firefox (MaterialFox), Discord/Vesktop (System24)
@@ -175,7 +175,7 @@ Barra laterale destra:
 - **Aggiornamenti automatici** — `inir update` con rollback, migrazioni e preservazione delle modifiche utente
 - **Schermata di blocco** e **schermata di sessione** (logout/riavvio/spegnimento/sospensione)
 - **Agente polkit**, **tastiera su schermo**, **gestore avvio automatico**
-- **9 lingue** — rilevamento automatico, con generazione traduzioni assistita da IA
+- **17 localizzazioni** — rilevamento automatico, con generazione traduzioni assistita da IA
 - **Luce notturna** — programmata o manuale
 - **Meteo** — Open-Meteo, supporta GPS, coordinate manuali o nome città
 - **Gestione batteria** — soglie configurabili, sospensione automatica in stato critico

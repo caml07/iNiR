@@ -112,7 +112,7 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 ## Features
 
 **Two panel families**, switchable on the fly with `Super+Shift+W`:
-- **Material ii**: floating bar, sidebars, dock, and 8 visual styles (Material, Cards, Aurora, iNiR, Angel, Regalia, ZZZ, Cookie Shapes)
+- **Material ii**: floating bar, sidebars, dock, and 9 global styles (Material, Cards, Aurora, iNiR, Angel, Regalia, ZZZ, Cookie Shapes, Editorial)
 - **Waffle**: Windows 11-inspired taskbar, start menu, action center, notification center
 
 **Automatic theming**. Pick a wallpaper and everything adapts:
@@ -129,7 +129,7 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 
 ### Theming and appearance
 
-- **8 visual styles**: Material (solid), Cards, Aurora (glass blur), iNiR (TUI-inspired), Angel (neo-brutalism), Regalia (black engineered chassis, warm ivory ink, restrained champagne hardware), ZZZ (poster plates), Cookie Shapes (animated shape morphing)
+- **9 global styles**: Material (solid), Cards, Aurora (glass blur), iNiR (TUI-inspired), Angel (neo-brutalism), Regalia (black engineered chassis, warm ivory ink, restrained champagne hardware), ZZZ (poster plates), Cookie Shapes (animated shape morphing), Editorial (paper-and-ink typography)
 - **Dynamic wallpaper colors** via Material You, propagated system-wide
 - **10 terminal and TUI tools auto-themed**: foot, kitty, alacritty, ghostty, wezterm, starship, fuzzel, btop, lazygit, yazi
 - **App theming**: GTK3/4, Qt (via plasma-integration and darkly), Firefox (MaterialFox), Discord/Vesktop (System24), Zed, Spicetify, Steam, SDDM
@@ -185,7 +185,7 @@ Right sidebar:
 - **Lock screen** and **session screen** (logout/reboot/shutdown/suspend)
 - **Polkit agent**, **on-screen keyboard**, **autostart manager** backed by niri's own startup file
 - **Kira**: pixel-art cat girl who wanders the screen edges, reacts to what you do, and has a chaos mode. Opt-in, separate ~32 MiB art pack under `./setup` › Extras
-- **15 languages** with auto-detection
+- **17 locales** with auto-detection, including Kalaallisut (`kl_GL`)
 - **Night light**: scheduled or manual
 - **Weather**: Open-Meteo, supports GPS, manual coordinates, or city name
 - **Battery management**: configurable thresholds, auto-suspend on critical

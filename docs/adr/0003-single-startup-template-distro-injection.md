@@ -15,4 +15,4 @@ Injection is idempotent and removes legacy unmarked entries owned by iNiR.
 Migration 021 also removes the runsvdir block when the systemd predicate holds,
 so the two startup paths cannot create two shells.
 
-Status: accepted for PR3.0 implementation.
+Status: accepted and VM validated through the 2026-09-18 PR1-PR5 reboot gate.

@@ -12,11 +12,13 @@ built against and will be revised after VM validation. Decisions: see
   activation is a separate, confirmed root step. An XBPS package is a
   separate milestone (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
-  musl libc and `seatd` without elogind. Ydotool is now part of the toolkit
-  parity work and requires a validated provider before V1 closes.
+  musl libc and `seatd` without elogind.
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
+- Current checkpoint (2026-09-18): PR1 through PR5.5 are implemented,
+  fat-checked, and merged into `feat/void-pr5`. PR6 (XBPS UI) is next; PR7
+  remains the mandatory closure/release-validation gate.
 
 ## How the port decides what to do
 
@@ -109,8 +111,9 @@ Notes:
 - Quickshell from the Void repo is rebuilt by Void in lockstep with Qt
   updates, so the Qt/Quickshell ABI check (`check_qs_abi`) self-heals.
   `deps-map.sh` must say `void:quickshell`, not `void:COMPILE`.
-- `kf6-kirigami` / `kf6-syntax-highlighting` are needed only for the
-  compile-from-source profile, not the base install.
+- `kf6-syntax-highlighting` is a base runtime dependency because the shared
+  sidebar host imports `org.kde.syntaxhighlighting`. `kf6-kirigami` remains a
+  build/runtime dependency only where the selected provider requires it.
 - `ydotool` is not packaged in the current Void repositories. PR4.2 provides
   verified upstream v1.0.4 source, a predicate-selected user service,
   input-group `/dev/uinput` permissions, and install/Doctor update paths.
@@ -192,7 +195,7 @@ upstream pull request is opened, its review diff is rebuilt from the then-curren
 | 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
 | 3 | `feat/void-runit-install` | Delivered as PR3.0-PR3.3: supervisors, lifecycle, session runtime, and optional runtime adapters. | Complete PR3.3 capability checks; retain all PR3.0-PR3.2 VM contracts. |
 | 4 | `feat/void-capability-providers` | System-backed capabilities: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. Delivered as PR4.0 (NetworkManager), PR4.1 (BlueZ), PR4.2 (ydotool), PR4.3 (WARP research/conditional). | Provision each selected provider twice and exercise its UI action and runit service. |
-| 5 | `feat/void-pr5` | Desktop parity delivered as PR5.0 Mission Center, PR5.1 OCR, PR5.2 visual providers, PR5.3 fonts, PR5.4 Darkly, and PR5.5 desktop/runtime closure. | No selected profile/default references an unavailable provider; live Niri session validates shell startup, sidebars, Qt/GTK theming, distro icon, and representative keybinds. |
+| 5 | `feat/void-pr5` | Desktop parity delivered as PR5.0 Mission Center, PR5.1 OCR, PR5.2 visual providers, PR5.3 fonts, PR5.4 Darkly, and PR5.5 desktop/runtime closure. | No selected profile/default references an unavailable provider; live Niri session validates shell startup, sidebars, Qt/GTK theming, Void icon asset/mapping, and representative keybinds. |
 | 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
 | 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
 

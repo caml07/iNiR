@@ -504,7 +504,9 @@ turnstile or iNiR failure.
   `nmcli -t -f STATE g` reported `connected`. The remaining two failures were
   checker-only permission errors reading system runit supervision as an
   unprivileged user. Commit `3dd0b9db` makes the existing `sudo sv status`
-  checks report their full results; a clean final checker rerun is pending.
+  checks report their full results. This is a historical checkpoint; the
+  integrated PR4 fat-check later in this document supersedes the pending
+  checker status.
 - PR4.1 was checked on 2026-09-08 from clean commit `e112c416` after installing
   `libspa-bluetooth-1.6.8_1` and enabling `/etc/sv/bluetoothd`. The versioned
   `scripts/check-void-pr41.sh` contract passed: XBPS `bluez-5.86_2`,
@@ -579,5 +581,110 @@ turnstile or iNiR failure.
 `make test-local`, `bash -n`, JSON parsing, and `git diff --check` passed after
 the PR5 runtime closure and Mod+Q lifecycle fix. ShellCheck was not available
 in the host environment. No upstream PR has been opened; the Void port remains
-a fork progress branch while the PR1-PR5 fat-check and documentation sweep are
-prepared before PR6.
+a fork progress branch.
+
+## PR1-PR5 fat-check and reboot checkpoint (2026-09-18)
+
+The integrated branch was audited in batches before starting PR6.
+
+### PR1-PR3
+
+The local/VM sweep rechecked the usable-systemd-user-manager predicate, XBPS
+dependency routing, runsvdir/turnstile ownership, session environment, Niri
+startup, PipeWire user services, and optional runtime adapters. Remaining
+predicate-sensitive paths found during the sweep were fixed before continuing.
+Night Light uses the Void `wlsunset` provider and Doctor/runtime checks remain
+predicate-safe.
+
+### PR4 providers
+
+NetworkManager, BlueZ, ydotool, and WARP were re-exercised in the live VM.
+Observed results included:
+
+- NetworkManager and system D-Bus were supervised by runit and
+  `nmcli -t -f STATE g` returned `connected`.
+- `bluetoothd` was alive and `org.bluez` owned the system D-Bus name. The VM
+  still exposes no Bluetooth adapter, so pairing/audio hardware operation is
+  not claimed.
+- ydotool v1.0.4 had a live user service/socket and a direct uinput key
+  injection passed.
+- WARP's runit service, socket, and `vlogger -t warp-svc -p daemon` logger were
+  alive. Account registration, TOS acceptance, and a real tunnel remain
+  intentionally outside this validation.
+
+An interactive privileged run confirmed the root-owned runit service status
+checks. A later attempt to rerun the full PR4.2/PR4.3 installer-idempotency
+path was blocked only by the test harness being unable to supply a new sudo
+credential non-interactively; the provider snapshots/reconcile paths passed,
+and the earlier versioned PR4 idempotency evidence above remains the recorded
+full-install proof.
+
+The fat-check also fixed two installer presentation/contract gaps: Void now
+reports an automated dependency path instead of the generic compatibility
+warning, and the installed `dunst` package is no longer treated as a package
+conflict merely because iNiR uses its `dunstify` client. A running dunst daemon
+remains covered by runtime conflict handling.
+
+### PR5.0-PR5.5
+
+A clean VM audit worktree at integration commit `3763698d` ran all six PR5
+checkers with `INIR_VERIFY_IDEMPOTENCY=true`:
+
+- PR5.0 Mission Center: Flatpak/provider wrapper and second-install snapshot
+  passed.
+- PR5.1 OCR: horizontal language packages, pinned vertical models, model-load
+  smoke tests, user-local `tesseract` adapter, and second-install snapshot
+  passed. The checker was hardened to add the user-local bin directory to its
+  own PATH so SSH transport does not create a false failure.
+- PR5.2 visual providers: adw-gtk3, WhiteSur, Capitaine, provenance checks,
+  and second-install snapshot passed.
+- PR5.3 fonts: required XBPS/pinned fonts, checksums, Fontconfig resolution,
+  and second-install snapshot passed.
+- PR5.4 Darkly: Qt6/KF6 build dependencies, plugin presence, Qt style loading,
+  KDE platform theme, and second-install snapshot passed.
+- PR5.5 closure: Rubik, Google Sans Flex -> Roboto Flex alias,
+  `plasma-integration`, Niri KDE platform theme, and closure snapshot passed.
+
+### Integrated reboot gate
+
+`virsh reboot voidlinux` did not produce a new guest boot ID, so the final
+gate used `virsh reset voidlinux` to force an actual VM reboot without changing
+snapshots or disk contents. The boot ID changed from
+`19c45771-09ab-4e2b-8562-c1567a0335f1` to
+`6b6df81a-0c24-414f-9446-8a7f9c0dbaca`.
+
+After the new boot:
+
+- `loginctl` showed an active local `login` session on tty1, type Wayland.
+  `niri --session` was a child of the tty1 shell and exactly one supervised
+  Quickshell shell was running.
+- `/run/user/1000/systemd/private` was absent, so the non-systemd predicate
+  remained active.
+- Quickshell's `NIRI_SOCKET` exactly matched the new live Niri socket.
+- `niri validate` passed.
+- left and right sidebar IPC toggles passed.
+- a temporary Foot window was focused and a real Super+Q sequence was injected
+  through ydotool/uinput; the window closed (`MOD_Q_END_TO_END=PASS`).
+- iNiR, PipeWire, WirePlumber, PipeWire Pulse, and ydotool user services were
+  running; `pactl info` and the ydotool socket checks passed.
+- Rubik, the Google Sans Flex alias, Material Symbols, Darkly, KDE platform
+  integration, and the vendored Void icon asset/mapping passed mechanical
+  checks.
+- the latest Quickshell log contained no missing-module, stale-Niri-socket,
+  failed-component-load, or equivalent severe errors.
+- NetworkManager returned `connected`, BlueZ owned `org.bluez`, the WARP socket
+  existed, and the WARP `vlogger` process was alive after boot.
+- GameMode was exercised through the real `globalActions` IPC. Manual toggle
+  changed `inactive (off)` to `active (manual)` and back to `inactive (off)`,
+  while no `discover-overlay` process appeared. The effective Void config had
+  `suppressNotifications=true` and `disableNiriAnimations=false`, matching the
+  repository default. Notification-policy wiring was therefore checked
+  mechanically; this gate does not claim Niri animations were disabled in a
+  profile where that option is off.
+
+The rendered top-bar Void icon was not separately visually inspected during
+this automated gate, and tty1 was not screen-captured to prove absence of log
+spam. The runtime asset/mapping and WARP logger path were verified instead.
+
+With these limits recorded, PR1 through PR5.5 are considered fat-checked and
+PR6 is the next implementation phase.

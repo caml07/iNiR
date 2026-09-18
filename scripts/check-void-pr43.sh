@@ -57,6 +57,9 @@ check test -x /usr/local/bin/warp-cli
 check test -x /usr/local/bin/warp-svc
 check test -L /var/service/warp-svc
 check grep -Fq '# Managed by iNiR.' /etc/sv/warp-svc/run
+check test -x /etc/sv/warp-svc/log/run
+check grep -Fq '# Managed by iNiR.' /etc/sv/warp-svc/log/run
+check grep -Fq 'exec vlogger -t warp-svc -p daemon' /etc/sv/warp-svc/log/run
 check sudo sv status /var/service/warp-svc
 check test -S /run/cloudflare-warp/warp_service
 
@@ -78,7 +81,7 @@ if [[ "${INIR_VERIFY_IDEMPOTENCY:-false}" == true ]]; then
   after="$(mktemp)"
   provider_snapshot() {
     xbps-query -l | sort
-    for path in /usr/local/bin/warp-cli /usr/local/bin/warp-svc /etc/sv/warp-svc/run /var/service/warp-svc; do
+    for path in /usr/local/bin/warp-cli /usr/local/bin/warp-svc /etc/sv/warp-svc/run /etc/sv/warp-svc/log/run /var/service/warp-svc; do
       [[ -f "$path" ]] && sha256sum "$path"
       [[ -L "$path" ]] && readlink "$path"
     done

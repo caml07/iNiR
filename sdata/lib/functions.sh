@@ -645,7 +645,10 @@ configure_void_warp_service() {
   [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0
   [[ -x /usr/local/bin/warp-svc ]] || return 0
 
-  local run_file=/etc/sv/warp-svc/run service_link=/var/service/warp-svc
+  local run_file=/etc/sv/warp-svc/run
+  local log_run_file=/etc/sv/warp-svc/log/run
+  local service_link=/var/service/warp-svc
+  local temp_dir run_tmp log_tmp
   if [[ -e /etc/sv/warp-svc && ! -f "$run_file" ]]; then
     log_warning "Existing WARP service directory is not managed by iNiR; leaving it unchanged"
     return 0
@@ -659,16 +662,46 @@ configure_void_warp_service() {
     log_warning "Existing WARP service link is not managed by iNiR; leaving it unchanged"
     return 0
   fi
+  if [[ -e "$log_run_file" ]] && ! grep -q '^# Managed by iNiR\.' "$log_run_file"; then
+    if [[ ! -x "$log_run_file" ]]; then
+      log_warning "Existing WARP logger is not managed by iNiR and is not executable; leaving it unchanged"
+      return 0
+    fi
+    log_info "Keeping existing custom WARP runit logger"
+  fi
   if [[ -f "$run_file" ]] && grep -q '^# Managed by iNiR\.' "$run_file" \
+      && [[ -x "$log_run_file" ]] \
       && [[ -L "$service_link" ]] && [[ "$(readlink "$service_link")" == /etc/sv/warp-svc ]]; then
     log_success "Cloudflare WARP runit service already enabled"
     return 0
   fi
 
   if [[ "${ask:-true}" != true ]] || tui_confirm "Enable Cloudflare WARP system service?" "yes"; then
-    if elevate sh -c 'mkdir -p /etc/sv/warp-svc /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp && printf "#!/bin/sh\n# Managed by iNiR.\nmkdir -p /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp\nexec /usr/local/bin/warp-svc\n" > /etc/sv/warp-svc/run && chmod 755 /etc/sv/warp-svc/run && ln -sfn /etc/sv/warp-svc /var/service/warp-svc'; then
+    temp_dir="$(mktemp -d)" || return 1
+    run_tmp="$temp_dir/run"
+    log_tmp="$temp_dir/log-run"
+    printf '%s\n' '#!/bin/sh' '# Managed by iNiR.' \
+      'mkdir -p /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp' \
+      'exec /usr/local/bin/warp-svc' > "$run_tmp"
+    printf '%s\n' '#!/bin/sh' '# Managed by iNiR.' \
+      'exec vlogger -t warp-svc -p daemon' > "$log_tmp"
+    if elevate mkdir -p /etc/sv/warp-svc/log /var/lib/cloudflare-warp /run/cloudflare-warp /var/log/cloudflare-warp \
+        && elevate install -m 0755 "$run_tmp" "$run_file" \
+        && {
+          if [[ ! -e "$log_run_file" ]] || grep -q '^# Managed by iNiR\.' "$log_run_file"; then
+            elevate install -m 0755 "$log_tmp" "$log_run_file"
+          else
+            true
+          fi
+        } \
+        && elevate ln -sfn /etc/sv/warp-svc "$service_link"; then
+      rm -rf "$temp_dir"
+      if command -v sv >/dev/null 2>&1 && [[ -L "$service_link" ]]; then
+        elevate sv exit "$service_link" >/dev/null 2>&1 || true
+      fi
       log_success "Cloudflare WARP runit service enabled"
     else
+      rm -rf "$temp_dir"
       log_warning "Could not enable Cloudflare WARP runit service"
       return 1
     fi

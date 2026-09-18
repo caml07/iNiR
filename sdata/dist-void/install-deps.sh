@@ -155,6 +155,8 @@ VOID_SCREENCAPTURE_PACKAGES=(
 
 # Fonts and theming
 VOID_FONTS_PACKAGES=(
+  curl
+  unzip
   dejavu-fonts-ttf
   twemoji
   qt6ct
@@ -171,6 +173,15 @@ WARP_VERSION="2026.7.1377.0"
 WARP_DEB_SHA256="95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55"
 WARP_DEB_URL="https://pkg.cloudflareclient.com/pool/bookworm/main/c/cloudflare-warp/cloudflare-warp_${WARP_VERSION}_amd64.deb"
 TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"
+ADW_GTK3_VERSION="6.5"
+ADW_GTK3_SHA256="a81780fadfc432be0fc3d89c4ebb41aa28e4f032d42c36f9789c57dd10cfa41c"
+ADW_GTK3_URL="https://github.com/lassekongo83/adw-gtk3/releases/download/v${ADW_GTK3_VERSION}/adw-gtk3v${ADW_GTK3_VERSION}.tar.xz"
+WHITESUR_ICON_VERSION="2026-09-10"
+WHITESUR_ICON_SHA256="406c9cd59705583f1754b0eaca96cc48bafda042b88ef143f16d8ae1820ecd95"
+WHITESUR_ICON_URL="https://github.com/vinceliuice/WhiteSur-icon-theme/archive/refs/tags/${WHITESUR_ICON_VERSION}.tar.gz"
+CAPITAINE_VERSION="r5"
+CAPITAINE_SHA256="60114cf857902a9907780bdcfa995d600618cf14b37f90776565c9de7e5add6c"
+CAPITAINE_URL="https://github.com/sainnhe/capitaine-cursors/releases/download/${CAPITAINE_VERSION}/Linux.zip"
 
 declare -A VOID_OCR_MODEL_SHA256=(
   [jpn_vert]="bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"
@@ -241,6 +252,126 @@ configure_void_tesseract_command() {
     export PATH="$wrapper_dir:$PATH"
   fi
   command -v tesseract >/dev/null 2>&1 || return 1
+}
+
+install_void_adw_gtk3() {
+  local data_home theme_dir marker_dir marker temp_dir archive
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  theme_dir="$data_home/themes"
+  marker_dir="$data_home/inir/providers"
+  marker="$marker_dir/adw-gtk3"
+
+  if [[ -d "$theme_dir/adw-gtk3" && -d "$theme_dir/adw-gtk3-dark" ]] \
+      && [[ "$(cat "$marker" 2>/dev/null || true)" == "${ADW_GTK3_VERSION}:${ADW_GTK3_SHA256}" ]]; then
+    return 0
+  fi
+
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/adw-gtk3.tar.xz"
+  if ! curl -fsSL --max-time 90 -o "$archive" "$ADW_GTK3_URL" \
+      || ! printf '%s  %s\n' "$ADW_GTK3_SHA256" "$archive" | sha256sum -c - >/dev/null \
+      || ! mkdir -p "$temp_dir/extract" \
+      || ! tar -xJf "$archive" -C "$temp_dir/extract" \
+      || [[ ! -d "$temp_dir/extract/adw-gtk3" || ! -d "$temp_dir/extract/adw-gtk3-dark" ]]; then
+    rm -rf "$temp_dir"
+    log_warning "Could not provision verified adw-gtk3 v${ADW_GTK3_VERSION}"
+    return 1
+  fi
+
+  mkdir -p "$theme_dir" "$marker_dir"
+  rm -rf "$theme_dir/adw-gtk3" "$theme_dir/adw-gtk3-dark"
+  if ! cp -a "$temp_dir/extract/adw-gtk3" "$temp_dir/extract/adw-gtk3-dark" "$theme_dir/"; then
+    rm -rf "$temp_dir"
+    return 1
+  fi
+  printf '%s\n' "${ADW_GTK3_VERSION}:${ADW_GTK3_SHA256}" > "$marker"
+  rm -rf "$temp_dir"
+}
+
+install_void_whitesur_icons() {
+  local data_home icon_dir marker_dir marker temp_dir archive source_dir stage
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  icon_dir="$data_home/icons"
+  marker_dir="$data_home/inir/providers"
+  marker="$marker_dir/whitesur-icons"
+
+  if [[ -d "$icon_dir/WhiteSur-dark" ]] \
+      && [[ "$(cat "$marker" 2>/dev/null || true)" == "${WHITESUR_ICON_VERSION}:${WHITESUR_ICON_SHA256}" ]]; then
+    return 0
+  fi
+
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/whitesur-icons.tar.gz"
+  source_dir="$temp_dir/WhiteSur-icon-theme-${WHITESUR_ICON_VERSION}"
+  stage="$temp_dir/stage"
+  if ! curl -fsSL --max-time 90 -o "$archive" "$WHITESUR_ICON_URL" \
+      || ! printf '%s  %s\n' "$WHITESUR_ICON_SHA256" "$archive" | sha256sum -c - >/dev/null \
+      || ! tar -xzf "$archive" -C "$temp_dir" \
+      || [[ ! -x "$source_dir/install.sh" ]] \
+      || ! mkdir -p "$stage" \
+      || ! (cd "$source_dir" && ./install.sh -d "$stage" -t default >/dev/null 2>&1) \
+      || [[ ! -d "$stage/WhiteSur-dark" ]]; then
+    rm -rf "$temp_dir"
+    log_warning "Could not provision verified WhiteSur icons ${WHITESUR_ICON_VERSION}"
+    return 1
+  fi
+
+  mkdir -p "$icon_dir" "$marker_dir"
+  rm -rf "$icon_dir/WhiteSur" "$icon_dir/WhiteSur-dark" "$icon_dir/WhiteSur-light"
+  if ! cp -a "$stage/WhiteSur" "$stage/WhiteSur-dark" "$stage/WhiteSur-light" "$icon_dir/"; then
+    rm -rf "$temp_dir"
+    return 1
+  fi
+  printf '%s\n' "${WHITESUR_ICON_VERSION}:${WHITESUR_ICON_SHA256}" > "$marker"
+  rm -rf "$temp_dir"
+}
+
+install_void_capitaine_cursors() {
+  local data_home icon_dir marker_dir marker temp_dir archive extract_dir dark light
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  icon_dir="$data_home/icons"
+  marker_dir="$data_home/inir/providers"
+  marker="$marker_dir/capitaine-cursors"
+  dark="Capitaine Cursors"
+  light="Capitaine Cursors - White"
+
+  if [[ -d "$icon_dir/$dark" && -d "$icon_dir/$light" \
+      && -L "$icon_dir/capitaine-cursors-light" ]] \
+      && [[ "$(cat "$marker" 2>/dev/null || true)" == "${CAPITAINE_VERSION}:${CAPITAINE_SHA256}" ]]; then
+    return 0
+  fi
+
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/capitaine.zip"
+  extract_dir="$temp_dir/extract"
+  if ! curl -fsSL --max-time 90 -o "$archive" "$CAPITAINE_URL" \
+      || ! printf '%s  %s\n' "$CAPITAINE_SHA256" "$archive" | sha256sum -c - >/dev/null \
+      || ! mkdir -p "$extract_dir" \
+      || ! unzip -q "$archive" -d "$extract_dir" \
+      || [[ ! -d "$extract_dir/$dark" || ! -d "$extract_dir/$light" ]]; then
+    rm -rf "$temp_dir"
+    log_warning "Could not provision verified Capitaine cursors ${CAPITAINE_VERSION}"
+    return 1
+  fi
+
+  mkdir -p "$icon_dir" "$marker_dir"
+  rm -rf "$icon_dir/$dark" "$icon_dir/$light" \
+    "$icon_dir/capitaine-cursors" "$icon_dir/capitaine-cursors-light"
+  if ! cp -a "$extract_dir/$dark" "$extract_dir/$light" "$icon_dir/" \
+      || ! ln -s "$dark" "$icon_dir/capitaine-cursors" \
+      || ! ln -s "$light" "$icon_dir/capitaine-cursors-light"; then
+    rm -rf "$temp_dir"
+    return 1
+  fi
+  printf '%s\n' "${CAPITAINE_VERSION}:${CAPITAINE_SHA256}" > "$marker"
+  rm -rf "$temp_dir"
+}
+
+install_void_visual_providers() {
+  install_void_adw_gtk3 || return 1
+  install_void_whitesur_icons || return 1
+  install_void_capitaine_cursors || return 1
+  log_success "Void visual theme providers are ready"
 }
 
 install_void_missioncenter() {
@@ -422,6 +553,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _need_warp=false
   _need_missioncenter=false
   _need_tesseract_adapter=false
+  _need_visual_providers=false
   _ocr_fallback_models=()
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
@@ -446,6 +578,13 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     fi
     if [[ "$cmd" == tesseract ]]; then
       _need_tesseract_adapter=true
+    fi
+    if [[ "$cmd" == adw-gtk3 || "$cmd" == whitesur-icon-theme || "$cmd" == capitaine-cursors ]]; then
+      _need_visual_providers=true
+      for _miss_pkg in curl unzip; do
+        [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
+      done
+      continue
     fi
     case "$cmd" in
       ocr-jpn-vert)
@@ -479,6 +618,9 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_tesseract_adapter; then
     configure_void_tesseract_command || return 1
+  fi
+  if $_need_visual_providers; then
+    install_void_visual_providers || return 1
   fi
   if [[ ${#_ocr_fallback_models[@]} -gt 0 ]]; then
     install_void_ocr_models "${_ocr_fallback_models[@]}" || return 1
@@ -550,6 +692,7 @@ fi
 if ${INSTALL_FONTS:-true}; then
   tui_info "Installing fonts and theming packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_FONTS_PACKAGES[@]}"
+  install_void_visual_providers || return 1
 fi
 
 #####################################################################################

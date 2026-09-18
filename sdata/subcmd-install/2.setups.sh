@@ -268,6 +268,16 @@ function setup_desktop_settings(){
   if [[ ! -d "$HOME/.local/share/icons/$preferred_icon_theme" ]] && [[ ! -d "/usr/share/icons/$preferred_icon_theme" ]]; then
     icon_theme="Adwaita"
   fi
+  local preferred_gtk_theme="adw-gtk3-dark"
+  local gtk_theme="$preferred_gtk_theme"
+  if [[ ! -d "$HOME/.local/share/themes/$preferred_gtk_theme" ]] && [[ ! -d "/usr/share/themes/$preferred_gtk_theme" ]]; then
+    gtk_theme="Adwaita"
+  fi
+  local preferred_cursor_theme="capitaine-cursors-light"
+  local cursor_theme="$preferred_cursor_theme"
+  if [[ ! -d "$HOME/.local/share/icons/$preferred_cursor_theme" ]] && [[ ! -d "/usr/share/icons/$preferred_cursor_theme" ]]; then
+    cursor_theme="Adwaita"
+  fi
   
   # gsettings for GNOME/GTK apps (Nautilus, etc.)
   # Keep default icon theme aligned with iNiR defaults/config and installer payload.
@@ -275,9 +285,9 @@ function setup_desktop_settings(){
   # If user later changes icon theme in Settings, IconThemeService persists and syncs it.
   if command -v gsettings &>/dev/null; then
     try gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
-    try gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
+    try gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
     try gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
-    try gsettings set org.gnome.desktop.interface cursor-theme 'capitaine-cursors-light'
+    try gsettings set org.gnome.desktop.interface cursor-theme "$cursor_theme"
     try gsettings set org.gnome.desktop.interface cursor-size 24
     try gsettings set org.gnome.desktop.interface font-name 'Rubik 11'
   fi

@@ -2419,6 +2419,42 @@ if ! grep -Fq 'TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"' 
     exit 1
 fi
 
+step "Void visual theme providers"
+void_fonts_packages="$(sed -n '/^VOID_FONTS_PACKAGES=(/,/^)/p' "$void_deps")"
+for package in curl unzip; do
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_fonts_packages"; then
+        printf 'FAIL: Void fonts/theme profile missing provider dependency: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+for needle in \
+    'ADW_GTK3_VERSION="6.5"' \
+    'ADW_GTK3_SHA256="a81780fadfc432be0fc3d89c4ebb41aa28e4f032d42c36f9789c57dd10cfa41c"' \
+    'WHITESUR_ICON_VERSION="2026-09-10"' \
+    'WHITESUR_ICON_SHA256="406c9cd59705583f1754b0eaca96cc48bafda042b88ef143f16d8ae1820ecd95"' \
+    'CAPITAINE_VERSION="r5"' \
+    'CAPITAINE_SHA256="60114cf857902a9907780bdcfa995d600618cf14b37f90776565c9de7e5add6c"' \
+    'install_void_visual_providers' \
+    'capitaine-cursors-light'; do
+    if ! grep -Fq "$needle" "$void_deps"; then
+        printf 'FAIL: Void visual provider missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if grep -Eq 'WhiteSur-icon-theme/(archive/refs/heads/master|releases/latest)|capitaine-cursors/releases/latest|adw-gtk3/releases/latest' "$void_deps"; then
+    printf 'FAIL: Void visual providers use an unpinned upstream URL\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'local preferred_gtk_theme="adw-gtk3-dark"' "$void_setups" \
+        || ! grep -Fq 'gtk_theme="Adwaita"' "$void_setups" \
+        || ! grep -Fq 'local preferred_cursor_theme="capitaine-cursors-light"' "$void_setups" \
+        || ! grep -Fq 'cursor_theme="Adwaita"' "$void_setups" \
+        || ! grep -Fq 'gtk-theme "$gtk_theme"' "$void_setups" \
+        || ! grep -Fq 'cursor-theme "$cursor_theme"' "$void_setups"; then
+    printf 'FAIL: desktop setup can still persist unavailable Void GTK/cursor defaults\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

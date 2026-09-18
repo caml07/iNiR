@@ -2311,6 +2311,13 @@ rm -rf "$turnstile_test_root"
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
+void_icon="$runtime_root/assets/icons/void-symbolic.svg"
+system_info="$runtime_root/services/SystemInfo.qml"
+if [[ ! -s "$void_icon" ]] \
+        || ! grep -Fq 'case "void": distroIcon = "void-symbolic"; break;' "$system_info"; then
+    printf 'FAIL: Void distro identity still falls back to the generic Linux icon\n' >&2
+    exit 1
+fi
 if ! grep -Eq '^[[:space:]]+kf6-syntax-highlighting$' <<< "$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"; then
     printf 'FAIL: Void base profile is missing the critical QML syntax-highlighting runtime\n' >&2
     exit 1

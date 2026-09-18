@@ -2371,6 +2371,16 @@ if ! grep -Fq 'YDOTOOL_VERSION="1.0.4"' "$void_deps" \
     exit 1
 fi
 
+step "Void Mission Center provider"
+if ! grep -Fq 'install_void_missioncenter' "$void_deps" \
+        || ! grep -Fq 'io.missioncenter.MissionCenter' "$void_deps" \
+        || ! grep -Eq '^[[:space:]]+flatpak$' <<< "$void_toolkit_packages" \
+        || ! grep -Fq '[[ "$cmd" == missioncenter ]]' "$void_deps" \
+        || ! grep -Fq 'exec flatpak run io.missioncenter.MissionCenter "$@"' "$void_deps"; then
+    printf 'FAIL: Void Mission Center Flatpak provider is incomplete\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

@@ -2340,6 +2340,11 @@ rm -rf "$turnstile_test_root"
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
+void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
+if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greeting"; then
+    printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
+    exit 1
+fi
 mod_q_default="$runtime_root/defaults/niri/config.d/70-binds.kdl"
 mod_q_legacy="$runtime_root/dots/.config/niri/config.kdl"
 mod_q_migration="$runtime_root/sdata/migrations/006-close-confirm.sh"

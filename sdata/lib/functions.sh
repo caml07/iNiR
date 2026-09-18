@@ -898,7 +898,7 @@ else:
 // Do not add a compositor startup entry here or you'll get two shells.'''
     block = r'''// BEGIN inir-turnstile-environment
 // Publish Niri's session environment to Turnstile-managed user services.
-spawn-sh-at-startup "if command -v turnstile-update-runit-env >/dev/null 2>&1 && [ -n \"${WAYLAND_DISPLAY:-}\" ] && [ -n \"${XDG_RUNTIME_DIR:-}\" ] && [ -n \"${DBUS_SESSION_BUS_ADDRESS:-}\" ]; then turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET; fi"
+spawn-sh-at-startup "export PATH=\"$HOME/.local/bin:$PATH\"; export INIR_VENV=\"$HOME/.local/state/quickshell/.venv\"; export ILLOGICAL_IMPULSE_VIRTUAL_ENV=\"$INIR_VENV\"; if command -v turnstile-update-runit-env >/dev/null 2>&1 && [ -n \"${WAYLAND_DISPLAY:-}\" ] && [ -n \"${XDG_RUNTIME_DIR:-}\" ] && [ -n \"${DBUS_SESSION_BUS_ADDRESS:-}\" ]; then turnstile-update-runit-env PATH INIR_VENV ILLOGICAL_IMPULSE_VIRTUAL_ENV WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET; fi"
 // END inir-turnstile-environment'''
 
 suffix = f"\n\n{supervisor_comment}\n"

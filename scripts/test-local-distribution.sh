@@ -2271,6 +2271,9 @@ if ! (
     grep -Fq 'turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq '[ -n \"${WAYLAND_DISPLAY:-}\" ]' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     ! grep -Fq '[ -n "${WAYLAND_DISPLAY:-}" ]' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq 'export PATH=\"$HOME/.local/bin:$PATH\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq 'export INIR_VENV=\"$HOME/.local/state/quickshell/.venv\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq 'turnstile-update-runit-env PATH INIR_VENV ILLOGICAL_IMPULSE_VIRTUAL_ENV WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     for audio_svc in pipewire wireplumber pipewire-pulse; do
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
@@ -2299,6 +2302,10 @@ rm -rf "$turnstile_test_root"
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
+if ! grep -Eq '^[[:space:]]+kf6-syntax-highlighting$' <<< "$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"; then
+    printf 'FAIL: Void base profile is missing the critical QML syntax-highlighting runtime\n' >&2
+    exit 1
+fi
 for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do
     if ! grep -Fq "$mapping" "$deps_map"; then
         printf 'FAIL: Void dependency map missing %s\n' "$mapping" >&2

@@ -157,8 +157,10 @@ VOID_SCREENCAPTURE_PACKAGES=(
 VOID_FONTS_PACKAGES=(
   curl
   unzip
+  fontconfig
   dejavu-fonts-ttf
   twemoji
+  nerd-fonts-ttf
   qt6ct
   kvantum
   breeze
@@ -182,6 +184,14 @@ WHITESUR_ICON_URL="https://github.com/vinceliuice/WhiteSur-icon-theme/archive/re
 CAPITAINE_VERSION="r5"
 CAPITAINE_SHA256="60114cf857902a9907780bdcfa995d600618cf14b37f90776565c9de7e5add6c"
 CAPITAINE_URL="https://github.com/sainnhe/capitaine-cursors/releases/download/${CAPITAINE_VERSION}/Linux.zip"
+MATERIAL_SYMBOLS_COMMIT="40a7a292a79d9394157e1ea24f83d52d5e17c556"
+MATERIAL_SYMBOLS_SHA256="f1472f172c0fc4a922be22972e4752ccc54fe795ed82564ab6f6b097782f2dbc"
+ROBOTO_FLEX_VERSION="3.200"
+ROBOTO_FLEX_SHA256="6b2b14e11308c7d3e8388b623cf740c46b872e7519198e0cff8062e52b75239b"
+ROBOTO_FLEX_FONT_SHA256="a55c1e67f6dcf27f2bb71dc3e4c03d3abcbc5054411aac943b2f94985195825e"
+GOOGLE_FONTS_COMMIT="a54f7446f84a1125ef6bf08baa46f3639e8905e0"
+GABARITO_SHA256="8650e2bd7747f7d74619fd7aecbcb0309e6f37b7964024f3fb15ae4833b67ca5"
+OXANIUM_SHA256="2ce01d946e1e1ffc8d7eecfffbda8623bedd63eaf811a20488c4b69af45babb0"
 
 declare -A VOID_OCR_MODEL_SHA256=(
   [jpn_vert]="bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"
@@ -374,6 +384,101 @@ install_void_visual_providers() {
   log_success "Void visual theme providers are ready"
 }
 
+install_void_verified_font_file() {
+  local label="$1" url="$2" expected_sha="$3" target="$4"
+  local tmp
+
+  if [[ -s "$target" ]] \
+      && printf '%s  %s\n' "$expected_sha" "$target" | sha256sum -c - >/dev/null 2>&1; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$target")"
+  tmp="${target}.part.$$"
+  if ! curl -fsSL --max-time 120 -o "$tmp" "$url" \
+      || ! printf '%s  %s\n' "$expected_sha" "$tmp" | sha256sum -c - >/dev/null 2>&1 \
+      || ! mv -f "$tmp" "$target"; then
+    rm -f "$tmp"
+    log_warning "Could not provision verified font: $label"
+    return 1
+  fi
+}
+
+install_void_roboto_flex() {
+  local data_home font_dir target temp_dir archive extracted
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  font_dir="$data_home/fonts"
+  target="$font_dir/RobotoFlex.ttf"
+
+  if [[ -s "$target" ]] \
+      && printf '%s  %s\n' "$ROBOTO_FLEX_FONT_SHA256" "$target" | sha256sum -c - >/dev/null 2>&1; then
+    return 0
+  fi
+
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/roboto-flex.zip"
+  extracted="$temp_dir/RobotoFlex.ttf"
+  if ! curl -fsSL --max-time 120 -o "$archive" \
+      "https://github.com/googlefonts/roboto-flex/releases/download/${ROBOTO_FLEX_VERSION}/roboto-flex-fonts.zip" \
+      || ! printf '%s  %s\n' "$ROBOTO_FLEX_SHA256" "$archive" | sha256sum -c - >/dev/null 2>&1 \
+      || ! python3 - "$archive" "$extracted" <<'PY'
+import sys
+import zipfile
+
+archive, target = sys.argv[1:]
+with zipfile.ZipFile(archive) as bundle:
+    name = next(
+        entry for entry in bundle.namelist()
+        if "/variable/" in entry and entry.endswith(".ttf")
+    )
+    with open(target, "wb") as output:
+        output.write(bundle.read(name))
+PY
+  then
+    rm -rf "$temp_dir"
+    log_warning "Could not extract verified Roboto Flex ${ROBOTO_FLEX_VERSION}"
+    return 1
+  fi
+  if ! printf '%s  %s\n' "$ROBOTO_FLEX_FONT_SHA256" "$extracted" | sha256sum -c - >/dev/null 2>&1; then
+    rm -rf "$temp_dir"
+    log_warning "Roboto Flex extracted font checksum mismatch"
+    return 1
+  fi
+  mkdir -p "$font_dir"
+  if ! install -m 0644 "$extracted" "$target"; then
+    rm -rf "$temp_dir"
+    return 1
+  fi
+  rm -rf "$temp_dir"
+}
+
+install_void_font_providers() {
+  local data_home font_dir
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  font_dir="$data_home/fonts"
+  mkdir -p "$font_dir"
+
+  install_void_verified_font_file \
+    "Material Symbols Rounded" \
+    "https://raw.githubusercontent.com/google/material-design-icons/${MATERIAL_SYMBOLS_COMMIT}/variablefont/MaterialSymbolsRounded%5BFILL%2CGRAD%2Copsz%2Cwght%5D.ttf" \
+    "$MATERIAL_SYMBOLS_SHA256" \
+    "$font_dir/MaterialSymbolsRounded.ttf" || return 1
+  install_void_roboto_flex || return 1
+  install_void_verified_font_file \
+    "Gabarito" \
+    "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/gabarito/Gabarito%5Bwght%5D.ttf" \
+    "$GABARITO_SHA256" \
+    "$font_dir/Gabarito.ttf" || return 1
+  install_void_verified_font_file \
+    "Oxanium" \
+    "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/oxanium/Oxanium%5Bwght%5D.ttf" \
+    "$OXANIUM_SHA256" \
+    "$font_dir/Oxanium.ttf" || return 1
+
+  fc-cache -f "$font_dir" >/dev/null 2>&1 || return 1
+  log_success "Void required font providers are ready"
+}
+
 install_void_missioncenter() {
   local app_id="io.missioncenter.MissionCenter"
   local wrapper_dir wrapper_path wrapper
@@ -542,6 +647,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [ocr-jpn]="tesseract-ocr-jpn"
     [ocr-chi-sim]="tesseract-ocr-chi_sim"
     [ocr-chi-tra]="tesseract-ocr-chi_tra"
+    [font-jetbrains-mono-nerd]="nerd-fonts-ttf"
   )
 
   _miss_installflags=(-S)
@@ -554,6 +660,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _need_missioncenter=false
   _need_tesseract_adapter=false
   _need_visual_providers=false
+  _need_font_providers=false
   _ocr_fallback_models=()
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
@@ -586,6 +693,13 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
       done
       continue
     fi
+    if [[ "$cmd" == font-providers ]]; then
+      _need_font_providers=true
+      for _miss_pkg in curl unzip python3 fontconfig; do
+        [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
+      done
+      continue
+    fi
     case "$cmd" in
       ocr-jpn-vert)
         _ocr_fallback_models+=(jpn_vert)
@@ -605,6 +719,16 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   done
 
   if [[ ${#_miss_pkgs[@]} -gt 0 ]]; then
+    _pending_pkgs=()
+    for _miss_pkg in "${_miss_pkgs[@]}"; do
+      if ! xbps-query -p pkgver "$_miss_pkg" >/dev/null 2>&1; then
+        _pending_pkgs+=("$_miss_pkg")
+      fi
+    done
+    _miss_pkgs=("${_pending_pkgs[@]}")
+  fi
+
+  if [[ ${#_miss_pkgs[@]} -gt 0 ]]; then
     v pkg_sudo xbps-install "${_miss_installflags[@]}" "${_miss_pkgs[@]}"
   fi
   if $_need_ydotool; then
@@ -621,6 +745,9 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_visual_providers; then
     install_void_visual_providers || return 1
+  fi
+  if $_need_font_providers; then
+    install_void_font_providers || return 1
   fi
   if [[ ${#_ocr_fallback_models[@]} -gt 0 ]]; then
     install_void_ocr_models "${_ocr_fallback_models[@]}" || return 1
@@ -692,6 +819,7 @@ fi
 if ${INSTALL_FONTS:-true}; then
   tui_info "Installing fonts and theming packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_FONTS_PACKAGES[@]}"
+  install_void_font_providers || return 1
   install_void_visual_providers || return 1
 fi
 

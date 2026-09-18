@@ -896,7 +896,7 @@ spawn-sh-at-startup "exec runsvdir ~/.config/service"
 else:
     supervisor_comment = '''// iNiR is managed by the turnstile user service (service/inir).
 // Do not add a compositor startup entry here or you'll get two shells.'''
-    block = '''// BEGIN inir-turnstile-environment
+    block = r'''// BEGIN inir-turnstile-environment
 // Publish Niri's session environment to Turnstile-managed user services.
 spawn-sh-at-startup "if command -v turnstile-update-runit-env >/dev/null 2>&1 && [ -n \"${WAYLAND_DISPLAY:-}\" ] && [ -n \"${XDG_RUNTIME_DIR:-}\" ] && [ -n \"${DBUS_SESSION_BUS_ADDRESS:-}\" ]; then turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET; fi"
 // END inir-turnstile-environment'''

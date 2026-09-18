@@ -192,7 +192,7 @@ upstream pull request is opened, its review diff is rebuilt from the then-curren
 | 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
 | 3 | `feat/void-runit-install` | Delivered as PR3.0-PR3.3: supervisors, lifecycle, session runtime, and optional runtime adapters. | Complete PR3.3 capability checks; retain all PR3.0-PR3.2 VM contracts. |
 | 4 | `feat/void-capability-providers` | System-backed capabilities: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. Delivered as PR4.0 (NetworkManager), PR4.1 (BlueZ), PR4.2 (ydotool), PR4.3 (WARP research/conditional). | Provision each selected provider twice and exercise its UI action and runit service. |
-| 5 | `feat/void-desktop-parity` | Flatpak/upstream desktop providers, themes, Mission Center, OCR languages, and remaining default parity. | No selected profile or default references an unavailable provider. |
+| 5 | `feat/void-pr5` | Desktop parity delivered as PR5.0 Mission Center, PR5.1 OCR, PR5.2 visual providers, PR5.3 fonts, PR5.4 Darkly, and PR5.5 desktop/runtime closure. | No selected profile/default references an unavailable provider; live Niri session validates shell startup, sidebars, Qt/GTK theming, distro icon, and representative keybinds. |
 | 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
 | 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
 

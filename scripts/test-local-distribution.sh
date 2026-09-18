@@ -2283,6 +2283,7 @@ if ! (
     grep -Fq 'export PATH=\"$HOME/.local/bin:$PATH\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'export INIR_VENV=\"$HOME/.local/state/quickshell/.venv\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'turnstile-update-runit-env PATH INIR_VENV ILLOGICAL_IMPULSE_VIRTUAL_ENV WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq 'sv restart \"$HOME/.config/service/inir\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     for audio_svc in pipewire wireplumber pipewire-pulse; do
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
@@ -2311,6 +2312,15 @@ rm -rf "$turnstile_test_root"
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
+mod_q_default="$runtime_root/defaults/niri/config.d/70-binds.kdl"
+mod_q_legacy="$runtime_root/dots/.config/niri/config.kdl"
+mod_q_migration="$runtime_root/sdata/migrations/006-close-confirm.sh"
+for source in "$mod_q_default" "$mod_q_legacy" "$mod_q_migration"; do
+    if ! grep -Fq 'Mod+Q repeat=false allow-inhibiting=false' "$source"; then
+        printf 'FAIL: Mod+Q can still be inhibited after config regeneration: %s\n' "$source" >&2
+        exit 1
+    fi
+done
 void_icon="$runtime_root/assets/icons/void-symbolic.svg"
 system_info="$runtime_root/services/SystemInfo.qml"
 if [[ ! -s "$void_icon" ]] \

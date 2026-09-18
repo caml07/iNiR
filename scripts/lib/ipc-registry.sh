@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 2feb5c64f68fe8ae
+# IPC.md hash: e9d389ab824db160
 # Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
@@ -587,7 +587,7 @@ bind "Alt+Shift+Tab" { spawn "inir" "altSwitcher" "previous"; }'
   [background]='bind "Super+W" { spawn "inir" "background" "toggleEditMode"; }'
   [cheatsheet]='bind "Super+Slash" { spawn "inir" "cheatsheet" "toggle"; }'
   [clipboard]='bind "Super+V" repeat=false { spawn "inir" "clipboard" "toggle"; }'
-  [closeConfirm]='bind "Mod+Q" repeat=false { spawn "inir" "close-window"; }'
+  [closeConfirm]='bind "Mod+Q" repeat=false allow-inhibiting=false { spawn "inir" "close-window"; }'
   [equalizer]='bind "Ctrl+Alt+F" { spawn "inir" "equalizer" "toggle"; }'
   [gamemode]='bind "Super+F12" { spawn "inir" "gamemode" "toggle"; }'
   [globalActions]='bind "Super+Slash" { spawn "inir" "globalActions" "open"; }

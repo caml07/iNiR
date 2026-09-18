@@ -15,6 +15,21 @@ PROMPTS.md
 .agents/
 .agents-backups/
 **/.agents/
+
+# Version only the repository-owned Void port skills. Keep all other agent
+# state local, but allow these skill directories to grow supporting resources.
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/inir-void-port/
+!.agents/skills/inir-void-port/**
+!.agents/skills/inir-void-provider/
+!.agents/skills/inir-void-provider/**
+!.agents/skills/inir-void-validation/
+!.agents/skills/inir-void-validation/**
+!.agents/skills/inir-void-debugging/
+!.agents/skills/inir-void-debugging/**
 CODEX.md
 PI.md
 GEMINI.md*

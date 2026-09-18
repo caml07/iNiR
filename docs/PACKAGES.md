@@ -1,10 +1,46 @@
 # Package Reference
 
-Complete list of packages used by iNiR, organized by category. These are what the setup script installs on Arch-based systems.
+Package reference for iNiR, organized by category. The existing package tables
+below describe the Arch-based install. Void Linux uses the same user-facing
+profiles through XBPS plus a small set of pinned or Flatpak providers.
 
 The PKGBUILDs live in `sdata/dist-arch/`.
 
 > **`inir-deps`** is a meta-package that depends on all the groups below. It exists so that `pacman -Qdtq | pacman -Rns -` (clean orphans) doesn't remove iNiR's dependencies. It has no files of its own.
+
+## Void Linux
+
+Void uses the normal per-user installer with XBPS-backed dependency profiles.
+The executable source of truth is `sdata/dist-void/install-deps.sh`; use
+`docs/VOID_CAPABILITIES.md` for delivery/validation status and
+`docs/VOID_PORT_RUNBOOK.md` for operational rules. Provider versions and
+checksums live in the installer script, not this reference.
+
+Important Void package-name and provider differences:
+
+| Capability | Void provider | Notes |
+|---|---|---|
+| Fish shell | `fish-shell` | Provides `/usr/bin/fish` |
+| Qt 6 Qt5 compatibility | `qt6-qt5compat` | Void package name |
+| Quickshell | `quickshell` | Official XBPS package |
+| Python Pillow | `python3-Pillow` | Toolkit profile |
+| Geolocation | `geoclue2` | Toolkit profile |
+| ImageMagick | `ImageMagick` | Screencapture profile |
+| Network editor | `network-manager-applet` | Base profile with `NetworkManager` |
+| QML syntax highlighting | `kf6-syntax-highlighting` | Required base runtime for both sidebars |
+| KDE integration | `kf6-kconfig`, `plasma-integration` | Toolkit/fonts-theme profiles |
+| OCR | `tesseract-ocr` plus language packages | Vertical models are pinned upstream artifacts |
+| Night light | `wlsunset` | Base profile |
+| Wallpaper | `awww` | Official XBPS package |
+
+Validated non-XBPS providers are used only where Void does not provide a
+suitable package: pinned upstream ydotool, WARP, adw-gtk3, WhiteSur,
+Capitaine, Darkly, selected UI fonts and vertical OCR models, plus Mission
+Center from Flathub.
+
+Void intentionally installs `dunst` for the `dunstify` client. The package
+itself is not an installer conflict; a running `dunst` daemon remains a
+runtime conflict.
 
 ---
 

@@ -199,8 +199,8 @@ upstream pull request is opened, its review diff is rebuilt from the then-curren
 | 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
 | 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
 
-Documentation and VM observations stay on the fork's `docs/void` branch while
-the port is in development; they are not opened as a separate upstream PR.
+Documentation and VM observations are versioned with the current Void
+integration branch on the fork. They are not opened as a separate upstream PR.
 The final integration gate is a clean Void installation on an external disk:
 clone the fork at the merged implementation commit, run iNiR's normal one-line
 installer, and record the exact commands and observations in

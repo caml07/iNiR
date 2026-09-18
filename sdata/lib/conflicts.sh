@@ -8,6 +8,11 @@ check_conflicts() {
     local conflict_services=()
     local critical_conflicts=()
     local package_manager=""
+    local usable_systemd_user_manager=false
+    if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+            && has_usable_systemd_user_manager; then
+        usable_systemd_user_manager=true
+    fi
     
     if command -v pacman &>/dev/null; then
         package_manager="pacman"
@@ -92,7 +97,8 @@ check_conflicts() {
                 critical_conflicts+=("$pkg")
             fi
             # Check if it's a systemd service
-            if systemctl --user list-unit-files "${pkg}.service" &>/dev/null 2>&1; then
+            if $usable_systemd_user_manager \
+                    && systemctl --user list-unit-files "${pkg}.service" &>/dev/null 2>&1; then
                 conflict_services+=("${pkg}.service")
             fi
         fi
@@ -209,8 +215,11 @@ _remove_critical_conflicts() {
 
         # Stop related services before removal
         local svc_name="${pkg}.service"
-        systemctl --user stop "$svc_name" 2>/dev/null || true
-        systemctl --user disable "$svc_name" 2>/dev/null || true
+        if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+                && has_usable_systemd_user_manager; then
+            systemctl --user stop "$svc_name" 2>/dev/null || true
+            systemctl --user disable "$svc_name" 2>/dev/null || true
+        fi
 
         log_info "Removing $pkg..."
         pkg_sudo pacman -Rdd --noconfirm "$pkg" 2>/dev/null \

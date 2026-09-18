@@ -295,7 +295,7 @@ uninstall_stop_services() {
     qs -p "$runtime_target" kill 2>/dev/null || true
 
     # Stop super daemon if running
-    if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
+    if has_usable_systemd_user_manager; then
         # Stop the service
         systemctl --user stop inir.service 2>/dev/null || true
         # Remove all wants links (compositor-specific and legacy graphical-session)
@@ -318,7 +318,7 @@ uninstall_stop_services() {
 }
 
 uninstall_reload_user_systemd() {
-    if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
+    if has_usable_systemd_user_manager; then
         systemctl --user daemon-reload 2>/dev/null || true
     fi
 }
@@ -802,9 +802,12 @@ uninstall_show_manual_steps() {
         echo -e "  ${STY_CYAN}# Remove i2c module autoload${STY_RST}"
         echo -e "  sudo rm /etc/modules-load.d/i2c-dev.conf"
         echo ""
-        if command -v systemctl &>/dev/null; then
+        if has_usable_systemd_user_manager; then
             echo -e "  ${STY_CYAN}# Disable ydotool${STY_RST}"
             echo -e "  systemctl --user disable ydotool"
+        elif command -v sv &>/dev/null; then
+            echo -e "  ${STY_CYAN}# Disable ydotool user service${STY_RST}"
+            echo -e "  sv down ~/.config/service/ydotool"
         fi
         echo ""
         echo -e "  ${STY_CYAN}# Remove SDDM theme${STY_RST}"

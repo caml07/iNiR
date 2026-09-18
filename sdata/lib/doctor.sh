@@ -32,7 +32,8 @@ doctor_fix() {
 }
 
 doctor_detect_compositor_service() {
-    if ! command -v systemctl >/dev/null 2>&1; then
+    if ! declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+            || ! has_usable_systemd_user_manager; then
         return 1
     fi
 
@@ -864,7 +865,8 @@ _try_install_font_package() {
 check_niri_running() {
     local current_socket="${NIRI_SOCKET:-}"
 
-    if command -v systemctl >/dev/null 2>&1 \
+    if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+            && has_usable_systemd_user_manager \
             && systemctl --user is-active --quiet niri.service >/dev/null 2>&1 \
             && declare -F inir_resolve_niri_service_environment >/dev/null 2>&1; then
         if ! inir_resolve_niri_service_environment; then
@@ -976,8 +978,9 @@ check_manifest() {
 }
 
 check_service_unit_health() {
-    if ! command -v systemctl >/dev/null 2>&1; then
-        doctor_pass "User service checks skipped (systemctl missing)"
+    if ! declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+            || ! has_usable_systemd_user_manager; then
+        doctor_pass "User service checks skipped (no usable systemd user manager)"
         return 0
     fi
 
@@ -1524,7 +1527,10 @@ check_conflicting_services() {
     if [[ ${#running[@]} -gt 0 ]]; then
         for proc in "${running[@]}"; do
             pkill -x "$proc" 2>/dev/null
-            systemctl --user disable --now "${proc}.service" 2>/dev/null || true
+            if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+                    && has_usable_systemd_user_manager; then
+                systemctl --user disable --now "${proc}.service" 2>/dev/null || true
+            fi
         done
         doctor_fix "Stopped conflicting: ${running[*]} (iNiR has built-in notifications, re-enable with: systemctl --user enable <service>)"
     else

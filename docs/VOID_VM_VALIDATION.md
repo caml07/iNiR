@@ -541,14 +541,39 @@ turnstile or iNiR failure.
   `/run/cloudflare-warp/warp_service`; `warp-cli status` reached it and asked
   for explicit TOS acceptance. No account was available, so registration,
   connection, and `warp=on` trace validation remain pending.
+- The final PR4 checker rerun on 2026-09-17 passed PR4.0 through PR4.3 over
+  SSH. PR4.0 confirmed live NetworkManager and D-Bus runit supervision plus
+  `nmcli` connectivity. PR4.1 again passed package/service/D-Bus/group checks;
+  the VM still exposes no Bluetooth adapter, so hardware pairing remains an
+  environment limitation rather than a checker failure. PR4.2 and PR4.3 passed
+  their current contracts unchanged.
+- PR5.0 Mission Center was validated on 2026-09-17 using Void's
+  `flatpak-1.18.2_1` and Flathub `io.missioncenter.MissionCenter` 1.2.0.
+  The installer created `~/.local/bin/missioncenter`, the repeatable checker
+  passed, and a second repair/install run preserved the Flatpak ref and wrapper
+  SHA-256.
+- PR5.1 OCR parity was validated on 2026-09-17. Void provides the executable as
+  `tesseract-ocr`, so the installer now materializes a user `tesseract`
+  command adapter. Russian, Japanese, Simplified Chinese, and Traditional
+  Chinese horizontal models use XBPS packages. The three vertical models use a
+  pinned `tessdata_fast` commit with per-file SHA-256 verification. Tesseract
+  loaded each vertical model successfully, and the second installer run was
+  idempotent.
+- PR5.2 visual providers were validated on 2026-09-17. Void's missing
+  Arch-default providers are supplied by pinned upstream artifacts:
+  adw-gtk3 6.5, WhiteSur 2026-09-10, and Capitaine r5, each with a verified
+  archive SHA-256. The installed names match iNiR defaults
+  (`adw-gtk3-dark`, `WhiteSur-dark`, `capitaine-cursors-light`) and the
+  second provider run produced no changes.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
   sweep, clean VM installation, and the external-disk validation.
 - Run shellcheck and `make test-local` before each PR.
 
-`make test-local`, `bash -n`, `qmllint`, JSON parsing, and `git diff --check`
-passed after merging Snowarch `upstream/prerelease` at `4c824cf9` through every
-Void branch. ShellCheck was not available in the host environment. No upstream
-PR has been opened; the Void port remains a fork progress branch while PR4 is
-developed.
+`make test-local`, `bash -n`, JSON parsing, and `git diff --check` passed
+for the PR5.0-PR5.2 work. ShellCheck was not available in the host environment.
+On 2026-09-17 every local `feat/void-*` branch contained Snowarch
+`upstream/prerelease` at `593eb2dc` (zero commits behind). Existing Void
+branches in the fork had no local commits pending against their matching
+`origin` refs; the new PR5 branch was ready to publish.

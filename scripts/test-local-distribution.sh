@@ -2371,6 +2371,90 @@ if ! grep -Fq 'YDOTOOL_VERSION="1.0.4"' "$void_deps" \
     exit 1
 fi
 
+step "Void Mission Center provider"
+if ! grep -Fq 'install_void_missioncenter' "$void_deps" \
+        || ! grep -Fq 'io.missioncenter.MissionCenter' "$void_deps" \
+        || ! grep -Eq '^[[:space:]]+flatpak$' <<< "$void_toolkit_packages" \
+        || ! grep -Fq '[[ "$cmd" == missioncenter ]]' "$void_deps" \
+        || ! grep -Fq 'exec flatpak run io.missioncenter.MissionCenter "$@"' "$void_deps"; then
+    printf 'FAIL: Void Mission Center Flatpak provider is incomplete\n' >&2
+    exit 1
+fi
+
+step "Void OCR language provider"
+for package in \
+    tesseract-ocr-rus \
+    tesseract-ocr-jpn \
+    tesseract-ocr-chi_sim \
+    tesseract-ocr-chi_tra; do
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_toolkit_packages"; then
+        printf 'FAIL: Void OCR profile missing package: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+for mapping in \
+    '[tesseract]="tesseract-ocr"' \
+    '[ocr-eng]="tesseract-ocr-eng"' \
+    '[ocr-spa]="tesseract-ocr-spa"' \
+    '[ocr-rus]="tesseract-ocr-rus"' \
+    '[ocr-jpn]="tesseract-ocr-jpn"' \
+    '[ocr-chi-sim]="tesseract-ocr-chi_sim"' \
+    '[ocr-chi-tra]="tesseract-ocr-chi_tra"'; do
+    if ! grep -Fq "$mapping" "$void_deps"; then
+        printf 'FAIL: Void OCR repair mapping missing: %s\n' "$mapping" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"' "$void_deps" \
+        || ! grep -Fq 'bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b' "$void_deps" \
+        || ! grep -Fq '20590de84725bab69cde93bd6e8ed360a13cc5421a7e7364ddeb93e9af53d6da' "$void_deps" \
+        || ! grep -Fq '1df02a4b210e5c217b783819538b63e9dfe6904e2b5e53b62664f1b9f7a989d0' "$void_deps" \
+        || ! grep -Fq 'install_void_ocr_models' "$void_deps" \
+        || ! grep -Fq 'configure_void_tesseract_command' "$void_deps" \
+        || ! grep -Fq 'exec tesseract-ocr "$@"' "$void_deps" \
+        || ! grep -Fq 'ocr-jpn-vert' "$void_deps" \
+        || ! grep -Fq 'ocr-chi-sim-vert' "$void_deps" \
+        || ! grep -Fq 'ocr-chi-tra-vert' "$void_deps"; then
+    printf 'FAIL: Void OCR vertical-model fallback is incomplete\n' >&2
+    exit 1
+fi
+
+step "Void visual theme providers"
+void_fonts_packages="$(sed -n '/^VOID_FONTS_PACKAGES=(/,/^)/p' "$void_deps")"
+for package in curl unzip; do
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_fonts_packages"; then
+        printf 'FAIL: Void fonts/theme profile missing provider dependency: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+for needle in \
+    'ADW_GTK3_VERSION="6.5"' \
+    'ADW_GTK3_SHA256="a81780fadfc432be0fc3d89c4ebb41aa28e4f032d42c36f9789c57dd10cfa41c"' \
+    'WHITESUR_ICON_VERSION="2026-09-10"' \
+    'WHITESUR_ICON_SHA256="406c9cd59705583f1754b0eaca96cc48bafda042b88ef143f16d8ae1820ecd95"' \
+    'CAPITAINE_VERSION="r5"' \
+    'CAPITAINE_SHA256="60114cf857902a9907780bdcfa995d600618cf14b37f90776565c9de7e5add6c"' \
+    'install_void_visual_providers' \
+    'capitaine-cursors-light'; do
+    if ! grep -Fq "$needle" "$void_deps"; then
+        printf 'FAIL: Void visual provider missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if grep -Eq 'WhiteSur-icon-theme/(archive/refs/heads/master|releases/latest)|capitaine-cursors/releases/latest|adw-gtk3/releases/latest' "$void_deps"; then
+    printf 'FAIL: Void visual providers use an unpinned upstream URL\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'local preferred_gtk_theme="adw-gtk3-dark"' "$void_setups" \
+        || ! grep -Fq 'gtk_theme="Adwaita"' "$void_setups" \
+        || ! grep -Fq 'local preferred_cursor_theme="capitaine-cursors-light"' "$void_setups" \
+        || ! grep -Fq 'cursor_theme="Adwaita"' "$void_setups" \
+        || ! grep -Fq 'gtk-theme "$gtk_theme"' "$void_setups" \
+        || ! grep -Fq 'cursor-theme "$cursor_theme"' "$void_setups"; then
+    printf 'FAIL: desktop setup can still persist unavailable Void GTK/cursor defaults\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

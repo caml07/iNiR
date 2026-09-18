@@ -9,7 +9,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | Niri + Quickshell | base | XBPS `niri`, `quickshell`, Qt 6 packages | session supervisor | VM validated | PR1-PR3.2 |
 | Session D-Bus and login | base | XBPS `dbus`, `elogind`, `turnstile` | confirmed runit services + turnstile | VM validated | PR3.1 |
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
-| Network | base | XBPS `NetworkManager` | runit service | VM exercised: conflict guard, activation, group, and `nmcli` operation passed; final checker rerun pending | PR4.0 |
+| Network | base | XBPS `NetworkManager` | runit service | VM validated: conflict guard, activation, group, runit status, D-Bus dependency, and `nmcli connected` passed on final checker rerun | PR4.0 |
 | Bluetooth | toolkit | XBPS `bluez`, `blueman`; audio adds `libspa-bluetooth` | confirmed `bluetoothd` runit service | VM validated: packages, service, D-Bus, and group; physical adapter operation pending | PR4.1 |
 | Awww wallpaper | base | official XBPS `awww` | systemd transient unit or session daemon by predicate | VM validated: daemon + query + img apply on wayland-1 | PR3.3 |
 | GameMode | base | built into iNiR | session process | `discover-overlay` control removed; still to verify in a live Niri session: toggle on/off, Niri animations + notifications behavior, no `discover-overlay` process touched | PR3.3 |
@@ -17,9 +17,9 @@ after provider, provisioning, activation, operation, and verification pass.
 | Screen recording | screencapture | XBPS `wf-recorder`, `ffmpeg`; audio profile provides `pipewire` | direct session processes | VM validated: `pipewire`/`wireplumber`/`pipewire-pulse` user services run; `pactl` reports PulseAudio on PipeWire 1.6.7 | PR3.3 |
 | Clipboard history and paste | base/toolkit | XBPS `wl-clipboard`, `cliphist`; verified upstream `ydotool` v1.0.4 source | session watchers + predicate-selected ydotool user service | ydotool provider VM validated: provision, permissions, service, socket, direct injection, idempotency, and lock-screen keyboard UI; Superpaste not separately exercised | PR4.2 |
 | Cloudflare WARP | toolkit | verified upstream `cloudflare-warp` v2026.7.1377.0, extracted without Debian scripts | iNiR-owned `warp-svc` runit service | VM validated: provision, daemon up, socket, version, idempotency; pending: account registration, connection, and trace verification | PR4.3 |
-| Mission Center | toolkit | maintained Flatpak | Flatpak application | provisioning/launcher pending | PR5 |
-| OCR | toolkit | XBPS Tesseract + user-space language download | direct process | English/Spanish VM validated; full language flow pending | PR5 |
-| Themes, icons, cursors | fonts/theme | XBPS first, pinned upstream fallback | files/config only | unavailable Arch defaults need Void providers | PR5 |
+| Mission Center | toolkit | Flathub `io.missioncenter.MissionCenter` via XBPS Flatpak | Flatpak application + `missioncenter` wrapper | VM validated: Flatpak 1.18.2, Mission Center 1.2.0, launcher, repair path, and idempotency | PR5.0 |
+| OCR | toolkit | XBPS Tesseract/language packages + pinned `tessdata_fast` vertical models | direct process + `tesseract` command adapter | VM validated: English/Spanish/Russian/Japanese/Chinese packages, verified vertical models, command adapter, model loading, and idempotency | PR5.1 |
+| Themes, icons, cursors | fonts/theme | XBPS base theming + pinned adw-gtk3, WhiteSur, and Capitaine providers | files/config only | VM validated: adw-gtk3 6.5, WhiteSur 2026-09-10, Capitaine r5, expected theme names, safe Adwaita fallback, and idempotency | PR5.2 |
 | Package updates/search/catalog | base | XBPS | direct commands with confirmed elevation | not implemented | PR6 |
 | Doctor and ABI repair | base | XBPS diagnostics | direct commands | partial | PR7 |
 

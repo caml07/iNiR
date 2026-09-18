@@ -573,6 +573,16 @@ turnstile or iNiR failure.
   `JetBrainsMono Nerd Font`. The selective repair path filters already
   installed XBPS packages before elevation, so the second provider run passed
   non-interactively and produced an unchanged provider snapshot.
+- PR5.4 Darkly parity was validated on 2026-09-17 against maintained upstream
+  `Bali10050/Darkly` v0.5.39 with source SHA-256
+  `5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2`.
+  Void builds the Qt6 KStyle natively with its Qt 6.11.2/KF6 6.29.0 stack,
+  Qt Quick/Kirigami, and KWin decorations disabled because Niri owns window
+  decoration. The installed `darkly6.so` had no missing `ldd` dependencies,
+  `QT_STYLE_OVERRIDE=Darkly` was accepted by Qt, and the second selective
+  provider run preserved the plugin and provider marker unchanged. This work
+  also fixed `setup install` so a failed dependency provider now aborts the
+  install instead of being rendered as a successful dependency step.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
@@ -580,7 +590,7 @@ turnstile or iNiR failure.
 - Run shellcheck and `make test-local` before each PR.
 
 `make test-local`, `bash -n`, JSON parsing, and `git diff --check` passed
-through PR5.3. ShellCheck was not available in the host environment.
+through PR5.4. ShellCheck was not available in the host environment.
 On 2026-09-17 every local `feat/void-*` branch contained Snowarch
 `upstream/prerelease` at `593eb2dc` (zero commits behind). Existing Void
 branches in the fork had no local commits pending against their matching

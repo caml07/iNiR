@@ -21,6 +21,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | OCR | toolkit | XBPS Tesseract/language packages + pinned `tessdata_fast` vertical models | direct process + `tesseract` command adapter | VM validated: English/Spanish/Russian/Japanese/Chinese packages, verified vertical models, command adapter, model loading, and idempotency | PR5.1 |
 | Themes, icons, cursors | fonts/theme | XBPS base theming + pinned adw-gtk3, WhiteSur, and Capitaine providers | files/config only | VM validated: adw-gtk3 6.5, WhiteSur 2026-09-10, Capitaine r5, expected theme names, safe Adwaita fallback, and idempotency | PR5.2 |
 | Required UI fonts | fonts/theme | XBPS `nerd-fonts-ttf`, `noto-fonts-emoji`, `fontconfig` + pinned Material Symbols Rounded, Roboto Flex 3.200, Gabarito, and Oxanium artifacts | Fontconfig cache | VM validated: exact iNiR font families resolve, verified checksums, selective repair, and idempotency | PR5.3 |
+| Darkly Qt style | fonts/theme | pinned Darkly v0.5.39 source + Void Qt6/KF6 build dependencies | Qt6 KStyle plugin | VM validated: source checksum, native Qt6 build, clean runtime linkage, Qt style loading, selective repair, and idempotency | PR5.4 |
 | Package updates/search/catalog | base | XBPS | direct commands with confirmed elevation | not implemented | PR6 |
 | Doctor and ABI repair | base | XBPS diagnostics | direct commands | partial | PR7 |
 

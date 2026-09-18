@@ -158,6 +158,20 @@ VOID_FONTS_PACKAGES=(
   curl
   unzip
   fontconfig
+  cmake
+  extra-cmake-modules
+  qt6-base-devel
+  qt6-declarative-devel
+  kf6-kcoreaddons-devel
+  kf6-kcmutils-devel
+  kf6-kcolorscheme-devel
+  kf6-kconfig-devel
+  kf6-kguiaddons-devel
+  kf6-ki18n-devel
+  kf6-kiconthemes-devel
+  kf6-kwindowsystem-devel
+  kf6-kirigami-devel
+  kf6-frameworkintegration-devel
   dejavu-fonts-ttf
   twemoji
   nerd-fonts-ttf
@@ -192,6 +206,9 @@ ROBOTO_FLEX_FONT_SHA256="a55c1e67f6dcf27f2bb71dc3e4c03d3abcbc5054411aac943b2f949
 GOOGLE_FONTS_COMMIT="a54f7446f84a1125ef6bf08baa46f3639e8905e0"
 GABARITO_SHA256="8650e2bd7747f7d74619fd7aecbcb0309e6f37b7964024f3fb15ae4833b67ca5"
 OXANIUM_SHA256="2ce01d946e1e1ffc8d7eecfffbda8623bedd63eaf811a20488c4b69af45babb0"
+DARKLY_VERSION="0.5.39"
+DARKLY_SOURCE_SHA256="5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2"
+DARKLY_SOURCE_URL="https://github.com/Bali10050/Darkly/archive/refs/tags/v${DARKLY_VERSION}.tar.gz"
 
 declare -A VOID_OCR_MODEL_SHA256=(
   [jpn_vert]="bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"
@@ -479,6 +496,100 @@ install_void_font_providers() {
   log_success "Void required font providers are ready"
 }
 
+void_darkly_plugin_path() {
+  local plugin_dir
+  plugin_dir=""
+  if command -v qtpaths6 >/dev/null 2>&1; then
+    plugin_dir="$(qtpaths6 --plugin-dir 2>/dev/null || true)"
+  elif command -v qtpaths >/dev/null 2>&1; then
+    plugin_dir="$(qtpaths --plugin-dir 2>/dev/null || true)"
+  fi
+  for plugin_dir in \
+      "$plugin_dir" \
+      /usr/lib64/qt6/plugins \
+      /usr/lib/qt6/plugins \
+      /usr/lib/x86_64-linux-gnu/qt6/plugins; do
+    [[ -n "$plugin_dir" && -d "$plugin_dir/styles" ]] || continue
+    find "$plugin_dir/styles" -maxdepth 1 -type f -iname '*darkly*.so' -print -quit 2>/dev/null
+  done | head -n1
+}
+
+install_void_darkly() {
+  local data_home marker_dir marker plugin temp_dir archive source_dir build_dir jobs verify_output
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  marker_dir="$data_home/inir/providers"
+  marker="$marker_dir/darkly"
+  plugin="$(void_darkly_plugin_path || true)"
+
+  if [[ -n "$plugin" ]] \
+      && [[ "$(cat "$marker" 2>/dev/null || true)" == "${DARKLY_VERSION}:${DARKLY_SOURCE_SHA256}" ]] \
+      && ! ldd "$plugin" 2>/dev/null | grep -Fq 'not found'; then
+    return 0
+  fi
+
+  temp_dir="$(mktemp -d)" || return 1
+  archive="$temp_dir/darkly.tar.gz"
+  source_dir="$temp_dir/Darkly-${DARKLY_VERSION}"
+  build_dir="$temp_dir/build"
+  if ! curl -fsSL --max-time 120 -o "$archive" "$DARKLY_SOURCE_URL" \
+      || ! printf '%s  %s\n' "$DARKLY_SOURCE_SHA256" "$archive" | sha256sum -c - >/dev/null 2>&1 \
+      || ! tar -xzf "$archive" -C "$temp_dir"; then
+    rm -rf "$temp_dir"
+    log_warning "Could not fetch verified Darkly v${DARKLY_VERSION} source"
+    return 1
+  fi
+  if ! python3 - "$source_dir/CMakeLists.txt" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = 'find_package(Qt6 ${QT_MIN_VERSION} REQUIRED CONFIG COMPONENTS Widgets DBus)'
+new = 'find_package(Qt6 ${QT_MIN_VERSION} REQUIRED CONFIG COMPONENTS Widgets DBus OpenGL)'
+if text.count(old) != 1:
+    raise SystemExit('Darkly Qt6 find_package shape changed')
+path.write_text(text.replace(old, new, 1))
+PY
+  then
+    rm -rf "$temp_dir"
+    log_warning "Darkly v${DARKLY_VERSION} Qt6 build patch no longer applies"
+    return 1
+  fi
+
+  jobs="$(nproc)"
+  (( jobs > 2 )) && jobs=2
+  if ! cmake -S "$source_dir" -B "$build_dir" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+      -DKDE_INSTALL_USE_QT_SYS_PATHS=ON \
+      -DBUILD_QT5=OFF \
+      -DBUILD_QT6=ON \
+      -DWITH_DECORATIONS=OFF \
+      -DBUILD_TESTING=OFF \
+      || ! cmake --build "$build_dir" -j"$jobs" \
+      || ! pkg_sudo cmake --install "$build_dir"; then
+    rm -rf "$temp_dir"
+    log_warning "Darkly v${DARKLY_VERSION} Qt6 build/install failed"
+    return 1
+  fi
+  rm -rf "$temp_dir"
+
+  plugin="$(void_darkly_plugin_path || true)"
+  if [[ -z "$plugin" ]] || ldd "$plugin" 2>/dev/null | grep -Fq 'not found'; then
+    log_warning "Darkly Qt6 plugin was not installed with usable runtime dependencies"
+    return 1
+  fi
+  verify_output="$(timeout 3 env QT_QPA_PLATFORM=offscreen QT_STYLE_OVERRIDE=Darkly qt6ct 2>&1 || true)"
+  if grep -Fq "invalid style override 'Darkly'" <<<"$verify_output"; then
+    log_warning "Qt6 rejected the installed Darkly style"
+    return 1
+  fi
+
+  mkdir -p "$marker_dir"
+  printf '%s\n' "${DARKLY_VERSION}:${DARKLY_SOURCE_SHA256}" > "$marker"
+  log_success "Darkly v${DARKLY_VERSION} Qt6 style installed"
+}
+
 install_void_missioncenter() {
   local app_id="io.missioncenter.MissionCenter"
   local wrapper_dir wrapper_path wrapper
@@ -661,6 +772,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _need_tesseract_adapter=false
   _need_visual_providers=false
   _need_font_providers=false
+  _need_darkly=false
   _ocr_fallback_models=()
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
@@ -696,6 +808,18 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     if [[ "$cmd" == font-providers ]]; then
       _need_font_providers=true
       for _miss_pkg in curl unzip python3 fontconfig; do
+        [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
+      done
+      continue
+    fi
+    if [[ "$cmd" == darkly ]]; then
+      _need_darkly=true
+      for _miss_pkg in \
+          curl cmake extra-cmake-modules qt6-base-devel qt6-declarative-devel \
+          kf6-kcoreaddons-devel kf6-kcmutils-devel kf6-kcolorscheme-devel \
+          kf6-kconfig-devel kf6-kguiaddons-devel kf6-ki18n-devel \
+          kf6-kiconthemes-devel kf6-kwindowsystem-devel kf6-kirigami-devel \
+          kf6-frameworkintegration-devel; do
         [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
       done
       continue
@@ -748,6 +872,9 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_font_providers; then
     install_void_font_providers || return 1
+  fi
+  if $_need_darkly; then
+    install_void_darkly || return 1
   fi
   if [[ ${#_ocr_fallback_models[@]} -gt 0 ]]; then
     install_void_ocr_models "${_ocr_fallback_models[@]}" || return 1
@@ -821,6 +948,7 @@ if ${INSTALL_FONTS:-true}; then
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_FONTS_PACKAGES[@]}"
   install_void_font_providers || return 1
   install_void_visual_providers || return 1
+  install_void_darkly || return 1
 fi
 
 #####################################################################################

@@ -2489,6 +2489,51 @@ if grep -Eq 'google/(fonts|material-design-icons)/(raw|archive)/(main|master)|re
     exit 1
 fi
 
+step "Void Darkly Qt provider"
+for package in \
+    cmake extra-cmake-modules qt6-base-devel qt6-declarative-devel \
+    kf6-kcoreaddons-devel kf6-kcmutils-devel kf6-kcolorscheme-devel \
+    kf6-kconfig-devel kf6-kguiaddons-devel kf6-ki18n-devel \
+    kf6-kiconthemes-devel kf6-kwindowsystem-devel kf6-kirigami-devel \
+    kf6-frameworkintegration-devel; do
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_fonts_packages"; then
+        printf 'FAIL: Void Darkly provider dependency missing: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+for needle in \
+    'DARKLY_VERSION="0.5.39"' \
+    'DARKLY_SOURCE_SHA256="5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2"' \
+    'install_void_darkly' \
+    '-DBUILD_QT5=OFF' \
+    '-DBUILD_QT6=ON' \
+    '-DWITH_DECORATIONS=OFF' \
+    'Widgets DBus OpenGL' \
+    '/usr/lib64/qt6/plugins'; do
+    if ! grep -Fq -- "$needle" "$void_deps"; then
+        printf 'FAIL: Void Darkly provider missing contract: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if grep -Fq -- '-DCMAKE_DISABLE_FIND_PACKAGE_Qt6Quick=TRUE' "$void_deps"; then
+    printf 'FAIL: Void Darkly provider disables Qt Quick even though kstyle requires it\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'void:COMPILE:https://github.com/Bali10050/Darkly' "$deps_map"; then
+    printf 'FAIL: Void Darkly dependency map does not point at maintained upstream\n' >&2
+    exit 1
+fi
+if grep -Fq 'void:COMPILE:https://github.com/AlessioC31/darkly' "$deps_map"; then
+    printf 'FAIL: Void Darkly dependency map still points at removed upstream\n' >&2
+    exit 1
+fi
+run_install_body="$(sed -n '/^run_install() {/,/^}/p' "$runtime_root/setup")"
+if ! grep -Fq 'if ! source ./sdata/subcmd-install/1.deps-router.sh; then' <<< "$run_install_body" \
+        || ! grep -Fq 'Dependency installation failed' <<< "$run_install_body"; then
+    printf 'FAIL: install flow can report success after a dependency provider fails\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

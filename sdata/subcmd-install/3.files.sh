@@ -294,10 +294,12 @@ case "${SKIP_NIRI}" in
       # colors from kdeglobals. Without it, Qt apps can't use KDE color schemes.
       # We check for plasma-integration (not plasma-desktop) because it can be
       # installed standalone for KDE theming without the full Plasma desktop.
-      if pacman -Q plasma-integration &>/dev/null 2>&1 || \
+      if xbps-query -p pkgver plasma-integration >/dev/null 2>&1 || \
+         pacman -Q plasma-integration &>/dev/null 2>&1 || \
          dpkg -l plasma-integration 2>/dev/null | grep -q '^ii' || \
          rpm -q plasma-integration &>/dev/null 2>&1; then
-        : # plasma-integration installed — keep "kde" platform theme (reads kdeglobals)
+        # Reconcile previous fallback installs back to KDE when the provider exists.
+        sed -i 's/QT_QPA_PLATFORMTHEME "qt6ct"/QT_QPA_PLATFORMTHEME "kde"/' "$NIRI_ENV_TARGET"
         log_success "Qt theme: kde (plasma-integration detected)"
       else
         # No plasma-integration: fall back to qt6ct
@@ -608,8 +610,8 @@ if [[ -d "dots/.config/vesktop/themes" ]]; then
 fi
 
 # Fontconfig
-if [[ -d "dots/.config/fontconfig" ]]; then
-  install_dir__sync "dots/.config/fontconfig" "${XDG_CONFIG_HOME}/fontconfig"
+if [[ -f "dots/.config/fontconfig/fonts.conf" ]]; then
+  install_file "dots/.config/fontconfig/fonts.conf" "${XDG_CONFIG_HOME}/fontconfig/fonts.conf"
 fi
 
 # Config (use defaults for distribution)

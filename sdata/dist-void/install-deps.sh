@@ -206,6 +206,8 @@ ROBOTO_FLEX_FONT_SHA256="a55c1e67f6dcf27f2bb71dc3e4c03d3abcbc5054411aac943b2f949
 GOOGLE_FONTS_COMMIT="a54f7446f84a1125ef6bf08baa46f3639e8905e0"
 GABARITO_SHA256="8650e2bd7747f7d74619fd7aecbcb0309e6f37b7964024f3fb15ae4833b67ca5"
 OXANIUM_SHA256="2ce01d946e1e1ffc8d7eecfffbda8623bedd63eaf811a20488c4b69af45babb0"
+RUBIK_SHA256="1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88"
+RUBIK_ITALIC_SHA256="08c6c4018a5ada8b517407b46897e46cf6ebb106853fbd3e89addb51d3b59c62"
 DARKLY_VERSION="0.5.39"
 DARKLY_SOURCE_SHA256="5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2"
 DARKLY_SOURCE_URL="https://github.com/Bali10050/Darkly/archive/refs/tags/v${DARKLY_VERSION}.tar.gz"
@@ -470,9 +472,12 @@ PY
 }
 
 install_void_font_providers() {
-  local data_home font_dir
+  local data_home config_home font_dir fontconfig_dir alias_file alias_tmp
   data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
   font_dir="$data_home/fonts"
+  fontconfig_dir="$config_home/fontconfig/conf.d"
+  alias_file="$fontconfig_dir/60-inir-void-font-aliases.conf"
   mkdir -p "$font_dir"
 
   install_void_verified_font_file \
@@ -491,6 +496,37 @@ install_void_font_providers() {
     "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/oxanium/Oxanium%5Bwght%5D.ttf" \
     "$OXANIUM_SHA256" \
     "$font_dir/Oxanium.ttf" || return 1
+  install_void_verified_font_file \
+    "Rubik" \
+    "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/rubik/Rubik%5Bwght%5D.ttf" \
+    "$RUBIK_SHA256" \
+    "$font_dir/Rubik.ttf" || return 1
+  install_void_verified_font_file \
+    "Rubik Italic" \
+    "https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl/rubik/Rubik-Italic%5Bwght%5D.ttf" \
+    "$RUBIK_ITALIC_SHA256" \
+    "$font_dir/Rubik-Italic.ttf" || return 1
+
+  mkdir -p "$fontconfig_dir"
+  alias_tmp="$(mktemp)" || return 1
+  printf '%s\n' \
+    '<?xml version="1.0"?>' \
+    '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">' \
+    '<fontconfig>' \
+    '  <alias binding="same">' \
+    '    <family>Google Sans Flex</family>' \
+    '    <prefer>' \
+    '      <family>Roboto Flex</family>' \
+    '    </prefer>' \
+    '  </alias>' \
+    '</fontconfig>' > "$alias_tmp"
+  if [[ ! -f "$alias_file" ]] || ! cmp -s "$alias_tmp" "$alias_file"; then
+    if ! install -m 0644 "$alias_tmp" "$alias_file"; then
+      rm -f "$alias_tmp"
+      return 1
+    fi
+  fi
+  rm -f "$alias_tmp"
 
   fc-cache -f "$font_dir" >/dev/null 2>&1 || return 1
   log_success "Void required font providers are ready"

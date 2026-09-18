@@ -2534,6 +2534,32 @@ if ! grep -Fq 'if ! source ./sdata/subcmd-install/1.deps-router.sh; then' <<< "$
     exit 1
 fi
 
+step "Void desktop parity closure"
+for needle in \
+    'RUBIK_SHA256="1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88"' \
+    'RUBIK_ITALIC_SHA256="08c6c4018a5ada8b517407b46897e46cf6ebb106853fbd3e89addb51d3b59c62"' \
+    'Rubik%5Bwght%5D.ttf' \
+    'Rubik-Italic%5Bwght%5D.ttf' \
+    '60-inir-void-font-aliases.conf' \
+    '<family>Google Sans Flex</family>' \
+    '<family>Roboto Flex</family>'; do
+    if ! grep -Fq "$needle" "$void_deps"; then
+        printf 'FAIL: Void desktop parity closure missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+void_files="$runtime_root/sdata/subcmd-install/3.files.sh"
+if ! grep -Fq 'xbps-query -p pkgver plasma-integration' "$void_files" \
+        || ! grep -Fq 's/QT_QPA_PLATFORMTHEME "qt6ct"/QT_QPA_PLATFORMTHEME "kde"/' "$void_files"; then
+    printf 'FAIL: Void file reconciliation cannot restore KDE platform integration\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'install_file "dots/.config/fontconfig/fonts.conf" "${XDG_CONFIG_HOME}/fontconfig/fonts.conf"' "$void_files" \
+        || grep -Fq 'install_dir__sync "dots/.config/fontconfig" "${XDG_CONFIG_HOME}/fontconfig"' "$void_files"; then
+    printf 'FAIL: Fontconfig reconciliation can delete provider/user conf.d entries\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

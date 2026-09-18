@@ -51,6 +51,7 @@ VOID_BASE_PACKAGES=(
 
   # Network
   NetworkManager
+  network-manager-applet
 
   # Wayland utilities
   wl-clipboard
@@ -58,6 +59,7 @@ VOID_BASE_PACKAGES=(
   grim
   slurp
   wlsunset
+  fuzzel
 
   # Idle/lock
   swayidle
@@ -100,6 +102,7 @@ VOID_AUDIO_PACKAGES=(
   socat
   cava
   libspa-bluetooth
+  songrec
 )
 
 # Toolkit: input, desktop, backlight, bluetooth, OCR, KDE integration
@@ -118,6 +121,8 @@ VOID_TOOLKIT_PACKAGES=(
   brightnessctl
   ddcutil
   geoclue2
+  qalculate
+  gowall
 
   # Bluetooth
   bluez
@@ -781,6 +786,11 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [cliphist]="cliphist"
     [wl-copy]="wl-clipboard"
     [wl-paste]="wl-clipboard"
+    [fuzzel]="fuzzel"
+    [qalc]="qalculate"
+    [gowall]="gowall"
+    [nm-connection-editor]="network-manager-applet"
+    [songrec]="songrec"
     [pkg-config]="pkg-config"
     [cc]="gcc"
     [gcc]="gcc"

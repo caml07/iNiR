@@ -2364,6 +2364,40 @@ if ! grep -Eq '^[[:space:]]+wlsunset$' <<< "$(sed -n '/^VOID_BASE_PACKAGES=(/,/^
     printf 'FAIL: Void base profile is missing the Niri night-light provider\n' >&2
     exit 1
 fi
+void_base_block="$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"
+void_audio_block="$(sed -n '/^VOID_AUDIO_PACKAGES=(/,/^)/p' "$void_deps")"
+void_toolkit_block="$(sed -n '/^VOID_TOOLKIT_PACKAGES=(/,/^)/p' "$void_deps")"
+for pkg in fuzzel network-manager-applet; do
+    if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
+        printf 'FAIL: Void base profile is missing required shell provider %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
+if ! grep -Eq '^[[:space:]]+songrec$' <<< "$void_audio_block"; then
+    printf 'FAIL: Void audio profile is missing required provider songrec\n' >&2
+    exit 1
+fi
+for pkg in qalculate gowall; do
+    if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_toolkit_block"; then
+        printf 'FAIL: Void toolkit profile is missing required provider %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
+for mapping in \
+    '[fuzzel]="fuzzel"' \
+    '[qalc]="qalculate"' \
+    '[gowall]="gowall"' \
+    '[nm-connection-editor]="network-manager-applet"' \
+    '[songrec]="songrec"'; do
+    if ! grep -Fq "$mapping" "$void_deps"; then
+        printf 'FAIL: Void selective-repair mapping missing %s\n' "$mapping" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'void:qalculate' "$deps_map"; then
+    printf 'FAIL: Void qalc dependency map points at a non-provider package\n' >&2
+    exit 1
+fi
 for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do
     if ! grep -Fq "$mapping" "$deps_map"; then
         printf 'FAIL: Void dependency map missing %s\n' "$mapping" >&2

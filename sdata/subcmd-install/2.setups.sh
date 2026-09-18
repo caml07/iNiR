@@ -150,11 +150,11 @@ function setup_systemd_services(){
   fi
   
   # Enable ydotool only if service exists
-  if $ydotool_service_found && [[ -n "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+  if $ydotool_service_found && has_usable_systemd_user_manager; then
     v systemctl --user daemon-reload
     v systemctl --user enable ydotool --now 2>/dev/null || log_warning "Could not enable ydotool service"
   elif $ydotool_service_found; then
-    log_info "ydotool service found. Enable after login: systemctl --user enable ydotool --now"
+    log_info "ydotool service found, but no usable systemd user manager is active"
   fi
   
   # Bluetooth (optional)

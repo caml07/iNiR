@@ -748,6 +748,7 @@ _inir_perf_detect_temp_paths() {
 
     [[ -n "$cpu_path" ]] && printf 'cpu:%s:%s:%s\n' "$cpu_path" "$(_inir_perf_sensor_label "$cpu_path")" "$(_inir_perf_temp_celsius "$cpu_path")"
     [[ -n "$gpu_path" ]] && printf 'gpu:%s:%s:%s\n' "$gpu_path" "$(_inir_perf_sensor_label "$gpu_path")" "$(_inir_perf_temp_celsius "$gpu_path")"
+    return 0
 }
 
 _inir_perf_detect_gpu_usage_source() {
@@ -1210,7 +1211,10 @@ _inir_doctor_perf() {
     printf '=== inir.service cgroup ===\n'
     local unit_info unit_cgroup unit_main_pid unit_memory cgroup_rows=""
     local saw_awww=false saw_wlcopy=false saw_possible_app=false
-    unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    unit_info=""
+    if has_usable_systemd_user_manager; then
+        unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    fi
     unit_main_pid="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MainPID"{print $2}')"
     unit_cgroup="$(printf '%s\n' "$unit_info" | awk -F= '$1=="ControlGroup"{print $2}')"
     unit_memory="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MemoryCurrent"{print $2}')"

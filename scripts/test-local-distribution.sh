@@ -73,19 +73,20 @@ if [[ ! -f "$session_helper" ]] \
 fi
 
 session_env_root="$(mktemp -d)"
-mkdir -p "$session_env_root/bin" "$session_env_root/runtime"
+mkdir -p "$session_env_root/bin" "$session_env_root/runtime/systemd"
 python3 - "$session_env_root/runtime" <<'PYSESSION'
 import pathlib
 import socket
 import sys
 root = pathlib.Path(sys.argv[1])
-for name in ("wayland-7", "niri.wayland-7.4242.sock"):
+for name in ("wayland-7", "niri.wayland-7.4242.sock", "systemd/private"):
     sock = socket.socket(socket.AF_UNIX)
     sock.bind(str(root / name))
     sock.close()
 PYSESSION
 cat > "$session_env_root/bin/systemctl" <<'SH'
 #!/usr/bin/env bash
+if [[ "$*" == "--user show-environment" ]]; then exit 0; fi
 if [[ "$*" == "--user is-active --quiet niri.service" ]]; then exit 0; fi
 if [[ "$*" == "--user show -p MainPID --value niri.service" ]]; then printf '%s\n' "${INIR_TEST_NIRI_PID:-4242}"; exit 0; fi
 exit 1
@@ -1463,6 +1464,9 @@ fi
 
 nightlight_service="$runtime_root/services/Hyprsunset.qml"
 if ! grep -Fq 'inir-wlsunset.service' "$nightlight_service" \
+        || ! grep -Fq 'systemd/private' "$nightlight_service" \
+        || ! grep -Fq 'timeout 3s /usr/bin/systemctl --user show-environment' "$nightlight_service" \
+        || ! grep -Fq 'nohup /usr/bin/wlsunset' "$nightlight_service" \
         || grep -Fq 'Quickshell.execDetached(["/usr/bin/wlsunset"' "$nightlight_service"; then
     printf 'FAIL: Niri night light can regress to leaking wlsunset inside inir.service\n' >&2
     exit 1
@@ -2064,6 +2068,30 @@ if [[ -e "$runtime_root/sdata/migrations/037-scope-quickshell-malloc-env.sh" ]];
 fi
 
 step "migration predicate guards"
+predicate_setup="$runtime_root/setup"
+predicate_doctor="$runtime_root/sdata/lib/doctor.sh"
+predicate_uninstall="$runtime_root/sdata/lib/uninstall.sh"
+predicate_conflicts="$runtime_root/sdata/lib/conflicts.sh"
+predicate_niri_env="$runtime_root/scripts/lib/niri-session-env.sh"
+predicate_setups="$runtime_root/sdata/subcmd-install/2.setups.sh"
+predicate_launcher="$runtime_root/scripts/inir"
+perf_temp_helper="$(sed -n '/^_inir_perf_detect_temp_paths() {/,/^}/p' "$predicate_launcher")"
+perf_report_helper="$(sed -n '/^_inir_doctor_perf() {/,/^}/p' "$predicate_launcher")"
+if ! grep -Fq 'has_usable_systemd_user_manager && systemctl --user daemon-reload' "$predicate_setup" \
+        || ! grep -Fq 'declare -F has_usable_systemd_user_manager' "$predicate_setup" \
+        || ! grep -Fq '|| ! has_usable_systemd_user_manager; then' "$predicate_doctor" \
+        || ! grep -Fq 'User service checks skipped (no usable systemd user manager)' "$predicate_doctor" \
+        || ! grep -Fq '&& has_usable_systemd_user_manager \' "$predicate_doctor" \
+        || ! grep -Fq 'if has_usable_systemd_user_manager; then' "$predicate_uninstall" \
+        || ! grep -Fq 'has_usable_systemd_user_manager' "$predicate_conflicts" \
+        || ! grep -Fq 'systemd/private' "$predicate_niri_env" \
+        || ! grep -Fq 'timeout 3s systemctl --user show-environment' "$predicate_niri_env" \
+        || ! grep -Fq 'ydotool_service_found && has_usable_systemd_user_manager' "$predicate_setups" \
+        || ! grep -Fq 'has_usable_systemd_user_manager' <<< "$perf_report_helper" \
+        || ! grep -Fq 'return 0' <<< "$perf_temp_helper"; then
+    printf 'FAIL: a systemd-sensitive maintenance path bypasses the usable-user-manager predicate\n' >&2
+    exit 1
+fi
 migration_021="$runtime_root/sdata/migrations/021-systemd-single-instance.sh"
 migration_022="$runtime_root/sdata/migrations/022-service-compositor-wants.sh"
 migration_test_root="$(mktemp -d)"
@@ -2330,6 +2358,10 @@ if [[ ! -s "$void_icon" ]] \
 fi
 if ! grep -Eq '^[[:space:]]+kf6-syntax-highlighting$' <<< "$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"; then
     printf 'FAIL: Void base profile is missing the critical QML syntax-highlighting runtime\n' >&2
+    exit 1
+fi
+if ! grep -Eq '^[[:space:]]+wlsunset$' <<< "$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"; then
+    printf 'FAIL: Void base profile is missing the Niri night-light provider\n' >&2
     exit 1
 fi
 for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do

@@ -282,7 +282,7 @@ EOF
 
         # The symlink target can change after git pull without changing the link.
         # Reload every repo-link sync so systemd sees the current checkout unit.
-        command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload >/dev/null 2>&1 || true
+        has_usable_systemd_user_manager && systemctl --user daemon-reload >/dev/null 2>&1 || true
         return 0
     fi
 
@@ -763,7 +763,8 @@ show_status_boot_timing() {
 
     # Process & service start — these often dominate perceived startup time.
     local service_start_ms=0 qs_start_ms=0
-    if command -v systemctl >/dev/null 2>&1; then
+    if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+            && has_usable_systemd_user_manager; then
         local exec_start
         exec_start=$(systemctl --user show inir.service -p ExecMainStartTimestamp --value 2>/dev/null)
         if [[ -n "$exec_start" && "$exec_start" != "n/a" ]]; then

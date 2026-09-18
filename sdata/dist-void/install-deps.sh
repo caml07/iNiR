@@ -57,6 +57,7 @@ VOID_BASE_PACKAGES=(
   cliphist
   grim
   slurp
+  wlsunset
 
   # Idle/lock
   swayidle

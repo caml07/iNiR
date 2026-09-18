@@ -310,7 +310,7 @@ Close window confirmation dialog. Shows a prompt before closing the focused wind
 | `close` | Dismiss the dialog without closing |
 
 ```kdl
-bind "Mod+Q" repeat=false { spawn "inir" "close-window"; }
+bind "Mod+Q" repeat=false allow-inhibiting=false { spawn "inir" "close-window"; }
 ```
 
 By default, confirmation is disabled (closes immediately). Enable it in settings or config:

@@ -541,14 +541,43 @@ turnstile or iNiR failure.
   `/run/cloudflare-warp/warp_service`; `warp-cli status` reached it and asked
   for explicit TOS acceptance. No account was available, so registration,
   connection, and `warp=on` trace validation remain pending.
-- PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
+- PR5.0-PR5.5 desktop parity was validated cumulatively through 2026-09-18.
+  Mission Center installs from Flathub with a stable launcher; OCR uses Void
+  Tesseract packages plus pinned vertical tessdata models; adw-gtk3, WhiteSur,
+  Capitaine, the required fonts, and Darkly are provisioned by explicit
+  providers with repeat-install checks. Qt uses KDE platform integration on
+  Void and Darkly loads as a real Qt6 KStyle. Rubik resolves natively and the
+  stale `Google Sans Flex` default resolves to the guaranteed `Roboto Flex`
+  family through a Void-only Fontconfig alias.
+- The live Niri/Quickshell closure found and fixed two runtime gaps. First,
+  `kf6-syntax-highlighting` was missing from the Void base profile; without it
+  `SidebarHost` failed because `org.kde.syntaxhighlighting` could not load.
+  After installing the package, both `sidebarLeft toggle` and
+  `sidebarRight toggle` succeeded over the real shell IPC.
+- The intermittent `Mod+Q` failure was traced to stale compositor IPC state,
+  not the physical key or Niri binding parser. `ydotool` reproduced the bug
+  end to end: native `Mod+Q { close-window; }` worked, while
+  `spawn "inir" "close-window"` returned success without closing the test
+  window. Quickshell still held the previous Niri socket after a compositor
+  restart. The Turnstile startup handoff now publishes the current
+  `NIRI_SOCKET` and restarts only `~/.config/service/inir`, so Quickshell
+  inherits the refreshed socket. `Mod+Q` is also marked
+  `allow-inhibiting=false`. Final injected Super+Q validation closed the
+  focused temporary Foot window (`MOD_Q_END_TO_END=PASS`).
+- WARP's runit service now owns a `vlogger` subservice instead of writing
+  daemon DEBUG/INFO output directly to tty1. The WARP socket remained live and
+  a second service reconciliation left the managed run/log files unchanged.
+- The VM disk was expanded online from 20 GiB to 30 GiB with libvirt
+  `blockresize`, `growpart /dev/vda 2`, and `resize2fs /dev/vda2`; the root
+  filesystem then reported roughly 29 GiB total with about 11 GiB free.
+- PR6 implements the remaining XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
   sweep, clean VM installation, and the external-disk validation.
 - Run shellcheck and `make test-local` before each PR.
 
-`make test-local`, `bash -n`, `qmllint`, JSON parsing, and `git diff --check`
-passed after merging Snowarch `upstream/prerelease` at `4c824cf9` through every
-Void branch. ShellCheck was not available in the host environment. No upstream
-PR has been opened; the Void port remains a fork progress branch while PR4 is
-developed.
+`make test-local`, `bash -n`, JSON parsing, and `git diff --check` passed after
+the PR5 runtime closure and Mod+Q lifecycle fix. ShellCheck was not available
+in the host environment. No upstream PR has been opened; the Void port remains
+a fork progress branch while the PR1-PR5 fat-check and documentation sweep are
+prepared before PR6.

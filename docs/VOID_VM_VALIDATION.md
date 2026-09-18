@@ -565,6 +565,14 @@ turnstile or iNiR failure.
   archive SHA-256. The installed names match iNiR defaults
   (`adw-gtk3-dark`, `WhiteSur-dark`, `capitaine-cursors-light`) and the
   second provider run produced no changes.
+- PR5.3 font parity was validated on 2026-09-17. The fonts/theme profile now
+  installs Void's official `nerd-fonts-ttf-3.5.0_1` and
+  `noto-fonts-emoji-2.051_2`; Material Symbols Rounded, Roboto Flex 3.200,
+  Gabarito, and Oxanium use pinned upstream artifacts with SHA-256
+  verification. `fc-match` resolved every iNiR-required family, including
+  `JetBrainsMono Nerd Font`. The selective repair path filters already
+  installed XBPS packages before elevation, so the second provider run passed
+  non-interactively and produced an unchanged provider snapshot.
 - PR4-PR6 implement the remaining capability providers and XBPS UI recorded in
   `docs/VOID_CAPABILITIES.md`.
 - PR7 is the mandatory closure gate: doctor/versioning, the final ADR-0002
@@ -572,7 +580,7 @@ turnstile or iNiR failure.
 - Run shellcheck and `make test-local` before each PR.
 
 `make test-local`, `bash -n`, JSON parsing, and `git diff --check` passed
-for the PR5.0-PR5.2 work. ShellCheck was not available in the host environment.
+through PR5.3. ShellCheck was not available in the host environment.
 On 2026-09-17 every local `feat/void-*` branch contained Snowarch
 `upstream/prerelease` at `593eb2dc` (zero commits behind). Existing Void
 branches in the fork had no local commits pending against their matching

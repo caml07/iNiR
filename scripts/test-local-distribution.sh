@@ -2455,6 +2455,40 @@ if ! grep -Fq 'local preferred_gtk_theme="adw-gtk3-dark"' "$void_setups" \
     exit 1
 fi
 
+step "Void required font providers"
+if ! grep -Eq '^[[:space:]]+nerd-fonts-ttf$' <<< "$void_fonts_packages"; then
+    printf 'FAIL: Void fonts/theme profile must install nerd-fonts-ttf for JetBrainsMono Nerd Font parity\n' >&2
+    exit 1
+fi
+for needle in \
+    'MATERIAL_SYMBOLS_COMMIT="40a7a292a79d9394157e1ea24f83d52d5e17c556"' \
+    'MATERIAL_SYMBOLS_SHA256="f1472f172c0fc4a922be22972e4752ccc54fe795ed82564ab6f6b097782f2dbc"' \
+    'ROBOTO_FLEX_VERSION="3.200"' \
+    'ROBOTO_FLEX_SHA256="6b2b14e11308c7d3e8388b623cf740c46b872e7519198e0cff8062e52b75239b"' \
+    'GOOGLE_FONTS_COMMIT="a54f7446f84a1125ef6bf08baa46f3639e8905e0"' \
+    'GABARITO_SHA256="8650e2bd7747f7d74619fd7aecbcb0309e6f37b7964024f3fb15ae4833b67ca5"' \
+    'OXANIUM_SHA256="2ce01d946e1e1ffc8d7eecfffbda8623bedd63eaf811a20488c4b69af45babb0"' \
+    'install_void_font_providers'; do
+    if ! grep -Fq "$needle" "$void_deps"; then
+        printf 'FAIL: Void required font provider missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'font-jetbrains-mono-nerd' "$void_deps" \
+        || ! grep -Fq 'font-providers' "$void_deps" \
+        || ! grep -Fq '_need_font_providers' "$void_deps"; then
+    printf 'FAIL: Void font providers do not have a selective repair path\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'xbps-query -p pkgver "$_miss_pkg"' "$void_deps"; then
+    printf 'FAIL: Void selective repair still invokes sudo for already-installed XBPS packages\n' >&2
+    exit 1
+fi
+if grep -Eq 'google/(fonts|material-design-icons)/(raw|archive)/(main|master)|releases/latest/download/JetBrainsMono' "$void_deps"; then
+    printf 'FAIL: Void required font providers use an unpinned upstream URL\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

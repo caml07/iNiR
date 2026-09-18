@@ -1,72 +1,58 @@
 # AGENTS.md — iNiR Void Linux port
 
 Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
-Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. This work is **in progress**
-on branch `feat/void-optional-systemd-adapters` (base: upstream `prerelease`). The
-remaining roadmap and capability ledger are in `docs/VOID.md` and
-`docs/VOID_CAPABILITIES.md`.
+Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
+`docs/VOID_PORT_RUNBOOK.md`.
 
-## Current progress (2026-09-05)
+The current integration branch is `feat/void-pr5` (target: upstream
+`prerelease`). PR1 through PR5.5 are implemented and fat-checked locally and
+in the Void VM. PR6 (XBPS UI) is next; PR7 remains the mandatory final closure
+gate.
 
-- PR1 `feat/void-systemd-predicate`: validated locally and in the Void VM.
-- PR2 `feat/void-dependencies`: tip `59b6366d`, pushed to
-  `origin/feat/void-dependencies`. **Fixed**: added `rsync`, `base-devel`,
-  `pkg-config`, `cairo-devel`, `python3-devel`, `glib-devel`,
-  `gobject-introspection`, `python3-gobject-devel`, `libffi-devel` to base
-  packages; added `ONLY_MISSING_DEPS` handling for update path.
-- The canonical VM checkout is `/home/voidcaml/inir-src`. PR3.0 was installed
-  and exercised successfully in the Void VM on 2026-08-31.
-- Host validation passed: 5 suites and 27 tests, with 0 failures. `bash -n`
-  and `git diff --check` also passed.
-- VM validation passed all five dependency groups twice. The sorted
-  `xbps-query -l` snapshots produced an empty second-run diff.
-- Validated Void package names include `python3-Pillow`, `geoclue2`,
-  `tesseract-ocr*`, and `ImageMagick`. `adw-gtk3`, `capitaine-cursors`, and
-  `whitesur-icon-theme` are not in the current Void repositories and were
-  excluded from the XBPS group.
-- PR3 is split into four sequential branches/PRs:
-  - PR3.0 `feat/void-runsvdir-supervisor`: per-user runit fallback (no turnstile);
-    **implementation and VM validation complete**, local tests pass.
-  - PR3.1 `feat/void-turnstile-session`: turnstile + elogind profile with confirmed elevation;
-    **implementation and VM validation complete**.
-  - PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
-    **Implementation and VM validation complete** on 2026-09-02; local tests
-    pass. The checker passed over SSH with the graphical session's
-    `/run/user/1000` and D-Bus address exported explicitly. `xembedsniproxy`
-    was absent and was correctly treated as optional.
-  - PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww,
-    GameMode, clipboard, captures, and thumbnails; remove `discover-overlay`.
-    **Implementation and VM validation complete**. PipeWire, WirePlumber, and
-    PipeWire Pulse run as managed turnstile user services; Awww apply and the
-    clipboard fallback passed in the live graphical session. WARP stays visible
-    while its provider and runit lifecycle move to PR4.
-- All implementation branches were merged forward with Snowarch
-  `upstream/prerelease` at `4c824cf9` on 2026-09-05.
-- PR4 now owns system capability providers (NetworkManager, BlueZ, ydotool,
-  WARP); PR5 owns desktop/provider parity; PR6 owns XBPS UI; PR7 is the
-  mandatory port-closure gate.
+## Current progress (2026-09-18)
+
+- PR1-PR3: usable-systemd predicate, XBPS dependency routing, runsvdir/
+  turnstile supervision, non-systemd runtime adapters, PipeWire user services,
+  and Niri startup are complete. The 2026-09-18 sweep also fixed remaining
+  predicate-sensitive runtime gaps and Night Light/Doctor coverage.
+- PR4.0-PR4.3: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle
+  are complete. WARP registration and a real tunnel are intentionally not part
+  of the port gate because they require user account/TOS state.
+- PR5.0-PR5.5: Mission Center, OCR, visual providers, required fonts, Darkly,
+  KDE/Qt integration, QML runtime dependencies, Void identity, and session
+  closure are complete. All PR5 checkers passed in the VM with their
+  idempotency modes enabled.
+- Fat-check fixes integrated into `feat/void-pr5` include systemd-predicate
+  cleanup, required desktop tools, git-worktree detection, Niri/Turnstile
+  socket lifecycle, WARP runit logging, a real Void distro icon, supported
+  Void installer messaging, dunst client-package handling, and a self-contained
+  OCR checker.
+- `make test-local`, `bash -n`, and `git diff --check` pass after the current
+  PR5 closure work. ShellCheck is not installed on the host.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
+Repo-local procedures are also available under `.agents/skills/`:
+`inir-void-port`, `inir-void-provider`, `inir-void-validation`, and
+`inir-void-debugging`.
 
 ### Latest VM checkpoint
 
-- Install completed at version `2.29.3`; all critical QML/config files verified.
-- `fish-shell` had to be installed explicitly because Void names the package
-  `fish-shell`, not `fish`. The dependency profile now installs it and maps the
-  `fish` command to that package.
-- PR3.1 enabled `dbus`, `elogind`, `polkitd`, and `turnstiled` with confirmed
-  elevation; `manage_rundir = no` is set for elogind.
-- `~/.config/service/{dbus,inir,turnstile-ready}` are supervised by turnstile.
-  `inir/run` uses `chpst -e "$TURNSTILE_ENV_DIR"`; the Niri fallback KDL block
-  was removed. A turnstile backend `runsvdir` is expected and is not the Niri
-  fallback.
-- `~/.config/service/{pipewire,wireplumber,pipewire-pulse}` are managed by iNiR
-  under turnstile. All three services were running and `pactl info` reported
-  PulseAudio on PipeWire 1.6.7.
-- Kitty under Niri has `WAYLAND_DISPLAY=wayland-1`,
-  `XDG_SESSION_TYPE=wayland`, and a session D-Bus address.
-- SPICE clipboard is not supported in this Wayland-only VM session because
-  Void's `spice-vdagent` requires an X11 `DISPLAY`; it does not block the port.
+- VM: `192.168.122.140`, user `voidcaml`; canonical checkout
+  `/home/voidcaml/inir-src`. The root filesystem was expanded to 30 GiB.
+- A real libvirt reset on 2026-09-18 produced a new boot ID. The resulting
+  local session was `login` on tty1, type Wayland, with `niri --session` and a
+  single supervised Quickshell shell.
+- The usable-systemd-user-manager predicate remained false. Turnstile's user
+  runsvdir supervised iNiR, PipeWire, WirePlumber, PipeWire Pulse, and ydotool.
+- Quickshell inherited the new Niri socket after boot. Niri config validation,
+  both sidebars, end-to-end `Mod+Q` via ydotool/uinput, audio, ydotool, font
+  aliases, Darkly, KDE platform integration, Void icon mapping, and the
+  Quickshell severe-error log scan all passed.
+- NetworkManager reported `connected`, BlueZ owned `org.bluez`, and WARP's
+  socket plus `vlogger` runit logger were present after boot.
+- The VM exposes no Bluetooth hardware. WARP account registration/tunnel,
+  visual confirmation of the rendered Void icon, and SPICE clipboard under the
+  Wayland-only session are not claimed as validated gates.
 
 ## Where things are
 
@@ -102,9 +88,11 @@ requirement can be identified.
 
 ## Files to change (port)
 
-- `sdata/lib/deps-map.sh` — Void fixes: `void:quickshell` (repo, not
-  COMPILE), `void:uv` (repo, not CARGO), `qt6-qt5compat` (not `qt6-5compat`),
-  no kirigami/syntax-highlighting in base.
+- `sdata/lib/deps-map.sh` / `sdata/dist-void/install-deps.sh` — keep Void
+  package names literal. `quickshell` and `uv` are repo packages,
+  `qt6-qt5compat` is the correct Qt compat package, and
+  `kf6-syntax-highlighting` is a required base runtime dependency for the
+  sidebars.
 - `sdata/subcmd-install/1.deps-router.sh` — route `void` to
   `dist-void/install-deps.sh` (new), not the generic path.
 - `defaults/niri/config.d/50-startup.kdl` — marked blocks (ADR-0003);
@@ -155,5 +143,8 @@ requirement can be identified.
 - Touch `/home/caml/inir` or `inir-fix` (PR #222 work).
 - Commit without being asked. Never commit the untracked
   `05-caelestia-terminal.sh`.
+- Stage or modify the current user-owned dirty files
+  `scripts/generate-settings-search-index.py` and
+  `scripts/test-detect-sensors.py` unless the user explicitly asks for them.
 - Gate anything on `command -v systemctl` alone.
 - Rename Void packages to Arch names or vice versa (e.g. `qt6-qt5compat`).

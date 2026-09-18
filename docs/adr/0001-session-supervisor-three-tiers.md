@@ -24,4 +24,4 @@ session tier may own that directory at a time. Turnstile's backend may itself
 run `runsvdir`; this is not the Niri fallback and does not create a second
 shell.
 
-Status: accepted and VM validated through PR3.1.
+Status: accepted and VM validated through the 2026-09-18 PR1-PR5 reboot gate.

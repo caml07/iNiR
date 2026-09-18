@@ -2341,8 +2341,18 @@ step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
 void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
+installer_conflicts="$runtime_root/sdata/lib/conflicts.sh"
+runtime_conflict_killer="$runtime_root/services/ConflictKiller.qml"
 if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greeting"; then
     printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
+    exit 1
+fi
+if grep -Fq 'conflict_map["dunst"]=' "$installer_conflicts"; then
+    printf 'FAIL: installer treats the dunst client package as a runtime daemon conflict\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'killall", "mako", "dunst"' "$runtime_conflict_killer"; then
+    printf 'FAIL: runtime conflict handling no longer covers an active dunst daemon\n' >&2
     exit 1
 fi
 mod_q_default="$runtime_root/defaults/niri/config.d/70-binds.kdl"

@@ -25,8 +25,9 @@ check_conflicts() {
     # Define conflict groups
     declare -A conflict_map
     
-    # Notifications (Quickshell has built-in notifications)
-    conflict_map["dunst"]="Notification Daemon"
+    # Notifications (Quickshell has built-in notifications). The dunst package
+    # is intentionally allowed because iNiR uses its dunstify client; a running
+    # dunst daemon is handled at runtime by ConflictKiller/Doctor instead.
     conflict_map["mako"]="Notification Daemon"
     conflict_map["swaync"]="Notification Daemon"
     

@@ -124,6 +124,9 @@ VOID_TOOLKIT_PACKAGES=(
   # KDE integration (kwriteconfig6)
   kf6-kconfig
 
+  # Desktop applications delivered through maintained Flatpaks
+  flatpak
+
   # OCR
   tesseract-ocr
   tesseract-ocr-eng
@@ -163,6 +166,51 @@ YDOTOOL_SOURCE_SHA256="ba075a43aa6ead51940e892ecffa4d0b8b40c241e4e2bc4bd9bd26b61
 WARP_VERSION="2026.7.1377.0"
 WARP_DEB_SHA256="95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55"
 WARP_DEB_URL="https://pkg.cloudflareclient.com/pool/bookworm/main/c/cloudflare-warp/cloudflare-warp_${WARP_VERSION}_amd64.deb"
+
+install_void_missioncenter() {
+  local app_id="io.missioncenter.MissionCenter"
+  local wrapper_dir wrapper_path wrapper
+
+  wrapper_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+  wrapper_path="$wrapper_dir/missioncenter"
+
+  if command -v flatpak >/dev/null 2>&1 \
+      && flatpak info --user "$app_id" >/dev/null 2>&1 \
+      && [[ -x "$wrapper_path" ]] \
+      && grep -Fq 'exec flatpak run io.missioncenter.MissionCenter "$@"' "$wrapper_path"; then
+    log_success "Mission Center already installed"
+    return 0
+  fi
+
+  if ! command -v flatpak >/dev/null 2>&1; then
+    log_warning "Mission Center requires Flatpak on Void"
+    return 1
+  fi
+
+  tui_info "Installing Mission Center from Flathub..."
+  if ! flatpak remote-add --if-not-exists --user flathub \
+      https://flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1 \
+      || ! flatpak install -y --user flathub "$app_id" >/dev/null 2>&1; then
+    log_warning "Mission Center Flatpak installation failed"
+    return 1
+  fi
+
+  wrapper="$(mktemp)" || return 1
+  printf '%s\n' '#!/bin/sh' 'exec flatpak run io.missioncenter.MissionCenter "$@"' > "$wrapper"
+  if ! install -Dm755 "$wrapper" "$wrapper_path"; then
+    rm -f "$wrapper"
+    log_warning "Could not install the Mission Center launcher"
+    return 1
+  fi
+  rm -f "$wrapper"
+
+  if ! command -v missioncenter >/dev/null 2>&1 && [[ ":$PATH:" != *":${wrapper_dir}:"* ]]; then
+    log_warning "Mission Center installed, but $wrapper_dir is not on PATH"
+    return 1
+  fi
+
+  log_success "Mission Center installed"
+}
 
 install_void_ydotool() {
   local installed_version
@@ -289,6 +337,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _miss_cmds=()
   _need_ydotool=false
   _need_warp=false
+  _need_missioncenter=false
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
     if [[ "$cmd" == ydotool || "$cmd" == ydotoold ]]; then
@@ -305,6 +354,11 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
       done
       continue
     fi
+    if [[ "$cmd" == missioncenter ]]; then
+      _need_missioncenter=true
+      [[ " ${_miss_pkgs[*]} " == *" flatpak "* ]] || _miss_pkgs+=(flatpak)
+      continue
+    fi
     _miss_pkg="${cmd_to_pkg[$cmd]:-$cmd}"
     [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
   done
@@ -317,6 +371,9 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_warp; then
     install_void_warp || return 1
+  fi
+  if $_need_missioncenter; then
+    install_void_missioncenter || return 1
   fi
 
   unset ONLY_MISSING_DEPS
@@ -366,6 +423,7 @@ if ${INSTALL_TOOLKIT:-true}; then
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_TOOLKIT_PACKAGES[@]}"
   install_void_ydotool || return 1
   install_void_warp || return 1
+  install_void_missioncenter || return 1
 fi
 
 #####################################################################################

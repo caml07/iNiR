@@ -2269,6 +2269,8 @@ if ! (
     grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_run"
     grep -Fq 'BEGIN inir-turnstile-environment' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    grep -Fq '[ -n \"${WAYLAND_DISPLAY:-}\" ]' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    ! grep -Fq '[ -n "${WAYLAND_DISPLAY:-}" ]' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     for audio_svc in pipewire wireplumber pipewire-pulse; do
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"

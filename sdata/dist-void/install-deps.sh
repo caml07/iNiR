@@ -131,6 +131,10 @@ VOID_TOOLKIT_PACKAGES=(
   tesseract-ocr
   tesseract-ocr-eng
   tesseract-ocr-spa
+  tesseract-ocr-rus
+  tesseract-ocr-jpn
+  tesseract-ocr-chi_sim
+  tesseract-ocr-chi_tra
 
   # Cloudflare WARP upstream provider extraction
   binutils
@@ -166,6 +170,78 @@ YDOTOOL_SOURCE_SHA256="ba075a43aa6ead51940e892ecffa4d0b8b40c241e4e2bc4bd9bd26b61
 WARP_VERSION="2026.7.1377.0"
 WARP_DEB_SHA256="95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55"
 WARP_DEB_URL="https://pkg.cloudflareclient.com/pool/bookworm/main/c/cloudflare-warp/cloudflare-warp_${WARP_VERSION}_amd64.deb"
+TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"
+
+declare -A VOID_OCR_MODEL_SHA256=(
+  [jpn_vert]="bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"
+  [chi_sim_vert]="20590de84725bab69cde93bd6e8ed360a13cc5421a7e7364ddeb93e9af53d6da"
+  [chi_tra_vert]="1df02a4b210e5c217b783819538b63e9dfe6904e2b5e53b62664f1b9f7a989d0"
+)
+
+install_void_ocr_models() {
+  local data_home tessdata_dir lang expected_sha target tmp url
+  data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  tessdata_dir="${INIR_TESSDATA_DIR:-$data_home/inir/tessdata}"
+
+  mkdir -p "$tessdata_dir" || {
+    log_warning "Could not create OCR model directory: $tessdata_dir"
+    return 1
+  }
+
+  for lang in "$@"; do
+    expected_sha="${VOID_OCR_MODEL_SHA256[$lang]:-}"
+    if [[ -z "$expected_sha" ]]; then
+      log_warning "No verified Void OCR fallback is defined for $lang"
+      return 1
+    fi
+
+    target="$tessdata_dir/$lang.traineddata"
+    if [[ -s "$target" ]] \
+        && printf '%s  %s\n' "$expected_sha" "$target" | sha256sum -c - >/dev/null 2>&1; then
+      continue
+    fi
+
+    tmp="$target.part.$$"
+    url="https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/${TESSDATA_FAST_COMMIT}/${lang}.traineddata"
+    if ! curl -fsSL --max-time 90 -o "$tmp" "$url" \
+        || ! printf '%s  %s\n' "$expected_sha" "$tmp" | sha256sum -c - >/dev/null 2>&1 \
+        || ! mv -f "$tmp" "$target"; then
+      rm -f "$tmp"
+      log_warning "Could not provision verified OCR model: $lang"
+      return 1
+    fi
+  done
+
+  log_success "Void OCR language models are ready"
+}
+
+configure_void_tesseract_command() {
+  local wrapper_dir wrapper_path wrapper
+
+  if command -v tesseract >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v tesseract-ocr >/dev/null 2>&1; then
+    log_warning "Void Tesseract binary is unavailable"
+    return 1
+  fi
+
+  wrapper_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+  wrapper_path="$wrapper_dir/tesseract"
+  wrapper="$(mktemp)" || return 1
+  printf '%s\n' '#!/bin/sh' 'exec tesseract-ocr "$@"' > "$wrapper"
+  if ! install -Dm755 "$wrapper" "$wrapper_path"; then
+    rm -f "$wrapper"
+    log_warning "Could not install the Void Tesseract command adapter"
+    return 1
+  fi
+  rm -f "$wrapper"
+
+  if [[ ":$PATH:" != *":${wrapper_dir}:"* ]]; then
+    export PATH="$wrapper_dir:$PATH"
+  fi
+  command -v tesseract >/dev/null 2>&1 || return 1
+}
 
 install_void_missioncenter() {
   local app_id="io.missioncenter.MissionCenter"
@@ -311,6 +387,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [dunstify]="dunst"
     [fish]="fish-shell"
     [magick]="ImageMagick"
+    [tesseract]="tesseract-ocr"
     [blueman-manager]="blueman"
     [swaylock]="swaylock"
     [swayidle]="swayidle"
@@ -328,6 +405,12 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [python3-gobject-devel]="python3-gobject-devel"
     [glib-devel]="glib-devel"
     [libffi-devel]="libffi-devel"
+    [ocr-eng]="tesseract-ocr-eng"
+    [ocr-spa]="tesseract-ocr-spa"
+    [ocr-rus]="tesseract-ocr-rus"
+    [ocr-jpn]="tesseract-ocr-jpn"
+    [ocr-chi-sim]="tesseract-ocr-chi_sim"
+    [ocr-chi-tra]="tesseract-ocr-chi_tra"
   )
 
   _miss_installflags=(-S)
@@ -338,6 +421,8 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _need_ydotool=false
   _need_warp=false
   _need_missioncenter=false
+  _need_tesseract_adapter=false
+  _ocr_fallback_models=()
   read -r -a _miss_cmds <<<"$ONLY_MISSING_DEPS"
   for cmd in "${_miss_cmds[@]}"; do
     if [[ "$cmd" == ydotool || "$cmd" == ydotoold ]]; then
@@ -359,6 +444,23 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
       [[ " ${_miss_pkgs[*]} " == *" flatpak "* ]] || _miss_pkgs+=(flatpak)
       continue
     fi
+    if [[ "$cmd" == tesseract ]]; then
+      _need_tesseract_adapter=true
+    fi
+    case "$cmd" in
+      ocr-jpn-vert)
+        _ocr_fallback_models+=(jpn_vert)
+        continue
+        ;;
+      ocr-chi-sim-vert)
+        _ocr_fallback_models+=(chi_sim_vert)
+        continue
+        ;;
+      ocr-chi-tra-vert)
+        _ocr_fallback_models+=(chi_tra_vert)
+        continue
+        ;;
+    esac
     _miss_pkg="${cmd_to_pkg[$cmd]:-$cmd}"
     [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
   done
@@ -374,6 +476,12 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_missioncenter; then
     install_void_missioncenter || return 1
+  fi
+  if $_need_tesseract_adapter; then
+    configure_void_tesseract_command || return 1
+  fi
+  if [[ ${#_ocr_fallback_models[@]} -gt 0 ]]; then
+    install_void_ocr_models "${_ocr_fallback_models[@]}" || return 1
   fi
 
   unset ONLY_MISSING_DEPS
@@ -424,6 +532,8 @@ if ${INSTALL_TOOLKIT:-true}; then
   install_void_ydotool || return 1
   install_void_warp || return 1
   install_void_missioncenter || return 1
+  configure_void_tesseract_command || return 1
+  install_void_ocr_models jpn_vert chi_sim_vert chi_tra_vert || return 1
 fi
 
 #####################################################################################

@@ -2381,6 +2381,44 @@ if ! grep -Fq 'install_void_missioncenter' "$void_deps" \
     exit 1
 fi
 
+step "Void OCR language provider"
+for package in \
+    tesseract-ocr-rus \
+    tesseract-ocr-jpn \
+    tesseract-ocr-chi_sim \
+    tesseract-ocr-chi_tra; do
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_toolkit_packages"; then
+        printf 'FAIL: Void OCR profile missing package: %s\n' "$package" >&2
+        exit 1
+    fi
+done
+for mapping in \
+    '[tesseract]="tesseract-ocr"' \
+    '[ocr-eng]="tesseract-ocr-eng"' \
+    '[ocr-spa]="tesseract-ocr-spa"' \
+    '[ocr-rus]="tesseract-ocr-rus"' \
+    '[ocr-jpn]="tesseract-ocr-jpn"' \
+    '[ocr-chi-sim]="tesseract-ocr-chi_sim"' \
+    '[ocr-chi-tra]="tesseract-ocr-chi_tra"'; do
+    if ! grep -Fq "$mapping" "$void_deps"; then
+        printf 'FAIL: Void OCR repair mapping missing: %s\n' "$mapping" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"' "$void_deps" \
+        || ! grep -Fq 'bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b' "$void_deps" \
+        || ! grep -Fq '20590de84725bab69cde93bd6e8ed360a13cc5421a7e7364ddeb93e9af53d6da' "$void_deps" \
+        || ! grep -Fq '1df02a4b210e5c217b783819538b63e9dfe6904e2b5e53b62664f1b9f7a989d0' "$void_deps" \
+        || ! grep -Fq 'install_void_ocr_models' "$void_deps" \
+        || ! grep -Fq 'configure_void_tesseract_command' "$void_deps" \
+        || ! grep -Fq 'exec tesseract-ocr "$@"' "$void_deps" \
+        || ! grep -Fq 'ocr-jpn-vert' "$void_deps" \
+        || ! grep -Fq 'ocr-chi-sim-vert' "$void_deps" \
+        || ! grep -Fq 'ocr-chi-tra-vert' "$void_deps"; then
+    printf 'FAIL: Void OCR vertical-model fallback is incomplete\n' >&2
+    exit 1
+fi
+
 migration_lib="$runtime_root/sdata/lib/migrations.sh"
 repair_lib="$runtime_root/sdata/lib/functions.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"

@@ -32,6 +32,7 @@ VOID_BASE_PACKAGES=(
   qt6-multimedia
   qt6-imageformats
   qt6-virtualkeyboard
+  kf6-syntax-highlighting
 
   # Session services (system services enabled separately in setup)
   elogind

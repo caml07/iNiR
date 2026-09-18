@@ -2343,6 +2343,7 @@ deps_map="$runtime_root/sdata/lib/deps-map.sh"
 void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
 installer_conflicts="$runtime_root/sdata/lib/conflicts.sh"
 runtime_conflict_killer="$runtime_root/services/ConflictKiller.qml"
+pr51_checker="$runtime_root/scripts/check-void-pr51.sh"
 if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greeting"; then
     printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
     exit 1
@@ -2353,6 +2354,10 @@ if grep -Fq 'conflict_map["dunst"]=' "$installer_conflicts"; then
 fi
 if ! grep -Fq 'killall", "mako", "dunst"' "$runtime_conflict_killer"; then
     printf 'FAIL: runtime conflict handling no longer covers an active dunst daemon\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'XDG_BIN_HOME' "$pr51_checker"; then
+    printf 'FAIL: PR5.1 checker does not expose the user-local tesseract adapter on PATH\n' >&2
     exit 1
 fi
 mod_q_default="$runtime_root/defaults/niri/config.d/70-binds.kdl"

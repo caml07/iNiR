@@ -2,6 +2,9 @@
 # PR5.1 checks for the complete OCR language provider in a live Void session.
 set -u
 
+XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+export PATH="$XDG_BIN_HOME:$PATH"
+
 failures=0
 check() {
   if "$@"; then

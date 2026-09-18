@@ -1801,7 +1801,10 @@ run_install() {
         tui_task_run 0 "packages, runtime, compositor"
         tui_task_finalize
         tui_step 1 3 "Installing dependencies" "Package managers, shell runtime pieces, and compositor requirements."
-        source ./sdata/subcmd-install/1.deps-router.sh
+        if ! source ./sdata/subcmd-install/1.deps-router.sh; then
+            tui_error "Dependency installation failed"
+            return 1
+        fi
         # Reinit after step output to show updated state
         echo ""
         tui_task_init \

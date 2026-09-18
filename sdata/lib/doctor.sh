@@ -361,7 +361,7 @@ check_repo_checkout_state() {
         return 0
     fi
 
-    if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+    if [[ ! -e "${REPO_ROOT}/.git" ]]; then
         doctor_fail "Repo checkout is missing git metadata"
         echo -e "    ${STY_FAINT}Run setup from a real iNiR checkout, not a random copy${STY_RST}"
         return 1

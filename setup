@@ -5,7 +5,7 @@
 resolve_bootstrap_repo_root() {
     local script_dir="$1"
 
-    if [[ -d "${script_dir}/.git" && -f "${script_dir}/setup" && -f "${script_dir}/shell.qml" ]]; then
+    if [[ -e "${script_dir}/.git" && -f "${script_dir}/setup" && -f "${script_dir}/shell.qml" ]]; then
         printf '%s' "$script_dir"
         return
     fi
@@ -39,7 +39,7 @@ resolve_bootstrap_repo_root() {
 
     stored_repo="${stored_repo/#\~/$HOME}"
 
-    if [[ -n "$stored_repo" && -d "${stored_repo}/.git" && -f "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
+    if [[ -n "$stored_repo" && -e "${stored_repo}/.git" && -f "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
         printf '%s' "$stored_repo"
         return
     fi
@@ -433,7 +433,7 @@ setup_remote_state_summary() {
         return
     fi
 
-    if [[ ! -d "${REPO_ROOT}/.git" ]] || ! declare -F check_remote_updates >/dev/null 2>&1; then
+    if [[ ! -e "${REPO_ROOT}/.git" ]] || ! declare -F check_remote_updates >/dev/null 2>&1; then
         printf '%s' "unavailable"
         return
     fi
@@ -461,7 +461,7 @@ setup_runtime_change_summary() {
             return
             ;;
         repo-link)
-            if [[ -d "${REPO_ROOT}/.git" ]]; then
+            if [[ -e "${REPO_ROOT}/.git" ]]; then
                 local dirty_count
                 dirty_count="$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
                 if [[ "${dirty_count:-0}" -eq 0 ]]; then
@@ -533,7 +533,7 @@ show_setup_context_card() {
         "Service:${service_links}"
     )
 
-    if [[ -d "${REPO_ROOT}/.git" ]]; then
+    if [[ -e "${REPO_ROOT}/.git" ]]; then
         pairs+=("Branch:${current_branch}")
         [[ "$current_branch" == "HEAD" ]] && pairs+=("Tracks:origin/${tracked_branch}")
     fi

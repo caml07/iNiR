@@ -204,7 +204,7 @@ extras_refresh_mascot_pack_on_update() {
   local helper
   helper="$(extras_mascot_helper)"
 
-  [[ -d "${shell_dir}/.git" ]] && return 0
+  [[ -e "${shell_dir}/.git" ]] && return 0
   [[ -x "$helper" || -f "$helper" ]] || return 0
 
   local count

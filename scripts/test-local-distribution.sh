@@ -2770,6 +2770,31 @@ if grep -Fq 'systemctl --user enable --now inir.service' "$arch_install" \
     exit 1
 fi
 
+step "worktree repository detection"
+for source in \
+    "$runtime_root/setup" \
+    "$runtime_root/scripts/inir" \
+    "$runtime_root/sdata/lib/versioning.sh" \
+    "$runtime_root/sdata/lib/snapshots.sh" \
+    "$runtime_root/sdata/lib/doctor.sh" \
+    "$runtime_root/sdata/subcmd-install/3.files.sh"; do
+    if grep -Eq -- '-d[[:space:]]+["'\''$\{A-Za-z_].*\.git' "$source"; then
+        printf 'FAIL: repo detection still requires .git to be a directory: %s\n' "$source" >&2
+        exit 1
+    fi
+done
+worktree_root="$(mktemp -d)"
+touch "$worktree_root/.git" "$worktree_root/setup" "$worktree_root/shell.qml"
+if ! XDG_CONFIG_HOME_RESOLVED="$worktree_root/config" REPO_ROOT="$worktree_root" bash -c '
+    source "$1/sdata/lib/versioning.sh"
+    [[ "$(get_install_mode)" == repo-copy ]]
+' _ "$runtime_root"; then
+    rm -rf "$worktree_root"
+    printf 'FAIL: versioning does not recognize a git worktree checkout\n' >&2
+    exit 1
+fi
+rm -rf "$worktree_root"
+
 if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-ipc-registry.py" ]]; then
     step "IPC registry freshness"
     python3 "$runtime_root/scripts/lib/generate-ipc-registry.py" --check

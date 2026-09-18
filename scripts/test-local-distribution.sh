@@ -1797,6 +1797,15 @@ for warp_toggle in \
         exit 1
     fi
 done
+warp_functions="$runtime_root/sdata/lib/functions.sh"
+for needle in \
+    'log_run_file=/etc/sv/warp-svc/log/run' \
+    'exec vlogger -t warp-svc -p daemon'; do
+    if ! grep -Fq "$needle" "$warp_functions"; then
+        printf 'FAIL: Void WARP runit logger contract missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
 audio_helper="$runtime_root/sdata/lib/functions.sh"
 if ! grep -Fq 'reconcile_audio_user_services' "$audio_helper" \
         || ! grep -Fq 'pipewire-pulse' "$audio_helper" \

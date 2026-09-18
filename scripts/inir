@@ -188,15 +188,15 @@ resolve_live_version_context() {
     repo_dir="${repo_dir/#\~/$HOME}"
 
     if [[ "$install_mode" == "repo-link" ]]; then
-        if [[ -n "$runtime_path" && -d "$runtime_path/.git" ]]; then
+        if [[ -n "$runtime_path" && -e "$runtime_path/.git" ]]; then
             printf '%s' "$runtime_path"
             return 0
         fi
-        if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+        if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
             printf '%s' "$repo_dir"
             return 0
         fi
-        if [[ -n "$launcher_root" && -d "$launcher_root/.git" ]]; then
+        if [[ -n "$launcher_root" && -e "$launcher_root/.git" ]]; then
             printf '%s' "$launcher_root"
             return 0
         fi
@@ -271,7 +271,7 @@ print_cli_context() {
     printf '  launcher: %s\n' "$launcher_path"
     printf '  service: %s\n' "$service_state"
 
-    if [[ -n "$setup_dir" && -d "$setup_dir/.git" ]]; then
+    if [[ -n "$setup_dir" && -e "$setup_dir/.git" ]]; then
         branch="$(git -C "$setup_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
         if [[ -n "$branch" ]]; then
             printf '  branch: %s\n' "$branch"
@@ -2365,7 +2365,7 @@ resolve_setup_dir() {
     fi
 
     stored_repo="${stored_repo/#\~/$HOME}"
-    if [[ -n "$stored_repo" && -d "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
+    if [[ -n "$stored_repo" && -e "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
         printf '%s' "$stored_repo"
         return
     fi
@@ -2826,7 +2826,7 @@ install_user_service() {
         local launcher_real repo_launcher_real
         launcher_real="$(readlink -f "$launcher_path" 2>/dev/null || true)"
         repo_launcher_real="$(readlink -f "$setup_dir/scripts/inir" 2>/dev/null || true)"
-        if [[ -d "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
+        if [[ -e "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
             install_mode="repo-link"
         fi
     fi
@@ -3221,7 +3221,7 @@ show_version() {
             local repo_dir=""
             repo_dir="$(jq -r '.repoPath // empty' "$version_file" 2>/dev/null || true)"
             [[ -z "$repo_dir" ]] && repo_dir="$runtime_path"
-            if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+            if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
                 local git_branch
                 git_branch="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
                 if [[ -n "$git_branch" ]]; then

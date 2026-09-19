@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/iris-2.31-principal.webp" alt="iNiR 2.31 iRiS desktop" width="900">
+</p>
+
 <h1 align="center">iNiR</h1>
 
 <p align="center">
@@ -78,6 +82,20 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 ---
 
 ## Screenshots
+
+<details open>
+<summary><b>iRiS</b>: Island, desktop pieces, cards and Dock</summary>
+
+<p align="center">
+  <img src="docs/images/iris-2.31-desktop.webp" alt="iRiS desktop layout" width="49%">
+  <img src="docs/images/iris-2.31-card.webp" alt="iRiS card surface" width="49%">
+</p>
+
+<p align="center">
+  <img src="docs/images/iris-2.31-dock.webp" alt="iRiS Dock and edge layout" width="99%">
+</p>
+
+</details>
 
 <details open>
 <summary><b>Material ii</b>: floating bar, sidebars, Material Design aesthetic</summary>

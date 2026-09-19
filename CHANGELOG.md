@@ -5,9 +5,12 @@ All notable changes to iNiR will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.31.0] - 2026-09-19
 
-Target release: **2.31.0**.
+2.31.0 introduces **iRiS**, the third panel family, together with its Island,
+Themes, Studio, edge-aware Dock and desktop pieces. The release also folds in
+the wallpaper, widget, Settings, runtime and installer work completed on
+`prerelease` since 2.30.0.
 
 ### Added
 
@@ -61,7 +64,7 @@ Target release: **2.31.0**.
 ### Issues / PRs
 
 - Fixed [#256](https://github.com/snowarch/iNiR/issues/256) and [#257](https://github.com/snowarch/iNiR/issues/257).
-- [#258](https://github.com/snowarch/iNiR/issues/258) remains under review in contributor PR [#259](https://github.com/snowarch/iNiR/pull/259) and is not part of the 2.31.0 candidate yet.
+- [#258](https://github.com/snowarch/iNiR/issues/258) remains under review in contributor PR [#259](https://github.com/snowarch/iNiR/pull/259) and is not part of 2.31.0.
 
 ## [2.30.0] - 2026-09-03
 

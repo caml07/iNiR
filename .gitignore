@@ -28,6 +28,7 @@ session-*.md
 **/codemap.md
 # Private design contracts (kept local by the maintainer)
 modules/iris/DESIGN.md
+modules/iris/DECISIONS.md
 
 # AI tool directories
 .design-system/

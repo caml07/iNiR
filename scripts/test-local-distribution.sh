@@ -2847,6 +2847,40 @@ if ! grep -Fq 'install_void_missioncenter' "$void_deps" \
     printf 'FAIL: Void Mission Center Flatpak provider is incomplete\n' >&2
     exit 1
 fi
+if grep -Fq 'Mission Center installed, but $wrapper_dir is not on PATH' "$void_deps"; then
+    printf 'FAIL: Mission Center provider rejects a valid fresh install before shell PATH integration\n' >&2
+    exit 1
+fi
+
+missioncenter_fresh_fixture() (
+    set -e
+    local root
+    root="$(mktemp -d)"
+    trap 'rm -rf "$root"' EXIT
+    export HOME="$root/home"
+    export XDG_BIN_HOME="$HOME/.local/bin"
+    export PATH="$root/bin:/usr/bin:/bin"
+    mkdir -p "$root/bin" "$HOME"
+    cat > "$root/bin/flatpak" <<'SH'
+#!/bin/sh
+case "$1" in
+  remote-add|install) exit 0 ;;
+  info) exit 1 ;;
+  run) exit 0 ;;
+esac
+exit 0
+SH
+    chmod +x "$root/bin/flatpak"
+    tui_info() { :; }
+    log_success() { :; }
+    log_warning() { printf '%s\n' "$*" >&2; }
+    awk '/^install_void_missioncenter\(\) {/,/^}/' "$void_deps" > "$root/provider.sh"
+    source "$root/provider.sh"
+    install_void_missioncenter
+    [[ -x "$XDG_BIN_HOME/missioncenter" ]]
+    grep -Fq 'exec flatpak run io.missioncenter.MissionCenter "$@"' "$XDG_BIN_HOME/missioncenter"
+)
+missioncenter_fresh_fixture
 
 step "Void OCR language provider"
 void_ocr_packages="$(sed -n '/^VOID_OCR_PACKAGES=(/,/^)/p' "$void_deps")"

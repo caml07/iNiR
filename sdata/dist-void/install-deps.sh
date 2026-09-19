@@ -701,8 +701,9 @@ install_void_missioncenter() {
   fi
   rm -f "$wrapper"
 
-  if ! command -v missioncenter >/dev/null 2>&1 && [[ ":$PATH:" != *":${wrapper_dir}:"* ]]; then
-    log_warning "Mission Center installed, but $wrapper_dir is not on PATH"
+  if [[ ! -x "$wrapper_path" ]] \
+      || ! grep -Fq 'exec flatpak run io.missioncenter.MissionCenter "$@"' "$wrapper_path"; then
+    log_warning "Mission Center launcher verification failed: $wrapper_path"
     return 1
   fi
 

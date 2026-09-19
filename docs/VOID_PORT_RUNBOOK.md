@@ -9,7 +9,9 @@ live in `docs/adr/`; capability status lives in
 
 As of 2026-09-19:
 
-- Integration/release-validation branch: `fix/void-final-fatcheck`.
+- Canonical integration/release-candidate branch: `prerelease`.
+- Branch-formalization checkpoint:
+  `5c13b6c4fa1b3c0459a38117e91d05e140943b0a`.
 - Snow prerelease is merged through `9574fa42` (iNiR 2.31.0); the final
   runtime-changing Void closure tip validated in the VM is `212bb3ae`. The
   subsequent Snow release commits only touch release/docs/Arch surfaces.
@@ -19,8 +21,8 @@ As of 2026-09-19:
 - Remaining release evidence is the external-disk/hardware validation.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
-Do not infer current state from an old feature branch. Check the integration
-branch and `docs/VOID_VM_VALIDATION.md` first.
+Do not infer current state from an old feature branch. Check `prerelease` and
+`docs/VOID_VM_VALIDATION.md` first.
 
 ## Local project skills
 
@@ -97,16 +99,20 @@ out of scope.
 
 ## Branch and commit workflow
 
-Use small branches for bugs/providers and merge them explicitly into the
-current integration branch.
+The fork keeps only long-lived refs that still have an active role:
 
-Typical flow:
+- `main`: upstream baseline, updated from `upstream/main` by fast-forward
+  only;
+- `prerelease`: canonical Void integration/release candidate;
+- unrelated branches/worktrees owned by other work stay untouched.
 
-```text
-feat/void-pr5
-  <- fix/void-...
-  <- feat/void-pr6-...
-```
+Use small short-lived branches for new bugs/providers and merge them explicitly
+into `prerelease`. GitHub is configured to delete merged branches
+automatically. If a historical branch contains a genuinely divergent tip that
+must be preserved, create and verify an
+`archive/void-preintegration/*` archive tag before deleting the branch. Do not retain a
+large set of stale branches merely as history; commits and archive tags serve
+that purpose.
 
 For a discovered bug:
 
@@ -118,10 +124,23 @@ For a discovered bug:
 6. validate in the Void VM;
 7. secret-scan staged files;
 8. commit/push the small branch;
-9. merge with `--no-ff` into the integration branch;
+9. merge with `--no-ff` into `prerelease`;
 10. push integration.
 
 Never amend an existing commit unless explicitly requested.
+
+`main` and `prerelease` are protected against deletion and force-push. Do
+not weaken those protections to make a workflow convenient.
+
+The 2026-09-19 cleanup preserved the only four superseded divergent port tips as
+these archive tags before deleting their branches:
+
+```text
+archive/void-preintegration/docs-void
+archive/void-preintegration/missioncenter-provider
+archive/void-preintegration/font-providers
+archive/void-preintegration/darkly-provider
+```
 
 ## Local validation
 
@@ -152,10 +171,14 @@ Current release-validation VM:
 
 ```text
 libvirt domain: voidlinux-release-clean
-guest: DHCP lease (192.168.122.126 at the 2026-09-19 checkpoint)
+guest address: DHCP; discover it at validation time
 user: voidcaml
 canonical repo: /home/voidcaml/inir-release-test
 ```
+
+For a libvirt-managed guest, `virsh domifaddr voidlinux-release-clean` is one
+way to discover the current lease when the host exposes it. Do not persist a
+DHCP address as release state.
 
 The guest disk is 30 GiB. The initial 20 GiB release clone was insufficient for
 the default dependency profile because the Nerd Fonts transaction exhausted
@@ -428,7 +451,9 @@ These are not evidence of a broken provider unless scope changes:
   asset/mapping validation;
 - PR6's system-root sudo password prompt was not automated in the VM;
   QML action wiring and a real isolated-root XBPS install/remove transaction
-  were validated separately. PR7 final closure is not implemented yet.
+  were validated separately;
+- PR7 engineering and release-VM closure are implemented and validated. The
+  remaining gate is the external-disk/hardware test.
 
 ## Documentation update rules
 

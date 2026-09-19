@@ -4,12 +4,14 @@ Agent-facing state for the Void Linux port of iNiR. Spec: `docs/VOID.md`.
 Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
-The current integration branch is `feat/void-pr5` (target: upstream
-`prerelease`). PR1 through PR7 engineering closure are integrated there and VM
-validated. Only privileged Power Profiles live activation and the planned
-external-disk release check remain as operational evidence.
+The canonical Void integration/release-candidate branch on the fork is
+`prerelease`. At the 2026-09-19 branch-formalization checkpoint it is
+`5c13b6c4fa1b3c0459a38117e91d05e140943b0a` and contains Snow through
+`9574fa42` (iNiR 2.31.0). PR1 through PR7 engineering closure and the clean
+release-VM gate are complete. The remaining release evidence is the planned
+external-disk/hardware test.
 
-## Current progress (2026-09-18)
+## Current progress (2026-09-19)
 
 - PR1-PR3: usable-systemd predicate, XBPS dependency routing, runsvdir/
   turnstile supervision, non-systemd runtime adapters, PipeWire user services,
@@ -31,15 +33,18 @@ external-disk release check remain as operational evidence.
   across toolkit/screencapture, closed base QML runtime gaps (Kirigami,
   kdialog, breeze-icons, qt6ct), completed audio/profile parity, and added the
   official Power Profiles provider with runit/D-Bus/polkit verification.
-- Fat-check fixes integrated into `feat/void-pr5` include systemd-predicate
+- Fat-check fixes integrated into `prerelease` include systemd-predicate
   cleanup, required desktop tools, git-worktree detection, Niri/Turnstile
   socket lifecycle, WARP runit logging, a real Void distro icon, supported
   Void installer messaging, dunst client-package handling, and a self-contained
   OCR checker.
+- The clean 2.31 VM also passed a normal install/reinstall, reboot, live
+  Power Profiles activation, Doctor 27/27, Web Wallpaper, both sidebars,
+  end-to-end Super+Q through ydotool/uinput, and `inir logs --issues` under
+  runit.
 - `make test-local`, the PR7 static/full VM checker, real-Wayland QML smoke,
   package-action terminal capture, `bash -n`, and `git diff --check` pass
-  after the closure sweep. ShellCheck is not
-  installed on the host.
+  after the closure sweep. ShellCheck is not installed on the host.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 Repo-local procedures are also available under `.agents/skills/`:
@@ -48,11 +53,12 @@ Repo-local procedures are also available under `.agents/skills/`:
 
 ### Latest VM checkpoint
 
-- VM: `192.168.122.140`, user `voidcaml`; canonical checkout
-  `/home/voidcaml/inir-src`. The root filesystem was expanded to 30 GiB.
-- A real libvirt reset on 2026-09-18 produced a new boot ID. The resulting
-  local session was `login` on tty1, type Wayland, with `niri --session` and a
-  single supervised Quickshell shell.
+- Release-validation VM: `voidlinux-release-clean`, user `voidcaml`;
+  canonical checkout `/home/voidcaml/inir-release-test`. Its DHCP address is
+  intentionally not treated as stable state. The root filesystem is 30 GiB.
+- The 2026-09-19 release VM completed real reboots. The resulting local session
+  was `login` on tty1, type Wayland, with `niri --session` and a single
+  supervised Quickshell shell.
 - The usable-systemd-user-manager predicate remained false. Turnstile's user
   runsvdir supervised iNiR, PipeWire, WirePlumber, PipeWire Pulse, and ydotool.
 - Quickshell inherited the new Niri socket after boot. Niri config validation,
@@ -61,9 +67,26 @@ Repo-local procedures are also available under `.agents/skills/`:
   Quickshell severe-error log scan all passed.
 - NetworkManager reported `connected`, BlueZ owned `org.bluez`, and WARP's
   socket plus `vlogger` runit logger were present after boot.
+- `power-profiles-daemon` stayed active across reboot,
+  `powerprofilesctl list` returned profiles, and
+  `org.freedesktop.UPower.PowerProfiles` owned its system D-Bus name.
 - The VM exposes no Bluetooth hardware. WARP account registration/tunnel,
   visual confirmation of the rendered Void icon, and SPICE clipboard under the
   Wayland-only session are not claimed as validated gates.
+
+### Fork branch policy
+
+- `main` is the fork's upstream baseline and is updated from
+  `upstream/main` by fast-forward only.
+- `prerelease` is the canonical Void integration/release-candidate branch.
+- Short-lived `feat/*`, `fix/*`, and `docs/*` branches are deleted from the
+  fork after integration. A genuinely divergent historical tip is tagged under
+  `archive/void-preintegration/*` before its branch is removed.
+- On 2026-09-19 the fork was reduced from 41 remote heads to `main`,
+  `prerelease`, and the unrelated `fix/window-identity-rules` branch. The
+  latter is preserved because its separate checkout is outside this port task.
+- `main` and `prerelease` are protected against deletion and force-push.
+  GitHub is configured to delete merged branches automatically.
 
 ## Where things are
 
@@ -71,8 +94,9 @@ Repo-local procedures are also available under `.agents/skills/`:
   fork, `upstream` = `snowarch/inir`). PRs for this project target
   `snowarch/inir` `prerelease` (CONTRIBUTING.md).
 - The original clone stays at `/home/caml/inir` (upstream `main` clone,
-  untouched; `inir-fix` worktree there holds the open PR #222 branch
-  `fix/window-identity-rules` — do not touch).
+  untouched). Its `inir-fix` worktree holds the now-merged PR #222 branch
+  `fix/window-identity-rules`; it remains outside this port task — do not
+  touch it.
 - Untracked user file that must never be touched or committed:
   `scripts/colors/modules/05-caelestia-terminal.sh`.
 

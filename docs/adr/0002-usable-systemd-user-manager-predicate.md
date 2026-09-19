@@ -20,6 +20,7 @@ Paths it gates:
 Without the socket, `systemctl --user` can block for 10-30 seconds, so the
 socket check comes first and the probe is bounded.
 
-Status: accepted and extended through the 2026-09-18 PR1-PR5 fat-check.
-PR7 still owns the mandatory final closure sweep for newly added or missed
-runtime/maintenance paths.
+Status: accepted and verified through the 2026-09-19 PR7/final fat-check. The
+mandatory closure sweep for newly added or previously missed
+runtime/maintenance paths is complete; future systemd-sensitive work remains
+subject to this predicate.

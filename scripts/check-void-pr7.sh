@@ -19,7 +19,7 @@ check() {
 }
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-expected_branch="${INIR_EXPECTED_BRANCH:-feat/void-port-closure}"
+expected_branch="${INIR_EXPECTED_BRANCH:-prerelease}"
 expected_commit="${INIR_EXPECTED_COMMIT:-}"
 actual_branch="$(git -C "$repo_root" branch --show-current 2>/dev/null || true)"
 actual_commit="$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)"

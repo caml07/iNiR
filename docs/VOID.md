@@ -202,29 +202,39 @@ no-ops when the predicate is false (their `command -v systemctl` check is
 not enough — without the user-manager socket, `systemctl --user` hangs for
 10-30s).
 
-## Development PR queue
+## Historical delivery queue and branch policy
 
-The Void port targets `snowarch/inir:prerelease`. Existing development branches
-are cumulative on the fork so they can be exercised end to end; before an
-upstream pull request is opened, its review diff is rebuilt from the then-current
-`upstream/prerelease` after its predecessor merges.
+The implementation was delivered incrementally against
+`snowarch/inir:prerelease`. Those feature/fix branches were useful while the
+port was being built, but they are no longer active development refs. The
+canonical fork branch for the completed Void integration and release candidate
+is now `prerelease`; at the 2026-09-19 branch-formalization checkpoint it is
+`5c13b6c4fa1b3c0459a38117e91d05e140943b0a`.
 
-| Order | Branch | Scope | Required validation |
+| Order | Historical delivery | Scope | Closure evidence |
 |---|---|---|---|
-| 1 | `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch `make test-local`; predicate true on Arch and false in a Void non-systemd session. |
-| 2 | `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh VM dependency step twice; record package list and confirm the second-run diff is empty. |
-| 3 | `feat/void-runit-install` | Delivered as PR3.0-PR3.3: supervisors, lifecycle, session runtime, and optional runtime adapters. | Complete PR3.3 capability checks; retain all PR3.0-PR3.2 VM contracts. |
-| 4 | `feat/void-capability-providers` | System-backed capabilities: NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. Delivered as PR4.0 (NetworkManager), PR4.1 (BlueZ), PR4.2 (ydotool), PR4.3 (WARP research/conditional). | Provision each selected provider twice and exercise its UI action and runit service. |
-| 5 | `feat/void-pr5` | Desktop parity delivered as PR5.0 Mission Center, PR5.1 OCR, PR5.2 visual providers, PR5.3 fonts, PR5.4 Darkly, and PR5.5 desktop/runtime closure. | No selected profile/default references an unavailable provider; live Niri session validates shell startup, sidebars, Qt/GTK theming, Void icon asset/mapping, and representative keybinds. |
-| 6 | `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | Run update check, search, install, remove, and catalog checks in the VM. |
-| 7 | `feat/void-port-closure` | Mandatory doctor/versioning work, final ADR-0002 sweep, capability audit, and release validation. | Doctor/ABI checks, all local tests, clean VM install, and the external-disk gate pass. |
+| 1 | PR1 / `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch local tests plus predicate validation on Void. |
+| 2 | PR2 / `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh-VM dependency install and second-run idempotency. |
+| 3 | PR3.0-PR3.3 | Supervisors, lifecycle, session runtime, and optional runtime adapters. | Versioned PR3.2/PR3.3 contracts and live non-systemd session validation. |
+| 4 | PR4.0-PR4.3 | NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. | Provider provisioning, activation, repair, and representative operation checks. |
+| 5 | PR5.0-PR5.5 | Mission Center, OCR, visual providers, fonts, Darkly, and desktop/runtime parity. | All PR5 checkers plus live Niri/sidebar/theme/keybind validation. |
+| 6 | PR6 / `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | UI wiring and a real isolated-root XBPS transaction. |
+| 7 | PR7 / `feat/void-port-closure` | Doctor/versioning, final ADR-0002 sweep, capability audit, and release-VM closure. | Doctor 27/27, full checker sweep, clean install/reinstall, reboot, live Power Profiles, Web Wallpaper, and local gates. |
 
-Documentation and VM observations are versioned with the current Void
-integration branch on the fork. They are not opened as a separate upstream PR.
-The final integration gate is a clean Void installation on an external disk:
-clone the fork at the merged implementation commit, run iNiR's normal one-line
-installer, and record the exact commands and observations in
-`docs/VOID_VM_VALIDATION.md`.
+Current fork policy:
+
+- `main` follows `upstream/main` by fast-forward and is not the Void
+  integration branch.
+- `prerelease` is the only active Void integration/release-candidate branch.
+- completed short-lived port branches are removed after integration; a
+  divergent historical tip is preserved by an
+  `archive/void-preintegration/*` tag before branch deletion.
+- `main` and `prerelease` are protected against deletion and force-push.
+
+Documentation and VM observations travel with the canonical integration branch.
+The remaining release gate is a clean Void installation on an external disk:
+clone the fork's `prerelease` branch, run iNiR's normal installer, and record
+the exact commands and observations in `docs/VOID_VM_VALIDATION.md`.
 
 ### External hardware prerequisites
 

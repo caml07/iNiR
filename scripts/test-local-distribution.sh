@@ -1342,6 +1342,24 @@ if ! (
 fi
 rm -rf "$versioning_root"
 
+step "Void release checker canonical branch"
+pr7_branch_root="$(mktemp -d)"
+if ! (
+    git clone --quiet --shared "$runtime_root" "$pr7_branch_root/repo"
+    git -C "$pr7_branch_root/repo" switch --quiet -c prerelease
+    cp "$runtime_root/scripts/check-void-pr7.sh" "$pr7_branch_root/repo/scripts/check-void-pr7.sh"
+    expected_commit="$(git -C "$pr7_branch_root/repo" rev-parse HEAD)"
+    INIR_STATIC_ONLY=true \
+        INIR_ALLOW_DIRTY=true \
+        INIR_EXPECTED_COMMIT="$expected_commit" \
+        "$pr7_branch_root/repo/scripts/check-void-pr7.sh" >/dev/null
+); then
+    rm -rf "$pr7_branch_root"
+    printf 'FAIL: PR7 checker does not accept canonical prerelease branch by default\n' >&2
+    exit 1
+fi
+rm -rf "$pr7_branch_root"
+
 step "release polish guards"
 config_qml="$runtime_root/modules/common/Config.qml"
 game_mode_qml="$runtime_root/services/GameMode.qml"

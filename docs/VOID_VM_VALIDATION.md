@@ -955,3 +955,41 @@ The remaining release gate is the external-disk/hardware test. That test must
 prepare the machine's own GPU driver/firmware/Mesa stack before iNiR: the port
 installs the shell and userland capability providers, not hardware-specific
 graphics drivers.
+
+## Post-closure branch/checker hygiene (2026-09-19)
+
+This is repository-maintenance evidence, not a new VM runtime validation.
+
+After the release-VM closure, the fork was audited against its canonical
+`prerelease` tip. The fork had 41 remote heads even though the completed Void
+work was already integrated. Every port branch scheduled for deletion was
+verified either as an ancestor of `prerelease` or, for four superseded
+divergent historical tips, preserved first under
+`archive/void-preintegration/*` tags. The remote branch set was then reduced
+to `main`, `prerelease`, and the unrelated `fix/window-identity-rules`
+branch. `main` was fast-forwarded to Snow's `9574fa42` baseline.
+
+The branch cleanup exposed one stale release-checker contract:
+`scripts/check-void-pr7.sh` still defaulted to the historical
+`feat/void-port-closure` branch. A host regression test was added at the
+public checker seam:
+
+1. **RED:** run the current PR7 static checker from a checkout named
+   `prerelease`; it failed with
+   `FAIL: test prerelease = feat/void-port-closure`.
+2. **GREEN:** change only the checker's default expected branch to
+   `prerelease`; the same static checker completed with
+   `All PR7 static checks passed`.
+
+The `INIR_EXPECTED_BRANCH` override remains available for replaying historical
+checkpoints. This maintenance step does not claim a fresh VM or external-disk
+run; the runtime evidence above remains the release-VM source of truth.
+
+The host documentation verifier was also rerun after this maintenance change and
+compared with a clean checkout of the exact `5c13b6c4` baseline. Both runs
+returned the same non-zero result: the pre-existing `customWidgets` service
+documentation mismatch, 498 runtime literals missing from the canonical locale,
+194 missing keys in most translated locales (19 in the canonical English
+catalog), and generated CLI-registry drift. The filtered verifier outputs were
+identical, so this branch/checker maintenance introduced no new documentation or
+locale verifier regression.

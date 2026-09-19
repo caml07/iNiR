@@ -5,10 +5,9 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The current integration branch is `feat/void-pr5` (target: upstream
-`prerelease`). PR1 through PR6 are integrated there and VM validated. PR7
-engineering closure is complete on `feat/void-port-closure`; only privileged
-Power Profiles live activation and the planned external-disk release check
-remain as operational evidence.
+`prerelease`). PR1 through PR7 engineering closure are integrated there and VM
+validated. Only privileged Power Profiles live activation and the planned
+external-disk release check remain as operational evidence.
 
 ## Current progress (2026-09-18)
 

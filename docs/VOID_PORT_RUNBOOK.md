@@ -10,8 +10,8 @@ live in `docs/adr/`; capability status lives in
 As of 2026-09-18:
 
 - Integration branch: `feat/void-pr5`.
-- PR1 through PR6 are implemented, VM validated, and integrated.
-- PR7 engineering closure is complete on `feat/void-port-closure`.
+- PR1 through PR7 engineering closure are implemented, VM validated, and
+  integrated into `feat/void-pr5`.
 - Remaining release evidence is operational: privileged live activation of the
   Power Profiles runit service and the planned external-disk validation.
 - Packaging iNiR itself as an XBPS package is outside V1.

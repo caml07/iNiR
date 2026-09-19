@@ -15,11 +15,11 @@ implementation is complete through the PR7 engineering-closure sweep. Decisions:
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-18): PR1 through PR6 are integrated and VM
-  validated. PR7's engineering-closure sweep is complete on
-  `feat/void-port-closure`: provider/dependency parity, Doctor/versioning,
-  XBPS package actions, migration coverage, runtime QML loads, and the final
-  non-systemd/ABI checker pass. Remaining release evidence is operational only:
+- Current checkpoint (2026-09-18): PR1 through PR7 engineering closure are
+  integrated into `feat/void-pr5` and VM validated. PR7 closed
+  provider/dependency parity, Doctor/versioning, XBPS package actions, migration
+  coverage, runtime QML loads, and the final non-systemd/ABI checker pass.
+  Remaining release evidence is operational only:
   a privileged live activation of the newly added Power Profiles system service
   and the planned external-disk validation.
 

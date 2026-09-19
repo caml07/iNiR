@@ -1994,6 +1994,9 @@ if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-i
 
     step "iRiS style tokens"
     python3 "$runtime_root/scripts/test-iris-style-tokens.py"
+
+    step "iRiS defaults"
+    python3 "$runtime_root/scripts/test-iris-defaults.py"
 fi
 
 if [[ "$run_runtime" == true ]]; then

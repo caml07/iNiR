@@ -284,6 +284,14 @@ case "${SKIP_NIRI}" in
         log_warning "No polkit agent found — sudo dialogs may not work"
       fi
 
+      if [[ "${INSTALL_FIRSTRUN}" == true && "${OS_SPECIFIC_ID:-}" == "cachyos" ]] \
+          && command -v niri-focused-booster >/dev/null 2>&1 \
+          && ! grep -Fq 'niri-focused-booster' "$NIRI_STARTUP_TARGET"; then
+        printf '\nspawn-sh-at-startup "command -v niri-focused-booster >/dev/null 2>&1 && [ -r /sys/fs/cgroup/dmem.capacity ] && exec niri-focused-booster"\n' \
+          >> "$NIRI_STARTUP_TARGET"
+        log_success "Niri DMEM focus booster enabled"
+      fi
+
       # Patch config.kdl: detect QT platform theme
       # plasma-integration provides the "kde" QPA platform theme plugin which reads
       # colors from kdeglobals. Without it, Qt apps can't use KDE color schemes.

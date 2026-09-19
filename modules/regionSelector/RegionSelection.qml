@@ -55,6 +55,8 @@ PanelWindow {
     }
 
     readonly property bool useIris: Config.options?.panelFamily === "iris"
+    // The toolbar rests against a screen edge the shell may already own.
+    readonly property var shellInsets: ShellLayoutController.desktopInsets(root.screen?.name ?? "")
 
     // Tri-style color support
     property color overlayColor: root.useIris ? IrisStyle.veilStrong
@@ -656,6 +658,9 @@ PanelWindow {
                 readonly property bool useWaffle: Config.options?.panelFamily === "waffle"
 
                 // Position: waffle = top center, material and iRiS = bottom center
+                readonly property real restTopMargin: 16 + (root.shellInsets.top ?? 0)
+                readonly property real restBottomMargin: 8 + (root.shellInsets.bottom ?? 0)
+
                 anchors {
                     horizontalCenter: parent.horizontalCenter
                     top: useWaffle ? parent.top : undefined
@@ -669,12 +674,20 @@ PanelWindow {
                     function onVisibleChanged() {
                         if (!visible) return;
                         if (regionSelectionControls.useWaffle) {
-                            regionSelectionControls.anchors.topMargin = 16;
+                            regionSelectionControls.anchors.topMargin = regionSelectionControls.restTopMargin;
                         } else {
-                            regionSelectionControls.anchors.bottomMargin = 8;
+                            regionSelectionControls.anchors.bottomMargin = regionSelectionControls.restBottomMargin;
                         }
                         regionSelectionControls.opacity = 1;
                     }
+                }
+                onRestBottomMarginChanged: {
+                    if (root.visible && !regionSelectionControls.useWaffle)
+                        regionSelectionControls.anchors.bottomMargin = regionSelectionControls.restBottomMargin;
+                }
+                onRestTopMarginChanged: {
+                    if (root.visible && regionSelectionControls.useWaffle)
+                        regionSelectionControls.anchors.topMargin = regionSelectionControls.restTopMargin;
                 }
                 Behavior on opacity {
                     animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }

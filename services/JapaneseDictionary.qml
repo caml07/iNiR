@@ -129,14 +129,15 @@ Singleton {
 
     Component.onCompleted: {
         refresh()
-        ankiCheckTimer.restart()
+        root.checkAnki()
     }
 
     Timer {
         id: ankiCheckTimer
         interval: 10000
         repeat: true
-        running: Config.options?.regionSelector?.japaneseLookup?.anki?.enabled ?? false
+        running: (Config.options?.regionSelector?.japaneseLookup?.anki?.enabled ?? false)
+            && GlobalStates.japaneseLookupOpen
         triggeredOnStart: true
         onTriggered: root.checkAnki()
     }

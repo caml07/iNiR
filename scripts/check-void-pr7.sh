@@ -85,8 +85,16 @@ check grep -Fq 'timeout 3s systemctl --user show-environment' "$orbit_audit"
 for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
   check array_has_package VOID_BASE_PACKAGES "$package"
 done
-check grep -Fq 'command -v qml6 || command -v qml || command -v qs' "$repo_root/services/WebWallpaper.qml"
-check grep -Fq 'Quickshell.env("INIR_WEB_WALLPAPER_PROBE")' "$repo_root/modules/background/WebWallpaperHost.qml"
+check grep -Fq 'command -v qml6 || command -v qml' "$repo_root/services/WebWallpaper.qml"
+check grep -Fq '/usr/lib/qt6/bin/qml' "$repo_root/services/WebWallpaper.qml"
+if grep -Fq 'import Quickshell' "$repo_root/modules/background/WebWallpaperHost.qml" \
+    || grep -Fq 'Quickshell.env(' "$repo_root/modules/background/WebWallpaperHost.qml"; then
+  printf 'FAIL: Web Wallpaper host still depends on the Quickshell runner\n' >&2
+  failures=$((failures + 1))
+else
+  printf 'PASS: Web Wallpaper host is pure Qt QML\n'
+fi
+check grep -Fq 'args.indexOf("--probe")' "$repo_root/modules/background/WebWallpaperHost.qml"
 for package in plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire; do
   check array_has_package VOID_AUDIO_PACKAGES "$package"
 done

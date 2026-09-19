@@ -18,7 +18,6 @@ Singleton {
 
     property bool available: false
     property string runner: ""
-    readonly property bool runnerIsQuickshell: root.runner.endsWith("/qs")
     property string lastError: ""
     property int revision: 0
 
@@ -33,7 +32,10 @@ Singleton {
 
     Process {
         id: runnerProbeProc
-        command: ["/usr/bin/bash", "-lc", "command -v qml6 || command -v qml || command -v qs"]
+        command: [
+            "/usr/bin/bash", "-lc",
+            "command -v qml6 || command -v qml || { [ -x /usr/lib/qt6/bin/qml ] && printf '%s\\n' /usr/lib/qt6/bin/qml; }"
+        ]
         stdout: StdioCollector { id: probeOut }
         stderr: StdioCollector { id: probeErr }
         onExited: exitCode => {
@@ -50,16 +52,11 @@ Singleton {
 
     Process {
         id: hostProbeProc
-        environment: root.runnerIsQuickshell ? ({
-            "INIR_WEB_WALLPAPER_PROBE": "1"
-        }) : ({})
-        command: root.runnerIsQuickshell
-            ? [root.runner, "--no-color", "-p", Quickshell.shellPath("modules/background/WebWallpaperHost.qml")]
-            : [
-                root.runner,
-                Quickshell.shellPath("modules/background/WebWallpaperHost.qml"),
-                "--", "--probe"
-            ]
+        command: [
+            root.runner,
+            Quickshell.shellPath("modules/background/WebWallpaperHost.qml"),
+            "--", "--probe"
+        ]
         stderr: StdioCollector { id: hostProbeErr }
         onExited: exitCode => {
             root.available = exitCode === 0
@@ -146,11 +143,6 @@ Singleton {
 
             Process {
                 id: hostProc
-                environment: root.runnerIsQuickshell ? ({
-                    "INIR_WEB_WALLPAPER_INTERACTIVE": root.interactive ? "1" : "0",
-                    "INIR_WEB_WALLPAPER_SCREEN": screenScope.screenName,
-                    "INIR_WEB_WALLPAPER_SOURCE": root.source
-                }) : ({})
                 command: [
                     "/usr/bin/bash", "-c",
                     `pidfile="$1"; shift;
@@ -174,16 +166,12 @@ Singleton {
                     trap - TERM INT HUP
                     exit "$status"`,
                     "_", screenScope.pidFile,
-                    ...(root.runnerIsQuickshell
-                        ? [root.runner, "--no-color", "-p", screenScope.hostPath]
-                        : [
-                            root.runner,
-                            screenScope.hostPath,
-                            "--",
-                            ...(root.interactive ? ["--interactive"] : []),
-                            "--screen", screenScope.screenName,
-                            root.source
-                        ])
+                    root.runner,
+                    screenScope.hostPath,
+                    "--",
+                    ...(root.interactive ? ["--interactive"] : []),
+                    "--screen", screenScope.screenName,
+                    root.source
                 ]
                 stderr: StdioCollector { id: hostErr }
                 onExited: exitCode => {

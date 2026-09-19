@@ -1847,6 +1847,47 @@ if [[ "$(<"$runit_test_root/sv.log")" != "restart $runit_test_root/config/servic
     rm -rf "$runit_test_root"
     exit 1
 fi
+
+# Runit owns service lifecycle, but log decoding still belongs to Quickshell.
+# New launcher log options must not be swallowed by the bare `sv status` fallback.
+show_logs_function="$(sed -n '/^show_logs() {/,/^}/p' "$launcher")"
+cat > "$runit_test_root/bin/qs-mock" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" > "$INIR_TEST_QS_LOG"
+printf '%s\n' \
+    '  WARN qml: sample warning 0x1234' \
+    '  WARN qml: sample warning 0x5678'
+SH
+chmod +x "$runit_test_root/bin/qs-mock"
+rm -f "$runit_test_root/sv.log"
+if ! runit_log_issues="$({
+    export TEST_SHOW_LOGS_FUNCTION="$show_logs_function"
+    export TEST_QS_BIN="$runit_test_root/bin/qs-mock"
+    export INIR_TEST_QS_LOG="$runit_test_root/qs.log"
+    export INIR_TEST_SV_LOG="$runit_test_root/sv.log"
+    export XDG_CONFIG_HOME="$runit_test_root/config"
+    export HOME="$runit_test_root/home"
+    bash -c '
+        set -e
+        config_dir="$XDG_CONFIG_HOME/quickshell/inir"
+        qs_bin="$TEST_QS_BIN"
+        resolve_config_dir() { :; }
+        is_using_runit_supervisor() { return 0; }
+        eval "$TEST_SHOW_LOGS_FUNCTION"
+        show_logs --issues
+    '
+} 2>&1)"; then
+    printf 'FAIL: runit logs --issues command failed\n%s\n' "$runit_log_issues" >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+if [[ -e "$runit_test_root/sv.log" ]] \
+        || [[ "$(<"$runit_test_root/qs.log")" != *"log"* ]] \
+        || [[ "$runit_log_issues" != *"2  WARN qml: sample warning 0x_"* ]]; then
+    printf 'FAIL: runit logs --issues was swallowed by sv status or did not decode Quickshell logs\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
 rm -rf "$runit_test_root"
 
 step "non-systemd runtime adapters"
@@ -2541,18 +2582,19 @@ done
 web_wallpaper_service="$runtime_root/services/WebWallpaper.qml"
 web_wallpaper_host="$runtime_root/modules/background/WebWallpaperHost.qml"
 for needle in \
-    'command -v qml6 || command -v qml || command -v qs' \
-    'INIR_WEB_WALLPAPER_PROBE' \
-    'INIR_WEB_WALLPAPER_SCREEN' \
-    'INIR_WEB_WALLPAPER_SOURCE'; do
+    'command -v qml6 || command -v qml' \
+    '/usr/lib/qt6/bin/qml' \
+    '"--", "--probe"' \
+    '"--screen", screenScope.screenName'; do
     if ! grep -Fq "$needle" "$web_wallpaper_service"; then
-        printf 'FAIL: Web Wallpaper lacks a Quickshell runner/provider contract: %s\n' "$needle" >&2
+        printf 'FAIL: Web Wallpaper lacks the Qt QML runner/provider contract: %s\n' "$needle" >&2
         exit 1
     fi
 done
-if ! grep -Fq 'import Quickshell' "$web_wallpaper_host" \
-        || ! grep -Fq 'Quickshell.env("INIR_WEB_WALLPAPER_PROBE")' "$web_wallpaper_host"; then
-    printf 'FAIL: Web Wallpaper host cannot receive Quickshell-runner arguments on Void\n' >&2
+if grep -Fq 'import Quickshell' "$web_wallpaper_host" \
+        || grep -Fq 'Quickshell.env(' "$web_wallpaper_host" \
+        || ! grep -Fq 'args.indexOf("--probe")' "$web_wallpaper_host"; then
+    printf 'FAIL: Web Wallpaper host must be a pure Qt QML host with argv-based options\n' >&2
     exit 1
 fi
 for pkg in fuzzel network-manager-applet; do
@@ -2610,6 +2652,55 @@ for mapping in \
         exit 1
     fi
 done
+if ! grep -Fq 'check_void_install_space' "$void_deps"; then
+    printf 'FAIL: Void installer lacks a preflight for selected-profile disk space\n' >&2
+    exit 1
+fi
+
+void_space_fixture() (
+    set -e
+    local root
+    root="$(mktemp -d)"
+    trap 'rm -rf "$root"' EXIT
+    mkdir -p "$root/bin"
+    cat > "$root/bin/xbps-install" <<'SH'
+#!/bin/sh
+if [ "${MOCK_XBPS_EMPTY:-0}" = 1 ]; then
+    exit 0
+fi
+printf '%s\n' 'hugepkg-1.0_1 install x86_64 mock-repo 8589934592 1073741824'
+SH
+    cat > "$root/bin/df" <<'SH'
+#!/bin/sh
+printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+printf 'mock 31457280 0 %s 0%% /\n' "${MOCK_AVAIL_KIB:?}"
+SH
+    chmod +x "$root/bin/xbps-install" "$root/bin/df"
+    export PATH="$root/bin:/usr/bin:/bin"
+    log_warning() { :; }
+    awk '/^check_void_install_space\(\) {/,/^}/' "$void_deps" > "$root/preflight.sh"
+    source "$root/preflight.sh"
+
+    export MOCK_AVAIL_KIB=10485760
+    if check_void_install_space hugepkg; then
+        printf 'FAIL: Void disk-space preflight accepts an undersized transaction\n' >&2
+        exit 1
+    fi
+
+    export MOCK_AVAIL_KIB=12582912
+    if ! check_void_install_space hugepkg; then
+        printf 'FAIL: Void disk-space preflight rejects a transaction with sufficient headroom\n' >&2
+        exit 1
+    fi
+
+    export MOCK_XBPS_EMPTY=1 MOCK_AVAIL_KIB=1
+    if ! check_void_install_space hugepkg; then
+        printf 'FAIL: Void disk-space preflight rejects an already-satisfied transaction\n' >&2
+        exit 1
+    fi
+)
+void_space_fixture
+
 if ! grep -Fq 'missing_cmds+=("qt-webengine")' "$doctor_lib" \
         || ! grep -Fq 'missing_cmds+=("layer-shell-qt")' "$doctor_lib"; then
     printf 'FAIL: Doctor cannot repair missing Web Wallpaper QML providers on Void\n' >&2

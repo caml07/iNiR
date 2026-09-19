@@ -249,12 +249,55 @@ RUBIK_ITALIC_SHA256="08c6c4018a5ada8b517407b46897e46cf6ebb106853fbd3e89addb51d3b
 DARKLY_VERSION="0.5.39"
 DARKLY_SOURCE_SHA256="5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2"
 DARKLY_SOURCE_URL="https://github.com/Bali10050/Darkly/archive/refs/tags/v${DARKLY_VERSION}.tar.gz"
+VOID_INSTALL_SPACE_MARGIN_BYTES=$((2 * 1024 * 1024 * 1024))
 
 declare -A VOID_OCR_MODEL_SHA256=(
   [jpn_vert]="bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"
   [chi_sim_vert]="20590de84725bab69cde93bd6e8ed360a13cc5421a7e7364ddeb93e9af53d6da"
   [chi_tra_vert]="1df02a4b210e5c217b783819538b63e9dfe6904e2b5e53b62664f1b9f7a989d0"
 )
+
+check_void_install_space() {
+  local dry_run required_bytes available_kib available_bytes needed_bytes
+  local needed_gib available_gib
+  local margin_bytes="${VOID_INSTALL_SPACE_MARGIN_BYTES:-2147483648}"
+
+  [[ $# -gt 0 ]] || return 0
+
+  if ! dry_run="$(xbps-install -n "$@" 2>/dev/null)"; then
+    log_warning "Could not estimate Void dependency disk usage; continuing without a space preflight"
+    return 0
+  fi
+
+  required_bytes="$(awk '
+    $5 ~ /^[0-9]+$/ && $6 ~ /^[0-9]+$/ { total += $5 + $6 }
+    END { printf "%.0f\n", total + 0 }
+  ' <<<"$dry_run")"
+  [[ "$required_bytes" =~ ^[0-9]+$ ]] || {
+    log_warning "Could not parse Void dependency disk usage; continuing without a space preflight"
+    return 0
+  }
+  (( required_bytes > 0 )) || return 0
+
+  available_kib="$(df -Pk / 2>/dev/null | awk 'NR == 2 { print $4 }')"
+  [[ "$available_kib" =~ ^[0-9]+$ ]] || {
+    log_warning "Could not determine free root filesystem space; continuing without a space preflight"
+    return 0
+  }
+
+  available_bytes=$((available_kib * 1024))
+  needed_bytes=$((required_bytes + margin_bytes))
+  if (( available_bytes < needed_bytes )); then
+    needed_gib="$(awk -v bytes="$needed_bytes" 'BEGIN { printf "%.1f", bytes / 1073741824 }')"
+    available_gib="$(awk -v bytes="$available_bytes" 'BEGIN { printf "%.1f", bytes / 1073741824 }')"
+    log_warning "Not enough free space for the selected Void dependency profiles"
+    log_warning "Need about ${needed_gib} GiB including download/build headroom; ${available_gib} GiB is free on /"
+    log_warning "Free disk space, disable optional profiles, or enlarge the root filesystem before retrying"
+    return 1
+  fi
+
+  return 0
+}
 
 install_void_ocr_models() {
   local data_home tessdata_dir lang expected_sha target tmp url
@@ -944,6 +987,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
 
   if [[ ${#_miss_pkgs[@]} -gt 0 ]]; then
+    check_void_install_space "${_miss_pkgs[@]}" || return 1
     v pkg_sudo xbps-install "${_miss_installflags[@]}" "${_miss_pkgs[@]}"
   fi
   if $_need_ydotool; then
@@ -974,6 +1018,28 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   unset ONLY_MISSING_DEPS
   return 0
 fi
+
+#####################################################################################
+# Preflight selected dependency profiles before modifying the system
+#####################################################################################
+_void_selected_packages=("${VOID_BASE_PACKAGES[@]}")
+if ${INSTALL_AUDIO:-true}; then
+  _void_selected_packages+=("${VOID_AUDIO_PACKAGES[@]}")
+fi
+if ${INSTALL_TOOLKIT:-true}; then
+  _void_selected_packages+=("${VOID_TOOLKIT_PACKAGES[@]}")
+fi
+if ${INSTALL_SCREENCAPTURE:-true}; then
+  _void_selected_packages+=("${VOID_SCREENCAPTURE_PACKAGES[@]}")
+fi
+if ${INSTALL_TOOLKIT:-true} || ${INSTALL_SCREENCAPTURE:-true}; then
+  _void_selected_packages+=("${VOID_OCR_PACKAGES[@]}")
+fi
+if ${INSTALL_FONTS:-true}; then
+  _void_selected_packages+=("${VOID_FONTS_PACKAGES[@]}")
+fi
+check_void_install_space "${_void_selected_packages[@]}" || return 1
+unset _void_selected_packages
 
 #####################################################################################
 # System update

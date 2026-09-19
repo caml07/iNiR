@@ -2444,7 +2444,7 @@ show_logs() {
         exec env QS_DEBUG=1 QT_LOGGING_RULES= "$qs_bin" -p "$config_dir"
     fi
 
-    if is_using_runit_supervisor; then
+    if [[ $# -eq 0 ]] && is_using_runit_supervisor; then
         exec sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
     fi
 

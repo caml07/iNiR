@@ -39,6 +39,7 @@ import qs.modules.background.widgets.japaneseTypography
 import qs.modules.background.desktopItems
 import qs.modules.iris.components
 import qs.modules.iris.style
+import qs.modules.iris.frame
 import "root:modules/common/functions/parallax.js" as ParallaxMath
 import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 
@@ -1791,20 +1792,25 @@ Scope {
                 ] : [
                     { type: "quick", items: [
                         { text: Translation.tr("Wallpaper"), iconName: "wallpaper",
+                            image: bgRoot.wallpaperIsVideo || bgRoot.wallpaperIsGif ? bgRoot.wallpaperThumbnailPath : bgRoot.wallpaperPath,
                             action: () => {
                                 GlobalStates.wallpaperSelectorTargetMonitor = bgRoot.screenName
                                 GlobalActions.runLauncher(["wallpaperSelector", "toggle"])
                             } },
                         { text: Translation.tr("Widgets"), iconName: "widgets",
                             action: () => GlobalStates.setWidgetEditMode(true) },
+                        { text: Translation.tr("Studio"), iconName: "palette",
+                            action: () => { GlobalStates.irisStudioOpen = true } },
                         { text: Translation.tr("Search"), iconName: "search",
                             action: () => { GlobalStates.searchOpen = true } }
                     ] },
                     { type: "separator" },
+                    { text: Translation.tr("Edit iRiS"), iconName: "edit",
+                        action: () => { GlobalStates.irisEdit = true } },
                     { text: Translation.tr("Quick controls"), iconName: "tune",
                         action: () => { GlobalStates.controlPanelOpen = true } },
                     { text: Translation.tr("Settings"), iconName: "settings",
-                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "settings"]) } },
+                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "iris", "settings", ""]) } },
                     { type: "separator" },
                     { text: Translation.tr("Reload shell"), iconName: "refresh",
                         action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
@@ -2476,7 +2482,7 @@ Scope {
                         readonly property bool irisTopEdge: (Config.options?.panelFamily ?? "ii") === "iris"
                             && editGridOverlay.workArea?.insets?.barEdge === "bottom"
                         attachedTopEdge: irisTopEdge
-                        y: editControlsBar.iris ? (irisTopEdge ? 0 : parent.height - height)
+                        y: editControlsBar.iris ? (irisTopEdge ? IrisFrame.band : parent.height - height - IrisFrame.band)
                             : Math.max(editGridOverlay.safeTop, editGridOverlay.safeBottom - height - 12)
                         onLibraryRequested: widgetManagerPanel.shown = !widgetManagerPanel.shown
                         onEdgeSettingsRequested: GlobalStates.openSettingsPage(14, "Organic edge")

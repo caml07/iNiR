@@ -530,6 +530,32 @@ Singleton {
         Qt.callLater(() => root._discardingIds.delete(id));
     }
 
+    function discardNotificationsForApp(appName) {
+        const doomed = root.list.filter(notif => notif.appName === appName)
+        if (doomed.length === 0)
+            return
+        for (const notif of doomed) {
+            if (notif.timer) {
+                notif.timer.stop();
+                notif.timer.destroy();
+                notif.timer = null;
+            }
+        }
+        root.list = root.list.filter(notif => notif.appName !== appName)
+        triggerListChange();
+        notifFileView.setText(stringifyList(root.list));
+        for (const notif of doomed) {
+            const id = notif.notificationId
+            root._discardingIds.add(id);
+            const tracked = notifServer.trackedNotifications.values.find(server => server.id + root.idOffset === id)
+            if (tracked)
+                tracked.dismiss()
+            root.discard(id);
+            notif.destroy();
+            Qt.callLater(() => root._discardingIds.delete(id));
+        }
+    }
+
     function discardAllNotifications() {
         // Cancel and destroy all active timers before clearing the list
         for (const notif of root.list) {

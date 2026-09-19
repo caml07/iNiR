@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 3b39b043a95ce8b0
+# IPC.md hash: baed4681b1c96b4a
 # Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
@@ -43,7 +43,7 @@ declare -gA IPC_TARGET_DESC=(
   [overlay]="Floating tools (Super+G): notes, images, crosshair, recorder, resources and other pinnable desktop tools."
   [overview]="Toggle the workspace overview panel. The one with all your windows looking tiny and organized."
   [packageSearch]="Package search service. Searches pacman repos and installed packages."
-  [panelFamily]="Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight)."
+  [panelFamily]="Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (the Island family)."
   [pill]="The pill bar's morphing surfaces (only registered while Bar appearance is set to Pill). Valid surface names: \`power\`, \`media\`, \`battery\`, \`calendar\`, \`link\`, \`mixer\`, \`sysmon\`, \`clipboard\`, \`glance\`, \`launcher\`, \`recorder\`."
   [recordingOsd]="Screen recording floating pill OSD. Shows elapsed time and stop button during active recording."
   [region]="Region selection tools. Screenshots, OCR, recording. Draw a box, get stuff done."
@@ -158,7 +158,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [equalizer]="toggle close open refresh ensure status setBand preset configure"
   [gamemode]="toggle activate deactivate status"
   [globalActions]="run runWithArgs list search open"
-  [iris]="open page close toggle card settings bubble dock dockApp appBubble pin layout barPiece arrange edit studio notch surround accent spotlight bubbleCard bubbleMenu morph activity activities set adaptive preset utility status"
+  [iris]="open page close toggle card theme settings bubble dock dockApp appBubble pin layout edge dockEdge zone barPiece arrange edit studio notch surround accent spotlight bubbleCard bubbleMenu morph activity activities set adaptive preset utility status"
   [keyboard]="switchLayout switchLayoutPrevious getCurrentLayout getLayouts"
   [lock]="activate prepareSleep deactivate status focus"
   [mascot]="poke status setVoice romp chase hideSeek tidy appear appearContextual appearWithLine hide snooze"
@@ -193,7 +193,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [wactionCenter]="toggle close open"
   [waffleAltSwitcher]="open close toggle next previous"
   [wallpaperLauncher]="next previous applyCurrent status"
-  [wallpaperSelector]="toggle open close openLauncher toggleOnMonitor random status"
+  [wallpaperSelector]="toggle open close openLauncher toggleOnMonitor random set browse status"
   [wbar]="toggle close open"
   [widgetpower]="status"
   [wnotificationCenter]="toggle close open"
@@ -307,13 +307,17 @@ declare -gA IPC_FUNCTION_DESC=(
   ["iris:close"]="Collapse the island"
   ["iris:toggle"]="Expand or collapse the island on the focused output"
   ["iris:card"]="\`open\`, \`close\` or \`toggle\` the media bubble's floating card, or \`pin\` to keep it open"
+  ["iris:theme"]="iRiS themes, each a whole redesign of the family: \`list\`, \`apply:<id>\`, \`save:<name>\` (what you see now becomes a theme file), \`import:<path>\` (a shared \`.json\`), \`export\` or \`export:<id>\` (prints the theme as JSON to share) and \`folder\` (where theme files live, \`~/.config/inir/iris/themes\`)"
   ["iris:settings"]="Open iRiS Settings on a section: \`bar\`, \`player\`, \`bubbles\`, \`dock\`, \`appearance\`, \`desktop\`, \`sidebars\`, \`surfaces\` or \`system\`; add \`/<group>\` to open that group, e.g. \`bubbles/behaviour\`"
-  ["iris:bubble"]="Place an Island bubble (\`left\`, \`right\`, \`utility\`) or an extra bubble (\`weather\`, \`notifications\`, \`controls\`, \`sound\`, \`mic\`, \`tools\`, \`media\`, \`tray\`): a zone (\`top-left\`, \`top-right\`, \`left\`, \`right\`, \`bottom-left\`, \`bottom-right\`), \`x,y\` fractions of the output, \`island\` (slots) or \`off\` (extras)"
+  ["iris:bubble"]="Place an Island bubble (\`left\`, \`right\`, \`utility\`) or an extra bubble (\`weather\`, \`notifications\`, \`controls\`, \`sound\`, \`mic\`, \`tools\`, \`media\`, \`tray\`): a zone (\`top-left\`, \`top-right\`, \`left\`, \`right\`, \`bottom-left\`, \`bottom-right\`), \`edge:<top"
   ["iris:dock"]="\`reveal\`, \`hide\` or \`toggle\` the iRiS Dock (revealed stays until hidden or an app is chosen)"
   ["iris:dockApp"]="Open a Dock app's \`windows\` or \`menu\` by app id (e.g. \`kitty windows\`), or \`<any> close\`"
   ["iris:appBubble"]="Carry a Dock app out as a bubble of its own (e.g. \`kitty right\`): a zone, \`x,y\` fractions of the output, or \`dock\` to send it back"
   ["iris:pin"]="Keep the \`left\` (Focus) or \`right\` (Today) panel open beside windows, or stop"
   ["iris:layout"]="How the Island sits on its edge: \`island\`, \`left\`, \`right\` or \`full\`"
+  ["iris:edge"]="Move the Island to a screen edge: \`top\`, \`bottom\`, \`left\` or \`right\` (on a side edge it rests as an upright capsule and its pages grow inward)"
+  ["iris:dockEdge"]="Move the Dock: \`auto\` (opposite the Island), \`top\`, \`bottom\`, \`left\` or \`right\`"
+  ["iris:zone"]="What a full-width Island carries in a zone: \`start\`, \`center\` or \`end\`, then kinds joined by \`+\` (\`island\`, \`workspaces\`, \`window\`, \`time\` or a piece kind), or \`none\`"
   ["iris:barPiece"]="Turn one of the Island's own pieces on or off: \`weather\`, \`notifications\`, \`controls\`, \`sound\`, \`mic\`, \`tools\`, \`media\` or \`tray\`, plus \`on\`, \`off\` or \`toggle\`"
   ["iris:arrange"]="Arrange the Island's desktop page in place — move, remove and add its blocks: \`on\`, \`off\` or \`toggle\`"
   ["iris:edit"]="Edit iRiS in place: every piece becomes grabbable and the edit bar holds the pieces, the look and the sizes — \`on\`, \`off\`, \`toggle\`, a tab of the edit bar (\`tab:pieces\`, \`tab:look\`, \`tab:motion\`, \`tab:layout\`), a target to inspect (\`material\`, \`colour\`, \`type\`, \`motion\`, \`island\`, \`pieces\`, \`bodies\`, \`places\`, \`transients\`, \`dock\`, \`desktop\`) or a piece (\`vitals\`, \`left\`, \`app:kitty\`)"
@@ -510,6 +514,8 @@ declare -gA IPC_FUNCTION_DESC=(
   ["wallpaperSelector:openLauncher"]="Open the compact launcher in \`static\` or \`animated\` mode"
   ["wallpaperSelector:toggleOnMonitor"]="Open wallpaper selector on a specific monitor"
   ["wallpaperSelector:random"]="Pick a random wallpaper from the current folder"
+  ["wallpaperSelector:set"]="Apply a wallpaper (picture, GIF or video) by path, the same way the picker does"
+  ["wallpaperSelector:browse"]="Open the picker on a source — \`library\`, \`wallhaven\` or \`live\` (anime live wallpapers) — with a search, a folder to open (\`~/Videos\`), or \`-\` for none. Sources are an iRiS feature; other families just open the picker"
   ["wallpaperSelector:status"]="Return picker style, open surface, target monitor and selection target as JSON"
   ["wbar:toggle"]="Show/hide taskbar"
   ["wbar:close"]="Hide taskbar"
@@ -566,6 +572,7 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["globalActions:search"]="<query>"
   ["iris:page"]="<name>"
   ["iris:card"]="<action>"
+  ["iris:theme"]="<action>"
   ["iris:settings"]="<section>"
   ["iris:bubble"]="<slot> <place>"
   ["iris:dock"]="<action>"
@@ -573,6 +580,9 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["iris:appBubble"]="<appId> <place>"
   ["iris:pin"]="<side>"
   ["iris:layout"]="<name>"
+  ["iris:edge"]="<name>"
+  ["iris:dockEdge"]="<name>"
+  ["iris:zone"]="<name> <kinds>"
   ["iris:barPiece"]="<kind> <action>"
   ["iris:arrange"]="<action>"
   ["iris:edit"]="<action>"
@@ -622,6 +632,8 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["shellLayout:validate"]="<surfaceId> <slot>"
   ["wallpaperSelector:openLauncher"]="<mode>"
   ["wallpaperSelector:toggleOnMonitor"]="<monitorName>"
+  ["wallpaperSelector:set"]="<path>"
+  ["wallpaperSelector:browse"]="<source> <query>"
 )
 
 declare -gA IPC_TARGET_EXAMPLE=(
@@ -654,6 +666,7 @@ bind "Ctrl+Shift+S" { spawn "inir" "region" "menu"; }'
   [shellLayout]='bind "Super+W" { spawn "inir" "shellLayout" "toggle"; }'
   [voiceSearch]='bind "Super+Shift+V" { spawn "inir" "voiceSearch" "toggle"; }'
   [wallpaperSelector]='bind "Ctrl+Alt+T" { spawn "inir" "wallpaperSelector" "toggle"; }
+bind "Ctrl+Alt+L" { spawn "inir" "wallpaperSelector" "browse" "live" "-"; }
 bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; }'
   [workspaceStrip]='bind "Super+Tab" { spawn "inir" "workspaceStrip" "toggle"; }'
   [ytmusic]='bind "Mod+M+Space" { spawn "inir" "ytmusic" "playPause"; }'

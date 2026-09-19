@@ -668,6 +668,27 @@ if grep -Fq 'pacman -S $installflags "${_all_official[@]}"' "$arch_installer"; t
     printf 'FAIL: Arch installer can still reinstall or downgrade satisfied dependencies\n' >&2
     exit 1
 fi
+if ! grep -Fq 'OS_SPECIFIC_ID:-}" == "cachyos"' "$arch_installer" \
+        || ! grep -Fq 'pacman -Si niri-focused-booster' "$arch_installer" \
+        || ! grep -Fq 'OFFICIAL_PACKAGES+=(niri-focused-booster)' "$arch_installer"; then
+    printf 'FAIL: CachyOS fresh installs no longer provision the Niri DMEM focus booster from configured repos\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'ID="?cachyos"?' "$runtime_root/sdata/lib/dist-determine.sh"; then
+    printf 'FAIL: CachyOS detection ignores /etc/os-release ID=cachyos\n' >&2
+    exit 1
+fi
+files_installer="$runtime_root/sdata/subcmd-install/3.files.sh"
+if ! grep -Fq 'INSTALL_FIRSTRUN}" == true && "${OS_SPECIFIC_ID:-}" == "cachyos"' "$files_installer" \
+        || ! grep -Fq 'command -v niri-focused-booster >/dev/null 2>&1' "$files_installer" \
+        || ! grep -Fq '[ -r /sys/fs/cgroup/dmem.capacity ] && exec niri-focused-booster' "$files_installer"; then
+    printf 'FAIL: fresh CachyOS installs do not conditionally wire the Niri DMEM focus booster\n' >&2
+    exit 1
+fi
+if grep -Fq 'niri-focused-booster' "$runtime_root/defaults/niri/config.d/50-startup.kdl"; then
+    printf 'FAIL: generic Niri defaults contain CachyOS-only DMEM integration\n' >&2
+    exit 1
+fi
 
 fedora_installer="$runtime_root/sdata/dist-fedora/install-deps.sh"
 if ! grep -Fq 'fedora_quickshell_compatible' "$fedora_installer" \
@@ -1997,6 +2018,9 @@ if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-i
 
     step "iRiS defaults"
     python3 "$runtime_root/scripts/test-iris-defaults.py"
+
+    step "iRiS performance contract"
+    python3 "$runtime_root/scripts/test-iris-performance-contract.py"
 fi
 
 if [[ "$run_runtime" == true ]]; then

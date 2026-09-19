@@ -383,6 +383,7 @@
         },
         "enableAnimation": true,
         "pauseAnimationOnBattery": true,
+        "videoPause": "covered",
         "effects": {
             "blurRadius": 22,
             "dim": 30,
@@ -936,6 +937,24 @@
                 "colorMode": "auto",
                 "x": 80,
                 "y": 80
+            },
+            "controls": {
+                "enable": false,
+                "locked": false,
+                "placementStrategy": "free",
+                "widgetScale": 100,
+                "cornerRadius": -1,
+                "x": 120,
+                "y": 420
+            },
+            "screenTime": {
+                "enable": false,
+                "locked": false,
+                "placementStrategy": "free",
+                "widgetScale": 100,
+                "cornerRadius": -1,
+                "x": 120,
+                "y": 240
             },
             "newsTicker": {
                 "enable": false,
@@ -2341,18 +2360,21 @@
                 "expanded": []
             }
         },
-        "widgets": { "radius": 22, "opacity": 100, "tint": "wallpaper", "material": "solid", "weight": "regular" },
+        "widgets": { "radius": 22, "opacity": 100, "tint": "wallpaper", "design": "iris", "material": "glass", "weight": "regular", "rim": false },
         "dock": {
             "enable": true,
             "autoHide": true,
             "reserveSpace": true,
             "blur": false,
+            "material": "inherit",
             "notch": true,
             "iconSize": 40,
             "magnification": false,
+            "magnifySize": 150,
             "badges": true,
             "launcher": true,
-            "revealOnEmpty": true
+            "revealOnEmpty": true,
+            "position": "auto"
         },
         "appearance": {
             "fontFamily": "",
@@ -2371,7 +2393,14 @@
             "aura": "subtle",
             "adaptive": 0,
             "studioPreview": true,
+            "previews": true,
             "saved": [],
+            "themeId": "iris",
+            "glass": {
+                "mode": "off",
+                "tint": 58,
+                "blur": 100
+            },
             "theme": {
                 "surface": "black",
                 "fill": 100,
@@ -2383,6 +2412,9 @@
                 "bounce": 100,
                 "text": 100,
                 "rim": true,
+                "rimTint": "neutral",
+                "rimWidth": 1,
+                "glow": 0,
                 "accentHue": 212,
                 "highlightHue": 32,
                 "lightReach": 100,
@@ -2459,6 +2491,9 @@
             "padding": 100,
             "satelliteScale": 100,
             "layout": "island",
+            "fullStart": ["workspaces", "window"],
+            "fullCenter": ["island"],
+            "fullEnd": ["tray", "notifications", "sound", "controls"],
             "pieces": [],
             "hoverExpand": true,
             "hoverDelay": 300,
@@ -2512,7 +2547,10 @@
         "wallpaper": {
             "thumbnailSize": 228,
             "width": 960,
-            "livePreview": true
+            "livePreview": true,
+            "layout": "showcase",
+            "motion": true,
+            "pinned": []
         },
         "player": {
             "roundCover": true,
@@ -2549,11 +2587,14 @@
             "snap": true,
             "cluster": true,
             "attach": true,
+            "join": "notch",
+            "notchCurve": 100,
             "reserve": true,
             "apps": []
         },
         "surround": {
             "enable": true,
+            "music": "widget",
             "thickness": 10,
             "radius": 22
         },

@@ -385,6 +385,8 @@ Singleton {
     // the resting Island's screen-local geometry, published by each Island.
     property var irisBubbleKinds: ({})
     property var irisIslandGeometry: ({})
+    // Per output: pieces an edge owner carries instead of floating over it ({ island: [...], dock: [...] }).
+    property var irisAbsorbed: ({})
     property bool irisSettingsWarm: false
     // iRiS side panel ("left"/"right") that was revealed by resting at its screen
     // edge: it closes when the pointer leaves until a press inside commits it.

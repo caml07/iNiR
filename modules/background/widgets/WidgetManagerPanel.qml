@@ -52,8 +52,10 @@ Item {
         { key: "mascot", icon: "pets", label: "Mascot", defaultEnabled: false },
         { key: "japaneseTypography", icon: "translate", label: "Japanese Typography", defaultEnabled: false },
         { key: "worldClock", icon: "public", label: "World clock", defaultEnabled: false },
-        { key: "userCard", icon: "account_circle", label: "User card", defaultEnabled: false }
-    ]
+        { key: "userCard", icon: "account_circle", label: "User card", defaultEnabled: false },
+        { key: "controls", icon: "toggle_on", label: "Controls", defaultEnabled: false, irisOnly: true },
+        { key: "screenTime", icon: "hourglass_bottom", label: "Screen Time", defaultEnabled: false, irisOnly: true }
+    ].filter(item => !item.irisOnly || (Config.options?.panelFamily ?? "ii") === "iris")
 
     function _setFilter(value: string): void {
         const next = ["all", "active", "locked", "custom"].includes(value) ? value : "all"

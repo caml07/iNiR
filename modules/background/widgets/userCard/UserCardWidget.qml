@@ -10,6 +10,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -38,8 +39,16 @@ AbstractBackgroundWidget {
             y: 420
         })
 
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 280) * scaleFactor)
-    implicitHeight: Math.round(Math.max(170, Number(root._readConfigKey("contentHeight") ?? 176)) * scaleFactor)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 280) * scaleFactor)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round(Math.max(170, Number(root._readConfigKey("contentHeight") ?? 176)) * scaleFactor)
+    irisFace: Component { IrisProfileFace { widget: root } }
+    irisSizes: ["small", "medium"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "showAvatar", raw: true, label: Translation.tr("Picture"), icon: "account_circle", fallback: true },
+        { key: "showWeather", raw: true, label: Translation.tr("Weather"), icon: "partly_cloudy_day", fallback: true },
+        { key: "showHostname", raw: true, label: Translation.tr("Computer name"), icon: "computer", fallback: true }
+    ]
     resizableAxes: ({
             width: "contentWidth",
             height: "contentHeight"
@@ -135,6 +144,7 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius
@@ -150,12 +160,12 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
+        shown: !root.irisFaced && !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     ColumnLayout {
         id: cardColumn
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         opacity: root.instrument ? 0 : 1
         enabled: !root.instrument
         Behavior on opacity {
@@ -390,7 +400,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: Math.round(12 * root.scaleFactor)
         spacing: Math.round(12 * root.scaleFactor)
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         opacity: root.instrument ? 1 : 0
         enabled: root.instrument
         Behavior on opacity {

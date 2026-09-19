@@ -9,6 +9,7 @@ import qs.modules.background.widgets
 import qs.modules.mediaControls.presets
 import qs.modules.mediaControls.components
 import qs.modules.iris.components
+import qs.modules.iris.widgets
 
 import QtQuick
 import QtQuick.Layouts
@@ -521,8 +522,14 @@ AbstractBackgroundWidget {
         ? [root.meaningfulPlayer] : []
     readonly property bool hasPlayer: root.meaningfulPlayers.length > 0
 
-    implicitWidth: root.hasPlayer ? root.widgetWidth : root.placeholderWidth
-    implicitHeight: root.hasPlayer ? root.widgetHeight : root.placeholderHeight
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : root.hasPlayer ? root.widgetWidth : root.placeholderWidth
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : root.hasPlayer ? root.widgetHeight : root.placeholderHeight
+    irisFace: Component { IrisNowPlayingFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "lyrics", label: Translation.tr("Synced lyrics"), icon: "lyrics", fallback: true }
+    ]
     readonly property real placeholderWidth: Math.round(
         96 * Appearance.fontSizeScale * scaleFactor)
     readonly property real placeholderHeight: root.placeholderWidth
@@ -546,7 +553,7 @@ AbstractBackgroundWidget {
     // This instance only exists when its effective output-local enable state is
     // true. Rechecking the global base would incorrectly disable Cava for a
     // widget enabled only on this monitor.
-    readonly property bool visualizerActive: root.vizPosition !== "none"
+    readonly property bool visualizerActive: !root.irisFaced && root.vizPosition !== "none"
         && root.visible && root.powerActive && MprisController.isPlaying
 
     CavaProcess {
@@ -630,11 +637,12 @@ AbstractBackgroundWidget {
     ColumnLayout {
         id: playerColumnLayout
         anchors.fill: parent
+        visible: !root.irisFaced
         spacing: -Appearance.sizes.elevationMargin
 
         Repeater {
             model: ScriptModel {
-                values: root.meaningfulPlayers
+                values: root.irisFaced ? [] : root.meaningfulPlayers
             }
             delegate: Item {
                 id: delegateRoot

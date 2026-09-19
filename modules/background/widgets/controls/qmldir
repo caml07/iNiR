@@ -1,0 +1,2 @@
+module qs.modules.background.widgets.controls
+ControlsWidget 1.0 ControlsWidget.qml

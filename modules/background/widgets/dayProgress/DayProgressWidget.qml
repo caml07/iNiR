@@ -9,6 +9,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.background.widgets
 import qs.modules.background.widgets.instrument
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -23,8 +24,10 @@ AbstractBackgroundWidget {
         x: 80, y: 260
     })
 
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 240) * scaleFactor)
-    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 240) * scaleFactor)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 240) * scaleFactor)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round(Number(root._readConfigKey("contentHeight") ?? 240) * scaleFactor)
+    irisFace: Component { IrisDayFace { widget: root } }
+    irisSizes: ["small", "medium"]
     resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
     resizeMinWidth: 190
     resizeMinHeight: 190
@@ -68,6 +71,7 @@ AbstractBackgroundWidget {
     // Borderless composition: no card, no border. The wallpaper-sampled ink
     // (needsColText) is the only thing keeping ring and type legible.
     ColumnLayout {
+        visible: !root.irisFaced
         anchors.fill: parent
         anchors.margins: Math.round(14 * root.scaleFactor)
         spacing: Math.round(10 * root.scaleFactor)

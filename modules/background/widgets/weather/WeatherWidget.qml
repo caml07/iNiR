@@ -8,6 +8,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -80,9 +81,14 @@ AbstractBackgroundWidget {
         return raw + "°";
     }
 
-    implicitWidth: root.weatherStyle === "detail" ? Math.round(shapeSize * 2.2)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : root.weatherStyle === "detail" ? Math.round(shapeSize * 2.2)
         : root.weatherStyle === "dial" ? Math.round(shapeSize * 1.4) : shapeSize
-    implicitHeight: root.weatherStyle === "detail" ? Math.round(shapeSize * 0.95) : shapeSize
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : root.weatherStyle === "detail" ? Math.round(shapeSize * 0.95) : shapeSize
+    irisFace: Component { IrisWeatherFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisOptions: [
+        { key: "showLocation", raw: true, label: Translation.tr("Location"), icon: "location_on", fallback: true }
+    ]
     resizableAxes: ({ uniform: "size" })
     resizeMinWidth: root.weatherStyle === "detail" ? 280
         : root.weatherStyle === "dial" ? 224 : 80
@@ -260,7 +266,7 @@ AbstractBackgroundWidget {
     // ensureVisible so the generated colour stays readable on any wallpaper.
     StyledDropShadow {
         target: pillBackground
-        visible: pillBackground.visible && !Appearance.zzzEverywhere
+        visible: !root.irisFaced && pillBackground.visible && !Appearance.zzzEverywhere
     }
 
     // zzz: ShapeCanvas (MaterialShape's base) has no stroke/border property, so
@@ -269,7 +275,7 @@ AbstractBackgroundWidget {
     // treatment at all. Fake a hairline stroke with a second, slightly larger
     // shape behind the fill in the hairline colour.
     MaterialShape {
-        visible: root.weatherStyle === "pill" && Appearance.zzzEverywhere
+        visible: !root.irisFaced && root.weatherStyle === "pill" && Appearance.zzzEverywhere
         anchors.centerIn: parent
         shape: root.pillShapeEnum
         color: Appearance.zzz.hairlineStrong
@@ -277,7 +283,7 @@ AbstractBackgroundWidget {
     }
 
     MaterialShape {
-        visible: root.weatherStyle === "pill" && (Appearance.inirEverywhere || Appearance.angelEverywhere)
+        visible: !root.irisFaced && root.weatherStyle === "pill" && (Appearance.inirEverywhere || Appearance.angelEverywhere)
         anchors.centerIn: parent
         shape: root.pillShapeEnum
         color: Appearance.inirEverywhere ? Appearance.inir.colBorder : Appearance.angel.colCardBorder
@@ -286,7 +292,7 @@ AbstractBackgroundWidget {
 
     MaterialShape {
         id: pillBackground
-        visible: root.weatherStyle === "pill"
+        visible: !root.irisFaced && root.weatherStyle === "pill"
         anchors.fill: parent
         shape: root.pillShapeEnum
         color: root.shapeFill
@@ -295,9 +301,10 @@ AbstractBackgroundWidget {
 
     // ── Card mode ──
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         id: cardBackground
-        shown: (root.weatherStyle === "card" || root.weatherStyle === "detail")
+        shown: !root.irisFaced && (root.weatherStyle === "card" || root.weatherStyle === "detail")
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.cardRadius
@@ -317,7 +324,7 @@ AbstractBackgroundWidget {
 
     ColumnLayout {
         id: detailLayout
-        visible: root.weatherStyle === "detail"
+        visible: !root.irisFaced && root.weatherStyle === "detail"
         anchors.fill: parent
         anchors.margins: Math.round(16 * root.scaleFactor)
         clip: true
@@ -430,7 +437,7 @@ AbstractBackgroundWidget {
 
     Item {
         anchors.fill: parent
-        visible: root.weatherStyle !== "detail" && root.weatherStyle !== "dial"
+        visible: !root.irisFaced && root.weatherStyle !== "detail" && root.weatherStyle !== "dial"
 
         MaterialSymbol {
             visible: root.visibleContentCount === 0
@@ -523,7 +530,7 @@ AbstractBackgroundWidget {
         id: instrumentArea
         anchors.fill: parent
         opacity: root.weatherStyle === "dial" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.weatherStyle === "dial"
         Behavior on opacity {
             enabled: root.animationsActive

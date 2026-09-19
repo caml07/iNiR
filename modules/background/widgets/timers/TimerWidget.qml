@@ -10,6 +10,7 @@ import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
 import qs.modules.background.widgets.instrument
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -37,8 +38,11 @@ AbstractBackgroundWidget {
     readonly property real cardHeight: Math.round((root.instrument ? 132 : 120) * root.scaleFactor)
     readonly property real cardSpacing: Math.round(12 * root.scaleFactor)
 
-    implicitWidth: timerGrid.implicitWidth
-    implicitHeight: timerGrid.implicitHeight
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : timerGrid.implicitWidth
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : timerGrid.implicitHeight
+    irisFace: Component { IrisTimerFace { widget: root } }
+    irisSizes: ["small", "medium"]
+    irisDefaultSize: "medium"
     visibleWhenLocked: true
     needsColText: true
     draggable: GlobalStates.widgetEditMode && !GlobalStates.screenLocked && !root.locked
@@ -380,7 +384,7 @@ AbstractBackgroundWidget {
     Grid {
         id: timerGrid
         opacity: 1
-        visible: true
+        visible: !root.irisFaced
         enabled: !GlobalStates.widgetEditMode
         move: Transition {
             enabled: root.animateGeometry

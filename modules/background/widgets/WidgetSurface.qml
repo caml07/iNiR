@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import Qt5Compat.GraphicalEffects as GE
 import Quickshell
+import qs
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
@@ -59,7 +60,8 @@ Rectangle {
     // otherwise blur twice as wide) and the layer is smoothed on upscale.
     readonly property real _blurScale: 0.5
 
-    readonly property bool _iris: (Config.options?.panelFamily ?? "ii") === "iris"
+    property bool irisPresentation: (Config.options?.panelFamily ?? "ii") === "iris"
+    readonly property bool _iris: root.irisPresentation
     readonly property string _surfaceDialect: root._iris ? "iris" : (Config.options?.background?.widgets?.style ?? "panel") === "island"
         ? "island" : Appearance.globalStyle
     readonly property bool _angel: root._surfaceDialect === "angel"
@@ -78,7 +80,13 @@ Rectangle {
     // the shared Ricelin opacity again or every widget becomes nearly invisible.
     readonly property real _plateAlpha: root._backgroundVisible
         ? (root._island ? 1 : root._editorial ? (root._glass ? Appearance.editorial.glassOpacity : Math.min(1, 0.86 + root._surfaceStrength * 0.14)) : Math.min(0.96, 0.72 + root._surfaceStrength * 0.24)) : 0
-    readonly property bool _glass: !root._iris && !root._island && root._backgroundVisible
+    readonly property string _irisMaterialName: String(Config.options?.iris?.widgets?.material ?? "glass")
+    readonly property bool _irisGlass: root._iris && root._backgroundVisible && root._irisMaterialName === "glass"
+    readonly property bool _irisClear: root._iris && root._irisMaterialName === "clear"
+    readonly property bool _irisRimHidden: root._irisClear
+        && !Boolean(Config.options?.iris?.widgets?.rim ?? false) && !GlobalStates.widgetEditMode
+    readonly property real _irisStrength: Math.max(0, Math.min(100, Config.options?.iris?.widgets?.opacity ?? 100)) / 100
+    readonly property bool _glass: root._irisGlass || !root._iris && !root._island && root._backgroundVisible
         && Appearance.blurBackendFor("widgets", Appearance.blurTopology.unsupported) === "wallpaper"
         && root.surfaceUseBlur
         && (!root._editorial || Appearance.editorial.glassActive)
@@ -114,9 +122,11 @@ Rectangle {
         root.colorMode === "auto" ? root.surfaceFill : root._plate, root._plateAlpha)
     // iRiS plates are the Island material (optionally carrying the wallpaper's
     // hue); a widget's own semantic fill would bring Material tones back in.
-    readonly property color _irisMaterial: String(Config.options?.iris?.widgets?.material ?? "solid") === "tinted"
+    readonly property color _irisMaterial: root._irisMaterialName === "tinted"
         ? ColorUtils.mix(IrisStyle.surface, Appearance.colors.colPrimary, 0.82) : IrisStyle.surface
-    readonly property color _irisFill: ColorUtils.applyAlpha(
+    readonly property color _irisFill: root._irisClear || root._irisGlass
+        ? ColorUtils.applyAlpha(IrisStyle.surface, IrisStyle.legibleVeil(root._irisMaterialName, root.regionBrightness, 0, root._irisStrength))
+        : ColorUtils.applyAlpha(
         root.colorMode === "dark" ? ColorUtils.mix(IrisStyle.text, IrisStyle.accent, 0.98) : root._irisMaterial,
         root._backgroundVisible ? Math.min(1, 0.72 + root._surfaceStrength * 0.28)
             * Math.max(0, Math.min(100, Config.options?.iris?.widgets?.opacity ?? 100)) / 100 : 0)
@@ -151,7 +161,7 @@ Rectangle {
 
     // iRiS widget plates share one continuous corner, tighter than the Island.
     radius: surfaceRadius
-    color: root._iris ? root._irisFill
+    color: root._iris ? (root._irisGlass ? "transparent" : root._irisFill)
         : _editorialStack ? "transparent"
         : _island ? "transparent"
         : _glass ? "transparent"
@@ -224,7 +234,7 @@ Rectangle {
         radius: root.radius
         color: "transparent"
         visible: !root._editorialStack && !root._zzz && !root._cookie && !root._regalia && !root._island && !root._angel
-            && root.surfaceBorderWidth > 0 && root.surfaceBorderOpacity > 0
+            && !root._irisRimHidden && root.surfaceBorderWidth > 0 && root.surfaceBorderOpacity > 0
         border.width: root.surfaceBorderWidth
         border.color: root._inir
             ? ColorUtils.applyAlpha(Appearance.inir.colBorder, root.surfaceBorderOpacity * 3)
@@ -307,7 +317,8 @@ Rectangle {
     Rectangle {
         anchors.fill: parent
         visible: root._glass && !root._island && !root._editorialStack
-        color: root._editorial ? root._flatFill
+        color: root._iris ? root._irisFill
+            : root._editorial ? root._flatFill
             : root._angel
             ? ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.angel.overlayOpacity)
             : ColorUtils.transparentize(Appearance.colors.colLayer0Base, Appearance.aurora.popupTransparentize * 1.2)

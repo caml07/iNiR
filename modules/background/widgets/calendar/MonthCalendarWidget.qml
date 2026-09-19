@@ -10,6 +10,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -26,8 +27,11 @@ AbstractBackgroundWidget {
         x: 420, y: 120
     })
 
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 300) * root.scaleFactor)
-    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 340) * root.scaleFactor)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 300) * root.scaleFactor)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round(Number(root._readConfigKey("contentHeight") ?? 340) * root.scaleFactor)
+    irisFace: Component { IrisCalendarFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
     visibleWhenLocked: true
     needsColText: true
     resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
@@ -171,6 +175,7 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         anchors.fill: parent
         regionBrightness: root.regionBrightness
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius
@@ -186,11 +191,12 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: !root.instrument
+        shown: !root.irisFaced && !root.instrument
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     ColumnLayout {
+        visible: !root.irisFaced
         anchors.fill: parent
         anchors.margins: Math.round(14 * root.scaleFactor)
         spacing: Math.round(8 * root.scaleFactor)

@@ -7,6 +7,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -41,10 +42,17 @@ AbstractBackgroundWidget {
 
     readonly property int listWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 300) * scaleFactor)
     readonly property int listHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 210) * scaleFactor)
-    implicitWidth: root.listWidth
-    implicitHeight: root.instrument
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : root.listWidth
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : root.instrument
         ? Math.max(root.listHeight, root.instrumentHeightTarget)
         : root.listHeight
+    irisFace: Component { IrisWorldClockFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "showNames", raw: true, label: Translation.tr("City names"), icon: "label", fallback: true },
+        { key: "showOffsets", raw: true, label: Translation.tr("Time difference"), icon: "schedule", fallback: true }
+    ]
     resizableAxes: ({
             width: "contentWidth",
             height: "contentHeight"
@@ -239,6 +247,7 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius
@@ -254,7 +263,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: !root.instrument
+        shown: !root.irisFaced && !root.instrument
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
@@ -264,7 +273,7 @@ AbstractBackgroundWidget {
     ColumnLayout {
         anchors.fill: parent
         opacity: root.instrument ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.instrument
         spacing: Math.round(5 * root.scaleFactor)
 
@@ -614,7 +623,7 @@ AbstractBackgroundWidget {
     }
     ColumnLayout {
         opacity: root.instrument ? 0 : 1
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: !root.instrument
         Behavior on opacity {
             enabled: root.animationsActive

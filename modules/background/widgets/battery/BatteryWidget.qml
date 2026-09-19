@@ -11,6 +11,7 @@ import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
 import qs.modules.background.widgets.instrument
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -26,8 +27,13 @@ AbstractBackgroundWidget {
         cornerRadius: -1, x: 50, y: 50
     })
 
-    implicitWidth: Math.round((root.displayMode === "instrument" ? 220 : 160) * scaleFactor)
-    implicitHeight: Math.round((root.displayMode === "instrument" ? 140 : 104) * scaleFactor)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round((root.displayMode === "instrument" ? 220 : 160) * scaleFactor)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round((root.displayMode === "instrument" ? 140 : 104) * scaleFactor)
+    irisFace: Component { IrisBatteryFace { widget: root } }
+    irisSizes: ["small", "medium"]
+    irisOptions: [
+        { key: "showTime", raw: true, label: Translation.tr("Time remaining"), icon: "timer", fallback: true }
+    ]
     widgetSurfaceEnabled: root.displayMode !== "instrument"
 
     visibleWhenLocked: true
@@ -120,6 +126,7 @@ AbstractBackgroundWidget {
 
     // ── Card background ───────────────────────────────────────
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.cardRadius
@@ -135,7 +142,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: root.displayMode !== "instrument"
+        shown: !root.irisFaced && root.displayMode !== "instrument"
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
@@ -144,7 +151,7 @@ AbstractBackgroundWidget {
         id: instrumentArea
         anchors.fill: parent
         opacity: root.displayMode === "instrument" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "instrument"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -234,7 +241,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: Appearance.angelEverywhere || Appearance.inirEverywhere ? 4 : 0
         opacity: root.displayMode === "ring" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "ring"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -285,7 +292,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: Appearance.angelEverywhere || Appearance.inirEverywhere ? 4 : 0
         opacity: root.displayMode === "bars" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "bars"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -369,7 +376,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: Appearance.angelEverywhere || Appearance.inirEverywhere ? 8 : 4
         opacity: root.displayMode === "pill" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "pill"
         Behavior on opacity {
             enabled: root.animationsActive

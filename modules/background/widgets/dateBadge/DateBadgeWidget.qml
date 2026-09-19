@@ -6,6 +6,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -16,8 +17,14 @@ AbstractBackgroundWidget {
         colorMode: "auto", dim: 0, showBackground: true, showBorder: true,
         backgroundOpacity: 0.16, borderWidth: 1, borderOpacity: 0.2,
         cornerRadius: -1, useBlur: false, x: 260, y: 80 })
-    implicitWidth: Math.max(140, Number(root._readConfigKey("contentWidth") ?? 220)) * scaleFactor
-    implicitHeight: Math.max(120, Number(root._readConfigKey("contentHeight") ?? 140)) * scaleFactor
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.max(140, Number(root._readConfigKey("contentWidth") ?? 220)) * scaleFactor
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.max(120, Number(root._readConfigKey("contentHeight") ?? 140)) * scaleFactor
+    irisFace: Component { IrisDateFace { widget: root } }
+    irisOptions: [
+        { key: "showWeekday", raw: true, label: Translation.tr("Weekday"), icon: "calendar_view_week", fallback: true },
+        { key: "showYear", raw: true, label: Translation.tr("Year"), icon: "event", fallback: true },
+        { key: "showOrdinal", raw: true, label: Translation.tr("Day of the year"), icon: "linear_scale", fallback: true }
+    ]
     resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
     resizeMinWidth: 140
     resizeMinHeight: 120
@@ -45,8 +52,9 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         anchors.fill: parent
-        shown: root.badgeStyle !== "seal" && !root.instrument
+        shown: !root.irisFaced && root.badgeStyle !== "seal" && !root.instrument
         regionBrightness: root.regionBrightness
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius
         surfaceOpacity: root.backgroundOpacity
@@ -64,7 +72,7 @@ AbstractBackgroundWidget {
     MaterialShape {
         anchors.centerIn: parent
         implicitSize: Math.min(root.width, root.height)
-        visible: root.badgeStyle === "seal"
+        visible: !root.irisFaced && root.badgeStyle === "seal"
         shape: MaterialShape.Shape.Cookie12Sided
         color: ColorUtils.applyAlpha(root.widgetPlateColor, root.backgroundOpacity)
         strokeColor: ColorUtils.applyAlpha(root.widgetAccent, root.borderOpacity)
@@ -72,7 +80,7 @@ AbstractBackgroundWidget {
     }
 
     Rectangle {
-        visible: root.badgeStyle === "ticket" && root.horizontal
+        visible: !root.irisFaced && root.badgeStyle === "ticket" && root.horizontal
         x: 10 * root.scaleFactor
         y: 10 * root.scaleFactor
         width: root.width * 0.36
@@ -82,7 +90,7 @@ AbstractBackgroundWidget {
     }
 
     Rectangle {
-        visible: root.badgeStyle === "stacked" && root.showBackground
+        visible: !root.irisFaced && root.badgeStyle === "stacked" && root.showBackground
         x: 16 * root.scaleFactor
         y: 12 * root.scaleFactor
         width: root.width - 32 * root.scaleFactor
@@ -93,7 +101,7 @@ AbstractBackgroundWidget {
 
     StyledText {
         id: dayNumber
-        visible: !root.instrument
+        visible: !root.irisFaced && !root.instrument
         x: root.horizontal ? 10 * root.scaleFactor : 0
         y: root.horizontal ? (root.height - height) / 2 : root.height * 0.14
         width: root.horizontal ? root.width * 0.36 : root.width
@@ -111,7 +119,7 @@ AbstractBackgroundWidget {
     }
 
     ColumnLayout {
-        visible: !root.instrument
+        visible: !root.irisFaced && !root.instrument
         x: root.horizontal ? root.width * 0.36 + 24 * root.scaleFactor : root.width * 0.14
         y: root.horizontal ? (root.height - implicitHeight) / 2 : root.height * 0.59
         width: root.horizontal ? root.width - x - 14 * root.scaleFactor : root.width * 0.72
@@ -140,7 +148,7 @@ AbstractBackgroundWidget {
     // an address in the year, not another progress gauge or clock face.
     Item {
         anchors.fill: parent
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         opacity: root.instrument ? 1 : 0
         enabled: root.instrument
         Behavior on opacity {

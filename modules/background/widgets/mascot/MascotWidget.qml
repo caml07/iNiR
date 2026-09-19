@@ -718,6 +718,7 @@ AbstractBackgroundWidget {
     // Card chrome is off by default — she's a cutout living on the desktop.
     // Users can turn the card back on from the widget manager / settings.
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius

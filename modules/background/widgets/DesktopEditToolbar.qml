@@ -2,13 +2,13 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Shapes
 import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.iris.style
+import qs.modules.iris.field as IrisFieldModule
 
 Item {
     id: root
@@ -32,7 +32,8 @@ Item {
     readonly property int railItemStride: 34
     readonly property int railSlots: Math.max(3, Math.min(12,
         Math.floor(Math.max(railStride * 3, availableWidth - 390) / railStride)))
-    readonly property real railWidth: railSlots * railStride
+    readonly property real railWidth: railSlots * railStride - (root.iris ? root.irisRailSpacing : 0)
+    readonly property int irisRailSpacing: 4
     readonly property var builtinWidgets: [
         { key: "weather", icon: "cloud", label: "Weather", defaultOn: false },
         { key: "customImage", icon: "add_photo_alternate", label: "Custom Image", defaultOn: false },
@@ -56,7 +57,9 @@ Item {
         { key: "mascot", icon: "pets", label: "Mascot", defaultOn: false },
         { key: "newsTicker", icon: "newspaper", label: "News Ticker", defaultOn: false },
         { key: "worldClock", icon: "public", label: "World Clock", defaultOn: false },
-        { key: "userCard", icon: "account_circle", label: "User Card", defaultOn: false }
+        { key: "userCard", icon: "account_circle", label: "User Card", defaultOn: false },
+        { key: "controls", icon: "toggle_on", label: "Controls", defaultOn: false, irisOnly: true },
+        { key: "screenTime", icon: "hourglass_bottom", label: "Screen Time", defaultOn: false, irisOnly: true }
     ]
 
     readonly property bool iris: (Config.options?.panelFamily ?? "ii") === "iris"
@@ -67,9 +70,31 @@ Item {
         notes: "#ffcc00", calendarUpcoming: "#ff3b30", monthCalendar: "#ff3b30", dateBadge: "#ff3b30",
         todo: "#ff9f0a", timers: "#ff9f0a", newsTicker: "#30b0c7", userCard: "#0a84ff",
         customImage: "#30b0c7", imageConverter: "#30b0c7", japaneseTypography: "#bf5af2",
-        editorial: "#8e8e93", shape: "#bf5af2", mascot: "#ff375f"
+        editorial: "#8e8e93", shape: "#bf5af2", mascot: "#ff375f", controls: "#0a84ff", screenTime: "#5e5ce6"
     })
-    readonly property real railStride: root.iris ? 40 : root.railItemStride
+    readonly property real railStride: root.iris ? 36 + root.irisRailSpacing : root.railItemStride
+    readonly property var irisEntries: {
+        const out = root.builtinWidgets.map(widget => ({ key: widget.key, icon: widget.icon, label: widget.label,
+            tint: root.irisTints[widget.key] ?? "#8e8e93",
+            on: DesktopWidgetLayout.enabled(root.outputName, widget.key,
+                Config.getNestedValue("background.widgets." + widget.key + ".enable", widget.defaultOn)) }))
+        for (const custom of (CustomWidgets.ready ? CustomWidgets.widgets : [])) {
+            const key = "custom." + custom.id
+            out.push({ key: key, icon: custom.icon || "widgets", label: custom.name, tint: "#5e5ce6",
+                on: DesktopWidgetLayout.enabled(root.outputName, key,
+                    Config.getNestedValue("background.widgets.custom." + custom.id + ".enable", false)) })
+        }
+        return out
+    }
+    readonly property int irisOnCount: root.irisEntries.filter(entry => entry.on).length
+    property var irisOrder: []
+    function irisResort(): void {
+        const on = root.irisEntries.filter(entry => entry.on).map(entry => entry.key)
+        const off = root.irisEntries.filter(entry => !entry.on).map(entry => entry.key)
+        root.irisOrder = on.length > 0 && off.length > 0 ? on.concat(["|"], off) : on.concat(off)
+    }
+    onIrisOnCountChanged: if (!railHover.hovered) root.irisResort()
+    Component.onCompleted: root.irisResort()
     readonly property real bodyHeight: root.iris ? 60 : 48
     readonly property real bodyRadius: root.iris ? Math.min(IrisStyle.radius, root.bodyHeight / 2) : 0
     readonly property real fillet: root.iris ? Math.round(root.bodyRadius * 0.62) : 0
@@ -97,74 +122,25 @@ Item {
         screenY: root.y
     }
 
-    // iRiS editing replaces the Dock with an edge-attached notch. Keep body and
-    // concave fillets in one path so the join reads as one Dynamic Island
-    // surface instead of a floating pill with decorative corners.
-    Shape {
-        id: irisNotchSilhouette
-        anchors.fill: parent
+    IrisFieldModule.IrisField {
+        id: irisNotchField
         visible: root.iris
-        preferredRendererType: Shape.CurveRenderer
-        readonly property bool flip: !root.attachedTopEdge
-        readonly property real f: root.fillet
-        readonly property real r: Math.min(root.bodyRadius, root.height, root.bodyWidth / 2)
-        readonly property real edgeL: root.fillet
-        readonly property real edgeR: root.fillet + root.bodyWidth
-        readonly property real far: root.height
-        function ey(v: real): real { return irisNotchSilhouette.flip ? root.height - v : v }
-        readonly property int outward: irisNotchSilhouette.flip ? PathArc.Counterclockwise : PathArc.Clockwise
-        readonly property int inward: irisNotchSilhouette.flip ? PathArc.Clockwise : PathArc.Counterclockwise
-
-        ShapePath {
-            strokeWidth: -1
-            fillColor: IrisStyle.surface
-            startX: irisNotchSilhouette.edgeL - irisNotchSilhouette.f
-            startY: irisNotchSilhouette.ey(0)
-            PathArc {
-                x: irisNotchSilhouette.edgeL
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.f)
-                radiusX: irisNotchSilhouette.f
-                radiusY: irisNotchSilhouette.f
-                direction: irisNotchSilhouette.outward
-            }
-            PathLine {
-                x: irisNotchSilhouette.edgeL
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.far - irisNotchSilhouette.r)
-            }
-            PathArc {
-                x: irisNotchSilhouette.edgeL + irisNotchSilhouette.r
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.far)
-                radiusX: irisNotchSilhouette.r
-                radiusY: irisNotchSilhouette.r
-                direction: irisNotchSilhouette.inward
-            }
-            PathLine {
-                x: irisNotchSilhouette.edgeR - irisNotchSilhouette.r
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.far)
-            }
-            PathArc {
-                x: irisNotchSilhouette.edgeR
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.far - irisNotchSilhouette.r)
-                radiusX: irisNotchSilhouette.r
-                radiusY: irisNotchSilhouette.r
-                direction: irisNotchSilhouette.inward
-            }
-            PathLine {
-                x: irisNotchSilhouette.edgeR
-                y: irisNotchSilhouette.ey(irisNotchSilhouette.f)
-            }
-            PathArc {
-                x: irisNotchSilhouette.edgeR + irisNotchSilhouette.f
-                y: irisNotchSilhouette.ey(0)
-                radiusX: irisNotchSilhouette.f
-                radiusY: irisNotchSilhouette.f
-                direction: irisNotchSilhouette.outward
-            }
-            PathLine {
-                x: irisNotchSilhouette.edgeL - irisNotchSilhouette.f
-                y: irisNotchSilhouette.ey(0)
-            }
-        }
+        readonly property real pad: IrisStyle.fuseEdge
+        readonly property real deep: Math.max(8, IrisStyle.fuseEdge)
+        readonly property real bodyTop: root.attachedTopEdge ? irisNotchField.deep - root.bodyRadius : 0
+        x: -irisNotchField.pad
+        y: root.attachedTopEdge ? -irisNotchField.deep : 0
+        width: root.width + 2 * irisNotchField.pad
+        height: root.height + irisNotchField.deep
+        framed: false
+        tint: IrisStyle.surface
+        shapes: !root.iris ? [] : [
+            { x: 0, y: root.attachedTopEdge ? 0 : root.height, width: irisNotchField.width, height: irisNotchField.deep,
+                radius: 0, paints: true, fuse: 0, id: "edge" },
+            { x: irisNotchField.pad + bodyFrame.x, y: irisNotchField.bodyTop, width: root.bodyWidth,
+                height: root.bodyHeight + root.bodyRadius, radius: root.bodyRadius, paints: true,
+                fuse: IrisStyle.fuseEdge, id: "toolbar", joins: "edge" }
+        ]
     }
 
     MouseArea {
@@ -257,8 +233,14 @@ Item {
                 }
 
                 onMovementEnded: contentX = snapContentX(contentX)
-                onWidthChanged: Qt.callLater(() => contentX = snapContentX(contentX))
-                onContentWidthChanged: Qt.callLater(() => contentX = snapContentX(contentX))
+                onWidthChanged: railSnapSettle.restart()
+                onContentWidthChanged: railSnapSettle.restart()
+
+                Timer {
+                    id: railSnapSettle
+                    interval: 0
+                    onTriggered: widgetRail.contentX = widgetRail.snapContentX(widgetRail.contentX)
+                }
 
                 WheelHandler {
                     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -273,12 +255,47 @@ Item {
                     }
                 }
 
+                HoverHandler {
+                    id: railHover
+                    onHoveredChanged: if (!hovered) root.irisResort()
+                }
+
                 Row {
                     id: widgetRow
-                    spacing: root.iris ? 2 : 2
+                    spacing: root.iris ? root.irisRailSpacing : 2
 
                     Repeater {
-                        model: root.builtinWidgets
+                        model: root.iris ? root.irisOrder : []
+                        Item {
+                            id: irisSlot
+                            required property string modelData
+                            readonly property var entry: root.irisEntries.find(item => item.key === irisSlot.modelData) ?? null
+                            width: 36
+                            height: 40
+                            Rectangle {
+                                visible: !irisSlot.entry
+                                anchors.centerIn: parent
+                                width: 1
+                                height: 24
+                                color: IrisStyle.hairlineStrong
+                            }
+                            WidgetEditAction {
+                                visible: irisSlot.entry !== null
+                                compact: true
+                                tileTint: irisSlot.entry?.tint ?? "transparent"
+                                iconName: irisSlot.entry?.icon ?? ""
+                                label: Translation.tr(irisSlot.entry?.label ?? "")
+                                tooltip: (irisSlot.entry?.on ? Translation.tr("%1 · on, click to remove") : Translation.tr("%1 · click to add"))
+                                    .arg(Translation.tr(irisSlot.entry?.label ?? ""))
+                                tooltipPosition: root.inwardTooltipPosition
+                                toggled: irisSlot.entry?.on ?? false
+                                onClicked: DesktopWidgetLayout.setGloballyEnabled(irisSlot.modelData, !(irisSlot.entry?.on ?? false))
+                            }
+                        }
+                    }
+
+                    Repeater {
+                        model: root.iris ? [] : root.builtinWidgets.filter(widget => !widget.irisOnly)
                         WidgetEditAction {
                             required property var modelData
                             readonly property bool widgetEnabled: DesktopWidgetLayout.enabled(
@@ -296,7 +313,7 @@ Item {
                     }
 
                     Repeater {
-                        model: CustomWidgets.ready ? CustomWidgets.widgets : []
+                        model: !root.iris && CustomWidgets.ready ? CustomWidgets.widgets : []
                         WidgetEditAction {
                             required property var modelData
                             readonly property string layoutKey: "custom." + modelData.id

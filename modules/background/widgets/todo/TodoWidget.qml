@@ -10,6 +10,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -26,10 +27,16 @@ AbstractBackgroundWidget {
         x: 120, y: 180
     })
 
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 300)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 300)
         * root.scaleFactor)
-    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 276)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round(Number(root._readConfigKey("contentHeight") ?? 276)
         * root.scaleFactor)
+    irisFace: Component { IrisTodoFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "showCompleted", raw: true, label: Translation.tr("Show completed"), icon: "task_alt", fallback: true }
+    ]
 
     visibleWhenLocked: false
     needsColText: true
@@ -184,6 +191,7 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         anchors.fill: parent
         regionBrightness: root.regionBrightness
         surfaceRadius: root.cornerRadiusOverride >= 0
@@ -200,12 +208,13 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: !root.instrument
+        shown: !root.irisFaced && !root.instrument
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     Item {
         id: stage
+        visible: !root.irisFaced
         anchors.fill: parent
         anchors.margins: root.inset
 

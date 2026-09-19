@@ -29,6 +29,7 @@ AbstractBackgroundWidget {
     readonly property real inset: (root._globalEditorial ? Appearance.editorial.inset : 20) * scaleFactor
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         anchors.fill: parent
         regionBrightness: root.regionBrightness
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.widgetCardRadius

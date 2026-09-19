@@ -11,7 +11,9 @@ As of 2026-09-18:
 
 - Integration branch: `feat/void-pr5`.
 - PR1 through PR6 are implemented, VM validated, and integrated.
-- PR7 is the mandatory closure/release-validation gate.
+- PR7 engineering closure is complete on `feat/void-port-closure`.
+- Remaining release evidence is operational: privileged live activation of the
+  Power Profiles runit service and the planned external-disk validation.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
 Do not infer current state from an old feature branch. Check the integration
@@ -247,6 +249,7 @@ polkitd
 turnstiled
 NetworkManager
 bluetoothd
+power-profiles-daemon
 warp-svc
 ```
 
@@ -273,7 +276,9 @@ Quickshell              -> quickshell
 Python Pillow           -> python3-Pillow
 ImageMagick             -> ImageMagick
 syntax highlighting     -> kf6-syntax-highlighting
+Kirigami runtime        -> kf6-kirigami
 KDE Qt integration      -> plasma-integration
+Power Profiles          -> power-profiles-daemon
 ```
 
 `kf6-syntax-highlighting` is required in the base profile because both
@@ -319,6 +324,7 @@ scripts/check-void-pr53.sh
 scripts/check-void-pr54.sh
 scripts/check-void-pr55.sh
 scripts/check-void-pr6.sh
+scripts/check-void-pr7.sh
 ```
 
 For an integration/audit branch, use `INIR_EXPECTED_BRANCH` rather than
@@ -344,6 +350,22 @@ repositories. For install/remove it prefers a real system-root transaction when
 copies the repository signing keys, and performs a real install/query/remove
 transaction there. The latter proves XBPS transaction semantics without
 pretending that an interactive sudo password was supplied.
+
+PR7 is the closure checker. In addition to Doctor/versioning/ABI and the
+usable-systemd predicate, it guards the final Arch-to-Void parity sweep:
+
+- base runtime providers such as Kirigami, kdialog, breeze-icons, qt6ct, and
+  power-profiles-daemon;
+- independent OCR provisioning for toolkit or screencapture selections;
+- audio parity providers (`alsa-pipewire`, `libdbusmenu-gtk3`);
+- XBPS-aware mandatory migrations, uninstall guidance, update/cache-clean UI,
+  wallpaper dependency recovery, and SDDM guidance;
+- Power Profiles package metadata for the runit service, D-Bus activation file,
+  and polkit policy.
+
+The checker intentionally does not claim that a privileged system-service
+activation happened when `sudo -n` is unavailable. That final operator action
+is evidence collection, not a reason to bypass the elevation boundary.
 
 ## Idempotency
 

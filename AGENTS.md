@@ -5,8 +5,10 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The current integration branch is `feat/void-pr5` (target: upstream
-`prerelease`). PR1 through PR6 are integrated there and VM validated. PR7 is
-the mandatory final closure/release-validation gate.
+`prerelease`). PR1 through PR6 are integrated there and VM validated. PR7
+engineering closure is complete on `feat/void-port-closure`; only privileged
+Power Profiles live activation and the planned external-disk release check
+remain as operational evidence.
 
 ## Current progress (2026-09-18)
 
@@ -25,13 +27,19 @@ the mandatory final closure/release-validation gate.
   terminal actions, and app-catalog targets are implemented and VM validated.
   The checker also caught and corrected an invalid draft command:
   XBPS removal uses `xbps-remove -R -- <pkg>`, not pacman-style `-Rns`.
+- PR7 closure sweep: removed remaining Arch-only package actions/defaults,
+  added XBPS paths to required migrations/uninstall flows, made OCR independent
+  across toolkit/screencapture, closed base QML runtime gaps (Kirigami,
+  kdialog, breeze-icons, qt6ct), completed audio/profile parity, and added the
+  official Power Profiles provider with runit/D-Bus/polkit verification.
 - Fat-check fixes integrated into `feat/void-pr5` include systemd-predicate
   cleanup, required desktop tools, git-worktree detection, Niri/Turnstile
   socket lifecycle, WARP runit logging, a real Void distro icon, supported
   Void installer messaging, dunst client-package handling, and a self-contained
   OCR checker.
-- `make test-local`, the PR6 static/full VM checker, `bash -n`, and
-  `git diff --check` pass after the current PR6 work. ShellCheck is not
+- `make test-local`, the PR7 static/full VM checker, real-Wayland QML smoke,
+  package-action terminal capture, `bash -n`, and `git diff --check` pass
+  after the closure sweep. ShellCheck is not
   installed on the host.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.

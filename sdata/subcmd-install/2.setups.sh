@@ -88,6 +88,20 @@ function setup_systemd_services(){
         log_info "Enable NetworkManager with: sudo ln -s /etc/sv/NetworkManager /var/service/"
       fi
     fi
+    # Power Profiles is a base UI capability; Quickshell talks to its system
+    # D-Bus service directly, so Void needs the packaged runit service active.
+    if [[ ! -d /etc/sv/power-profiles-daemon ]]; then
+      log_warning "Power Profiles service directory missing (/etc/sv/power-profiles-daemon); reinstall power-profiles-daemon"
+    elif [[ "${ask:-true}" == true ]] && tui_confirm "Enable power-profiles-daemon system service?" "yes"; then
+      if elevate sh -c 'ln -sfn /etc/sv/power-profiles-daemon /var/service/power-profiles-daemon'; then
+        log_success "Power Profiles service enabled"
+      else
+        log_warning "Could not enable power-profiles-daemon"
+        return 1
+      fi
+    else
+      log_info "Enable Power Profiles with: sudo ln -s /etc/sv/power-profiles-daemon /var/service/"
+    fi
     # Bluetooth toolkit provider: enable bluetoothd via runit with confirmation.
     if ${INSTALL_TOOLKIT:-true}; then
       if [[ -d /etc/sv/bluetoothd ]]; then

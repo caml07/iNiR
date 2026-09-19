@@ -284,7 +284,7 @@ Item {
                 StyledText {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
-                    text: Translation.tr("Install pacman, apt, or dnf")
+                    text: Translation.tr("Install pacman, apt, or dnf") + " / xbps"
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     color: root.colTextSecondary
                 }

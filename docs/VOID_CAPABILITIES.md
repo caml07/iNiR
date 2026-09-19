@@ -24,7 +24,8 @@ after provider, provisioning, activation, operation, and verification pass.
 | Darkly Qt style | fonts/theme | pinned Darkly v0.5.39 source + Void Qt6/KF6 build dependencies | Qt6 KStyle plugin | VM validated: native Qt6 build, runtime linkage, style loading, and idempotency | PR5.4 |
 | Shell desktop parity | base/fonts/theme | XBPS `plasma-integration`, `kf6-syntax-highlighting`, iNiR Turnstile env handoff, Void distro asset | Niri + Quickshell user session | VM validated: valid KDL, KDE platform integration, sidebars, Void icon asset/mapping, refreshed `NIRI_SOCKET`, and end-to-end `Mod+Q` input path; rendered-icon visual confirmation is not separately recorded | PR5.5 |
 | Package updates/search/catalog | base | XBPS | direct terminal commands; install/remove request sudo elevation | VM validated: update count, repository/installed search, 34 catalog targets, QML backend/target resolution, UI install/remove command wiring, and a real isolated-root XBPS install/remove transaction; system-root password entry was not automated because `sudo -n` is unavailable in the VM | PR6 |
-| Doctor and ABI repair | base | XBPS diagnostics | direct commands | partial | PR7 |
+| Power profiles | base | XBPS `power-profiles-daemon` | confirmed-elevation runit service | Engineering closure validated: package/provider, `powerprofilesctl` repair mapping, runit activation recipe, D-Bus service file, polkit policy, and live QML dependency path are checked; live root service activation remains an operator-only validation because the VM has no non-interactive elevation | PR7 |
+| Doctor and ABI repair | base | XBPS diagnostics | direct commands | VM validated: Void package repair mappings, Quickshell/Qt ABI no-op, package-manager/versioning metadata, and non-systemd predicate paths pass the PR7 checker | PR7 |
 
 ## Rules
 

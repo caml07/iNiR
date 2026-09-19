@@ -113,7 +113,13 @@ check_dependencies() {
         cmds+=("checkupdates:pacman-contrib")
     fi
     if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
-        cmds+=("ydotool:ydotool" "warp-cli:cloudflare-warp")
+        cmds+=(
+            "ydotool:ydotool"
+            "warp-cli:cloudflare-warp"
+            "secret-tool:libsecret"
+            "gnome-keyring-daemon:gnome-keyring"
+            "powerprofilesctl:power-profiles-daemon"
+        )
     fi
 
     # Check required commands
@@ -225,6 +231,9 @@ check_dependencies() {
                 ;;
             debian|ubuntu)
                 echo -e "    ${STY_FAINT}Run: sudo apt install ... (see ./setup install)${STY_RST}"
+                ;;
+            void)
+                echo -e "    ${STY_FAINT}Run: ./setup install (repairs the matching XBPS providers)${STY_RST}"
                 ;;
             *)
                 echo -e "    ${STY_FAINT}Install these tools using your package manager${STY_RST}"
@@ -1249,6 +1258,9 @@ _doctor_abi_rebuild_cmd() {
                 install_kind="arch-repo-official"
             fi
         fi
+    elif command -v xbps-query >/dev/null 2>&1 \
+            && xbps-query -p pkgver quickshell >/dev/null 2>&1; then
+        install_kind="void-xbps"; install_pkg="quickshell"
     elif command -v rpm >/dev/null 2>&1; then
         local rpm_q
         rpm_q="$(rpm -qa 2>/dev/null | grep -E '^quickshell(-git)?-[0-9]' | head -1)"
@@ -1296,6 +1308,9 @@ _doctor_abi_rebuild_cmd() {
             if [[ -n "$rebuild_helper" ]]; then
                 printf '%s -Rdd --noconfirm quickshell-bin && %s -Sa --noconfirm --skipreview quickshell-git' "$rebuild_helper" "$rebuild_helper"
             fi
+            ;;
+        void-xbps)
+            printf 'sudo xbps-install -Sf quickshell'
             ;;
         fedora-pkg)
             printf 'sudo dnf upgrade --refresh %s' "$install_pkg"
@@ -1781,6 +1796,7 @@ check_qt_theming() {
                 fedora) echo -e "    ${STY_FAINT}Run: sudo dnf install kde-cli-tools${STY_RST}" ;;
                 debian|ubuntu) echo -e "    ${STY_FAINT}Run: sudo apt install kde-cli-tools${STY_RST}" ;;
                 opensuse) echo -e "    ${STY_FAINT}Run: sudo zypper install kde-cli-tools6${STY_RST}" ;;
+                void) echo -e "    ${STY_FAINT}Run: sudo xbps-install -S kde-cli-tools${STY_RST}" ;;
                 *) echo -e "    ${STY_FAINT}Install kde-cli-tools using your package manager${STY_RST}" ;;
             esac
         fi

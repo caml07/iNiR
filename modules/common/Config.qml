@@ -1243,7 +1243,7 @@ Singleton {
                 property string browser: "firefox" // Used by launcher-backed browser shortcuts
                 property string volumeMixer: "pavucontrol"
                 property string discord: "discord" // Shell command to launch Discord client
-                property string update: "kitty -e sudo pacman -Syu" // Command to run system updates
+                property string update: "" // Empty uses the package-manager-aware update backend
                 property string manageUser: "kcmshell6 kcm_users" // User account management
             }
 

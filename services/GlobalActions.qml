@@ -832,15 +832,15 @@ Singleton {
         },
     ]
 
-    // PACKAGES: Run package manager commands (supports yay, paru, pacman)
+    // PACKAGES: Run package manager commands through PackageSearch.
     readonly property var _packageActions: [
         {
             id: "install-package",
             name: Translation.tr("Install Package"),
-            description: Translation.tr("Install a package with yay/paru/pacman (pass package name as argument)"),
+            description: Translation.tr("Install Package"),
             icon: "download",
             category: "system",
-            keywords: ["install", "package", "yay", "paru", "pacman", "aur", "setup"],
+            keywords: ["install", "package", "yay", "paru", "pacman", "xbps", "aur", "setup"],
             execute: args => {
                 if (!args || args.trim() === "") {
                     Quickshell.execDetached(["/usr/bin/notify-send", Translation.tr("Install Package"),
@@ -855,10 +855,10 @@ Singleton {
         {
             id: "remove-package",
             name: Translation.tr("Remove Package"),
-            description: Translation.tr("Remove a package with pacman (pass package name as argument)"),
+            description: Translation.tr("Remove Package"),
             icon: "delete",
             category: "system",
-            keywords: ["remove", "uninstall", "package", "pacman"],
+            keywords: ["remove", "uninstall", "package", "pacman", "xbps"],
             execute: args => {
                 if (!args || args.trim() === "") {
                     Quickshell.execDetached(["/usr/bin/notify-send", Translation.tr("Remove Package"),
@@ -876,7 +876,7 @@ Singleton {
             description: Translation.tr("Run a full system update"),
             icon: "system_update_alt",
             category: "system",
-            keywords: ["update", "upgrade", "system", "pacman", "yay", "paru"],
+            keywords: ["update", "upgrade", "system", "pacman", "yay", "paru", "xbps"],
             execute: () => { PackageSearch.updateSystem() }
         },
     ]

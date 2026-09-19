@@ -131,7 +131,7 @@ DEPS_THEME_KDE_CLI_TOOLS="arch:kde-cli-tools fedora:kde-cli-tools debian:kde-cli
 # Fonts (critical for UI)
 ###############################################################################
 DEPS_FONT_MATERIAL_SYMBOLS="arch:ttf-material-symbols-variable fedora:COMPILE:google-material-symbols debian:COMPILE:google-material-symbols ubuntu:COMPILE:google-material-symbols opensuse:COMPILE:google-material-symbols void:COMPILE:google-material-symbols"
-DEPS_FONT_JETBRAINS_MONO="arch:ttf-jetbrains-mono-nerd fedora:jetbrains-mono-fonts-all debian:fonts-jetbrains-mono ubuntu:fonts-jetbrains-mono opensuse:jetbrains-mono-fonts void:font-jetbrains-mono-nerd"
+DEPS_FONT_JETBRAINS_MONO="arch:ttf-jetbrains-mono-nerd fedora:jetbrains-mono-fonts-all debian:fonts-jetbrains-mono ubuntu:fonts-jetbrains-mono opensuse:jetbrains-mono-fonts void:nerd-fonts-ttf"
 DEPS_FONT_DEJAVU="arch:ttf-dejavu fedora:dejavu-fonts-all debian:fonts-dejavu ubuntu:fonts-dejavu opensuse:dejavu-fonts void:dejavu-fonts-ttf"
 DEPS_FONT_TWEMOJI="arch:AUR:ttf-twemoji fedora:twitter-twemoji-fonts debian:fonts-twemoji ubuntu:fonts-twemoji opensuse:twemoji-color-font void:twemoji"
 

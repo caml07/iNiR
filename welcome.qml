@@ -19,6 +19,8 @@ import qs.modules.common.functions
 import qs.modules.iris.style
 import qs.modules.iris.settings
 import qs.modules.iris.preview
+import qs.modules.iris.components as Iris
+import qs.modules.waffle.looks
 
 Scope {
     id: root
@@ -33,8 +35,9 @@ Scope {
     readonly property bool veryCompact: screenHeight < 720
     readonly property int screenPadding: veryCompact ? 12 : compact ? 24 : 60
     readonly property int cardPadding: compact ? 22 : 30
-    readonly property real stepWidth: Math.min(1040,
-        screenWidth - 2 * screenPadding - 2 * cardPadding)
+    readonly property real stepWidth: Math.max(0, wizardCard.width
+        - 2 * (root.compact ? 22 : 28)
+        - (root.irisFamily ? 2 * IrisStyle.concentricPad(IrisStyle.radiusPanel, 10) : 0))
     readonly property int totalSteps: 5
     property var focusedScreen: GlobalStates.primaryScreen
     readonly property real screenAspect: root.screenWidth / Math.max(1, root.screenHeight)
@@ -46,41 +49,64 @@ Scope {
     readonly property bool waffleFamily: root.family === "waffle"
     readonly property string familyTitle: root.irisFamily ? "iRiS" : root.waffleFamily ? "Waffle" : "Material II"
 
-    // ii/Waffle onboarding keeps the stable Material frame. Once iRiS is selected,
-    // the same controls take their type, radii, ink and accents from IrisStyle so
-    // the wizard previews the family it is actually configuring.
-    readonly property color welcomeSurfaceRaised: root.irisFamily ? IrisStyle.surface : Appearance.m3colors.m3surfaceContainer
-    readonly property color welcomeSurfaceHigh: root.irisFamily ? IrisStyle.surfaceHigh : Appearance.m3colors.m3surfaceContainerHigh
-    readonly property color welcomeSurfaceHighest: root.irisFamily ? IrisStyle.surfaceHighest : Appearance.m3colors.m3surfaceContainerHighest
-    readonly property color welcomeSurfaceRaisedHover: ColorUtils.mix(welcomeSurfaceRaised, welcomeOnSurface, 0.94)
-    readonly property color welcomeOnSurface: root.irisFamily ? IrisStyle.textStrong : Appearance.m3colors.m3onSurface
-    readonly property color welcomeOnSurfaceVariant: root.irisFamily ? IrisStyle.textSecondary : Appearance.m3colors.m3onSurfaceVariant
-    readonly property color welcomeOutline: root.irisFamily ? IrisStyle.border : Appearance.m3colors.m3outlineVariant
+    // Onboarding follows the selected family, independently of ii's Global Style.
+    readonly property color welcomeSurfaceRaised: root.irisFamily ? IrisStyle.surface
+        : root.waffleFamily ? Looks.colors.bg0 : Appearance.m3colors.m3surfaceContainer
+    readonly property color welcomeSurfaceHigh: root.irisFamily ? IrisStyle.surfaceHigh
+        : root.waffleFamily ? Looks.colors.bg1Base : Appearance.m3colors.m3surfaceContainerHigh
+    readonly property color welcomeSurfaceHighest: root.irisFamily ? IrisStyle.surfaceHighest
+        : root.waffleFamily ? Looks.colors.bg2Base : Appearance.m3colors.m3surfaceContainerHighest
+    readonly property color welcomeSurfaceRaisedHover: root.irisFamily ? IrisStyle.fillHover
+        : root.waffleFamily ? Looks.colors.bg1Hover
+        : ColorUtils.mix(welcomeSurfaceRaised, welcomeOnSurface, 0.94)
+    readonly property color welcomeOnSurface: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeOnSurfaceVariant: root.irisFamily ? IrisStyle.textSecondary
+        : root.waffleFamily ? Looks.colors.subfg : Appearance.m3colors.m3onSurfaceVariant
+    readonly property color welcomeOutline: root.irisFamily ? IrisStyle.border
+        : root.waffleFamily ? Looks.settings.strokeStrong : Appearance.m3colors.m3outlineVariant
     readonly property color welcomeScrim: Appearance.m3colors.m3scrim
-    readonly property color welcomePrimary: root.irisFamily ? IrisStyle.accent : Appearance.m3colors.m3primary
-    readonly property color welcomeOnPrimary: root.irisFamily ? IrisStyle.onAccent : Appearance.m3colors.m3onPrimary
-    readonly property color welcomePrimaryContainer: root.irisFamily ? IrisStyle.accentContainer : Appearance.m3colors.m3primaryContainer
-    readonly property color welcomeOnPrimaryContainer: root.irisFamily ? IrisStyle.onAccentContainer : Appearance.m3colors.m3onPrimaryContainer
-    readonly property color welcomeSecondary: root.irisFamily ? IrisStyle.secondaryAccent : Appearance.m3colors.m3secondary
-    readonly property color welcomeSecondaryContainer: root.irisFamily ? IrisStyle.fill : Appearance.m3colors.m3secondaryContainer
-    readonly property color welcomeOnSecondaryContainer: root.irisFamily ? IrisStyle.textStrong : Appearance.m3colors.m3onSecondaryContainer
-    readonly property color welcomeTertiary: root.irisFamily ? IrisStyle.secondaryAccent : Appearance.m3colors.m3tertiary
-    readonly property color welcomeTertiaryContainer: root.irisFamily ? IrisStyle.fillQuiet : Appearance.m3colors.m3tertiaryContainer
-    readonly property color welcomeOnTertiaryContainer: root.irisFamily ? IrisStyle.textStrong : Appearance.m3colors.m3onTertiaryContainer
-    // Welcome keeps a stable Material chassis while its accent follows the palette
-    // generated from the active wallpaper. Global Style selection must not restyle
-    // the wizard itself, but wallpaper colour is useful first-run feedback.
+    readonly property color welcomePrimary: root.irisFamily ? IrisStyle.accent
+        : root.waffleFamily ? Looks.colors.accent : Appearance.m3colors.m3primary
+    readonly property color welcomeOnPrimary: root.irisFamily ? IrisStyle.onAccent
+        : root.waffleFamily ? Looks.colors.accentFg : Appearance.m3colors.m3onPrimary
+    readonly property color welcomePrimaryContainer: root.irisFamily ? IrisStyle.tintFill(IrisStyle.accent)
+        : root.waffleFamily ? ColorUtils.mix(Looks.colors.bg1Base, Looks.colors.accent, 0.84)
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainerHigh,
+            Appearance.m3colors.m3primaryContainer, 0.72)
+    readonly property color welcomeOnPrimaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeSecondary: root.irisFamily ? IrisStyle.secondaryAccent
+        : root.waffleFamily ? Looks.colors.accentUnfocused : Appearance.m3colors.m3secondary
+    readonly property color welcomeSecondaryContainer: root.irisFamily ? IrisStyle.fill
+        : root.waffleFamily ? Looks.settings.tile : Appearance.m3colors.m3surfaceContainer
+    readonly property color welcomeOnSecondaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeTertiary: root.irisFamily ? IrisStyle.secondaryAccent
+        : root.waffleFamily ? Looks.colors.accentUnfocused : Appearance.m3colors.m3tertiary
+    readonly property color welcomeTertiaryContainer: root.irisFamily ? IrisStyle.tintFill(IrisStyle.secondaryAccent)
+        : root.waffleFamily ? Looks.settings.tile
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainer,
+            Appearance.m3colors.m3tertiaryContainer, 0.84)
+    readonly property color welcomeOnTertiaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.subfg : Appearance.m3colors.m3onSurfaceVariant
+    // Wallpaper colour provides feedback without switching ii's wizard dialect.
     readonly property color welcomeAccent: welcomePrimary
     readonly property color welcomeAccentAlt: welcomeTertiary
     readonly property color welcomeAccentContainer: welcomePrimaryContainer
-    readonly property color welcomeAccentHover: ColorUtils.mix(welcomePrimaryContainer, welcomeOnPrimaryContainer, 0.90)
+    readonly property color welcomeAccentHover: root.irisFamily ? IrisStyle.tintFillHover(IrisStyle.accent)
+        : root.waffleFamily ? ColorUtils.mix(Looks.colors.bg1Hover, Looks.colors.accent, 0.80)
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainerHighest,
+            Appearance.m3colors.m3primaryContainer, 0.68)
     readonly property color welcomeOnAccent: welcomeOnPrimary
     readonly property color welcomeOnAccentContainer: welcomeOnPrimaryContainer
     readonly property color welcomeGuideContainer: welcomeTertiaryContainer
     readonly property color welcomeGuideText: welcomeOnTertiaryContainer
     readonly property string welcomeFontMain: root.irisFamily ? IrisStyle.fontMain
+        : root.waffleFamily ? Looks.fontFamily
         : (Config.options?.appearance?.typography?.mainFont ?? "Roboto Flex")
     readonly property string welcomeFontTitle: root.irisFamily ? IrisStyle.fontTitle
+        : root.waffleFamily ? Looks.fontFamily
         : (Config.options?.appearance?.typography?.titleFont ?? "Gabarito")
     readonly property string welcomeFontNumbers: root.irisFamily ? IrisStyle.fontNumbers : "Rubik"
     readonly property string welcomeFontExpressive: "Space Grotesk"
@@ -92,6 +118,14 @@ Scope {
         welcomeOnSurfaceVariant, welcomeSurfaceRaised, 4.5)
     readonly property color welcomeTertiaryText: ColorUtils.ensureReadable(
         ColorUtils.applyAlpha(welcomeOnSurfaceVariant, 0.86), welcomeSurfaceRaised, 4.0)
+    readonly property real welcomePanelRadius: root.irisFamily ? IrisStyle.radiusPanel
+        : root.waffleFamily ? Looks.settings.radiusXLarge : 24
+    readonly property real welcomeControlRadius: root.irisFamily ? IrisStyle.radiusRow
+        : root.waffleFamily ? Looks.settings.radiusMedium : 12
+    readonly property real welcomeChoiceRadius: root.irisFamily ? IrisStyle.radiusTile
+        : root.waffleFamily ? Looks.settings.radiusLarge : 14
+    readonly property real welcomeCardRadius: root.irisFamily ? IrisStyle.radiusPlate
+        : root.waffleFamily ? Looks.settings.radiusLarge : 16
 
     readonly property string selectedProfile: Config.options?.welcomeWizard?.profile ?? "balanced"
     readonly property string selectedStylePreset: Config.options?.welcomeWizard?.stylePreset ?? "material"
@@ -815,9 +849,8 @@ Scope {
         anchors.fill: parent
         visible: root.irisFamily
         radius: IrisStyle.radiusPlate
-        color: IrisStyle.surfaceHigh
-        border.width: IrisStyle.rimWidth
-        border.color: IrisStyle.rim
+        color: IrisStyle.fillQuiet
+        border.width: 0
     }
 
     component WelcomeActionButton: RippleButton {
@@ -829,7 +862,7 @@ Scope {
 
         implicitWidth: actionContent.implicitWidth + 24
         implicitHeight: 42
-        buttonRadius: 12
+        buttonRadius: root.welcomeControlRadius
         rippleEnabled: true
         cookieMorphing: false
         colBackground: primary ? root.welcomeAccent : "transparent"
@@ -863,42 +896,6 @@ Scope {
         }
     }
 
-    component WelcomeStepMark: Item {
-        id: stepMark
-
-        property string icon: "category"
-        property string indexText: "01"
-
-        implicitWidth: 104
-        implicitHeight: 58
-
-        WelcomeText {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: stepMark.indexText
-            font.family: root.welcomeFontNumbers
-            font.pixelSize: 44
-            font.weight: Font.DemiBold
-            color: ColorUtils.applyAlpha(root.welcomeAccent, 0.105)
-        }
-
-        MaterialCookie {
-            anchors.right: parent.right
-            anchors.rightMargin: 48
-            anchors.verticalCenter: parent.verticalCenter
-            implicitSize: 42
-            sides: 8
-            color: ColorUtils.applyAlpha(root.welcomeAccentContainer, 0.92)
-
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: stepMark.icon
-                iconSize: 21
-                color: root.welcomeAccent
-            }
-        }
-    }
-
     component WelcomeSegmentedControl: RowLayout {
         id: segmented
 
@@ -918,10 +915,11 @@ Scope {
                 implicitHeight: 36
                 readonly property bool active: segmented.currentValue != null
                     && segmented.currentValue == modelData.value
-                buttonRadius: root.irisFamily ? IrisStyle.radiusRow : 10
+                buttonRadius: root.welcomeControlRadius
                 rippleEnabled: true
                 cookieMorphing: false
-                colBackground: active ? root.welcomeAccentContainer : root.welcomeSurfaceRaised
+                colBackground: active ? root.welcomeAccentContainer
+                    : root.irisFamily ? IrisStyle.fill : root.welcomeSurfaceRaised
                 colBackgroundHover: active ? root.welcomeAccentHover : root.welcomeSurfaceHigh
                 colRipple: root.welcomeSurfaceHighest
                 onClicked: segmented.selected(modelData.value)
@@ -933,7 +931,7 @@ Scope {
                         font.family: root.welcomeFontTitle
                         font.pixelSize: root.welcomeFontCaption
                         font.weight: segmentButton.active ? Font.Bold : Font.Medium
-                        color: segmentButton.active ? root.welcomeOnAccentContainer : root.welcomeSecondaryText
+                        color: segmentButton.active ? root.welcomeOnSurface : root.welcomeSecondaryText
                         horizontalAlignment: Text.AlignHCenter
                     }
 
@@ -980,10 +978,10 @@ Scope {
         property string subtitle: ""
 
         implicitHeight: 46
-        buttonRadius: 12
+        buttonRadius: root.welcomeControlRadius
         rippleEnabled: true
         cookieMorphing: false
-        colBackground: root.welcomeSurfaceRaised
+        colBackground: root.irisFamily ? IrisStyle.fill : root.welcomeSurfaceRaised
         colBackgroundHover: root.welcomeSurfaceHigh
         colRipple: root.welcomeSurfaceHighest
 
@@ -1077,8 +1075,8 @@ Scope {
                 : (root.compact ? 690 : 750)
             anchors.centerIn: parent
             width: Math.max(360, Math.min(1120,
-                parent.width - 2 * root.screenPadding))
-            height: Math.max(360, Math.min(parent.height - 2 * root.screenPadding,
+                root.screenWidth - 2 * root.screenPadding))
+            height: Math.max(360, Math.min(root.screenHeight - 2 * root.screenPadding,
                 preferredHeight))
             focus: true
 
@@ -1115,6 +1113,7 @@ Scope {
 
             PanelSurface {
                 id: cardBg
+                visible: !root.irisFamily
                 anchors.fill: parent
                 surfaceDialect: "material"
                 elevation: 1
@@ -1122,21 +1121,24 @@ Scope {
                 opaqueSurface: true
                 cardStyle: true
                 outlined: true
-                radiusOverride: root.irisFamily ? IrisStyle.radiusPanel : 24
+                radiusOverride: root.welcomePanelRadius
                 clipContent: true
 
-                Rectangle {
-                    anchors.fill: parent
-                    visible: root.irisFamily
-                    radius: IrisStyle.radiusPanel
-                    color: IrisStyle.bodySurface
-                    border.width: IrisStyle.rimWidth
-                    border.color: IrisStyle.rim
-                }
+            }
+
+            Iris.IrisMorphSurface {
+                anchors.fill: parent
+                visible: root.irisFamily
+                open: root._contentReady
+                radius: IrisStyle.radiusPanel
+                color: IrisStyle.surfaceHigh
+                light: IrisStyle.wallpaperLight
+                motionSurface: "settings"
             }
 
             ColumnLayout {
                 anchors.fill: parent
+                anchors.margins: root.irisFamily ? IrisStyle.concentricPad(IrisStyle.radiusPanel, 10) : 0
                 spacing: 0
 
                 // First-run navigation follows the same quiet tab grammar used
@@ -1155,17 +1157,15 @@ Scope {
                         RowLayout {
                             Layout.preferredWidth: wizardCard.width >= 820 ? 138 : 46
                             spacing: 9
-                            MaterialCookie {
-                                implicitSize: 34
-                                sides: 8
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "deployed_code"
-                                    iconSize: 18
-                                    color: root.welcomeAccent
-                                }
+                            Iris.IrisMark {
+                                visible: root.irisFamily
+                                implicitSize: 30
+                            }
+                            MaterialSymbol {
+                                visible: !root.irisFamily
+                                text: "deployed_code"
+                                iconSize: 26
+                                color: root.welcomeAccent
                             }
                             ColumnLayout {
                                 visible: wizardCard.width >= 820
@@ -1202,7 +1202,7 @@ Scope {
                                     opacity: enabled ? 1 : 0.62
                                     buttonRadius: 10
                                     colBackground: index === root.currentStep
-                                        ? ColorUtils.applyAlpha(root.welcomeAccentContainer, 0.94)
+                                        ? root.welcomeAccentContainer
                                         : "transparent"
                                     colBackgroundHover: index === root.currentStep
                                         ? root.welcomeAccentHover
@@ -1220,7 +1220,7 @@ Scope {
                                             font.pixelSize: root.welcomeFontCaption
                                             font.weight: stepTab.index === root.currentStep ? Font.Bold : Font.Medium
                                             color: stepTab.index === root.currentStep
-                                                ? root.welcomeOnAccentContainer : root.welcomeSecondaryText
+                                                ? root.welcomeOnSurface : root.welcomeSecondaryText
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
                                             elide: Text.ElideRight
@@ -1234,7 +1234,7 @@ Scope {
                                             text: stepTab.index < root.currentStep ? "check" : stepTab.modelData.icon
                                             iconSize: 15
                                             color: stepTab.index === root.currentStep
-                                                ? root.welcomeOnAccentContainer
+                                                ? root.welcomeAccent
                                                 : stepTab.index < root.currentStep
                                                     ? root.welcomeAccent
                                                     : root.welcomeSecondaryText
@@ -1244,8 +1244,8 @@ Scope {
                                             anchors.bottom: parent.bottom
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             width: stepTab.index === root.currentStep ? Math.min(parent.width - 18, 58) : 0
-                                            height: 3
-                                            radius: 1.5
+                                            height: 2
+                                            radius: 1
                                             color: root.welcomeAccent
                                             Behavior on width {
                                                 enabled: Appearance.animationsEnabled
@@ -1298,8 +1298,6 @@ Scope {
                     color: ColorUtils.applyAlpha(root.welcomeOutline, 0.55)
                 }
 
-                // Page body: strong textual hierarchy, then one task-specific
-                // composition. Avoid repeating a decorative icon card at every step.
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -1317,36 +1315,12 @@ Scope {
                             Layout.fillWidth: true
                             spacing: 3
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-
-                                Rectangle {
-                                    Layout.preferredWidth: 22
-                                    Layout.preferredHeight: 3
-                                    radius: 2
-                                    color: root.welcomeAccentAlt
-                                }
-
-                                WelcomeText {
-                                    Layout.fillWidth: true
-                                    text: String(root.currentStep + 1).padStart(2, "0") + "  "
-                                        + root.steps[root.currentStep].title.toUpperCase()
-                                    font.family: root.welcomeFontNumbers
-                                    font.pixelSize: root.welcomeFontMeta
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.0
-                                    color: root.welcomeAccentAlt
-                                }
-                            }
-
                             WelcomeText {
                                 Layout.fillWidth: true
                                 text: root.steps[root.currentStep].headline
-                                font.family: root.welcomeFontExpressive
-                                font.pixelSize: root.compact
-                                    ? Appearance.font.pixelSize.huge * 1.22
-                                    : Appearance.font.pixelSize.hugeass * 1.34
+                                font.family: root.welcomeFontTitle
+                                font.pixelSize: root.irisFamily ? 26 * IrisStyle.typeScale
+                                    : root.compact ? 28 : 32
                                 font.weight: Font.Bold
                                 font.letterSpacing: -0.42
                                 color: root.welcomeOnSurface
@@ -1366,36 +1340,8 @@ Scope {
                                 maximumLineCount: 2
                                 elide: Text.ElideRight
                             }
-
-                            Rectangle {
-                                Layout.topMargin: 3
-                                Layout.preferredWidth: Math.min(116, parent.width * 0.16)
-                                Layout.preferredHeight: 3
-                                radius: 2
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: root.welcomeAccent }
-                                    GradientStop { position: 1.0; color: root.welcomeAccentAlt }
-                                }
-                            }
                         }
 
-                        MascotImage {
-                            id: headerMascot
-                            previewMode: true
-                            pose: "welcome-wave"
-                            visible: root.currentStep === 0 && status === Image.Ready && wizardCard.width >= 850
-                            Layout.preferredWidth: visible ? 92 : 0
-                            Layout.preferredHeight: visible ? 108 : 0
-                            Layout.alignment: Qt.AlignBottom | Qt.AlignRight
-                        }
-
-                        WelcomeStepMark {
-                            visible: wizardCard.width >= 850 && !headerMascot.visible
-                            icon: root.steps[root.currentStep].icon
-                            indexText: String(root.currentStep + 1).padStart(2, "0")
-                            Layout.alignment: Qt.AlignTop | Qt.AlignRight
-                        }
                     }
 
                     Item {
@@ -1507,7 +1453,7 @@ Scope {
 
         Layout.fillWidth: true
         implicitHeight: compactRow ? 50 : (detail.length > 0 ? 76 : 52)
-        buttonRadius: root.irisFamily ? IrisStyle.radiusRow : 14
+        buttonRadius: choiceRow.compactRow ? root.welcomeControlRadius : root.welcomeChoiceRadius
         colBackground: selected
             ? root.welcomeAccentContainer
             : "transparent"
@@ -1539,7 +1485,7 @@ Scope {
 
                     MaterialCookie {
                         anchors.centerIn: parent
-                        visible: choiceRow.selected && !choiceRow.compactRow
+                        visible: !root.irisFamily && choiceRow.selected && !choiceRow.compactRow
                         implicitSize: 32
                         sides: 8
                         color: ColorUtils.applyAlpha(root.welcomeSurfaceHighest, 0.96)
@@ -1632,14 +1578,44 @@ Scope {
                 rowSpacing: 18
 
                 ColumnLayout {
+                    visible: !root.irisFamily || welcomeFlickable.width >= 720
                     Layout.fillWidth: true
                     Layout.preferredWidth: welcomeFlickable.width < 720
-                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * 0.43
+                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * (root.irisFamily ? 0.58 : 0.43)
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: root.compact ? 2 : 6
                     spacing: 10
 
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: width / root.screenAspect
+                        visible: root.irisFamily
+                        IrisScreenPreview {
+                            anchors.fill: parent
+                            screen: root.focusedScreen
+                            maxScale: 1
+                        }
+                    }
+
+                    WelcomeText {
+                        visible: root.irisFamily
+                        text: "iRiS"
+                        font.family: root.welcomeFontTitle
+                        font.pixelSize: 28 * IrisStyle.typeScale
+                        font.weight: Font.Bold
+                        color: root.welcomeOnSurface
+                    }
+                    WelcomeText {
+                        visible: root.irisFamily
+                        Layout.fillWidth: true
+                        text: Translation.tr("Your desktop, built around the Island.")
+                        font.pixelSize: root.welcomeFontBody
+                        color: root.welcomeSecondaryText
+                        wrapMode: Text.WordWrap
+                    }
+
                     RowLayout {
+                        visible: !root.irisFamily
                         Layout.fillWidth: true
                         spacing: 6
 
@@ -1696,44 +1672,18 @@ Scope {
                             Layout.preferredHeight: visible ? (root.compact ? 162 : 194) : 0
                             Layout.alignment: Qt.AlignBottom
 
-                            MaterialCookie {
+                            MaterialSymbol {
                                 anchors.centerIn: parent
-                                implicitSize: root.compact ? 104 : 126
-                                sides: 9
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "deployed_code"
-                                    iconSize: root.compact ? 42 : 50
-                                    color: root.welcomeAccent
-                                }
-                            }
-
-                            MaterialCookie {
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.rightMargin: 8
-                                anchors.topMargin: 18
-                                implicitSize: 34
-                                sides: 7
-                                color: ColorUtils.mix(root.welcomeSurfaceHighest, root.welcomeAccentAlt, 0.62)
-                            }
-
-                            MaterialCookie {
-                                anchors.left: parent.left
-                                anchors.bottom: parent.bottom
-                                anchors.leftMargin: 10
-                                anchors.bottomMargin: 20
-                                implicitSize: 24
-                                sides: 6
-                                color: ColorUtils.applyAlpha(root.welcomeAccent, 0.42)
+                                text: "deployed_code"
+                                iconSize: root.compact ? 42 : 50
+                                color: root.welcomeAccent
                             }
                         }
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
+                        visible: !root.irisFamily
                         Layout.topMargin: root.compact ? 8 : 16
                         spacing: 12
                         Repeater {
@@ -1778,7 +1728,7 @@ Scope {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     Layout.preferredWidth: welcomeFlickable.width < 720
-                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * 0.57
+                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * (root.irisFamily ? 0.42 : 0.57)
                     Layout.alignment: Qt.AlignTop
                     implicitHeight: welcomeSetupColumn.implicitHeight + 28
                     surfaceDialect: "material"
@@ -1786,8 +1736,6 @@ Scope {
                     borderless: root.irisFamily
                     outlined: false
                     radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
-
-                    WelcomeIrisFill {}
 
                     ColumnLayout {
                         id: welcomeSetupColumn
@@ -1798,17 +1746,10 @@ Scope {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            MaterialCookie {
-                                implicitSize: 34
-                                sides: 8
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
+                            MaterialSymbol {
                                 text: "dashboard"
-                                    iconSize: 17
-                                    color: root.welcomeAccent
-                                }
+                                iconSize: 20
+                                color: root.welcomeAccent
                             }
                             WelcomeText {
                                 text: Translation.tr("Desktop family")
@@ -1821,7 +1762,7 @@ Scope {
 
                         WelcomeText {
                             Layout.fillWidth: true
-                            text: Translation.tr("Choose the shell you want to configure.")
+                            text: Translation.tr("You can change this later in Settings.")
                             font.pixelSize: root.welcomeFontCaption
                             color: root.welcomeSecondaryText
                             wrapMode: Text.WordWrap
@@ -1829,7 +1770,7 @@ Scope {
 
                         WelcomeChoiceRow {
                             title: "Material II"
-                            detail: Translation.tr("Material shell with modular bars, sidebars, Dock and global styles.")
+                            detail: Translation.tr("Modular bars, sidebars and Material controls.")
                             symbol: "dashboard"
                             selected: root.family === "ii"
                             onClicked: root.chooseFamily("ii")
@@ -1845,7 +1786,7 @@ Scope {
 
                         WelcomeChoiceRow {
                             title: "iRiS"
-                            detail: Translation.tr("Edge-aware Island, movable pieces, Dock, Themes and Studio.")
+                            detail: Translation.tr("Island, pieces and a Dock on any edge.")
                             symbol: "visibility"
                             selected: root.family === "iris"
                             onClicked: root.chooseFamily("iris")
@@ -1857,12 +1798,14 @@ Scope {
                         }
 
                         Rectangle {
+                            visible: !root.irisFamily
                             Layout.fillWidth: true
                             implicitHeight: 1
                             color: ColorUtils.applyAlpha(root.welcomeOutline, 0.34)
                         }
 
                         RowLayout {
+                            visible: !root.irisFamily
                             Layout.fillWidth: true
                             spacing: 10
 
@@ -2969,7 +2912,7 @@ Scope {
 
                 WelcomeText {
                     Layout.fillWidth: true
-                    text: Translation.tr("Choose the initial chassis. Every option uses the same iRiS surfaces and services.")
+                    text: Translation.tr("Start with an Island or a full bar. Adjust its position next.")
                     font.pixelSize: root.welcomeFontCaption
                     color: root.welcomeSecondaryText
                     wrapMode: Text.WordWrap
@@ -3032,7 +2975,7 @@ Scope {
 
                     Item {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.compact ? 190 : 220
+                        Layout.preferredHeight: width / root.screenAspect
                         IrisScreenPreview {
                             anchors.fill: parent
                             screen: root.focusedScreen
@@ -3118,7 +3061,7 @@ Scope {
 
                 WelcomeText {
                     Layout.fillWidth: true
-                    text: Translation.tr("A theme changes material, shape, type and motion together. Studio has all 14.")
+                    text: Translation.tr("Material, shape and motion. More themes in Studio.")
                     font.pixelSize: root.welcomeFontCaption
                     color: root.welcomeSecondaryText
                     wrapMode: Text.WordWrap
@@ -3190,7 +3133,7 @@ Scope {
 
                     Item {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.compact ? 205 : 240
+                        Layout.preferredHeight: width / root.screenAspect
                         IrisScreenPreview {
                             anchors.fill: parent
                             screen: root.focusedScreen
@@ -3395,7 +3338,7 @@ Scope {
 
                     Item {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: root.compact ? 220 : 260
+                        Layout.preferredHeight: width / root.screenAspect
                         IrisScreenPreview {
                             anchors.fill: parent
                             screen: root.focusedScreen
@@ -3452,7 +3395,12 @@ Scope {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 12
+                        Iris.IrisMark {
+                            visible: root.irisFamily
+                            implicitSize: 36
+                        }
                         MaterialCookie {
+                            visible: !root.irisFamily
                             implicitSize: 46
                             sides: 8
                             color: root.welcomeAccentContainer

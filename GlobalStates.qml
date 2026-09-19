@@ -60,6 +60,8 @@ Singleton {
         }
         openEqualizer(outputName)
     }
+    property real irisLevelQuietUntil: 0
+    function quietIrisLevels(): void { root.irisLevelQuietUntil = Date.now() + 700 }
     property bool osdBrightnessOpen: false
     property bool osdVolumeOpen: false
     property bool osdMicOpen: false
@@ -347,6 +349,20 @@ Singleton {
     property var irisBubbleCard: null
     // The Island's desktop page is being arranged in place (iRiS Studio).
     property bool irisArrange: false
+    // The Dock's body per output, so the chassis field draws it in the same pass
+    // as the frame and the Island instead of the Dock carrying a second surface.
+    property var irisDockBody: ({})
+    // iRiS is being edited in place: every piece is grabbable, the edit bar
+    // holds the pieces, the look and the sizes, and Done ends it.
+    property bool irisEdit: false
+    // What the edit bar is inspecting: a piece slot ("extra:vitals", "left",
+    // "app:kitty"), a surface ("island", "dock", "cards"…) or "" for the family.
+    property string irisEditSelection: ""
+    // A Studio target the edit bar should inspect ("" = keep what it shows).
+    property string irisEditTarget: ""
+    property string irisEditTab: "pieces"
+    property int irisChassisEpoch: 0
+    onIrisEditChanged: if (!irisEdit) { irisEditSelection = ""; irisEditTarget = "" }
     // iRiS Studio, the live appearance editor, is open.
     property bool irisStudioOpen: false
     // Where Studio is on screen while it is presented ({ screen, x, y, width,
@@ -382,6 +398,7 @@ Singleton {
     signal desktopWidgetManagerToggleRequested(string outputName)
     // Whether any output's Island is expanded, published for `inir iris status`.
     property bool irisIslandExpanded: false
+    property string irisIslandPage: ""
     property bool dashboardOpen: false
     property bool workspaceShowNumbers: false
     property var activeBooruImageMenu: null  // Track which BooruImage has its menu open

@@ -312,6 +312,10 @@ OFFICIAL_PACKAGES=(
   mission-center
 )
 
+if [[ "${OS_SPECIFIC_ID:-}" == "cachyos" ]] && pacman -Si niri-focused-booster &>/dev/null; then
+  OFFICIAL_PACKAGES+=(niri-focused-booster)
+fi
+
 # Preserve install-group flags while preferring signed Arch packages wherever
 # possible. These used to be installed through AUR only when their group was on.
 if $INSTALL_FONTS; then

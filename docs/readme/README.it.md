@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Volevo che il mio desktop avesse un certo aspetto e funzionasse in un certo modo
 - **Wayland**: protocollo display di Linux (il nuovo, sostituisce X11)
 - **QML**: linguaggio UI dichiarativo di Qt, iNiR è scritto in questo
 - **Material You**: sistema colori Google che genera palette da immagini (così funziona l'auto-theming)
-- **ii / waffle**: i due stili di pannello. ii = vibes Material Design, waffle = vibes Windows 11. `Super+Shift+W` per cambiare
+- **ii / waffle / iRiS**: le tre famiglie di pannelli. ii = Material Design, waffle = Windows 11, iRiS = un'Island che diventa ciò che apri. `Super+Shift+W` le scorre
 
 </details>
 
@@ -110,9 +110,10 @@ Volevo che il mio desktop avesse un certo aspetto e funzionasse in un certo modo
 
 ## Funzionalità
 
-**Due famiglie di pannelli**, commutabili al volo con `Super+Shift+W`:
+**Tre famiglie di pannelli**, commutabili al volo con `Super+Shift+W`:
 - **Material ii** — barra flottante, barre laterali, dock, 9 stili globali (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra delle applicazioni stile Windows 11, menu start, centro azioni, centro notifiche
+- **iRiS** — la nuova famiglia Island con bordi configurabili, pezzi, Dock su ogni lato, Glass, Themes e Studio
 
 **Tematizzazione automatica** — scegli uno sfondo e tutto si adatta:
 - Colori della shell via Material You, propagati a GTK3/4, Qt, terminali, Firefox, Discord, SDDM

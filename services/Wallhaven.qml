@@ -54,7 +54,7 @@ QtObject {
     property string _lastTagSuggestionProvider: "wallhaven"
     property var _lastTagSuggestions: ([])
 
-    readonly property var wallpaperProviderIds: ["wallhaven", "commons", "konachan", "yandere"]
+    readonly property var wallpaperProviderIds: ["wallhaven", "commons", "konachan", "yandere", "motionbgs"]
 
     function _normalizedProvider(providerId): string {
         return root.wallpaperProviderIds.includes(providerId) ? providerId : "wallhaven"
@@ -686,6 +686,65 @@ QtObject {
             + "&prop=imageinfo&iiprop=url%7Csize%7Cmime&iiurlwidth=720"
     }
 
+    readonly property string motionBgsBase: "https://motionbgs.com"
+
+    function _buildMotionBgsUrl(tags, page) {
+        const words = (tags || []).map(tag => String(tag).trim()).filter(tag => tag.length > 0)
+        const pageNumber = Math.max(1, page || 1)
+        if (words.length === 1 && words[0].startsWith("tag:")) {
+            const tag = encodeURIComponent(words[0].slice(4).toLowerCase().replace(/\s+/g, "-"))
+            return root.motionBgsBase + "/tag:" + tag + "/" + (pageNumber > 1 ? pageNumber + "/" : "")
+        }
+        const query = words.join(" ")
+        if (query.length === 0)
+            return root.motionBgsBase + "/tag:anime/" + (pageNumber > 1 ? pageNumber + "/" : "")
+        return root.motionBgsBase + "/search?q=" + encodeURIComponent(query) + (pageNumber > 1 ? "&page=" + pageNumber : "")
+    }
+
+    function _parseMotionBgs(html) {
+        const images = []
+        const seen = {}
+        const anchor = /<a title="([^"]*)" href=\/([a-z0-9][a-z0-9-]*)>([\s\S]*?)<\/a>/g
+        let match = null
+        while ((match = anchor.exec(html || "")) !== null) {
+            const body = match[3]
+            const media = /\/i\/c\/\d+x\d+\/media\/(\d+)\/([^ >"]+?\.(?:jpg|jpeg|png))(?=[ >"])/.exec(body)
+            if (!media || seen[media[1]])
+                continue
+            seen[media[1]] = true
+            const id = media[1]
+            const file = media[2]
+            const stem = file.replace(/(\.\d+x\d+)?\.(jpg|jpeg|png)$/, "")
+            const named = /<span class=ttl>([^<]*)<\/span>/.exec(body)
+            const quality = (/<span class=frm>\s*([^<]*?)\s*<\/span>/.exec(body)?.[1] ?? "HD").toUpperCase()
+            const title = root._decodeHtmlEntities((named?.[1] ?? match[1].replace(/ live wallpaper$/i, "")).replace(/&#0?39;/g, "'").trim())
+            const is4k = quality === "4K"
+            const motion = root.motionBgsBase + "/media/" + id + "/" + stem + ".960x540.mp4"
+            images.push({
+                "id": id,
+                "slug": match[2],
+                "title": title,
+                "width": is4k ? 3840 : 1920,
+                "height": is4k ? 2160 : 1080,
+                "aspect_ratio": 16 / 9,
+                "tags": title,
+                "rating": "s",
+                "is_nsfw": false,
+                "md5": Qt.md5("motionbgs:" + id),
+                "preview_url": root.motionBgsBase + "/i/c/546x308/media/" + id + "/" + file,
+                "sample_url": motion,
+                "motion_url": motion,
+                "file_url": root.motionBgsBase + "/dl/hd/" + id + "/",
+                "file_url_4k": is4k ? root.motionBgsBase + "/dl/4k/" + id + "/" : "",
+                "file_ext": "mp4",
+                "quality": quality,
+                "is_video": true,
+                "source": root.motionBgsBase + "/" + match[2]
+            })
+        }
+        return images
+    }
+
     function makeRequest(tags, nsfw, limit, page, category, generation, providerId, fitProfile) {
         root.nowMs = Date.now()
         if (nsfw === undefined)
@@ -732,6 +791,8 @@ QtObject {
             ? root._buildSearchUrl(requestedTags, nsfw, providerLimit, page, requestedCategory, requestedFit)
             : requestedProvider === "commons"
                 ? root._buildCommonsUrl(requestedTags, providerLimit, page)
+            : requestedProvider === "motionbgs"
+                ? root._buildMotionBgsUrl(requestedTags, page)
                 : Booru.constructRequestUrlForProvider(requestedProvider,
                     requestedTags, nsfw, providerLimit, page || 1)
         _log("[Wallhaven] Making", requestedProvider, "request to", url)
@@ -757,7 +818,7 @@ QtObject {
 
         const command = root._curlGetArgs(20)
         command.push("-w", "\n__HTTP__%{http_code}")
-        if (requestedProvider === "wallhaven")
+        if (requestedProvider === "wallhaven" || requestedProvider === "motionbgs")
             command.push("-H", "User-Agent: " + defaultUserAgent)
         else if (requestedProvider === "waifu.im")
             command.push("-H", "Accept-Version: v7")
@@ -828,11 +889,20 @@ QtObject {
                 httpStatus = parseInt(text.substring(altIdx + 8), 10) || 0
             }
         }
-        body = root._extractJsonPayload(body)
+        if (root._currentSearchProvider !== "motionbgs")
+            body = root._extractJsonPayload(body)
 
         if (httpStatus === 429) {
             root.rateLimitedUntilMs = Date.now() + 30000
             newResponse.message = Translation.tr("Wallhaven rate limit reached. Wait a moment and try again.")
+            root._appendResponse(newResponse)
+            root.responseFinished()
+            root._currentSearchResponse = null
+            root._processPendingSearch()
+            return
+        }
+        if (root._currentSearchProvider === "motionbgs" && httpStatus === 404 && (newResponse.page || 1) > 1) {
+            newResponse.message = Translation.tr("No more results for this search.")
             root._appendResponse(newResponse)
             root.responseFinished()
             root._currentSearchResponse = null
@@ -928,6 +998,8 @@ QtObject {
                         "source": info.descriptionurl ?? ("https://commons.wikimedia.org/wiki/" + encodeURIComponent(pageData?.title ?? ""))
                     }
                 })
+            } else if (root._currentSearchProvider === "motionbgs") {
+                images = root._parseMotionBgs(body)
             } else if (root._currentSearchProvider === "picsum") {
                 const payload = JSON.parse(body)
                 const fit = root._currentSearchFitProfile

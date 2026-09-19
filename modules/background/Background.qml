@@ -30,6 +30,8 @@ import qs.modules.background.widgets.timers
 import qs.modules.background.widgets.shape
 import qs.modules.background.widgets.dateBadge
 import qs.modules.background.widgets.uptime
+import qs.modules.background.widgets.controls
+import qs.modules.background.widgets.screenTime
 import qs.modules.background.widgets.dayProgress
 import qs.modules.background.widgets.worldClock
 import qs.modules.background.widgets.userCard
@@ -39,6 +41,7 @@ import qs.modules.background.widgets.japaneseTypography
 import qs.modules.background.desktopItems
 import qs.modules.iris.components
 import qs.modules.iris.style
+import qs.modules.iris.frame
 import "root:modules/common/functions/parallax.js" as ParallaxMath
 import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 
@@ -172,7 +175,7 @@ Scope {
                 notes: false, calendarUpcoming: false, monthCalendar: false,
                 todo: false, timers: false, dayProgress: false, uptime: false, shape: false, dateBadge: false, editorial: false,
                 newsTicker: false, mascot: false, japaneseTypography: false,
-                worldClock: false, userCard: false
+                worldClock: false, userCard: false, controls: false, screenTime: false
             })
             let known = builtinDefaults[name] !== undefined
             let baseEnabled = known
@@ -239,7 +242,7 @@ Scope {
                 "mediaControls", "visualizer", "systemMonitor", "battery", "notes",
                 "calendarUpcoming", "monthCalendar", "todo", "timers", "dayProgress", "uptime", "shape", "dateBadge", "editorial",
                 "newsTicker", "mascot", "japaneseTypography",
-                "worldClock", "userCard"];
+                "worldClock", "userCard", "controls", "screenTime"];
             if (!knownWidgets.includes(widgetName))
                 return "unknown widget: " + widgetName;
             DesktopWidgetLayout.setGloballyEnabled(widgetName, enabled);
@@ -596,7 +599,9 @@ Scope {
             { key: "mascot",             defaultOn: false, icon: "pets" },
             { key: "japaneseTypography", defaultOn: false, icon: "translate" },
             { key: "worldClock",         defaultOn: false, icon: "public" },
-            { key: "userCard",           defaultOn: false, icon: "account_circle" }
+            { key: "userCard",           defaultOn: false, icon: "account_circle" },
+            { key: "controls",           defaultOn: false, icon: "toggle_on" },
+            { key: "screenTime",         defaultOn: false, icon: "hourglass_bottom" }
         ]
         // Revision counter to force re-evaluation
         property int _zoneRevision: 0
@@ -1421,7 +1426,8 @@ Scope {
                     layer.enabled: wallpaperContainer.needsStaticTexture
                         && !wallpaperContainer.showInternalStaticWallpaper
                         && !wallpaper.shaderOverlayHeld
-                    source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !wallpaperContainer.needsStaticTexture)
+                    source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !wallpaperContainer.needsStaticTexture
+                            || Wallpapers.isVideoFile(bgRoot.wallpaperPath))
                         ? "" : bgRoot.wallpaperPath
                     // NEVER use crossfader transitions when awww is active — awww handles all transitions.
                     // When parallax is on, the crossfader fades out to reveal awww's native transition.
@@ -1461,6 +1467,7 @@ Scope {
                     }
                     cache: false
                     playing: visible && bgRoot.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                        && Wallpapers.videoMotionAllowedOn(bgRoot.screenName)
                     asynchronous: true
                     source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif || bgRoot.backdropActive) ? "" : bgRoot.wallpaperPathRaw
                     fillMode: Image.PreserveAspectCrop
@@ -1507,6 +1514,7 @@ Scope {
                     transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
                     shouldPlay: bgRoot.enableAnimation && !GlobalStates.screenLocked
                         && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                        && Wallpapers.videoMotionAllowedOn(bgRoot.screenName)
                         && bgRoot._familyOwnsScreen
                         && visible
 
@@ -1791,20 +1799,25 @@ Scope {
                 ] : [
                     { type: "quick", items: [
                         { text: Translation.tr("Wallpaper"), iconName: "wallpaper",
+                            image: bgRoot.wallpaperIsVideo || bgRoot.wallpaperIsGif ? bgRoot.wallpaperThumbnailPath : bgRoot.wallpaperPath,
                             action: () => {
                                 GlobalStates.wallpaperSelectorTargetMonitor = bgRoot.screenName
                                 GlobalActions.runLauncher(["wallpaperSelector", "toggle"])
                             } },
                         { text: Translation.tr("Widgets"), iconName: "widgets",
                             action: () => GlobalStates.setWidgetEditMode(true) },
+                        { text: Translation.tr("Studio"), iconName: "palette",
+                            action: () => { GlobalStates.irisStudioOpen = true } },
                         { text: Translation.tr("Search"), iconName: "search",
                             action: () => { GlobalStates.searchOpen = true } }
                     ] },
                     { type: "separator" },
+                    { text: Translation.tr("Edit iRiS"), iconName: "edit",
+                        action: () => { GlobalStates.irisEdit = true } },
                     { text: Translation.tr("Quick controls"), iconName: "tune",
                         action: () => { GlobalStates.controlPanelOpen = true } },
                     { text: Translation.tr("Settings"), iconName: "settings",
-                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "settings"]) } },
+                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "iris", "settings", ""]) } },
                     { type: "separator" },
                     { text: Translation.tr("Reload shell"), iconName: "refresh",
                         action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
@@ -2476,7 +2489,7 @@ Scope {
                         readonly property bool irisTopEdge: (Config.options?.panelFamily ?? "ii") === "iris"
                             && editGridOverlay.workArea?.insets?.barEdge === "bottom"
                         attachedTopEdge: irisTopEdge
-                        y: editControlsBar.iris ? (irisTopEdge ? 0 : parent.height - height)
+                        y: editControlsBar.iris ? (irisTopEdge ? IrisFrame.band : parent.height - height - IrisFrame.band)
                             : Math.max(editGridOverlay.safeTop, editGridOverlay.safeBottom - height - 12)
                         onLibraryRequested: widgetManagerPanel.shown = !widgetManagerPanel.shown
                         onEdgeSettingsRequested: GlobalStates.openSettingsPage(14, "Organic edge")
@@ -2809,6 +2822,38 @@ Scope {
                     WidgetInputMask { id: _hitMask10; loader: parent }
                     sourceComponent: UptimeWidget {
                         widgetIndex: 9
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("controls", false) && (Config.options?.panelFamily ?? "ii") === "iris"
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskControls : null
+                    WidgetInputMask { id: _hitMaskControls; loader: parent }
+                    sourceComponent: ControlsWidget {
+                        widgetIndex: 19
+                        outputName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
+                    }
+                }
+
+                FadeLoader {
+                    shown: bgRoot._widgetEnabled("screenTime", false) && (Config.options?.panelFamily ?? "ii") === "iris"
+                    z: item?.desktopStackZ ?? 0
+                    containmentMask: GlobalStates.widgetEditMode ? _hitMaskScreenTime : null
+                    WidgetInputMask { id: _hitMaskScreenTime; loader: parent }
+                    sourceComponent: ScreenTimeWidget {
+                        widgetIndex: 39
                         outputName: bgRoot.screen?.name ?? ""
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height

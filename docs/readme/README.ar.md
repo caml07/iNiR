@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -80,7 +80,7 @@ Wayland ← GPU
 - **Wayland**: بروتوكول العرض في لينكس (الجديد، بديل X11)
 - **QML**: لغة UI من Qt، iNiR مكتوب فيها
 - **Material You**: نظام ألوان قوقل اللي يسوي باليتات من الصور (كذا يشتغل الـ auto-theming)
-- **ii / waffle**: ستايلين للبانل. ii = فايب Material Design، waffle = فايب Windows 11. `Super+Shift+W` يبدل بينهم
+- **ii / waffle / iRiS**: ثلاث عائلات للواجهات. ii = Material Design، waffle = Windows 11، وiRiS = Island تتشكل حسب ما تفتحه. `Super+Shift+W` يبدل بينها
 
 </details>
 
@@ -112,9 +112,10 @@ Wayland ← GPU
 
 ## الميزات
 
-**عائلتان من اللوحات**، قابلة للتبديل أثناء التشغيل بـ `Super+Shift+W`:
+**ثلاث عائلات من اللوحات**، قابلة للتبديل أثناء التشغيل بـ `Super+Shift+W`:
 - **Material ii** — شريط عائم، أشرطة جانبية، رصيف، 9 أنماط عامة (material، cards، aurora، inir، angel، regalia، zzz، cookie، editorial)
 - **Waffle** — شريط مهام بأسلوب Windows 11، قائمة ابدأ، مركز الإجراءات، مركز الإشعارات
+- **iRiS** — عائلة Island الجديدة: كل حواف الشاشة، Pieces، Dock على أي حافة، Glass وThemes وStudio
 
 **سمات تلقائية** — اختر خلفية ويتكيف كل شيء:
 - ألوان الواجهة عبر Material You، تنتشر إلى GTK3/4، Qt، المحطات الطرفية، Firefox، Discord، SDDM

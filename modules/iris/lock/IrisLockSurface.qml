@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import QtMultimedia
 import Quickshell.Widgets
 import qs
 import qs.services
@@ -20,14 +21,10 @@ Item {
     readonly property real d: IrisStyle.density
     readonly property string wallpaperPath: Config.options?.background?.wallpaperPath ?? ""
     readonly property string wallpaperLower: root.wallpaperPath.toLowerCase()
-    readonly property bool animatedWallpaper: wallpaperLower.endsWith(".gif")
-        || wallpaperLower.endsWith(".mp4") || wallpaperLower.endsWith(".webm")
-        || wallpaperLower.endsWith(".mkv") || wallpaperLower.endsWith(".avi")
-        || wallpaperLower.endsWith(".mov")
-    readonly property string lockWallpaperPath: root.animatedWallpaper
-        ? (Config.options?.background?.thumbnailPath ?? "") : root.wallpaperPath
-    readonly property string wallpaperSource: root.lockWallpaperPath.length === 0 ? ""
-        : root.lockWallpaperPath.startsWith("file://") ? root.lockWallpaperPath : "file://" + root.lockWallpaperPath
+    readonly property bool videoWallpaper: Wallpapers.isVideoFile(root.wallpaperLower)
+    readonly property string wallpaperSource: Wallpapers.stillUrlFor(root.wallpaperPath)
+    readonly property bool playsVideo: root.videoWallpaper && !root.blurEnabled
+        && (Config.options?.lock?.enableAnimation ?? false)
     readonly property bool blurEnabled: Config.options?.lock?.blur?.enable ?? true
 
     function wakeIfNeeded(): bool {
@@ -56,8 +53,6 @@ Item {
         return h > 0 ? h + ":" + String(m).padStart(2, "0") + ":" + sec : m + ":" + sec
     }
 
-    // One live activity on the lock screen: glyph disc, what it is, and its
-    // figure in the activity colour, with a hairline of progress when it has one.
     component ActivityPlate: Item {
         id: plate
         property bool shown: false
@@ -75,8 +70,8 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            radius: Math.round(22 * root.d)
-            color: Qt.rgba(0, 0, 0, 0.34)
+            radius: IrisStyle.radiusPlate
+            color: IrisStyle.mediaScrim
         }
         RowLayout {
             anchors.fill: parent
@@ -87,7 +82,7 @@ Item {
                 Layout.preferredWidth: Math.round(40 * root.d)
                 Layout.preferredHeight: Layout.preferredWidth
                 radius: width / 2
-                color: ColorUtils.applyAlpha(plate.tint, 0.2)
+                color: IrisStyle.tintFill(plate.tint)
                 MaterialSymbol {
                     anchors.centerIn: parent
                     text: plate.glyph
@@ -99,7 +94,7 @@ Item {
             IrisText {
                 Layout.fillWidth: true
                 text: plate.label
-                color: "#ffffff"
+                color: IrisStyle.onMedia
                 font.pixelSize: Math.round(15 * IrisStyle.typeScale)
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
@@ -145,7 +140,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "#000000"
+        color: IrisStyle.surfaceOpaque
     }
 
     MouseArea {
@@ -162,7 +157,6 @@ Item {
         sourceComponent: islandComponent
     }
 
-    // ── Island: wallpaper, large clock, identity and a password capsule ──
     Component {
         id: islandComponent
 
@@ -174,10 +168,22 @@ Item {
                 id: wallpaper
                 anchors.fill: parent
                 source: root.wallpaperSource
+                sourceSize: Qt.size(stage.width, stage.height)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: false
                 visible: !root.blurEnabled
+            }
+            Loader {
+                anchors.fill: parent
+                active: root.playsVideo
+                sourceComponent: Video {
+                    source: "file://" + root.wallpaperPath
+                    fillMode: VideoOutput.PreserveAspectCrop
+                    loops: MediaPlayer.Infinite
+                    muted: true
+                    autoPlay: true
+                }
             }
             MultiEffect {
                 anchors.fill: parent
@@ -187,15 +193,14 @@ Item {
                 blur: 1
                 blurMax: 48
                 saturation: 0.15
-                // Blur pulls transparent edges inwards; a slight zoom hides them.
                 transform: Scale { origin.x: stage.width / 2; origin.y: stage.height / 2; xScale: 1.06; yScale: 1.06 }
             }
             Rectangle {
                 anchors.fill: parent
                 gradient: Gradient {
-                    GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.28) }
-                    GradientStop { position: 0.45; color: Qt.rgba(0, 0, 0, 0.12) }
-                    GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.42) }
+                    GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.28) } // iris-literal: wallpaper legibility gradient
+                    GradientStop { position: 0.45; color: Qt.rgba(0, 0, 0, 0.12) } // iris-literal: wallpaper legibility gradient
+                    GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.42) } // iris-literal: wallpaper legibility gradient
                 }
             }
 
@@ -208,7 +213,7 @@ Item {
                 IrisText {
                     Layout.alignment: Qt.AlignHCenter
                     text: Qt.locale().toString(DateTime.clock.date, "dddd, d MMMM")
-                    color: ColorUtils.applyAlpha("#ffffff", 0.86)
+                    color: IrisStyle.onMedia
                     font.pixelSize: Math.round(21 * IrisStyle.typeScale)
                     font.weight: Font.DemiBold
                 }
@@ -216,7 +221,7 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: -6 * root.d
                     text: DateTime.timeDisplay
-                    color: "#ffffff"
+                    color: IrisStyle.onMedia
                     font.family: IrisStyle.fontNumbers
                     font.features: ({ "tnum": 1 })
                     font.pixelSize: Math.round(112 * IrisStyle.typeScale)
@@ -224,7 +229,6 @@ Item {
                     font.letterSpacing: -2
                 }
 
-                // Now playing, only while something plays.
                 Item {
                     readonly property bool active: MprisController.activePlayer !== null
                         && String(MprisController.activePlayer?.trackTitle ?? "").length > 0
@@ -235,8 +239,8 @@ Item {
                     implicitHeight: active ? mediaCard.implicitHeight : 0
                     Rectangle {
                         anchors.fill: parent
-                        radius: Math.round(22 * root.d)
-                        color: Qt.rgba(0, 0, 0, 0.34)
+                        radius: IrisStyle.radiusPlate
+                        color: IrisStyle.mediaScrim
                     }
                     IrisMediaCard {
                         id: mediaCard
@@ -246,8 +250,6 @@ Item {
                     }
                 }
 
-                // Live activities keep reading on the lock screen: the same
-                // identity as in the Island (red recording, highlight timer).
                 ActivityPlate {
                     shown: RecorderStatus.isRecording
                     glyph: "radio_button_checked"
@@ -263,7 +265,7 @@ Item {
                         : kind === "countdown" ? TimerService.countdownPaused : TimerService.stopwatchPaused
                     shown: kind.length > 0
                     glyph: paused ? "pause" : kind === "stopwatch" ? "timer" : kind === "pomodoro" && TimerService.pomodoroBreak ? "coffee" : "hourglass_top"
-                    tint: paused ? ColorUtils.applyAlpha("#ffffff", 0.7) : IrisStyle.secondaryAccent
+                    tint: paused ? IrisStyle.onMediaSecondary : IrisStyle.secondaryAccent
                     label: kind === "pomodoro" ? (TimerService.pomodoroBreak ? Translation.tr("Break") : Translation.tr("Focus"))
                         : kind === "countdown" ? Translation.tr("Timer") : Translation.tr("Stopwatch")
                     countDown: kind !== "stopwatch"
@@ -287,7 +289,7 @@ Item {
                     implicitWidth: Math.round(76 * root.d)
                     implicitHeight: implicitWidth
                     radius: width / 2
-                    color: Qt.rgba(1, 1, 1, 0.2)
+                    color: IrisStyle.onMediaFill
                     property int sourceIndex: 0
                     Image {
                         id: avatarImage
@@ -307,7 +309,7 @@ Item {
                         anchors.centerIn: parent
                         visible: avatarImage.status !== Image.Ready
                         text: (SystemInfo.displayName || SystemInfo.username || "?").charAt(0).toUpperCase()
-                        color: "#ffffff"
+                        color: IrisStyle.onMedia
                         font.pixelSize: Math.round(32 * IrisStyle.typeScale)
                         font.weight: Font.DemiBold
                     }
@@ -317,12 +319,11 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 12 * root.d
                     text: SystemInfo.displayName || SystemInfo.username
-                    color: "#ffffff"
+                    color: IrisStyle.onMedia
                     font.pixelSize: Math.round(16 * IrisStyle.typeScale)
                     font.weight: Font.DemiBold
                 }
 
-                // Password capsule; shakes on a rejected attempt.
                 Rectangle {
                     id: capsule
                     Layout.alignment: Qt.AlignHCenter
@@ -330,9 +331,9 @@ Item {
                     implicitWidth: Math.round(248 * root.d)
                     implicitHeight: Math.round(38 * root.d)
                     radius: height / 2
-                    color: Qt.rgba(1, 1, 1, passwordInput.activeFocus ? 0.24 : 0.18)
+                    color: (passwordInput.activeFocus ? IrisStyle.onMediaFillHover : IrisStyle.onMediaFill)
                     border.width: root.context.showFailure ? 1 : 0
-                    border.color: ColorUtils.applyAlpha(IrisStyle.danger, 0.8)
+                    border.color: IrisStyle.tintBorder(IrisStyle.danger)
                     Behavior on color { ColorAnimation { duration: IrisStyle.duration(120) } }
 
                     transform: Translate { id: shakeOffset }
@@ -358,8 +359,8 @@ Item {
                         echoMode: TextInput.Password
                         passwordCharacter: "●"
                         horizontalAlignment: TextInput.AlignHCenter
-                        color: "#ffffff"
-                        selectionColor: Qt.rgba(1, 1, 1, 0.3)
+                        color: IrisStyle.onMedia
+                        selectionColor: IrisStyle.onMediaFillHover
                         font.family: IrisStyle.fontMain
                         font.pixelSize: Math.round(14 * IrisStyle.typeScale)
                         font.letterSpacing: 1.5
@@ -373,12 +374,11 @@ Item {
                             anchors.centerIn: parent
                             visible: passwordInput.text.length === 0
                             text: root.context.fingerprintsConfigured ? Translation.tr("Password or fingerprint") : Translation.tr("Enter Password")
-                            color: Qt.rgba(1, 1, 1, 0.62)
+                            color: IrisStyle.onMediaSecondary
                             font.pixelSize: Math.round(13 * IrisStyle.typeScale)
                         }
                     }
 
-                    // Submit arrow appears once there is something to submit.
                     Rectangle {
                         id: submitButton
                         anchors.right: parent.right
@@ -387,7 +387,7 @@ Item {
                         width: Math.round(28 * root.d)
                         height: width
                         radius: width / 2
-                        color: Qt.rgba(1, 1, 1, submitArea.containsMouse ? 0.4 : 0.28)
+                        color: (submitArea.containsMouse ? IrisStyle.onMediaFillHover : IrisStyle.onMediaFill)
                         opacity: root.context.currentText.length > 0 || root.context.unlockInProgress ? 1 : 0
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(120) } }
@@ -395,7 +395,7 @@ Item {
                             anchors.centerIn: parent
                             text: root.context.unlockInProgress ? "more_horiz" : "arrow_forward"
                             iconSize: Math.round(18 * root.d)
-                            color: "#ffffff"
+                            color: IrisStyle.onMedia
                         }
                         MouseArea {
                             id: submitArea
@@ -416,7 +416,7 @@ Item {
                         : root.context.showFailure ? Translation.tr("Incorrect password")
                         : root.context.fingerprintsConfigured ? Translation.tr("Touch the fingerprint reader or enter your password")
                         : " "
-                    color: root.context.showFailure ? "#ffb4ab" : Qt.rgba(1, 1, 1, 0.7)
+                    color: root.context.showFailure ? IrisStyle.danger : IrisStyle.onMediaSecondary
                     font.pixelSize: Math.round(12 * IrisStyle.typeScale)
                 }
             }

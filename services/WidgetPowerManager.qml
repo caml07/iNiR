@@ -48,21 +48,7 @@ Singleton {
     readonly property bool pauseWhenWindowsPresent: Config.options?.background?.widgets?.powerSaving?.pauseWhenWindowsPresent ?? false
 
     function _hasWindowsOnActiveWorkspace(outputName: string): bool {
-        try {
-            if (!CompositorService.isNiri || !Array.isArray(NiriService.windows))
-                return false;
-            const allWorkspaces = Object.values(NiriService.workspaces ?? {});
-            const activeWorkspaces = allWorkspaces.filter(workspace =>
-                workspace?.is_active
-                    && (outputName.length === 0 || workspace.output === outputName));
-            if (activeWorkspaces.length === 0)
-                return false;
-            return NiriService.windows.some(window =>
-                !window?.is_minimized
-                    && activeWorkspaces.some(workspace => workspace.id === window.workspace_id));
-        } catch (e) {
-            return false;
-        }
+        return CompositorService.isNiri && NiriService.hasWindowsOnActiveWorkspace(outputName);
     }
 
     function _fullscreenForOutput(outputName: string): bool {

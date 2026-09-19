@@ -128,17 +128,23 @@ Some panels are shared between families (cheatsheet, region selector, on-screen 
 
 ## iRiS
 
-iRiS is the deliberately minimal family. It keeps only background + modular bar resident and creates Palette, Controls, notification feedback, OSD, session/auth surfaces and shared utilities when they are actually needed.
+iRiS is the Island family and the main new family in 2.31. It is built around one screen-edge chassis instead of a collection of unrelated floating windows. The resting Island can grow into pages and cards, pieces can move between the Island, screen contour and desktop, and the Dock can live on any edge.
 
 ### Layout and design
 
-- **Bar**: compact top/bottom bar with `left`, `center`, and `right` slots.
-- **Palette**: keyboard-first apps/actions/clipboard/math surface in place of separate resident launchers.
-- **Controls**: compact volume/brightness/toggle surface.
+- **Island**: top, bottom, left or right. Side edges use a vertical compact form and opened content grows inward.
+- **Full bar**: `iris.bar.layout = "full"` turns the Island edge into start/center/end zones for the Island, workspaces, focused window, time and pieces.
+- **Pieces**: weather, notifications, sound, microphone, tools, media, tray and app bubbles can sit on the Island, attach to an edge owner or float on the desktop.
+- **Dock**: top, bottom, left, right or `auto`; auto keeps it opposite the Island and both edge owners can trade places.
+- **Palette / Spotlight**: keyboard-first apps, actions, clipboard and calculator surface.
+- **Controls**: quick controls can live in the Island or open as their own body.
+- **Studio**: live editor for appearance, motion, surfaces, layout and Themes.
+- **Themes**: curated whole-family redesigns plus user themes stored as JSON in `~/.config/inir/iris/themes`.
+- **Material**: iRiS glass uses the wallpaper below each body; Niri compositor blur is also available as an experimental material.
 - **Visual owner**: `modules/iris/style/IrisStyle.qml`.
-- **User modules**: reuse `CustomWidgets`; a manifest can provide `iris.main` plus allowed slots.
+- **Desktop widgets**: the shared widget canvas gains iRiS faces, materials and controls instead of maintaining a separate persistence system.
 
-iRiS composition is split between `modules/iris/critical/ShellIrisCriticalPanels.qml` and `modules/iris/ShellIrisPanelsImpl.qml` through `ShellIrisPanels.qml`. See `modules/iris/DESIGN.md` and `defaults/widgets/IRIS-SDK.md` for the family contract and extension API.
+iRiS composition is split between `modules/iris/critical/ShellIrisCriticalPanels.qml` and `modules/iris/ShellIrisPanelsImpl.qml` through `ShellIrisPanels.qml`. The chassis keeps the background and Island available first; heavier pages and transient surfaces are loaded on demand. See [iRiS](IRIS.md) for the user-facing family guide and `defaults/widgets/IRIS-SDK.md` for the extension API.
 
 ## Switching families
 

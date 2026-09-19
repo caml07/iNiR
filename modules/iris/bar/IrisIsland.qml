@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtQuick.Shapes
-import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
@@ -17,39 +16,81 @@ import qs.modules.common.widgets
 import qs.modules.mediaControls.components
 import qs.modules.iris.style
 import qs.modules.iris.components
+import qs.modules.iris.frame
+import qs.modules.iris.pieces
+import qs.modules.iris.bar.island
+import qs.modules.iris.control
 
-// The signature iRiS surface. One black chassis owns the silhouette; live
-// activities (screen recording, timers, media) take turns inside it, and a
-// second concurrent activity detaches as a minimal satellite that slides out
-// from behind the chassis and merges back when the Island expands.
 Item {
     id: root
 
     property var targetScreen
     property real availableWidth: 800
+    property real availableAcross: 800
     property real compactHeight: 42
     property bool expanded: false
     property bool pinned: false
-    // Expanded page requested by the gesture that opened the Island; empty
-    // means "the page of the primary activity".
     property string page: ""
 
     readonly property real d: IrisStyle.density
     readonly property var options: Config.options?.iris?.bar ?? ({})
-    readonly property bool notch: root.options?.notch ?? false
-    // Edge the owning bar window is mapped on (not the live option: the bar
-    // recycles its surface when the edge changes).
-    property bool bottomEdge: String(root.options?.position ?? "top") === "bottom"
+    readonly property real clockScale: Math.max(0.8, Math.min(1.5, Number(root.options?.clockScale ?? 100) / 100))
+    readonly property real breathing: Math.max(0.5, Math.min(2.5, Number(root.options?.padding ?? 100) / 100))
+    readonly property string clockAccentName: String(root.options?.clockAccent ?? "highlight")
+    readonly property color clockAccent: root.clockAccentName === "accent" ? IrisStyle.accent
+        : root.clockAccentName === "plain" ? IrisStyle.text : IrisStyle.secondaryAccent
+    readonly property real satelliteScale: Math.max(0.7, Math.min(1, Number(root.options?.satelliteScale ?? 100) / 100))
 
-    // ── Activities ────────────────────────────────────────────────────────
+    readonly property var desktopBlockKinds: ["profile", "context", "forecast", "agenda", "vitals", "modules"]
+    readonly property var desktopBlocks: Array.from(root.options?.desktopBlocks ?? root.desktopBlockKinds)
+        .filter(kind => root.desktopBlockKinds.includes(kind))
+    function desktopBlockLabel(kind: string): string {
+        return ({ profile: Translation.tr("Profile"), context: Translation.tr("Current app"),
+            forecast: Translation.tr("Forecast"), agenda: Translation.tr("Up next"),
+            vitals: Translation.tr("Vitals"), modules: Translation.tr("Modules") })[kind] ?? kind
+    }
+    function setDesktopBlock(kind: string, on: bool): void {
+        const next = root.desktopBlocks.filter(entry => entry !== kind)
+        if (on) next.push(kind)
+        Config.setNestedValue("iris.bar.desktopBlocks", next)
+    }
+    function desktopBlockGlyph(kind: string): string {
+        return ({ profile: "account_circle", context: "select_window", forecast: "partly_cloudy_day",
+            agenda: "event_upcoming", vitals: "monitor_heart", modules: "widgets" })[kind] ?? "add"
+    }
+    function moveDesktopBlock(kind: string, step: int): void {
+        const next = root.desktopBlocks.slice()
+        const from = next.indexOf(kind)
+        const to = Math.max(0, Math.min(next.length - 1, from + step))
+        if (from < 0 || to === from) return
+        next.splice(to, 0, next.splice(from, 1)[0])
+        Config.setNestedValue("iris.bar.desktopBlocks", next)
+    }
+    readonly property real studioHandlesWidth: Math.round(40 * root.d)
+    property string arrangeKind: ""
+    property real arrangeTravel: 0
+    property int arrangeSteps: 0
+    property real arrangeSpan: 0
+    readonly property bool studio: GlobalStates.irisArrange && root.focusedOutput && root.visualExpanded
+        && root.effectivePage === "desktop"
+    Connections {
+        target: root
+        function onVisualExpandedChanged(): void { if (!root.visualExpanded && root.focusedOutput) GlobalStates.irisArrange = false }
+    }
+    readonly property bool notch: root.options?.notch ?? false
+    readonly property alias notchness: notchSpring.value
+    IrisSpring { id: notchSpring; surface: "island"; intent: "move"; to: root.notch ? 1 : 0; minimum: 0 }
+    property string edge: "top"
+    readonly property bool bottomEdge: root.edge === "bottom"
+    readonly property bool rightEdge: root.edge === "right"
+    readonly property bool vertical: root.edge === "left" || root.rightEdge
+
     readonly property var player: MprisController.activePlayer
     readonly property bool hasMedia: root.player !== null && root.player !== undefined
         && String(root.player.trackTitle ?? "").length > 0
     readonly property bool ytMusic: root.hasMedia && MprisController._isYtMusicMpv(root.player)
     readonly property string title: root.ytMusic ? YtMusic.currentTitle : String(root.player?.trackTitle ?? "")
     readonly property bool playing: root.hasMedia && (root.ytMusic ? YtMusic.isPlaying : (root.player?.isPlaying ?? false))
-    // Same effective-progress ownership as the shared media widgets: YT Music
-    // streams report real position/duration through YtMusic, not MPRIS.
     readonly property real effectivePosition: root.ytMusic ? YtMusic.currentPosition : (root.player?.position ?? 0)
     readonly property real effectiveLength: root.ytMusic ? YtMusic.currentDuration : (root.player?.length ?? 0)
     readonly property real trackProgress: root.effectiveLength > 0
@@ -76,16 +117,19 @@ Item {
     readonly property string timerGlyph: root.timerKind === "pomodoro" && TimerService.pomodoroBreak ? "coffee"
         : root.timerKind === "stopwatch" ? "timer" : "hourglass_top"
 
+    readonly property var task: LiveActivities.latest
+    readonly property color taskTint: IrisStyle.identityColor(String(root.task?.tint ?? "lavender"))
     readonly property var activities: {
         const list = []
         if (root.recording) list.push("record")
         if (root.timerKind.length > 0) list.push("timer")
+        if (root.task) list.push("task")
         if (root.hasMedia) list.push("media")
         return list
     }
     readonly property string primary: root.activities[0] ?? "idle"
     readonly property string secondary: root.activities[1] ?? ""
-    readonly property bool hasSystemActivity: root.recording || root.timerKind.length > 0
+    readonly property bool hasSystemActivity: root.recording || root.timerKind.length > 0 || root.task !== null
 
     function pageFor(kind: string): string {
         return kind === "media" ? "media" : kind === "idle" || kind === "" ? "desktop" : "activity"
@@ -97,39 +141,128 @@ Item {
         return requested
     }
 
-    function openPage(nextPage: string, pin: bool): void {
+    readonly property var navKinds: ["media", "activity", "desktop", "tray", "tools", "focus", "today", "controls", "settings"]
+    readonly property var navItems: {
+        const chosen = Array.from(IrisStyle.structuralValue("bar.navItems", root.navKinds))
+            .filter(kind => root.navKinds.includes(kind))
+        return chosen.length > 0 ? chosen : root.navKinds
+    }
+    function navAvailable(kind: string): bool {
+        if (kind === "media") return root.hasMedia
+        if (kind === "activity") return root.hasSystemActivity
+        if (kind === "focus") return Config.options?.iris?.sidebars?.left?.enable ?? true
+        if (kind === "today") return Config.options?.iris?.sidebars?.right?.enable ?? true
+        return true
+    }
+    function navPageOf(kind: string): string {
+        if (kind === "controls") return root.controlsInIsland ? "controls" : ""
+        return ["media", "activity", "desktop", "tray", "tools"].includes(kind) ? kind : ""
+    }
+    readonly property var navEntries: {
+        const glyphs = { media: "music_note", activity: root.recording ? "radio_button_checked"
+                : root.timerKind.length > 0 ? root.timerGlyph : String(root.task?.glyph ?? "bolt"),
+            desktop: "space_dashboard", tray: "apps", tools: "timer", focus: "left_panel_open",
+            today: "right_panel_open", controls: "tune", settings: "settings" }
+        const labels = { media: "Now playing", activity: "Live activities", desktop: "Desktop", tray: "Tray",
+            tools: "Timers", focus: "Focus panel", today: "Today panel", controls: "Quick controls", settings: "Settings" }
+        const visible = root.navItems.filter(kind => root.navAvailable(kind))
+        const out = []
+        let pages = true
+        for (const kind of visible) {
+            const page = root.navPageOf(kind)
+            if (pages && page.length === 0 && out.length > 0) out.push({ kind: "|" })
+            if (page.length === 0) pages = false
+            out.push({ kind: kind, page: page, glyph: glyphs[kind], label: labels[kind] })
+        }
+        return out
+    }
+    readonly property var pageCycle: root.navEntries.filter(entry => (entry.page ?? "").length > 0).map(entry => entry.page)
+    function activateNav(kind: string): void {
+        const page = root.navPageOf(kind)
+        if (kind === "controls") {
+            if (!root.controlsInIsland) root.openControlCenterFrom(chassis)
+            else if (root.focusedOutput) GlobalStates.controlPanelOpen = true
+            return
+        }
+        if (page.length > 0) { root.page = page; root.pinned = true; return }
+        if (kind === "focus") { root.expanded = false; GlobalStates.openSidebarLeft(root.targetScreen?.name ?? "") }
+        else if (kind === "today") { root.expanded = false; GlobalStates.openSidebarRight(root.targetScreen?.name ?? "") }
+        else if (kind === "settings") root.openSettingsFrom(chassis)
+    }
+    function stepPage(steps: int): bool {
+        const cycle = root.pageCycle
+        if (cycle.length === 0 || steps === 0) return false
+        const at = Math.max(0, cycle.indexOf(root.effectivePage))
+        const next = cycle[Math.max(0, Math.min(cycle.length - 1, at + steps))]
+        if (!root.expanded) { root.openPage(next, true, null); return true }
+        if (next === root.effectivePage) return false
+        if (next === "controls" && root.focusedOutput) GlobalStates.controlPanelOpen = true
+        else root.page = next
+        root.pinned = true
+        return true
+    }
+    property real pageWheel: 0
+    function wheelPages(event, vertical: bool): void {
+        const dx = event.angleDelta.x !== 0 ? event.angleDelta.x : event.pixelDelta.x * 4
+        const dy = event.angleDelta.y !== 0 ? event.angleDelta.y : event.pixelDelta.y * 4
+        const across = Math.abs(dx) > Math.abs(dy)
+        if (!across && !vertical) return
+        event.accepted = true
+        root.pageWheel += across ? -dx : -dy
+        const steps = Math.trunc(root.pageWheel / 120)
+        if (steps === 0) return
+        root.pageWheel -= steps * 120
+        root.stepPage(steps)
+    }
+
+    function openPage(nextPage: string, pin: bool, origin): void {
         root.page = nextPage
+        root.pageOrigin = origin ?? null
+        if (origin) { root.pageOriginX = -1; root.pageOriginY = -1 }
         if (pin) root.pinned = true
         root.expanded = true
     }
+    property real pageOriginX: -1
+    property real pageOriginY: -1
 
-    // Screen-local y of the bar window's top edge (bottom bars sit low).
     property real screenOffsetY: 0
-    // Hand the exact visible shape of the part that opened a surface to that
-    // surface, so it can grow out of it. Only the focused output publishes.
+    function chassisBody(): var {
+        const p = chassis.mapToItem(null, chassis.leftInset, chassis.topInset)
+        return { x: p.x, y: p.y, width: root.vertical ? root.compactHeight : chassis.width,
+            height: root.vertical ? chassis.height : chassis.bodyHeight }
+    }
+    function partRect(part): var {
+        if (part === chassis) return root.chassisBody()
+        const p = part.mapToItem(null, 0, 0)
+        return { x: p.x, y: p.y, width: part.width * part.scale, height: part.height * part.scale }
+    }
     function publishOrigin(part): void {
         if (root.targetScreen?.name !== GlobalStates.focusedScreen?.name) return
         if (root.suppressed || !part?.visible) { GlobalStates.irisMorphOrigin = null; return }
-        root.handoffPart = part
         const isChassis = part === chassis
-        const top = part.mapToItem(null, 0, isChassis ? chassis.topInset : 0)
-        const height = isChassis ? chassis.bodyHeight : part.height
+        const r = root.partRect(part)
         GlobalStates.irisMorphOrigin = {
-            x: top.x, y: top.y + root.screenOffsetY,
-            width: part.width * part.scale, height: height,
-            radius: isChassis ? chassis.radius : part.width / 2,
+            x: r.x, y: r.y + root.screenOffsetY,
+            width: r.width, height: r.height,
+            radius: isChassis ? chassis.radius : IrisStyle.pieceRadius(Math.min(r.width, r.height)),
             screen: root.targetScreen?.name ?? ""
         }
     }
 
-    // The part a morphing surface grew out of; hidden while that morph flies.
-    property Item handoffPart: null
     property Item controlMorphPart: null
     property Item settingsMorphPart: null
     property bool controlOriginPrepared: false
     property bool settingsOriginPrepared: false
+    property bool settingsIntent: false
+    property string pageIntent: ""
 
+    readonly property bool controlsInIsland: String(Config.options?.iris?.controlCenter?.opens ?? "island") === "island"
     function openControlCenterFrom(part): void {
+        if (root.controlsInIsland) {
+            root.openPage("controls", true, part ?? null)
+            if (root.focusedOutput) GlobalStates.controlPanelOpen = true
+            return
+        }
         root.controlMorphPart = part ?? chassis
         root.publishOrigin(root.controlMorphPart)
         root.controlOriginPrepared = true
@@ -144,11 +277,7 @@ Item {
         root.expanded = false
         GlobalStates.openSettings()
     }
-    readonly property bool handingOff: GlobalStates.irisMorphHandoff && GlobalStates.irisMorphOwner === ""
-        && root.targetScreen?.name === GlobalStates.focusedScreen?.name
 
-    // Profile picture: the picker lives outside the expanded content so it
-    // survives the collapse that makes room for the native dialog.
     function chooseAvatar(): void {
         root.expanded = false
         avatarDialog.open()
@@ -177,9 +306,9 @@ Item {
         return h > 0 ? h + ":" + pad(m) + ":" + pad(sec) : m + ":" + pad(sec)
     }
 
-    // ── Feedback (volume / brightness / microphone HUD) ─────────────────
     property string feedbackKind: "volume"
-    readonly property bool feedback: feedbackTimer.running && !root.expanded
+    property bool wheelHold: false
+    readonly property bool feedback: (feedbackTimer.running || root.wheelHold) && !root.expanded && !root.fullscreenCovered
     readonly property var brightnessMonitor: Brightness.getMonitorForScreen(root.targetScreen)
     readonly property real feedbackValue: root.feedbackKind === "brightness"
         ? (root.brightnessMonitor?.brightness ?? 0)
@@ -193,21 +322,13 @@ Item {
         : root.feedbackValue < 0.67 ? "volume_down" : "volume_up"
 
     function showFeedback(kind: string): void {
-        // A level bubble being scrolled is its own feedback; the HUD would
-        // retire the bubble from under the pointer.
-        if (bubbleWheel.running) return
-        if (!(Config.options?.iris?.modules?.osd ?? true) || root.expanded
+        if (Date.now() < GlobalStates.irisLevelQuietUntil) return
+        if (!(Config.options?.iris?.modules?.osd ?? true) || root.expanded || root.fullscreenCovered
             || root.targetScreen?.name !== GlobalStates.focusedScreen?.name) return
         root.feedbackKind = kind
         feedbackTimer.restart()
     }
 
-    // ── System events ────────────────────────────────────────────────────
-    // Things that just happened (charger, a Bluetooth device, Do Not Disturb,
-    // Caps Lock, keyboard layout) take the resting shape for a moment and leave
-    // on their own, like the level HUD: glyph in its identity colour, what
-    // happened, and a level when one matters. Quiet during the first seconds
-    // after load so restoring state never reads as news.
     readonly property bool eventsEnabled: root.options?.events ?? true
     property var event: ({ icon: "", tint: IrisStyle.text, title: "", detail: "", value: -1 })
     readonly property bool eventShown: eventTimer.running && !root.expanded && !root.feedback
@@ -217,9 +338,46 @@ Item {
         root.event = { icon: icon, tint: tint, title: title, detail: detail, value: value }
         eventTimer.restart()
     }
-    Timer { id: eventTimer; interval: 2600 }
-    // Minor state (Caps Lock, keyboard layout) never takes the Island over: a
-    // small pill drops out of it, centred, and goes back in.
+    Timer { id: eventTimer; interval: 2600; onTriggered: root.clearOsdRequests() }
+    // The Island answers these requests, so it owns clearing them: a flag left
+    // set is never seen again by the OSD fallback on another output.
+    function clearOsdRequests(): void {
+        GlobalStates.osdVolumeOpen = false
+        GlobalStates.osdBrightnessOpen = false
+        GlobalStates.osdMicOpen = false
+        GlobalStates.osdMediaOpen = false
+        GlobalStates.osdKeyboardLayoutOpen = false
+    }
+    Connections {
+        target: GameMode
+        function onManuallyActivatedChanged(): void {
+            root.showEvent("sports_esports", GameMode.manuallyActivated ? IrisStyle.identity.green : IrisStyle.textSecondary,
+                GameMode.manuallyActivated ? Translation.tr("Game mode on") : Translation.tr("Game mode off"),
+                GameMode.manuallyActivated ? Translation.tr("Effects and notifications held back") : Translation.tr("Everything is back"), -1)
+        }
+    }
+    property bool niriConfigBroken: false
+    Connections {
+        target: CompositorService.isNiri ? NiriService : null
+        function onConfigLoadFinished(ok: bool, error: string): void {
+            if (!ok) {
+                const line = String(error ?? "").split("\n").map(part => part.trim()).find(part => part.length > 0) ?? ""
+                root.showEvent("error", IrisStyle.danger, Translation.tr("Niri config has an error"),
+                    line.length > 0 ? line : Translation.tr("The previous config is still in use"), -1)
+            } else if (root.niriConfigBroken) {
+                root.showEvent("check_circle", IrisStyle.success, Translation.tr("Niri config loaded"),
+                    Translation.tr("The error is fixed"), -1)
+            }
+            root.niriConfigBroken = !ok
+        }
+    }
+    Connections {
+        target: LiveActivities
+        function onFinished(activity: var): void {
+            root.showEvent("check_circle", IrisStyle.identityColor(String(activity?.tint ?? "lavender")),
+                String(activity?.title ?? ""), String(activity?.detail ?? "").length > 0 ? String(activity.detail) : Translation.tr("Done"), -1)
+        }
+    }
     property var badge: ({ icon: "", tint: IrisStyle.text, text: "" })
     function showBadge(icon: string, tint: color, text: string): void {
         if (!root.eventsEnabled || !eventsWarm.ready || root.fullscreenCovered
@@ -227,7 +385,7 @@ Item {
         root.badge = { icon: icon, tint: tint, text: text }
         badgeTimer.restart()
     }
-    Timer { id: badgeTimer; interval: 1600 }
+    Timer { id: badgeTimer; interval: 1600; onTriggered: root.clearOsdRequests() }
     Timer { id: eventsWarm; property bool ready: false; interval: 4000; running: true; onTriggered: ready = true }
     Connections {
         target: root.eventsEnabled && Battery.available ? Battery : null
@@ -249,7 +407,7 @@ Item {
     onBluetoothCountChanged: {
         const device = BluetoothStatus.firstActiveDevice
         if (root.lastBluetoothCount >= 0 && root.bluetoothCount > root.lastBluetoothCount && device)
-            root.showEvent("bluetooth_connected", "#64a8ff", String(device.name ?? Translation.tr("Device")), Translation.tr("Connected"),
+            root.showEvent("bluetooth_connected", IrisStyle.identity.blue, String(device.name ?? Translation.tr("Device")), Translation.tr("Connected"),
                 device.batteryAvailable ? device.battery : -1)
         else if (root.lastBluetoothCount > root.bluetoothCount)
             root.showEvent("bluetooth_disabled", IrisStyle.subtext, Translation.tr("Bluetooth"), Translation.tr("Device disconnected"), -1)
@@ -259,16 +417,13 @@ Item {
         target: root.eventsEnabled ? Notifications : null
         function onSilentChanged(): void {
             root.showEvent(Notifications.silent ? "do_not_disturb_on" : "notifications_active",
-                Notifications.silent ? "#b4a0ff" : IrisStyle.text, Translation.tr("Do not disturb"),
+                Notifications.silent ? IrisStyle.identity.lavender : IrisStyle.text, Translation.tr("Do not disturb"),
                 Notifications.silent ? Translation.tr("On") : Translation.tr("Off"), -1)
         }
     }
-    // An activity that ends takes the resting shape for a moment instead of
-    // vanishing: the Island says what finished before the clock returns.
     Connections {
         target: root.eventsEnabled ? TimerService : null
         function onCountdownRunningChanged(): void {
-            // Reset/stop restores the full duration; only a real finish reaches zero.
             if (!TimerService.countdownRunning && TimerService.countdownSecondsLeft <= 0)
                 root.showEvent("alarm", IrisStyle.secondaryAccent, Translation.tr("Time's up"),
                     Translation.tr("%1 timer").arg(root.durationText(TimerService.countdownDuration)), -1)
@@ -281,7 +436,6 @@ Item {
                 root.durationText(TimerService.pomodoroLapDuration), -1)
         }
     }
-    // The recorder clears its elapsed time as it stops, so the length is kept.
     property int lastRecordingSeconds: 0
     onRecordingChanged: {
         if (root.recording) root.lastRecordingSeconds = 0
@@ -294,18 +448,34 @@ Item {
             if (RecorderStatus.elapsedSeconds > 0) root.lastRecordingSeconds = RecorderStatus.elapsedSeconds
         }
     }
-    // Only referenced while events are on, so the keyboard state daemon is not
-    // started for iRiS otherwise.
     Connections {
-        target: root.eventsEnabled && (Config.options?.keyboardIndicators?.showPopup ?? true) ? KeyboardIndicators : null
-        function onCapsLockChanged(): void {
-            if (!KeyboardIndicators.ready || !KeyboardIndicators.showCapsPopup) return
-            root.showBadge("keyboard_capslock", KeyboardIndicators.capsLock ? IrisStyle.secondaryAccent : IrisStyle.subtext,
-                KeyboardIndicators.capsLock ? Translation.tr("Caps Lock") : Translation.tr("Caps Lock off"))
+        target: root.eventsEnabled ? Audio : null
+        function onSinkProtectionTriggered(reason: string): void {
+            root.showEvent("volume_off", IrisStyle.danger, Translation.tr("Volume held back"), reason, -1)
         }
-        function onCurrentLayoutNameChanged(): void {
-            if (!KeyboardIndicators.showLayoutPopup || !KeyboardIndicators.hasMultipleLayouts) return
-            root.showBadge("keyboard", IrisStyle.accent, KeyboardIndicators.currentLayoutCodeInline || KeyboardIndicators.currentLayoutName)
+    }
+    Connections {
+        target: root.eventsEnabled ? GlobalStates : null
+        function onOsdMediaActionTriggered(action: string): void {
+            if (!root.hasMedia || root.primary === "media") return
+            const title = StringUtils.cleanMusicTitle(root.title)
+            root.showEvent(action === "next" ? "skip_next" : action === "previous" ? "skip_previous"
+                : action === "pause" ? "pause" : "play_arrow", IrisStyle.accent,
+                title.length > 0 ? title : Translation.tr("Now playing"),
+                root.ytMusic ? YtMusic.currentArtist : String(root.player?.trackArtist ?? ""), -1)
+        }
+    }
+    Connections {
+        target: root.eventsEnabled ? KeyboardIndicators : null
+        function onPopupSequenceChanged(): void {
+            if (!KeyboardIndicators.ready) return
+            const kind = KeyboardIndicators.popupKind
+            const active = KeyboardIndicators.popupActive
+            root.showBadge(KeyboardIndicators.popupMaterialIcon,
+                kind === "layout" ? IrisStyle.accent : active ? IrisStyle.secondaryAccent : IrisStyle.subtext,
+                kind === "layout"
+                    ? (KeyboardIndicators.currentLayoutCodeInline || KeyboardIndicators.popupText)
+                    : KeyboardIndicators.popupText)
         }
     }
     function durationText(seconds: real): string {
@@ -313,9 +483,6 @@ Item {
         return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min"
     }
 
-    // ── Artwork tint ─────────────────────────────────────────────────────
-    // Live-activity accents follow the artwork like the system waveform does;
-    // greyscale covers fall back to plain text colour instead of inventing hue.
     ColorQuantizer {
         id: tintQuantizer
         source: root.hasMedia ? MediaArtwork.displaySource : ""
@@ -336,177 +503,264 @@ Item {
             Math.max(0.64, Math.min(0.76, best.hslLightness + 0.22)), 1)
     }
 
-    // ── Geometry ─────────────────────────────────────────────────────────
     readonly property bool visualExpanded: root.expanded && details.status === Loader.Ready
     readonly property real bubble: root.compactHeight
-    readonly property real satelliteGap: Math.round(6 * root.d)
-    // The fillet follows the chassis radius as it morphs, so the join to the
-    // screen edge grows with the shape instead of snapping between sizes.
-    readonly property real fillet: root.notch ? Math.round(chassis.radius * 0.62) : 0
-    readonly property real expandedWidth: Math.min(root.availableWidth - 2 * (root.bubble + root.satelliteGap),
-        (root.effectivePage === "activity" ? 384 : 440) * root.d)
+    readonly property real satelliteGap: Math.round(Math.max(0, Math.min(24, Number(Config.options?.iris?.bar?.satelliteGap ?? 6))) * root.d)
+    readonly property real satelliteOffset: root.satelliteGap + Math.round(IrisStyle.fuseEdge / 4 * root.notchness)
+    readonly property real fillet: Math.round(chassis.radius * 0.62 * root.notchness)
+    readonly property real expandedWidth: Math.min(root.vertical ? root.availableAcross : root.availableWidth - 2 * (root.bubble + root.satelliteGap),
+        root.effectivePage === "controls" ? Math.max(360, Number(Config.options?.iris?.controlCenter?.width ?? 360)) * root.d + 2 * root.padding
+            : (root.effectivePage === "activity" ? root.pageWidth * 384 / 440 : root.pageWidth) * root.d)
+    readonly property real pageWidth: Math.max(360, Math.min(600, Number(root.options?.pageWidth ?? 440)))
     readonly property real padding: Math.round(20 * root.d)
-    // Desktop editing is modal, so it takes the resting shape over the clock
-    // and activities: the Island says what mode the desktop is in and ends it.
     readonly property bool editingDesktop: GlobalStates.widgetEditMode
         && root.targetScreen?.name === GlobalStates.focusedScreen?.name
-    readonly property string compactMode: root.feedback ? "feedback"
-        : root.eventShown ? "event"
+    readonly property string compactMode: root.feedback && !root.anchored ? "feedback"
+        : root.eventShown && !root.anchored ? "event"
         : root.editingDesktop ? "edit"
-        : IrisStyle.cluster ? "clock" : root.primary
-    readonly property real chassisTargetWidth: root.visualExpanded ? root.expandedWidth
-        : Math.min(root.availableWidth, (root.compactMode === "feedback" ? 280
-            : root.compactMode === "event" ? 300
-            : root.compactMode === "clock" ? (root.clockStyle === "time" ? 96 : 156)
-            : root.compactMode === "idle" && root.clockStyle === "time" ? 110
-            : root.compactMode === "media" ? 320
-            : root.compactMode === "edit" ? 250
-            : root.compactMode === "idle" ? 180 : 236) * root.d)
-    // What the resting clock shows, and what the Cluster's trailing bubble is.
+        : IrisStyle.cluster && !root.zoned ? "clock" : root.primary
+    readonly property string layout: String(root.options?.layout ?? "island")
+    readonly property bool fullWidth: root.layout === "full"
+    readonly property bool zoned: root.fullWidth
+    readonly property bool heartShown: !root.zoned || root.compactMode !== "idle" || !barZones.hasTime
+    readonly property real heartTarget: !root.heartShown ? 0
+        : Math.max(root.compactFloor, Math.min(root.compactCeiling, root.compactContentWidth + Math.round(29 * root.d * root.breathing)))
+    readonly property alias heartLength: heartSpring.value
+    IrisSpring { id: heartSpring; surface: "island"; intent: "move"; to: root.heartTarget; minimum: 0; epsilon: 0.25 }
+    readonly property real fullChassisWidth: Math.max(0,
+        root.availableWidth - 2 * Math.max(root.sideReserveTarget, root.fillet))
+    readonly property bool anchored: root.fullWidth || root.vertical
+    // The page is built synchronously (~90 ms): starting the shape before it is
+    // ready spends the first frames of the morph inside that build.
+    readonly property bool pageReady: !root.expanded || details.status === Loader.Ready
+    readonly property bool inlineExpanded: root.visualExpanded && !root.anchored && root.pageReady
+    readonly property bool compactSizeClass: root.compactMode === "feedback" || root.compactMode === "event"
+    readonly property bool spanning: root.fullWidth
+    readonly property var compactRows: ({ idle: idleRow, media: mediaRow, record: recordRow,
+        timer: timerRow, task: taskRow, clock: clockRow, edit: editRow, event: eventRow, feedback: feedbackRow })
+    readonly property real compactContentWidth: root.vertical ? compactColumn.implicitHeight
+        : root.compactRows[root.compactMode]?.implicitWidth ?? 0
+    readonly property real compactFloor: root.compactHeight * 2.1
+    readonly property real compactCeiling: Math.min(root.availableWidth,
+        (root.compactMode === "media" ? 380 : root.compactMode === "event" ? 330 : 320) * root.d)
+    readonly property real compactTargetWidth: root.spanning ? root.fullChassisWidth
+        : Math.max(root.compactFloor, Math.min(root.compactCeiling,
+            root.compactContentWidth + Math.round(29 * root.d * root.breathing) + root.barPieceReserve))
+    readonly property real chassisTargetWidth: root.inlineExpanded ? root.expandedWidth : root.compactTargetWidth
     readonly property string clockStyle: {
-        const style = String(root.options?.clockStyle ?? "dateTime")
+        const style = String(IrisStyle.structuralValue("bar.clockStyle", "dateTime"))
         return style === "weather" && !(Weather.enabled && !String(Weather.data?.temp ?? "--").startsWith("--")) ? "time" : style
     }
-    readonly property string trailing: String(root.options?.trailing ?? "controls")
+    readonly property string trailing: String(IrisStyle.structuralValue("bar.trailing", "controls"))
     readonly property string trailingKind: root.trailing === "notifications" && (Notifications.list?.length ?? 0) === 0 ? "none" : root.trailing
-    readonly property bool leftSatelliteShown: IrisStyle.cluster && !root.visualExpanded && !root.feedback && !root.eventShown
+    readonly property bool leftSatelliteShown: root.leftSatelliteRest && !root.inlineExpanded
+    readonly property bool leftSatelliteRest: IrisStyle.cluster && !root.zoned && !root.feedback && !root.eventShown
         && !root.floatingSlots.includes("left")
         && root.primary !== "idle"
-    readonly property bool rightSatelliteShown: !root.visualExpanded && !root.feedback && !root.eventShown
-        && !root.floatingSlots.includes("right")
+    readonly property bool rightSatelliteShown: root.rightSatelliteRest && !root.inlineExpanded
+    function floatsAlone(kind: string): bool { return Config.options?.iris?.bubbles?.extras?.[kind]?.enable ?? false }
+    readonly property bool rightSatelliteRest: !root.zoned && !root.feedback && !root.eventShown
+        && !root.floatingSlots.includes("right") && !(IrisStyle.cluster && root.floatsAlone(root.trailingKind))
         && (IrisStyle.cluster ? root.trailingKind !== "none" : root.secondary.length > 0)
 
     readonly property var trayItems: SystemTray.items.values.filter(item => item && item.id
         && (!(Config.options?.iris?.tray?.hidePassive ?? false) || item.status !== Status.Passive))
-    readonly property string auxiliary: String(root.options?.auxiliary ?? "tray")
-    readonly property int auxiliarySlot: (IrisStyle.cluster ? root.trailingKind !== "none" : root.secondary.length > 0)
+    readonly property string auxiliary: String(IrisStyle.structuralValue("bar.auxiliary", "tray"))
+    readonly property int auxiliarySlot: (IrisStyle.cluster ? root.trailingKind !== "none" && !root.floatsAlone(root.trailingKind) : root.secondary.length > 0)
         && !root.floatingSlots.includes("right") ? 2 : 1
-    readonly property bool auxiliaryShown: !root.visualExpanded && !root.feedback && !root.eventShown && root.auxiliary !== "none"
+    readonly property bool auxiliaryShown: root.auxiliaryRest && !root.inlineExpanded
+    readonly property bool auxiliaryRest: !root.zoned && !root.feedback && !root.eventShown && root.auxiliary !== "none"
+        && !root.floatsAlone(root.auxiliary)
         && !root.floatingSlots.includes("utility")
         && (root.auxiliary !== "tray" || root.trayItems.length > 0)
-    readonly property real sideReserveTarget: root.auxiliaryShown
-        ? root.auxiliarySlot * (root.bubble + root.satelliteGap)
-        : root.leftSatelliteShown || root.rightSatelliteShown ? root.bubble + root.satelliteGap : root.fillet
-    property real sideReserve: root.sideReserveTarget
-    Behavior on sideReserve { NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.OutCubic } }
+    readonly property var absorbed: GlobalStates.irisAbsorbed?.[root.targetScreen?.name ?? ""] ?? ({})
+    readonly property var absorbedPieces: Array.from(root.absorbed?.island ?? [])
+    function pieceTaken(kind: string): bool {
+        if (root.absorbedPieces.includes(kind)) return false
+        if (Config.options?.iris?.bubbles?.extras?.[kind]?.enable ?? false) return true
+        if (root.auxiliaryShown && root.auxiliary === kind) return true
+        if (root.rightSatelliteShown && IrisStyle.cluster && root.trailingKind === kind) return true
+        return root.leftSatelliteShown && kind === "media"
+    }
+    readonly property var barPieces: {
+        const carried = Array.from(IrisStyle.structuralValue("bar.pieces", []))
+        for (const kind of root.absorbedPieces) if (!carried.includes(kind)) carried.push(kind)
+        return carried.filter(kind => IrisPieces.extraIds.includes(kind) && IrisPieces.available(kind) && !root.pieceTaken(kind))
+    }
+    readonly property real barPieceSize: Math.round(root.compactHeight - 10 * root.d)
+    readonly property real barPieceGap: Math.round(6 * root.d)
+    readonly property real barPieceReserve: root.zoned || root.barPieces.length === 0 ? 0
+        : root.barPieces.length * root.barPieceSize
+            + (root.barPieces.length - 1) * root.barPieceGap + Math.round(13 * root.d)
 
-    implicitWidth: chassis.width + 2 * Math.max(root.sideReserve, root.fillet)
-    implicitHeight: chassis.bodyHeight
-    // Input covers both the shape on screen and the shape it is becoming. A
-    // morph under a still pointer must never push it out of the input region:
-    // Wayland sends leave, no enter follows until the pointer moves, and the
-    // hover-opened Island would collapse while the pointer is visibly on it.
-    readonly property real inputWidth: Math.max(root.implicitWidth,
+    readonly property real sideReserveTarget: root.auxiliaryShown
+        ? root.auxiliarySlot * (root.bubble + root.satelliteOffset)
+        : root.leftSatelliteShown || root.rightSatelliteShown ? root.bubble + root.satelliteOffset : root.fillet
+    property real sideReserve: root.sideReserveTarget
+    Behavior on sideReserve { NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve } }
+
+    property Item pageOrigin: null
+    property string extensionRole: "page"
+    readonly property string wantedRole: root.visualExpanded ? "page"
+        : root.feedback ? "feedback"
+        : root.eventShown ? "event" : ""
+    onWantedRoleChanged: if (root.wantedRole.length > 0) root.extensionRole = root.wantedRole
+    readonly property bool extensionOpen: root.anchored && root.wantedRole.length > 0
+    readonly property real joinFillet: Math.round(root.compactHeight * 0.6)
+    readonly property Item extensionOrigin: root.extensionRole === "page" ? root.pageOrigin
+        : root.extensionRole === "feedback"
+            ? root.pieceItem(root.feedbackKind === "mic" ? "mic" : root.feedbackKind === "brightness" ? "tools" : "sound")
+        : null
+    readonly property real originWidth: root.extensionOrigin?.visible
+        ? (root.vertical ? root.extensionOrigin.height : root.extensionOrigin.width) : Math.round(40 * root.d)
+    readonly property real originCenterX: {
+        const part = root.extensionOrigin
+        if (part && part.visible) return part.mapToItem(root, part.width / 2, 0).x
+        if (root.extensionRole === "page" && root.pageOriginX >= 0) return root.pageOriginX
+        if (root.zoned && root.heartShown) return chassis.x + barZones.heartAlong + root.heartLength / 2
+        return chassis.x + chassis.width / 2
+    }
+    function extensionX(width: real): real {
+        const inset = chassis.radius + root.joinFillet
+        const min = chassis.x + inset
+        const max = chassis.x + chassis.width - inset - width
+        return Math.round(Math.max(min, Math.min(max, root.originCenterX - width / 2)))
+    }
+    readonly property real originCenterY: {
+        const part = root.extensionOrigin
+        if (part && part.visible) return part.mapToItem(root, 0, part.height / 2).y
+        if (root.extensionRole === "page" && root.pageOriginY >= 0) return root.pageOriginY
+        if (root.zoned && root.heartShown) return chassis.y + barZones.heartAlong + root.heartLength / 2
+        return chassis.y + chassis.height / 2
+    }
+    function extensionY(height: real): real {
+        if (root.fullWidth) {
+            const inset = chassis.radius + root.joinFillet
+            return Math.round(Math.max(chassis.y + inset, Math.min(chassis.y + chassis.height - inset - height, root.originCenterY - height / 2)))
+        }
+        const sceneY = root.parent?.y ?? 0
+        const screenH = root.Window.window?.height ?? root.targetScreen?.height ?? 1080
+        const min = IrisFrame.inset("top") + Math.round(8 * root.d) - sceneY
+        const max = screenH - IrisFrame.inset("bottom") - Math.round(8 * root.d) - sceneY - height
+        return Math.round(Math.max(min, Math.min(max, root.originCenterY - height / 2)))
+    }
+
+    implicitWidth: root.vertical ? root.compactHeight + extension.reach
+        : chassis.width + 2 * Math.max(root.sideReserve, root.fillet)
+    implicitHeight: root.vertical ? chassis.height + 2 * Math.max(root.sideReserve, root.fillet)
+        : chassis.bodyHeight + (root.anchored ? extension.reach : 0)
+    readonly property rect extensionArea: root.anchored && extension.reach > 0.5
+        ? Qt.rect(extension.x, extension.y, extension.width, extension.height)
+        : Qt.rect(0, 0, 0, 0)
+    // The input region is a Wayland commit: while a shape is under way it only
+    // grows, so a collapsing Island does not hand the compositor a region a frame.
+    readonly property bool morphing: (chassis.presentation > 0.002 && chassis.presentation < 0.998)
+        || (extension.presentation > 0.002 && extension.presentation < 0.998)
+    readonly property real inputWidthLive: root.vertical ? root.implicitWidth : Math.max(root.implicitWidth,
         root.chassisTargetWidth + 2 * Math.max(root.sideReserveTarget, root.fillet))
-    readonly property real inputHeight: Math.max(root.implicitHeight, chassis.bodyHeightTarget)
+    readonly property real inputHeightLive: root.vertical ? Math.max(root.implicitHeight,
+        root.chassisTargetWidth + 2 * Math.max(root.sideReserveTarget, root.fillet))
+        : Math.max(chassis.bodyHeight, chassis.bodyHeightTarget)
+    property real inputWidthHeld: 0
+    property real inputHeightHeld: 0
+    function holdInput(): void {
+        root.inputWidthHeld = root.morphing ? Math.max(root.inputWidthHeld, root.inputWidthLive) : root.inputWidthLive
+        root.inputHeightHeld = root.morphing ? Math.max(root.inputHeightHeld, root.inputHeightLive) : root.inputHeightLive
+    }
+    onInputWidthLiveChanged: root.holdInput()
+    onInputHeightLiveChanged: root.holdInput()
+    onMorphingChanged: { root.holdInput(); if (!root.morphing) geometrySettle.restart() }
+    readonly property real inputWidth: Math.max(root.inputWidthLive, root.inputWidthHeld)
+    readonly property real inputHeight: Math.max(root.inputHeightLive, root.inputHeightHeld)
 
     Accessible.role: Accessible.Grouping
     Accessible.name: Translation.tr("Dynamic Island")
 
-    // ── Behaviour ────────────────────────────────────────────────────────
-    // Intent, not contact: the Island only opens once the pointer settles on a
-    // real part of it (chassis or satellite). Sweeping across the screen edge
-    // keeps restarting the dwell, and panels are never opened by hover alone.
-    readonly property bool pointerOnIsland: chassisHover.hovered || leftSatellite.hovered || rightSatellite.hovered || auxiliarySatellite.hovered
+    property real paintNudge: 1
+    Timer {
+        interval: 420
+        running: true
+        onTriggered: { root.paintNudge = 0.999; nudgeBack.restart() }
+    }
+    Timer { id: nudgeBack; interval: 40; onTriggered: root.paintNudge = 1 }
+
+    readonly property bool pointerOnIsland: chassisHover.hovered || extensionHover.hovered
+        || leftSatellite.hovered || rightSatellite.hovered || auxiliarySatellite.hovered
     property point dwellAnchor: Qt.point(-1000, -1000)
-    // Set by the bar while the pointer rests where the Island was before a
-    // resize moved it away; that is not leaving until the pointer moves.
     property bool pointerHeld: false
     onPointerHeldChanged: if (!root.pointerHeld && !root.pointerOnIsland && root.expanded && !root.pinned) leaveDelay.restart()
 
-    // Fullscreen windows own the output: the resting Island steps aside and
-    // only transient feedback or an explicitly opened Island is presented.
     readonly property bool fullscreenCovered: CompositorService.isNiri
         && GameMode.hasFullscreenOnOutput(root.targetScreen?.name ?? "")
         && !NiriService.inOverview
-    readonly property bool suppressed: root.fullscreenCovered && !feedbackTimer.running && !root.expanded
-    opacity: root.suppressed || (root.handingOff && root.handoffPart === chassis) ? 0 : 1
-    // Hidden by opacity only (input is already masked off while suppressed).
-    // Cycling visible on every fullscreen or hand-off left the clipping chassis
-    // and the notch path unpainted when it came back, while satellites drew.
-    // Hand-off hides on the same frame and returns with a short fade. It fades
-    // the whole Island, never the chassis itself: an animated opacity on the
-    // ClippingRectangle left it (and the notch) unpainted after hand-offs.
+    readonly property bool suppressed: root.fullscreenCovered && !root.feedback && !root.expanded
+    opacity: root.suppressed ? 0 : 1
+    // Opacity only, on the whole Island: toggling visible or animating the chassis opacity leaves it unpainted.
     Behavior on opacity {
-        enabled: !root.handingOff
-        NumberAnimation { duration: IrisStyle.duration(160); easing.type: Easing.OutCubic }
+        NumberAnimation { duration: IrisStyle.duration(160); easing.type: IrisStyle.feedbackEasing }
     }
 
+    property point pointerScene: Qt.point(-1000, -1000)
     function trackDwell(position: point): void {
-        // Scrolling reshapes the Island under a still pointer (HUD, satellites
-        // merging); that must never read as intent to expand.
-        // A resting shape that is itself an action (desktop editing's Done)
-        // must stay clickable: hover never expands it out from under the pointer.
+        root.pointerScene = position
         if (root.feedback || root.editingDesktop || wheelQuiet.running) { hoverDelay.stop(); return }
-        if (Math.abs(position.x - root.dwellAnchor.x) + Math.abs(position.y - root.dwellAnchor.y) < 6) return
+        if (Math.abs(position.x - root.dwellAnchor.x) + Math.abs(position.y - root.dwellAnchor.y) < 4) return
         root.dwellAnchor = position
-        if ((root.options?.hoverExpand ?? true) && !root.expanded && root.pointerOnIsland) hoverDelay.restart()
+        if ((root.options?.hoverExpand ?? true) && root.hoverArmed && !root.fullWidth && !root.expanded && root.pointerOnIsland)
+            hoverDelay.restart()
     }
 
+    property bool hoverArmed: true
     onPointerOnIslandChanged: {
         if (root.pointerOnIsland) {
             leaveDelay.stop()
         } else {
+            root.hoverArmed = true
             hoverDelay.stop()
-            root.dwellAnchor = Qt.point(-1000, -1000)
+            if (root.wheelHold) { root.wheelHold = false; feedbackTimer.restart() }
             if (root.expanded && !root.pinned && !root.pointerHeld) leaveDelay.restart()
         }
     }
     Timer {
         id: hoverDelay
-        interval: Math.max(60, Number(root.options?.hoverDelay ?? 160))
+        interval: Math.max(120, Number(root.options?.hoverDelay ?? 300))
         onTriggered: {
-            if (!root.pointerOnIsland || root.expanded || root.feedback || root.editingDesktop || wheelQuiet.running) return
+            if (!root.hoverArmed || !root.pointerOnIsland || root.expanded || root.feedback || root.editingDesktop || wheelQuiet.running) return
             if (auxiliarySatellite.hovered || (rightSatellite.hovered && IrisStyle.cluster)) return
-            // The player and live activities open on click only: they are what
-            // the wheel adjusts, and a page opening under it would take the scroll.
             const page = rightSatellite.hovered ? root.pageFor(root.secondary)
                 : leftSatellite.hovered ? root.pageFor(root.primary)
                 : IrisStyle.cluster ? "desktop" : root.pageFor(root.primary)
-            if (page === "desktop") root.openPage(page, false)
+            if (page === "desktop") root.openPage(page, false,
+                rightSatellite.hovered ? rightSatellite : leftSatellite.hovered ? leftSatellite : null)
         }
     }
     Timer { id: wheelQuiet; interval: 900 }
-    Timer { id: bubbleWheel; interval: 600 }
-    Timer { id: leaveDelay; interval: 320; onTriggered: { if (!root.pointerOnIsland && !root.pointerHeld && !root.pinned) root.expanded = false } }
+    Timer { id: leaveDelay; interval: 450; onTriggered: { if (!root.pointerOnIsland && !root.pointerHeld && !root.pinned) root.expanded = false } }
+    Timer { id: pageIntentExpiry; interval: 1800; onTriggered: root.pageIntent = "" }
 
     Binding {
         target: GlobalStates
         property: "irisControlsWarm"
-        value: root.pointerOnIsland || root.expanded
+        value: !root.controlsInIsland && (root.pointerOnIsland || root.expanded)
         when: root.targetScreen?.name === GlobalStates.focusedScreen?.name
         restoreMode: Binding.RestoreNone
     }
     Binding {
         target: GlobalStates
         property: "irisSettingsWarm"
-        value: root.expanded
+        value: root.settingsIntent
         when: root.targetScreen?.name === GlobalStates.focusedScreen?.name
         restoreMode: Binding.RestoreNone
     }
 
-    // Scroll over the resting Island adjusts volume (or brightness); Shift
-    // swaps the two. Touchpad pixel deltas accumulate into the same steps.
     property real wheelAccumulator: 0
-    // `target` forces a level (a Sound or Microphone bubble); otherwise the
-    // scroll action applies, Shift swaps volume and brightness and Ctrl adjusts
-    // the microphone. An Island only peeking by hover folds back into the level
-    // HUD, so scrolling over it always does what scrolling over it promises.
-    function applyWheel(event, target): void {
-        const action = target || String(root.options?.scrollAction ?? "volume")
-        if (action === "none") return
-        hoverDelay.stop()
-        wheelQuiet.restart()
-        if (root.expanded && !root.pinned) root.expanded = false
-        if (target) bubbleWheel.restart()
-        const delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.pixelDelta.y * 4
-        root.wheelAccumulator += delta
+    function wheelSteps(event): int {
+        root.wheelAccumulator += event.angleDelta.y !== 0 ? event.angleDelta.y : event.pixelDelta.y * 4
         const steps = Math.trunc(root.wheelAccumulator / 120)
-        if (steps === 0) return
         root.wheelAccumulator -= steps * 120
-        const level = target === "mic" || (!target && (event.modifiers & Qt.ControlModifier)) ? "mic"
-            : target === "sound" ? "volume"
-            : (action === "brightness") !== Boolean(event.modifiers & Qt.ShiftModifier) ? "brightness" : "volume"
+        return steps
+    }
+    function stepLevel(level: string, steps: int): void {
         if (level === "brightness") {
             if (root.brightnessMonitor)
                 root.brightnessMonitor.setBrightness(Math.max(0, Math.min(1, root.brightnessMonitor.brightness + steps * 0.05)))
@@ -516,33 +770,109 @@ Item {
             Audio.setSinkVolume(Math.max(0, Math.min(1, (Audio.value ?? 0) + steps * 0.05)))
         }
     }
-    // What a bubble does when clicked; the level bubbles mute instead of opening.
-    function activateBubble(kind: string, part): void {
+    function applyWheel(event): void {
+        if (root.expanded) { root.wheelPages(event, false); return }
+        const action = String(root.options?.scrollAction ?? "volume")
+        if (action === "none") return
+        hoverDelay.stop()
+        wheelQuiet.restart()
+        root.dwellAnchor = root.pointerScene
+        const steps = root.wheelSteps(event)
+        if (steps === 0) return
+        const level = event.modifiers & Qt.ControlModifier ? "mic"
+            : (action === "brightness") !== Boolean(event.modifiers & Qt.ShiftModifier) ? "brightness" : "volume"
+        root.wheelHold = root.pointerOnIsland
+        root.stepLevel(level, steps)
+    }
+    function applySatelliteWheel(event, satellite): void {
+        hoverDelay.stop()
+        wheelQuiet.restart()
+        const steps = root.wheelSteps(event)
+        if (steps === 0) return
+        const level = satellite.kind === "mic" || (satellite.kind !== "sound" && (event.modifiers & Qt.ControlModifier)) ? "mic" : "sound"
+        satellite.showLevel(level)
+        GlobalStates.quietIrisLevels()
+        root.stepLevel(level === "mic" ? "mic" : "volume", steps)
+    }
+    readonly property var cardKinds: ["weather", "notifications", "sound", "mic", "tools", "tray", "media", "calendar"]
+    readonly property bool opensCards: String(Config.options?.iris?.bubbles?.opens ?? "card") === "card"
+    function toggleBubbleCard(kind: string, part, source: string): void {
+        if (GlobalStates.irisBubbleCard?.source === source) { GlobalStates.irisBubbleCard = null; return }
+        const isChassis = part === chassis
+        const r = root.partRect(part)
+        const band = root.chassisBody()
+        GlobalStates.irisBubbleCard = {
+            kind: kind, source: source, screen: root.targetScreen?.name ?? "", edge: root.edge,
+            x: r.x, y: r.y + root.screenOffsetY,
+            width: r.width, height: r.height,
+            radius: isChassis ? chassis.radius : IrisStyle.pieceRadius(Math.min(r.width, r.height)),
+            bandX: band.x, bandWidth: band.width,
+            bandY: band.y + root.screenOffsetY, bandHeight: band.height
+        }
+    }
+    Connections {
+        target: GlobalStates
+        function onIrisBubbleCardRequestChanged(): void {
+            if (GlobalStates.irisBubbleCardRequest.length === 0 || !root.focusedOutput) return
+            Qt.callLater(() => {
+                const kind = GlobalStates.irisBubbleCardRequest
+                if (kind.length === 0) return
+                GlobalStates.irisBubbleCardRequest = ""
+                if (!root.cardKinds.includes(kind)) return
+                root.expanded = false
+                const piece = root.pieceItem(kind)
+                if (piece) { root.toggleBubbleCard(kind, piece, "island-piece-" + kind); return }
+                const part = [leftSatellite, rightSatellite, auxiliarySatellite].find(s => s.visible && s.kind === kind)
+                root.toggleBubbleCard(kind, part ?? chassis, part ? "island-" + part.slot : "island-chassis")
+            })
+        }
+    }
+    function pieceItem(kind: string): var {
+        if (root.zoned) return barZones.itemFor(kind)
+        if (!root.barPieces.includes(kind)) return null
+        const row = barPieceRow.children
+        for (let i = 0; i < row.length; i++) {
+            if (row[i] && row[i].visible && String(row[i].modelData ?? "") === kind) return row[i]
+        }
+        return null
+    }
+    function activatePiece(kind: string, part): void {
+        if (root.opensCards && root.cardKinds.includes(kind) && part) {
+            root.toggleBubbleCard(kind, part, "island-piece-" + kind)
+            return
+        }
         if (kind === "sound") Audio.toggleMute()
         else if (kind === "mic") Audio.toggleMicMute()
-        else if (kind === "notifications") GlobalStates.openSidebarRight(root.targetScreen?.name ?? "")
-        else if (kind === "weather") root.openPage("desktop", true)
-        else if (kind === "tray" || kind === "tools") root.openPage(kind, true)
+        else root.activateBubble(kind, null)
+    }
+    function activateBubble(kind: string, part): void {
+        if (root.opensCards && root.cardKinds.includes(kind) && part) root.toggleBubbleCard(kind, part, "island-" + part.slot)
+        else if (kind === "sound") Audio.toggleMute()
+        else if (kind === "mic") Audio.toggleMicMute()
+        else if (kind === "notifications" || kind === "calendar") GlobalStates.openSidebarRight(root.targetScreen?.name ?? "")
+        else if (kind === "focus") Notifications.silent = !Notifications.silent
+        else if (kind === "weather" || kind === "clock") root.openPage("desktop", true, part)
+        else if (kind === "tray" || kind === "tools") root.openPage(kind, true, part)
         else root.openControlCenterFrom(part)
     }
 
+    onPageChanged: if (root.controlsInIsland && root.page !== "controls" && root.focusedOutput
+        && GlobalStates.controlPanelOpen && GlobalStates.irisMorphOwner !== "stage") GlobalStates.controlPanelOpen = false
     onExpandedChanged: {
-        if (!root.expanded) root.pinned = false
-        // A transient media card gives way to the Island it came from.
-        else if (root.focusedOutput) GlobalStates.irisMediaCardOpen = false
+        if (!root.expanded && root.page === "controls" && root.focusedOutput && GlobalStates.irisMorphOwner !== "stage")
+            GlobalStates.controlPanelOpen = false
+        if (!root.expanded) {
+            root.pinned = false
+            root.settingsIntent = false
+            root.pageIntent = ""
+            pageIntentExpiry.stop()
+            if (root.pointerOnIsland) root.hoverArmed = false
+        }
+        else root.wheelHold = false
+        if (root.expanded && root.focusedOutput) GlobalStates.irisBubbleCard = null
     }
-    // True once an expansion has settled: later size changes are hops between
-    // open shapes. Cleared the moment the Island starts to close.
-    property bool hopping: false
-    onVisualExpandedChanged: {
-        root.hopping = false
-        if (root.visualExpanded) hopSettle.restart()
-        else hopSettle.stop()
-        root.flyParts()
-    }
-    // The Desktop page's wallpaper hero, kept decoded while the Island lives so
-    // the page (recreated on every open) paints it on its first frame.
-    readonly property real heroDecodeWidth: Math.round(Math.min(root.availableWidth - 2 * (root.bubble + root.satelliteGap), 440 * root.d) * 1.5)
+    onVisualExpandedChanged: root.flyParts()
+    readonly property real heroDecodeWidth: Math.round(Math.min(root.availableWidth - 2 * (root.bubble + root.satelliteGap), root.pageWidth * root.d) * 1.5)
     Image {
         id: heroPreload
         visible: false
@@ -552,32 +882,30 @@ Item {
         cache: true
         sourceSize.width: root.heroDecodeWidth
     }
-    // Parts registered by the expanded pages (they live inside the loader).
     property Item pageCover: null
+    readonly property Item coverFlightItem: coverFlight
+    readonly property Item clockFlightItem: clockFlight
+    readonly property Item chassisItem: chassis
+    readonly property Item extensionItem: extension
+    readonly property Item heroPreloadItem: heroPreload
     property Item heroClock: null
-    // The compact counterpart of the cover and clock in the resting shape.
-    readonly property Item restingCover: IrisStyle.cluster
+    readonly property Item restingCover: IrisStyle.cluster && leftSatellite.shown
         ? (root.primary === "media" ? leftSatellite.artwork : null)
-        : (root.compactMode === "media" ? compactCover : null)
-    readonly property Item restingClock: root.compactMode === "clock" ? clusterClock
+        : (root.compactMode === "media" && !root.vertical ? compactCover : null)
+    readonly property Item restingClock: root.vertical ? null : root.compactMode === "clock" ? clusterClock
         : root.compactMode === "idle" ? idleClock : null
     function flyParts(): void {
-        const opening = root.visualExpanded
+        // Only the arrival flies: closing, the part rides the shape home, and a
+        // copy crossing a page that is still opaque read as a second design.
+        if (!root.visualExpanded) { coverFlight.stop(); clockFlight.stop(); return }
         const cover = root.effectivePage === "media" ? root.pageCover : null
         const clock = root.effectivePage === "desktop" ? root.heroClock : null
-        if (cover && root.restingCover) coverFlight.launch(opening ? root.restingCover : cover, opening ? cover : root.restingCover)
+        if (cover && root.restingCover) coverFlight.launch(root.restingCover, cover)
         else coverFlight.stop()
-        if (clock && root.restingClock) clockFlight.launch(opening ? root.restingClock : clock, opening ? clock : root.restingClock)
+        if (clock && root.restingClock) clockFlight.launch(root.restingClock, clock)
         else clockFlight.stop()
     }
-    // Page switches are content replaces, not journeys. A closing Island
-    // drops its page once faded; that is not a switch.
     onEffectivePageChanged: if (root.visualExpanded) { coverFlight.stop(); clockFlight.stop() }
-    Timer { id: hopSettle; interval: Math.max(1, IrisStyle.settleDuration); onTriggered: root.hopping = root.visualExpanded }
-    // How long compact content and satellites wait while a closing chassis is
-    // still wider than its resting shape, so they never draw over or beside
-    // the expanded silhouette.
-    readonly property int collapseHold: Math.round(IrisStyle.settleDuration * 0.3)
     Binding {
         target: GlobalStates
         property: "irisIslandExpanded"
@@ -585,15 +913,18 @@ Item {
         when: root.targetScreen?.name === GlobalStates.focusedScreen?.name
         restoreMode: Binding.RestoreNone
     }
+    Binding {
+        target: GlobalStates
+        property: "irisIslandPage"
+        value: root.expanded ? root.effectivePage : ""
+        when: root.targetScreen?.name === GlobalStates.focusedScreen?.name
+        restoreMode: Binding.RestoreNone
+    }
 
     Timer {
         id: feedbackTimer
         interval: 1800
-        onTriggered: {
-            GlobalStates.osdVolumeOpen = false
-            GlobalStates.osdBrightnessOpen = false
-            GlobalStates.osdMicOpen = false
-        }
+        onTriggered: root.clearOsdRequests()
     }
     Timer {
         interval: 1000
@@ -626,6 +957,11 @@ Item {
         function onOsdVolumeOpenChanged(): void { if (GlobalStates.osdVolumeOpen) root.showFeedback("volume") }
         function onOsdBrightnessOpenChanged(): void { if (GlobalStates.osdBrightnessOpen) root.showFeedback("brightness") }
         function onOsdMicOpenChanged(): void { if (GlobalStates.osdMicOpen) root.showFeedback("mic") }
+        function onOsdKeyboardLayoutOpenChanged(): void {
+            if (!GlobalStates.osdKeyboardLayoutOpen) return
+            root.showBadge("language", IrisStyle.accent,
+                KeyboardIndicators.currentLayoutCodeInline || KeyboardIndicators.currentLayoutName)
+        }
         function onWallpaperSelectorOpenChanged(): void {
             root.publishOrigin(chassis)
             if (GlobalStates.wallpaperSelectorOpen) root.expanded = false
@@ -634,9 +970,14 @@ Item {
             root.publishOrigin(chassis)
             if (GlobalStates.searchOpen) root.expanded = false
         }
-        // Opening and closing both publish: the surface grows out of the shape
-        // that opened it and collapses into whatever the Island looks like now.
         function onControlPanelOpenChanged(): void {
+            if (GlobalStates.irisMorphOwner === "stage") return
+            if (root.controlsInIsland) {
+                if (!root.focusedOutput) return
+                if (GlobalStates.controlPanelOpen && !(root.expanded && root.page === "controls")) root.openPage("controls", true, null)
+                else if (!GlobalStates.controlPanelOpen && root.expanded && root.page === "controls") root.expanded = false
+                return
+            }
             if (GlobalStates.controlPanelOpen) {
                 if (!root.controlOriginPrepared) {
                     root.controlMorphPart = IrisStyle.cluster && rightSatellite.shown ? rightSatellite : chassis
@@ -650,9 +991,10 @@ Item {
             root.publishOrigin(part)
         }
         function onSettingsOverlayOpenChanged(): void {
-            // Opened from somewhere else (a side panel button): that owner
-            // publishes where Settings grows from and collapses into.
-            if (GlobalStates.irisMorphOwner !== "") { root.settingsOriginPrepared = false; return }
+            if (GlobalStates.irisMorphOwner === "control" && !GlobalStates.settingsOverlayOpen) {
+                GlobalStates.irisMorphOwner = ""
+                root.settingsMorphPart = chassis
+            } else if (GlobalStates.irisMorphOwner !== "") { root.settingsOriginPrepared = false; return }
             if (GlobalStates.settingsOverlayOpen) {
                 if (!root.settingsOriginPrepared) {
                     root.settingsMorphPart = chassis
@@ -667,195 +1009,6 @@ Item {
         }
     }
 
-    // ── Inline parts ─────────────────────────────────────────────────────
-    component Tabular: IrisText {
-        font.family: IrisStyle.fontNumbers
-        font.features: ({ "tnum": 1 })
-    }
-
-    // Weekday quiet, day number carrying the accent: the glance reads "14"
-    // and the weekday only confirms it.
-    component DateMark: Row {
-        id: dateMark
-        property real pixelSize: 12 * IrisStyle.typeScale
-        property color dayColor: IrisStyle.secondaryAccent
-        spacing: Math.round(dateMark.pixelSize * 0.3)
-        IrisText {
-            id: weekdayText
-            text: Qt.locale().toString(DateTime.clock.date, "ddd").replace(/\.$/, "")
-            color: IrisStyle.muted
-            font.pixelSize: dateMark.pixelSize * 0.92
-            font.weight: Font.Medium
-        }
-        IrisText {
-            anchors.baseline: weekdayText.baseline
-            text: Qt.locale().toString(DateTime.clock.date, "d")
-            color: dateMark.dayColor
-            font.pixelSize: dateMark.pixelSize
-            font.family: IrisStyle.fontNumbers
-            font.weight: Font.Bold
-            font.features: ({ "tnum": 1 })
-        }
-    }
-
-    // A figure with its unit set small and quiet ("50" + "%", "12" + "°C").
-    component Metric: Row {
-        id: metric
-        property string value: ""
-        property string unit: ""
-        property real pixelSize: 15 * IrisStyle.typeScale
-        property int weight: Font.DemiBold
-        property color color: IrisStyle.text
-        IrisText {
-            id: metricValue
-            text: metric.value
-            color: metric.color
-            font.pixelSize: metric.pixelSize
-            font.family: IrisStyle.fontNumbers
-            font.weight: metric.weight
-            font.features: ({ "tnum": 1 })
-            font.letterSpacing: -metric.pixelSize * 0.015
-        }
-        IrisText {
-            visible: metric.unit.length > 0
-            anchors.baseline: metricValue.baseline
-            leftPadding: metric.pixelSize * 0.06
-            text: metric.unit
-            color: ColorUtils.applyAlpha(metric.color, 0.55)
-            font.pixelSize: Math.max(9, metric.pixelSize * 0.6)
-            font.weight: Font.DemiBold
-        }
-    }
-
-    component Glyph: MaterialSymbol {
-        fill: 1
-        color: IrisStyle.text
-    }
-    component GlyphButton: IrisButton {
-        id: glyphButton
-        property string glyph: ""
-        property real glyphSize: 22 * root.d
-        property color glyphColor: glyphButton.emphasized && glyphButton.danger ? IrisStyle.onDanger : IrisStyle.text
-        quiet: !glyphButton.emphasized
-        implicitWidth: Math.round(38 * root.d)
-        implicitHeight: implicitWidth
-        buttonRadius: height / 2
-        buttonRadiusPressed: height / 2
-        Glyph {
-            anchors.centerIn: parent
-            text: glyphButton.glyph
-            iconSize: glyphButton.glyphSize
-            color: glyphButton.enabled ? glyphButton.glyphColor : IrisStyle.muted
-        }
-    }
-
-    component RecordDot: Rectangle {
-        id: dot
-        implicitWidth: 9 * root.d
-        implicitHeight: implicitWidth
-        radius: width / 2
-        color: IrisStyle.danger
-        SequentialAnimation on opacity {
-            running: dot.visible && IrisStyle.motionEnabled
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine }
-            onRunningChanged: if (!running) dot.opacity = 1
-        }
-    }
-
-    component ProgressRing: Shape {
-        id: ring
-        property real progress: 0
-        property color tint: IrisStyle.text
-        property real stroke: Math.max(2, 2.5 * root.d)
-        preferredRendererType: Shape.CurveRenderer
-        ShapePath {
-            strokeColor: ColorUtils.applyAlpha(ring.tint, 0.22)
-            strokeWidth: ring.stroke
-            fillColor: "transparent"
-            PathAngleArc {
-                centerX: ring.width / 2
-                centerY: ring.height / 2
-                radiusX: ring.width / 2 - ring.stroke / 2
-                radiusY: radiusX
-                startAngle: 0
-                sweepAngle: 360
-            }
-        }
-        ShapePath {
-            strokeColor: ring.tint
-            strokeWidth: ring.stroke
-            fillColor: "transparent"
-            capStyle: ShapePath.RoundCap
-            PathAngleArc {
-                centerX: ring.width / 2
-                centerY: ring.height / 2
-                radiusX: ring.width / 2 - ring.stroke / 2
-                radiusY: radiusX
-                startAngle: -90
-                sweepAngle: 360 * Math.max(0, Math.min(1, ring.progress))
-            }
-        }
-    }
-
-    // Live waveform over the shared cava subscription. Bars are centred like
-    // the system waveform and fall flat when playback pauses.
-    component Waveform: Item {
-        id: wave
-        property bool running: false
-        property color tint: IrisStyle.text
-        property real barHeight: 16 * root.d
-        readonly property int bars: 5
-        implicitWidth: wave.bars * 3 * root.d + (wave.bars - 1) * 2 * root.d
-        implicitHeight: wave.barHeight
-
-        CavaProcess { id: cava; active: wave.running && wave.visible }
-        readonly property var raw: {
-            const pts = cava.points ?? []
-            if (pts.length === 0) return []
-            const per = pts.length / wave.bars
-            const out = []
-            for (let i = 0; i < wave.bars; i++) {
-                const from = Math.floor(i * per)
-                const to = Math.max(from + 1, Math.floor((i + 1) * per))
-                let band = 0
-                for (let k = from; k < to && k < pts.length; k++) band = Math.max(band, pts[k] ?? 0)
-                out.push(band)
-            }
-            return out
-        }
-        // Without cava the bars hold a still silhouette rather than faking motion.
-        readonly property var restShape: [0.45, 0.8, 0.6, 0.9, 0.5]
-
-        Row {
-            anchors.centerIn: parent
-            spacing: 2 * root.d
-            Repeater {
-                model: wave.bars
-                Rectangle {
-                    required property int index
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 3 * root.d
-                    radius: width / 2
-                    color: wave.tint
-                    height: {
-                        const level = !wave.running ? 0
-                            : wave.raw.length > 0 ? Math.min(1, (wave.raw[index] ?? 0) / Math.max(1, cava.normalizationCeiling))
-                            : wave.restShape[index]
-                        return Math.max(3 * root.d, level * wave.barHeight)
-                    }
-                    Behavior on height { NumberAnimation { duration: IrisStyle.duration(90); easing.type: Easing.OutQuad } }
-                }
-            }
-        }
-    }
-
-    // Shared element: while the Island opens or closes, a live copy of one part
-    // (cover, clock) travels from its compact place to the place it takes in
-    // the other shape on the chassis curve, so the part itself grows instead
-    // of fading out and reappearing. Both real parts hide while it flies; the
-    // destination is followed every frame because it rides the morph too.
     component Flight: Item {
         id: flight
         property Item from: null
@@ -886,7 +1039,6 @@ Item {
         }
         function launch(source: Item, target: Item): void {
             if (!source || !target || IrisStyle.duration(240) <= 0) { flight.stop(); return }
-            // Reversing mid-flight starts from where the copy is, not from the part.
             const midway = flight.flying
             const mix = (a, b) => a + (b - a) * flight.t
             flight.fromRect = midway ? Qt.rect(flight.x, flight.y, flight.width, flight.height) : flight.rectOf(source)
@@ -912,12 +1064,9 @@ Item {
             property: "t"
             from: 0
             to: 1
-            // Lands as the page finishes arriving (70 ms hold + 170 ms fade), not on
-            // the chassis' liquid tail: a copy still growing over a visible page
-            // reads as the Island moving twice.
-            duration: IrisStyle.duration(240)
+            duration: IrisStyle.settleDuration
             easing.type: Easing.BezierSpline
-            easing.bezierCurve: IrisStyle.morphCurve
+            easing.bezierCurve: IrisStyle.emergeCurve
             onStopped: if (flight.t >= 1) { flight.active = false; flight.from = null; flight.to = null }
         }
         FrameAnimation {
@@ -926,51 +1075,62 @@ Item {
         }
     }
 
-    // Detached minimal presentation. Emerges from behind the chassis edge so
-    // splitting and merging read as the same material separating.
     component Satellite: Item {
         id: satellite
         property string kind: ""
-        // Which bubble this is ("left", "right", "utility"): what dragging moves.
         property string slot: ""
         property bool shown: false
+        property bool resting: false
         property bool leftSide: false
         property int slotIndex: 1
         readonly property alias hovered: satelliteHover.hovered
         readonly property alias artwork: face.artwork
         signal activated()
+        property string levelKind: ""
+        function showLevel(level: string): void {
+            if (satellite.kind === "sound" || satellite.kind === "mic") return
+            satellite.levelKind = level
+            levelLinger.restart()
+        }
+        Timer { id: levelLinger; interval: 1400; onTriggered: satellite.levelKind = "" }
 
-        property real emerge: satellite.shown ? 1 : 0
-        Behavior on emerge {
-            id: emergeMotion
-            SequentialAnimation {
-                PauseAnimation { duration: emergeMotion.targetValue > 0 && chassis.bodyHeight > root.compactHeight + 1 ? root.collapseHold : 0 }
-                NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve }
-            }
+        readonly property real emerge: emergeSpring.value * Math.max(0, 1 - chassis.presentation / 0.5)
+        IrisSpring {
+            id: emergeSpring
+            surface: "island"
+            intent: "move"
+            to: satellite.resting ? 1 : 0
+            minimum: 0
         }
 
-        // A notch chassis hangs from the edge; its satellite floats free of it.
-        width: root.notch ? root.bubble - Math.round(8 * root.d) : root.bubble
+        width: Math.round((root.bubble - Math.round(8 * root.d) * root.notchness) * root.satelliteScale)
         height: width
         z: -1
-        y: root.bottomEdge ? root.height - (root.bubble + height) / 2 : (root.bubble - height) / 2
-        x: satellite.leftSide
-            ? chassis.x + (-root.satelliteGap - width) * satellite.emerge
-            : chassis.x + chassis.width - width + (root.satelliteGap + width) * satellite.slotIndex * satellite.emerge
-        visible: satellite.emerge > 0.01
-        // The media bubble is the card while the card is on screen; a lifted
-        // bubble is drawn by the bubble layer under the pointer.
-        readonly property bool becameCard: satellite.kind === "media" && GlobalStates.irisMediaCardShown && root.focusedOutput
-            && !(GlobalStates.irisMediaBubble?.floating ?? false)
+        readonly property real acrossCentre: root.rightEdge ? chassis.x + root.compactHeight / 2
+            : chassis.x + chassis.leftInset + root.compactHeight / 2
+        y: root.vertical ? (satellite.leftSide
+                ? chassis.y + (-root.satelliteOffset - height) * satellite.emerge
+                : chassis.y + chassis.height - height + (root.satelliteOffset + height) * satellite.slotIndex * satellite.emerge)
+            : root.bottomEdge ? root.height - (root.bubble + height) / 2 : (root.bubble - height) / 2
+        x: root.vertical ? Math.round(satellite.acrossCentre - width / 2)
+            : satellite.leftSide
+            ? chassis.x + (-root.satelliteOffset - width) * satellite.emerge
+            : chassis.x + chassis.width - width + (root.satelliteOffset + width) * satellite.slotIndex * satellite.emerge
+        // Kept in the scene while the Island is open: a satellite's face carries
+        // Shapes, and dropping their nodes on every open meant re-triangulating
+        // them on the frame that starts the close (measured: one 88 ms frame).
+        visible: satellite.emerge > 0.01 || root.expanded || chassis.presentation > 0.002
         readonly property bool lifted: root.draggedSlot === satellite.slot
-        opacity: (root.handingOff && root.handoffPart === satellite) || satellite.becameCard || satellite.lifted
-            ? 0 : Math.min(1, satellite.emerge * 1.6)
-        scale: 0.72 + 0.28 * satellite.emerge
+        opacity: satellite.lifted ? 0 : 1
+        scale: 0.86 + 0.14 * satellite.emerge
 
         IrisBubbleFace {
             id: face
+            bodyless: true
+            screenName: root.targetScreen?.name ?? ""
+            opacity: Math.max(0, Math.min(1, (satellite.emerge - 0.45) / 0.4))
             anchors.fill: parent
-            kind: satellite.kind
+            kind: satellite.levelKind.length > 0 ? satellite.levelKind : satellite.kind
             tint: root.artTint
             playing: root.playing
             mediaProgress: root.trackProgress
@@ -984,15 +1144,11 @@ Item {
             cursorShape: Qt.PointingHandCursor
             onPointChanged: root.trackDwell(point.scenePosition)
         }
-        // Level bubbles always take the wheel; the others only when the user
-        // wants scrolling on every bubble.
         WheelHandler {
             enabled: satellite.kind === "sound" || satellite.kind === "mic" || (root.options?.scrollBubbles ?? true)
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-            onWheel: event => root.applyWheel(event, satellite.kind === "sound" || satellite.kind === "mic" ? satellite.kind : "")
+            onWheel: event => root.applySatelliteWheel(event, satellite)
         }
-        // A click activates; holding lifts the bubble so it can be carried
-        // somewhere else (see IrisBubbleLayer), and releasing drops it there.
         IrisBubbleGrip {
             id: bubblePointer
             anchors.fill: parent
@@ -1000,93 +1156,138 @@ Item {
             kind: satellite.kind
             screenName: root.targetScreen?.name ?? ""
             screenOffsetY: root.screenOffsetY
-            onTapped: satellite.activated()
+            holdLifts: !GlobalStates.irisEdit
+            pullDistance: GlobalStates.irisEdit ? 6 * root.d : 0
+            onTapped: {
+                if (GlobalStates.irisEdit) {
+                    GlobalStates.irisEditTarget = ""
+                    GlobalStates.irisEditSelection = GlobalStates.irisEditSelection === satellite.slot ? "" : satellite.slot
+                    return
+                }
+                satellite.activated()
+            }
         }
         Accessible.role: Accessible.Button
         Accessible.name: face.Accessible.name
     }
 
-    // ── Satellites ───────────────────────────────────────────────────────
     Satellite {
         id: leftSatellite
         slot: "left"
         leftSide: true
         kind: root.primary
         shown: root.leftSatelliteShown
-        // The media bubble floats out as a card when that is how it opens.
+        resting: root.leftSatelliteRest
         onActivated: {
-            if (root.mediaBubbleCard) GlobalStates.irisMediaCardOpen = !GlobalStates.irisMediaCardOpen
-            else root.openPage(root.pageFor(root.primary), true)
+            if (root.mediaBubbleCard) root.toggleBubbleCard("media", leftSatellite, "island-left")
+            else root.openPage(root.pageFor(root.primary), true, leftSatellite)
         }
     }
     readonly property bool mediaBubbleCard: IrisStyle.cluster && root.primary === "media"
         && String(Config.options?.iris?.player?.bubbleOpens ?? "card") === "card"
     readonly property bool focusedOutput: root.targetScreen?.name === GlobalStates.focusedScreen?.name
-    // The bubble's screen-local rect, for the card to grow out of and rest beside.
-    // Published only while the bubble has fully emerged, so a card keeps its
-    // place while the Island expands and the bubble tucks away.
-    Binding {
-        target: GlobalStates
-        property: "irisMediaBubble"
-        when: root.focusedOutput && root.mediaBubbleCard && leftSatellite.emerge >= 1 && !root.suppressed
-            && !root.floatingSlots.includes("left")
-        value: {
-            // The Island is centred by its loader: its position is part of the rect.
-            void (root.x + root.y + (root.parent?.x ?? 0) + (root.parent?.y ?? 0) + root.width + chassis.x + leftSatellite.x + leftSatellite.width)
-            const p = leftSatellite.mapToItem(null, 0, 0)
-            return {
-                x: p.x, y: p.y + root.screenOffsetY,
-                width: leftSatellite.width, height: leftSatellite.height,
-                radius: leftSatellite.width / 2, screen: root.targetScreen?.name ?? ""
-            }
-        }
-        restoreMode: Binding.RestoreNone
-    }
     Connections {
         target: GlobalStates
         function onIrisIslandPageRequestChanged(): void {
             const page = GlobalStates.irisIslandPageRequest
             if (page.length === 0 || !root.focusedOutput) return
             GlobalStates.irisIslandPageRequest = ""
-            root.openPage(page, true)
+            root.openPage(page, true, null)
         }
     }
-    // What each bubble slot shows on this output and where the Island rests, for
-    // the bubble layer: floating bubbles take their kind from here, and a bubble
-    // carried back re-attaches where its slot emerges.
     readonly property var bubbleKinds: ({
         left: IrisStyle.cluster && root.primary !== "idle" ? root.primary : "",
-        right: IrisStyle.cluster ? (root.trailingKind !== "none" ? root.trailingKind : "") : root.secondary,
-        utility: root.auxiliary !== "none" && (root.auxiliary !== "tray" || root.trayItems.length > 0) ? root.auxiliary : ""
+        right: IrisStyle.cluster ? (root.trailingKind !== "none" && !root.floatsAlone(root.trailingKind) ? root.trailingKind : "") : root.secondary,
+        utility: root.auxiliary !== "none" && !root.floatsAlone(root.auxiliary)
+            && (root.auxiliary !== "tray" || root.trayItems.length > 0) ? root.auxiliary : ""
     })
+    readonly property var fieldShapes: {
+        void (root.x + root.y + (root.parent?.x ?? 0) + (root.parent?.y ?? 0)
+            + chassis.x + chassis.width + chassis.bodyHeight + chassis.radius
+            + extension.x + extension.y + extension.width + extension.height
+            + leftSatellite.x + rightSatellite.x + auxiliarySatellite.x + leftSatellite.width)
+        const out = []
+        if (root.suppressed || root.opacity <= 0.01) return out
+        const melt = Math.min(1, Math.max(0, root.notchness))
+        if (melt > 0.01 && !IrisFrame.framed) {
+            const window = root.Window.window
+            const wide = (window?.width ?? 0) + 4 * IrisStyle.fuseDeep
+            const deep = Math.max(8, IrisStyle.fuseDeep * 2)
+            const top = root.bottomEdge ? (window?.height ?? 0) + 1 : -deep - 1
+            const tall = (window?.height ?? 0) + 4 * IrisStyle.fuseDeep
+            out.push(root.vertical
+                ? { x: root.rightEdge ? (window?.width ?? 0) + 1 : -deep - 1, y: -2 * IrisStyle.fuseDeep, width: deep, height: tall,
+                    radius: 0, paints: true, fuse: IrisStyle.fuseDeep, id: "edge" }
+                : { x: -2 * IrisStyle.fuseDeep, y: top, width: wide, height: deep,
+                    radius: 0, paints: true, fuse: IrisStyle.fuseDeep, id: "edge" })
+        }
+        const body = root.chassisBody()
+        out.push({ x: body.x, y: body.y, width: body.width, height: body.height,
+            radius: chassis.radius, paints: true,
+            fuse: IrisStyle.fuse + (IrisStyle.fuseEdge - IrisStyle.fuse) * melt, id: "island",
+            joins: melt <= 0.01 ? "" : IrisFrame.framed ? "frame" : "edge" })
+        if (extension.visible && extension.width > 1 && extension.height > 1) {
+            const page = extension.mapToItem(null, 0, 0)
+            const sink = root.fullWidth ? Math.min(extension.radius, root.compactHeight) : 0
+            out.push({ x: page.x - (root.vertical && !root.rightEdge ? sink : 0), y: page.y - (!root.vertical && !root.bottomEdge ? sink : 0),
+                width: extension.width + (root.vertical ? sink : 0), height: extension.height + (root.vertical ? 0 : sink),
+                radius: extension.radius, paints: true, fuse: IrisStyle.fuseDeep, joins: "island" })
+        }
+        for (const satellite of [leftSatellite, rightSatellite, auxiliarySatellite]) {
+            if (!satellite.visible || satellite.emerge <= 0.01) continue
+            const size = satellite.width * satellite.scale
+            const centre = satellite.mapToItem(null, satellite.width / 2, satellite.height / 2)
+            // Leaving, a satellite passes behind the Island: it melts into it only once it is out.
+            const joined = IrisStyle.fuse * IrisStyle.ramp(satellite.emerge, 0.85, 0.15)
+            out.push({ x: centre.x - size / 2, y: centre.y - size / 2, width: size, height: size,
+                radius: IrisStyle.pieceRadius(size), paints: true, fuse: joined, satellite: true, id: "satellite:" + satellite.slot,
+                joins: "island" })
+        }
+        return out
+    }
     readonly property var islandGeometry: {
-        void (root.x + (root.parent?.x ?? 0) + (root.parent?.y ?? 0) + chassis.x + chassis.width + chassis.bodyHeight)
-        const p = chassis.mapToItem(null, 0, chassis.topInset)
+        void (root.x + (root.parent?.x ?? 0) + (root.parent?.y ?? 0) + chassis.x + chassis.y + chassis.width + chassis.height + chassis.bodyHeight)
+        const p = root.chassisBody()
         return {
-            x: p.x, y: p.y + root.screenOffsetY, width: chassis.width, height: chassis.bodyHeight,
-            bubble: leftSatellite.width, gap: root.satelliteGap, bottomEdge: root.bottomEdge,
-            auxiliarySlot: root.auxiliarySlot, resting: !root.expanded
+            x: p.x, y: p.y + root.screenOffsetY, width: p.width, height: p.height,
+            bubble: leftSatellite.width, gap: root.satelliteOffset, bottomEdge: root.bottomEdge,
+            edge: root.edge, vertical: root.vertical,
+            auxiliarySlot: root.auxiliarySlot, resting: !root.expanded,
+            fullWidth: root.spanning
         }
     }
-    function publishBubbleState(): void {
+    function publishBubbleKinds(): void {
         const name = root.targetScreen?.name ?? ""
         if (name.length === 0) return
         const kinds = Object.assign({}, GlobalStates.irisBubbleKinds ?? {})
         kinds[name] = root.bubbleKinds
         GlobalStates.irisBubbleKinds = kinds
-        // Geometry is only meaningful at rest: a re-attach aims at the resting shape.
-        if (root.expanded) return
+    }
+    property string publishedGeometry: ""
+    function publishIslandGeometry(): void {
+        const name = root.targetScreen?.name ?? ""
+        // Only the resting shape fans out: it feeds every piece, card and mask,
+        // so a collapsing chassis must not publish a new one every frame — and a
+        // shape that came back to where it was must not publish at all. Writing
+        // this map rebuilds every piece, plate, hit rect and field shape on the
+        // output: measured at one 87 ms frame, right as the Island settled.
+        if (name.length === 0 || root.expanded || root.morphing) return
+        const next = root.islandGeometry
+        const key = JSON.stringify(next)
+        if (key === root.publishedGeometry) return
+        root.publishedGeometry = key
         const geometry = Object.assign({}, GlobalStates.irisIslandGeometry ?? {})
-        geometry[name] = root.islandGeometry
+        geometry[name] = next
         GlobalStates.irisIslandGeometry = geometry
     }
-    onBubbleKindsChanged: root.publishBubbleState()
-    onIslandGeometryChanged: root.publishBubbleState()
-    Component.onCompleted: root.publishBubbleState()
-    // Bubbles carried off the Island live in the bubble layer; the Island keeps
-    // their room free of them and hides the one being carried right now.
+    onBubbleKindsChanged: root.publishBubbleKinds()
+    onIslandGeometryChanged: geometrySettle.restart()
+    // Resting reshapes (width, notch, placement) change the geometry every frame; one fan-out per frame drops the output to ~14 fps.
+    Timer { id: geometrySettle; interval: 60; onTriggered: root.publishIslandGeometry() }
+    Component.onCompleted: { root.publishBubbleKinds(); root.publishIslandGeometry() }
     readonly property var floatingSlots: ["left", "right", "utility"]
-        .filter(slot => String(Config.options?.iris?.bubbles?.[slot]?.place ?? "island") !== "island")
+        .filter(slot => String(Config.options?.iris?.bubbles?.[slot]?.place ?? "island") !== "island"
+            && !(root.absorbed?.islandSlots ?? []).includes(slot))
     readonly property string draggedSlot: GlobalStates.irisBubbleDrag && GlobalStates.irisBubbleDrag.screen === (root.targetScreen?.name ?? "")
         ? String(GlobalStates.irisBubbleDrag.slot) : ""
     Satellite {
@@ -1094,8 +1295,9 @@ Item {
         slot: "right"
         kind: IrisStyle.cluster ? root.trailingKind : root.secondary
         shown: root.rightSatelliteShown
+        resting: root.rightSatelliteRest
         onActivated: {
-            if (!IrisStyle.cluster) root.openPage(root.pageFor(root.secondary), true)
+            if (!IrisStyle.cluster) root.openPage(root.pageFor(root.secondary), true, rightSatellite)
             else root.activateBubble(root.trailingKind, rightSatellite)
         }
     }
@@ -1106,6 +1308,7 @@ Item {
         kind: root.auxiliary
         slotIndex: root.auxiliarySlot
         shown: root.auxiliaryShown
+        resting: root.auxiliaryRest
         onActivated: root.activateBubble(root.auxiliary, auxiliarySatellite)
     }
 
@@ -1114,7 +1317,6 @@ Item {
         IrisArtwork {
             anchors.fill: parent
             source: MediaArtwork.displaySource
-            // The page cover's own decode size, so the copy it becomes is the same image.
             decodeSize: Math.ceil(68 * root.d * 2)
             circular: false
             radius: coverFlight.fromRadius + ((coverFlight.to?.radius ?? coverFlight.fromRadius) - coverFlight.fromRadius) * coverFlight.t
@@ -1123,7 +1325,11 @@ Item {
     Flight {
         id: clockFlight
         IrisClock {
-            pixelSize: Math.max(1, clockFlight.fromPixelSize + ((clockFlight.to?.pixelSize ?? clockFlight.fromPixelSize) - clockFlight.fromPixelSize) * clockFlight.t)
+            readonly property real fromSize: Math.max(1, clockFlight.fromPixelSize)
+            readonly property real toSize: Math.max(1, clockFlight.to?.pixelSize ?? clockFlight.fromPixelSize)
+            pixelSize: Math.max(fromSize, toSize)
+            transformOrigin: Item.TopLeft
+            scale: (fromSize + (toSize - fromSize) * clockFlight.t) / pixelSize
         }
     }
 
@@ -1131,13 +1337,15 @@ Item {
         id: badgePill
         readonly property bool shown: badgeTimer.running
         property real reveal: badgePill.shown ? 1 : 0
-        Behavior on reveal { NumberAnimation { duration: IrisStyle.settleDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
+        Behavior on reveal { NumberAnimation { duration: IrisStyle.emergeDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.emergeCurve } }
         readonly property real gap: Math.round(8 * root.d)
         width: badgeRow.implicitWidth + Math.round(22 * root.d)
         height: Math.round(28 * root.d)
-        x: (root.width - width) / 2
-        // Drops out from behind the Island's far edge.
-        y: root.bottomEdge ? -(height + gap) * badgePill.reveal + height * (1 - badgePill.reveal)
+        x: !root.vertical ? (root.width - width) / 2
+            : root.rightEdge ? chassis.x - (width + gap) * badgePill.reveal + width * (1 - badgePill.reveal)
+            : chassis.x + chassis.width - width + (width + gap) * badgePill.reveal
+        y: root.vertical ? Math.round(chassis.y + (chassis.height - height) / 2)
+            : root.bottomEdge ? -(height + gap) * badgePill.reveal + height * (1 - badgePill.reveal)
             : chassis.bodyHeight - height + (height + gap) * badgePill.reveal
         z: -2
         visible: badgePill.reveal > 0.01
@@ -1146,7 +1354,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: IrisStyle.surface
+            color: IrisStyle.bodySurface
         }
         Row {
             id: badgeRow
@@ -1167,171 +1375,141 @@ Item {
         }
     }
 
-    // Notch silhouette: body and concave fillets are one path with one fill,
-    // so the join to the screen edge is the same material as the chassis (two
-    // separately antialiased pieces read as a different component). The
-    // clipping chassis above paints the same black over the body.
-    Shape {
-        id: silhouette
-        visible: root.notch
-        anchors.fill: parent
-        preferredRendererType: Shape.CurveRenderer
-        readonly property bool flip: root.bottomEdge
-        readonly property real f: Math.min(root.fillet, Math.max(0, chassis.bodyHeight - chassis.radius))
-        readonly property real r: Math.min(chassis.radius, chassis.bodyHeight, chassis.width / 2)
-        readonly property real edgeL: chassis.x
-        readonly property real edgeR: chassis.x + chassis.width
-        readonly property real far: chassis.bodyHeight
-        function ey(v: real): real { return silhouette.flip ? root.height - v : v }
-        readonly property int outward: silhouette.flip ? PathArc.Counterclockwise : PathArc.Clockwise
-        readonly property int inward: silhouette.flip ? PathArc.Clockwise : PathArc.Counterclockwise
-        ShapePath {
-            strokeWidth: -1
-            fillColor: IrisStyle.surface
-            startX: silhouette.edgeL - silhouette.f
-            startY: silhouette.ey(0)
-            PathArc {
-                x: silhouette.edgeL; y: silhouette.ey(silhouette.f)
-                radiusX: silhouette.f; radiusY: silhouette.f
-                direction: silhouette.outward
-            }
-            PathLine { x: silhouette.edgeL; y: silhouette.ey(silhouette.far - silhouette.r) }
-            PathArc {
-                x: silhouette.edgeL + silhouette.r; y: silhouette.ey(silhouette.far)
-                radiusX: silhouette.r; radiusY: silhouette.r
-                direction: silhouette.inward
-            }
-            PathLine { x: silhouette.edgeR - silhouette.r; y: silhouette.ey(silhouette.far) }
-            PathArc {
-                x: silhouette.edgeR; y: silhouette.ey(silhouette.far - silhouette.r)
-                radiusX: silhouette.r; radiusY: silhouette.r
-                direction: silhouette.inward
-            }
-            PathLine { x: silhouette.edgeR; y: silhouette.ey(silhouette.f) }
-            PathArc {
-                x: silhouette.edgeR + silhouette.f; y: silhouette.ey(0)
-                radiusX: silhouette.f; radiusY: silhouette.f
-                direction: silhouette.outward
-            }
-            PathLine { x: silhouette.edgeL - silhouette.f; y: silhouette.ey(0) }
-        }
-    }
-
-    // ── Chassis ──────────────────────────────────────────────────────────
-    // A clipping chassis: artwork, compact rows and expanded pages are all cut
-    // by the same continuous silhouette while it morphs, so no rectangular
-    // content corner can escape the rounded shape mid-transition.
     ClippingRectangle {
         id: chassis
-        // Notch mode keeps one uniform radius and lets the chassis overflow the
-        // screen edge by that radius; the layer surface hides those corners.
         // ClippingRectangle does not re-mask when per-corner radii change live.
-        readonly property real bodyHeightTarget: root.visualExpanded ? (details.item?.implicitHeight ?? 0) + root.padding * 2 : root.compactHeight
-        property real bodyHeight: chassis.bodyHeightTarget
-        readonly property real topInset: root.notch && !root.bottomEdge ? chassis.radius : 0
-        readonly property real bottomInset: root.notch && root.bottomEdge ? chassis.radius : 0
-        // Whole pixels: the clipping chassis draws through a texture that goes
-        // soft when resampled at a half-pixel offset.
-        x: Math.round((root.width - width) / 2)
-        y: -chassis.topInset
-        width: root.chassisTargetWidth
-        height: chassis.bodyHeight + chassis.topInset + chassis.bottomInset
-        // Opaque even over the notch silhouette: a transparent ClippingRectangle
-        // hanging past the top edge stopped painting its children. Black on the
-        // same black leaves no seam.
-        color: IrisStyle.surface
-        radius: root.visualExpanded ? Math.max(IrisStyle.radius, 30 * root.d) : root.compactHeight / 2
-
-        // One object morphing: width, height and radius chase the same liquid
-        // curve, so the island reads as a single shape changing.
-        // Opening and closing settle with a liquid tail; hopping between shapes
-        // that are already open (pages, feedback, activities) stays quick.
-        readonly property int morphTime: root.hopping ? IrisStyle.morphDuration : IrisStyle.settleDuration
-        Behavior on width { NumberAnimation { duration: chassis.morphTime; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
-        Behavior on bodyHeight { NumberAnimation { duration: chassis.morphTime; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
-        Behavior on radius { NumberAnimation { duration: chassis.morphTime; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
+        readonly property real restWidth: root.compactTargetWidth
+        readonly property real restHeight: root.compactHeight
+        readonly property real restRadius: root.notch ? root.compactHeight / 2 : IrisStyle.pieceRadius(root.compactHeight)
+        readonly property real openWidthTarget: root.expandedWidth
+        readonly property real openHeightLive: (details.item?.implicitHeight ?? 0) + root.padding * 2
+        property real openHeightHeld: 0
+        onOpenHeightLiveChanged: if (root.inlineExpanded && chassis.openHeightLive > root.padding * 2)
+            chassis.openHeightHeld = chassis.openHeightLive
+        readonly property real openHeightTarget: root.inlineExpanded || chassis.openHeightHeld <= 0
+            ? chassis.openHeightLive : chassis.openHeightHeld
+        readonly property real openRadius: Math.max(IrisStyle.radius, 30 * root.d)
+        readonly property alias restW: restWidthSpring.value
+        readonly property alias openW: openWidthSpring.value
+        readonly property alias openH: openHeightSpring.value
+        IrisSpring { id: restWidthSpring; surface: "island"; to: chassis.restWidth; intent: "move"; epsilon: 0.25 }
+        IrisSpring { id: openWidthSpring; surface: "island"; to: chassis.openWidthTarget; intent: "move"; epsilon: 0.25; animate: chassis.presentation > 0.01 }
+        IrisSpring { id: openHeightSpring; surface: "island"; to: chassis.openHeightTarget; intent: "move"; epsilon: 0.25; animate: chassis.presentation > 0.01 }
+        readonly property alias presentation: chassisSpring.value
+        IrisSpring { id: chassisSpring; surface: "island"; to: root.inlineExpanded ? 1 : 0; minimum: 0 }
+        function lerp(a: real, b: real): real { return a + (b - a) * chassis.presentation }
+        readonly property real bodyHeightTarget: root.inlineExpanded ? chassis.openHeightTarget : chassis.restHeight
+        readonly property real bodyHeight: Math.round(chassis.lerp(chassis.restHeight, chassis.openH))
+        // Whole pixels: the chassis draws its content through a texture and a half-pixel offset softens it.
+        readonly property real edgeInset: Math.ceil(chassis.radius * root.notchness)
+        readonly property real topInset: root.edge === "top" ? chassis.edgeInset : 0
+        readonly property real bottomInset: root.bottomEdge ? chassis.edgeInset : 0
+        readonly property real leftInset: root.edge === "left" ? chassis.edgeInset : 0
+        readonly property real rightInset: root.rightEdge ? chassis.edgeInset : 0
+        x: !root.vertical ? Math.round((root.width - width) / 2)
+            : root.rightEdge ? root.width - root.compactHeight : -chassis.leftInset
+        y: root.vertical ? Math.round((root.height - chassis.height) / 2)
+            : root.bottomEdge ? root.height - chassis.bodyHeight : -chassis.topInset
+        width: root.vertical ? root.compactHeight + chassis.leftInset + chassis.rightInset
+            : Math.round(chassis.lerp(chassis.restW, chassis.openW))
+        height: root.vertical ? Math.round(chassis.restW) : chassis.bodyHeight + chassis.topInset + chassis.bottomInset
+        // Opaque: a transparent ClippingRectangle past the screen edge stops painting its children.
+        color: IrisStyle.bodyClip
+        radius: Math.min((root.vertical ? chassis.height : chassis.width) / 2, chassis.restRadius
+            + (chassis.openRadius - chassis.restRadius) * Math.min(1, chassis.presentation))
 
         HoverHandler {
             id: chassisHover
             onPointChanged: root.trackDwell(point.scenePosition)
         }
-        // Any press inside an Island opened by hover commits it (pins), so the
-        // user can move away after interacting without it vanishing.
         PointHandler {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onActiveChanged: if (active && root.expanded) root.pinned = true
         }
         WheelHandler {
-            enabled: !root.visualExpanded || !root.pinned
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onWheel: event => root.applyWheel(event)
         }
 
-        // Artwork vibrancy: the blurred cover tints the whole expanded chassis
-        // (not an inset card) and is released as soon as the page closes.
-        Loader {
-            id: artBackdrop
-            anchors.fill: parent
-            // Fades with the page switch instead of popping, and stays loaded
-            // until it has faded out.
-            property real shown: root.effectivePage === "media" ? 1 : 0
-            Behavior on shown {
-                enabled: root.visualExpanded && details.opacity >= 1
-                NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.OutCubic }
+        Item {
+            id: islandResize
+            z: 20
+            visible: GlobalStates.irisEdit && !root.expanded
+            width: Math.round((root.vertical ? 14 : 44) * root.d)
+            height: Math.round((root.vertical ? 44 : 14) * root.d)
+            x: !root.vertical ? Math.round((chassis.width - width) / 2) : root.rightEdge ? 0 : chassis.width - width
+            y: root.vertical ? Math.round((chassis.height - height) / 2) : root.bottomEdge ? 0 : chassis.height - height
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.vertical ? Math.max(2, Math.round(3 * root.d)) : Math.round(24 * root.d)
+                height: root.vertical ? Math.round(24 * root.d) : Math.max(2, Math.round(3 * root.d))
+                radius: Math.min(width, height) / 2
+                color: resizeHover.hovered || resizeDrag.active ? IrisStyle.accent : IrisStyle.textTertiary
             }
-            active: details.active && (root.effectivePage === "media" || artBackdrop.shown > 0)
-                && (Config.options?.iris?.player?.artworkBackground ?? true)
-                && MediaArtwork.displaySource.length > 0
-            opacity: details.opacity * artBackdrop.shown
-            layer.enabled: artBackdrop.opacity > 0 && artBackdrop.opacity < 1
-            sourceComponent: IrisMediaBackdrop {
-                source: MediaArtwork.displaySource
-                // The solid part of the band must cover the off-screen overflow and
-                // the fillet height, or the vibrancy meets black fillets at a seam.
-                edgeTop: chassis.topInset > 0 ? (chassis.topInset + root.fillet + 4 * root.d) / 0.45 : 0
-                edgeBottom: chassis.bottomInset > 0 ? (chassis.bottomInset + root.fillet + 4 * root.d) / 0.45 : 0
+            HoverHandler { id: resizeHover; cursorShape: root.vertical ? Qt.SizeHorCursor : Qt.SizeVerCursor }
+            DragHandler {
+                id: resizeDrag
+                target: null
+                xAxis.enabled: root.vertical
+                yAxis.enabled: !root.vertical
+                property real startHeight: 42
+                onActiveChanged: if (active) resizeDrag.startHeight = Number(Config.options?.iris?.bar?.height ?? 42)
+                onTranslationChanged: {
+                    if (!active) return
+                    const outward = root.vertical ? (root.rightEdge ? -translation.x : translation.x)
+                        : (root.bottomEdge ? -translation.y : translation.y)
+                    const delta = outward / Math.max(0.01, root.d)
+                    Config.setNestedValue("iris.bar.height", Math.round(Math.max(32, Math.min(64, resizeDrag.startHeight + delta))))
+                }
             }
         }
 
-        // ── Compact presentations ────────────────────────────────────────
         Item {
             id: compactLayer
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: root.bottomEdge ? chassis.height - chassis.bottomInset - height : chassis.topInset
-            height: root.compactHeight
-            opacity: root.visualExpanded ? 0 : 1
-            // Press feedback lives on the content, never on the clipping chassis:
-            // transforming a ClippingRectangle live can leave it unpainted.
-            scale: compactPress.pressed ? 0.93 : 1
-            Behavior on scale { NumberAnimation { duration: IrisStyle.duration(compactPress.pressed ? 80 : 200); easing.type: Easing.OutCubic } }
-            visible: opacity > 0
-            // Out before the page arrives; back only once the chassis has
-            // nearly reached its resting shape. The two layers never overlap.
-            Behavior on opacity {
-                id: compactFade
-                SequentialAnimation {
-                    PauseAnimation { duration: compactFade.targetValue > 0 ? root.collapseHold : 0 }
-                    NumberAnimation {
-                        duration: IrisStyle.duration(compactFade.targetValue > 0 ? 150 : 70)
-                        easing.type: compactFade.targetValue > 0 ? Easing.OutCubic : Easing.OutQuad
-                    }
-                }
+            x: root.vertical ? chassis.leftInset : 0
+            y: root.vertical ? 0 : root.bottomEdge ? chassis.height - chassis.bottomInset - height : chassis.topInset
+            width: root.vertical ? root.compactHeight : chassis.width
+            height: root.vertical ? chassis.height : root.compactHeight
+            readonly property real fall: Math.min(1, chassis.presentation / Math.max(0.02, IrisStyle.contentFall))
+            opacity: root.paintNudge * Math.max(0, 1 - compactLayer.fall) * IrisStyle.recompose
+            transform: Scale {
+                origin.x: compactLayer.width / 2
+                origin.y: compactLayer.height / 2
+                xScale: IrisStyle.revealFades ? 1 : (1 - 0.1 * compactLayer.fall) * (0.96 + 0.04 * IrisStyle.recompose)
+                yScale: IrisStyle.revealFades ? 1 : (1 - 0.1 * compactLayer.fall) * (0.96 + 0.04 * IrisStyle.recompose)
             }
+            // Never transform the ClippingRectangle live: it can stop painting.
+            scale: compactPress.pressed ? IrisStyle.pressScale(0.93) : 1
+            Behavior on scale { NumberAnimation { duration: IrisStyle.duration(compactPress.pressed ? 80 : 200); easing.type: IrisStyle.feedbackEasing } }
+            // Kept in the scene across a morph: its rows carry the clock, glyphs and
+            // figures, and rebuilding their nodes as the shape came back cost one
+            // 95 ms frame near the end of every close.
+            visible: opacity > 0 || root.expanded || chassis.presentation > 0.002
 
             component CompactRow: RowLayout {
                 id: compactRow
                 property string mode: ""
-                anchors.fill: parent
-                anchors.leftMargin: 14 * root.d
-                anchors.rightMargin: 15 * root.d
+                property real lead: 0
+                readonly property bool current: root.compactMode === compactRow.mode
+                property real laidWidth: 0
+                // Laid at the width of its own size class: relaying the row out per
+                // frame so it rides the shape measured 2.4x the cost of every morph.
+                Binding on laidWidth { when: compactRow.current; value: root.zoned ? root.heartTarget : root.compactTargetWidth; restoreMode: Binding.RestoreNone }
+                readonly property real leadMargin: compactRow.lead > 0
+                    ? Math.round((root.compactHeight - compactRow.lead) / 2) : 14 * root.d
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                x: (root.zoned ? Math.round(barZones.heartAlong + (root.heartLength - compactRow.laidWidth) / 2)
+                    : Math.round((parent.width - compactRow.laidWidth) / 2)) + compactRow.leadMargin
+                width: Math.max(0, compactRow.laidWidth - compactRow.leadMargin - 15 * root.d - root.barPieceReserve)
                 spacing: 9 * root.d
-                opacity: root.compactMode === compactRow.mode ? 1 : 0
+                opacity: root.compactMode === compactRow.mode && root.heartShown && !root.vertical ? 1 : 0
                 visible: opacity > 0
-                Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(140); easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(140); easing.type: IrisStyle.feedbackEasing } }
             }
 
             CompactRow {
+                id: idleRow
                 mode: "idle"
                 Glyph {
                     visible: root.clockStyle === "weather"
@@ -1349,18 +1527,23 @@ Item {
                 DateMark {
                     visible: root.clockStyle === "dateTime"
                     Layout.alignment: Qt.AlignVCenter
+                    pixelSize: 12 * IrisStyle.typeScale * root.clockScale
+                    dayColor: root.clockAccent
                 }
                 Item { Layout.fillWidth: true }
                 IrisClock {
                     id: idleClock
                     Layout.alignment: Qt.AlignVCenter
-                    pixelSize: 15 * IrisStyle.typeScale
+                    pixelSize: 15 * IrisStyle.typeScale * root.clockScale
+                    separatorColor: root.clockAccent
                     opacity: clockFlight.hides(idleClock) ? 0 : 1
                 }
             }
 
             CompactRow {
+                id: mediaRow
                 mode: "media"
+                lead: 24 * root.d
                 IrisArtwork {
                     id: compactCover
                     opacity: coverFlight.hides(compactCover) ? 0 : 1
@@ -1376,7 +1559,7 @@ Item {
                     IrisText {
                         Layout.fillWidth: true
                         text: root.title
-                        font.pixelSize: 12 * IrisStyle.typeScale
+                        font.pixelSize: 13 * IrisStyle.typeScale
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                     }
@@ -1385,7 +1568,7 @@ Item {
                         visible: root.effectiveLength > 0
                         implicitHeight: 2.5 * root.d
                         radius: height / 2
-                        color: ColorUtils.applyAlpha(IrisStyle.text, 0.18)
+                        color: IrisStyle.fillHover
                         Rectangle {
                             height: parent.height
                             radius: parent.radius
@@ -1408,12 +1591,13 @@ Item {
             }
 
             CompactRow {
+                id: recordRow
                 mode: "record"
                 RecordDot { Layout.alignment: Qt.AlignVCenter }
                 IrisText {
                     Layout.fillWidth: true
                     text: Translation.tr("Recording")
-                    font.pixelSize: 12 * IrisStyle.typeScale
+                    font.pixelSize: 13 * IrisStyle.typeScale
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -1426,6 +1610,7 @@ Item {
             }
 
             CompactRow {
+                id: timerRow
                 mode: "timer"
                 Glyph {
                     text: root.timerPaused ? "pause" : root.timerGlyph
@@ -1449,12 +1634,45 @@ Item {
             }
 
             CompactRow {
+                id: taskRow
+                mode: "task"
+                Glyph {
+                    text: String(root.task?.glyph ?? "bolt")
+                    iconSize: 17 * root.d
+                    color: root.taskTint
+                }
+                IrisText {
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: Math.round(190 * root.d)
+                    text: String(root.task?.title ?? "")
+                    font.pixelSize: 12 * IrisStyle.typeScale
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                }
+                IrisNumber {
+                    visible: Number(root.task?.progress ?? -1) >= 0
+                    text: Math.round(Number(root.task?.progress ?? 0) * 100) + "%"
+                    color: root.taskTint
+                    pixelSize: 13 * IrisStyle.typeScale
+                    weight: Font.DemiBold
+                }
+                RecordDot {
+                    visible: Number(root.task?.progress ?? -1) < 0
+                    Layout.alignment: Qt.AlignVCenter
+                    color: root.taskTint
+                }
+            }
+
+            CompactRow {
+                id: clockRow
                 mode: "clock"
                 Item { Layout.fillWidth: true }
                 DateMark {
                     visible: root.clockStyle === "dateTime"
                     Layout.alignment: Qt.AlignVCenter
                     Layout.rightMargin: 2 * root.d
+                    pixelSize: 12 * IrisStyle.typeScale * root.clockScale
+                    dayColor: root.clockAccent
                 }
                 Glyph {
                     visible: root.clockStyle === "weather"
@@ -1472,22 +1690,22 @@ Item {
                 IrisClock {
                     id: clusterClock
                     Layout.alignment: Qt.AlignVCenter
-                    pixelSize: 15 * IrisStyle.typeScale
+                    pixelSize: 15 * IrisStyle.typeScale * root.clockScale
+                    separatorColor: root.clockAccent
                     opacity: clockFlight.hides(clusterClock) ? 0 : 1
                 }
                 Item { Layout.fillWidth: true }
             }
 
-            // Editing the desktop: accent pencil, what is happening, and the one
-            // action that ends it (the whole resting shape is that action).
             CompactRow {
+                id: editRow
                 mode: "edit"
                 anchors.rightMargin: 5 * root.d
                 Rectangle {
                     Layout.preferredWidth: Math.round(26 * root.d)
                     Layout.preferredHeight: Layout.preferredWidth
                     radius: width / 2
-                    color: ColorUtils.applyAlpha(IrisStyle.accent, 0.18)
+                    color: IrisStyle.tintFill(IrisStyle.accent)
                     Glyph {
                         anchors.centerIn: parent
                         text: "edit"
@@ -1530,16 +1748,15 @@ Item {
                 }
             }
 
-            // System event: identity-coloured glyph disc, what happened, and a
-            // level ring with its figure when the event carries one.
             CompactRow {
+                id: eventRow
                 mode: "event"
                 anchors.leftMargin: 6 * root.d
                 Rectangle {
                     Layout.preferredWidth: root.compactHeight - Math.round(12 * root.d)
                     Layout.preferredHeight: Layout.preferredWidth
                     radius: width / 2
-                    color: ColorUtils.applyAlpha(root.event.tint, 0.18)
+                    color: IrisStyle.tintFill(root.event.tint)
                     Glyph {
                         anchors.centerIn: parent
                         text: root.event.icon
@@ -1584,8 +1801,8 @@ Item {
                 }
             }
 
-            // Apple-style HUD: glyph, continuous level capsule, value.
             CompactRow {
+                id: feedbackRow
                 mode: "feedback"
                 Glyph {
                     text: root.feedbackIcon
@@ -1597,8 +1814,7 @@ Item {
                     Layout.fillWidth: true
                     seekable: false
                     value: root.feedbackMuted ? 0 : Math.min(1, root.feedbackValue)
-                    fillColor: IrisStyle.text
-                    Behavior on value { NumberAnimation { duration: IrisStyle.duration(110); easing.type: Easing.OutCubic } }
+                    Behavior on value { NumberAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
                 }
                 Item {
                     Layout.preferredWidth: 38 * root.d
@@ -1615,22 +1831,109 @@ Item {
                 }
             }
 
+            Grid {
+                id: barPieceRow
+                z: 1
+                columns: root.vertical ? 1 : Math.max(1, root.barPieces.length)
+                x: root.vertical ? Math.round((parent.width - width) / 2) : parent.width - width - Math.round(12 * root.d)
+                y: root.vertical ? parent.height - height - Math.round(12 * root.d) : Math.round((parent.height - height) / 2)
+                spacing: root.barPieceGap
+                visible: root.barPieces.length > 0 && !root.inlineExpanded && !root.zoned
+                Repeater {
+                    model: root.barPieces
+                    delegate: Item {
+                        id: barPiece
+                        required property string modelData
+                        width: root.barPieceSize
+                        height: root.barPieceSize
+                        IrisBubbleFace {
+                            anchors.fill: parent
+                            screenName: root.targetScreen?.name ?? ""
+                            kind: barPiece.modelData
+                            plated: true
+                            hovered: pieceHover.hovered
+                            pressed: pieceTap.pressed
+                        }
+                        HoverHandler { id: pieceHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            id: pieceTap
+                            onTapped: {
+                                if (GlobalStates.irisEdit) {
+                                    GlobalStates.irisEditSelection = ""
+                                    GlobalStates.irisEditTarget = "pieces"
+                                    return
+                                }
+                                root.activatePiece(barPiece.modelData, barPiece)
+                            }
+                        }
+                        WheelHandler {
+                            enabled: barPiece.modelData === "sound" || barPiece.modelData === "mic"
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            onWheel: event => {
+                                const steps = root.wheelSteps(event)
+                                if (steps === 0) return
+                                GlobalStates.quietIrisLevels()
+                                root.stepLevel(barPiece.modelData === "mic" ? "mic" : "volume", steps)
+                            }
+                        }
+                    }
+                }
+            }
+
+            IslandCompactColumn {
+                id: compactColumn
+                visible: root.vertical && root.heartShown
+                island: root
+                mode: root.compactMode
+                thickness: root.compactHeight
+                clockScale: root.clockScale
+                clockAccent: root.clockAccent
+                clockStyle: root.clockStyle
+                x: 0
+                width: parent.width
+                height: root.zoned ? Math.round(root.heartLength) : parent.height - root.barPieceReserve
+                y: root.zoned ? Math.round(barZones.heartAlong) : 0
+            }
+
+            IslandBarZones {
+                id: barZones
+                anchors.fill: parent
+                visible: root.zoned
+                vertical: root.vertical
+                island: root
+                thickness: root.compactHeight
+                heartLength: root.heartLength
+                start: root.zoned ? IrisStyle.structuralValue("bar.fullStart", ["workspaces", "window"]) : []
+                center: root.zoned ? IrisStyle.structuralValue("bar.fullCenter", ["island"]) : []
+                end: root.zoned ? Array.from(IrisStyle.structuralValue("bar.fullEnd", ["tray", "notifications", "sound", "controls"]))
+                    .concat(root.absorbedPieces) : []
+                absorbed: root.absorbedPieces
+                screenName: root.targetScreen?.name ?? ""
+                clockStyle: root.clockStyle
+                clockScale: root.clockScale
+                clockAccent: root.clockAccent
+            }
+
             MouseArea {
                 id: compactPress
-                anchors.fill: parent
-                enabled: !root.visualExpanded
+                x: root.zoned && !root.vertical ? Math.round(barZones.heartAlong) : 0
+                y: root.zoned && root.vertical ? Math.round(barZones.heartAlong) : 0
+                width: root.zoned && !root.vertical ? Math.round(root.heartLength) : parent.width
+                height: root.zoned && root.vertical ? Math.round(root.heartLength) : parent.height
+                enabled: !root.inlineExpanded && (!root.zoned || root.heartShown)
                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                 hoverEnabled: root.compactMode === "edit"
-                cursorShape: islandGrip.carrying ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                cursorShape: islandGrip.carrying ? Qt.ClosedHandCursor
+                    : GlobalStates.irisEdit ? Qt.OpenHandCursor : Qt.PointingHandCursor
                 preventStealing: true
                 Accessible.role: Accessible.Button
-                Accessible.name: root.expanded ? Translation.tr("Collapse island") : Translation.tr("Expand island")
-                // Holding the resting Island lifts it: carried to the other half of
-                // the screen it moves the Island (and its Dock) to that edge.
+                Accessible.name: GlobalStates.irisEdit ? Translation.tr("Edit Dynamic Island")
+                    : root.expanded ? Translation.tr("Collapse island") : Translation.tr("Expand island")
                 pressAndHoldInterval: 380
                 QtObject {
                     id: islandGrip
                     property bool carrying: false
+                    property point pressAt: Qt.point(0, 0)
                     function publish(mouse, released: bool): void {
                         const p = compactPress.mapToItem(null, mouse.x, mouse.y)
                         GlobalStates.irisBubbleDrag = {
@@ -1640,12 +1943,19 @@ Item {
                         }
                     }
                 }
+                onPressed: mouse => islandGrip.pressAt = Qt.point(mouse.x, mouse.y)
                 onPressAndHold: mouse => {
                     if (mouse.button !== Qt.LeftButton || root.compactMode === "edit") return
                     islandGrip.carrying = true
                     islandGrip.publish(mouse, false)
                 }
-                onPositionChanged: mouse => { if (islandGrip.carrying) islandGrip.publish(mouse, false) }
+                onPositionChanged: mouse => {
+                    if (!islandGrip.carrying && GlobalStates.irisEdit && (mouse.buttons & Qt.LeftButton)
+                            && Math.hypot(mouse.x - islandGrip.pressAt.x, mouse.y - islandGrip.pressAt.y) > 6 * root.d) {
+                        islandGrip.carrying = true
+                    }
+                    if (islandGrip.carrying) islandGrip.publish(mouse, false)
+                }
                 onReleased: mouse => {
                     if (!islandGrip.carrying) return
                     islandGrip.publish(mouse, true)
@@ -1663,65 +1973,137 @@ Item {
                         if (root.hasMedia) MprisController.togglePlaying()
                         return
                     }
+                    if (GlobalStates.irisEdit) {
+                        GlobalStates.irisEditSelection = ""
+                        GlobalStates.irisEditTarget = "island"
+                        return
+                    }
                     if (root.compactMode === "edit") { GlobalStates.setWidgetEditMode(false); return }
                     if (root.pinned) root.expanded = false
-                    else root.openPage(IrisStyle.cluster ? "desktop" : root.pageFor(root.primary), true)
+                    else {
+                        const at = compactPress.mapToItem(root, mouse.x, mouse.y)
+                        root.pageOriginX = at.x
+                        root.pageOriginY = at.y
+                        root.openPage(IrisStyle.cluster ? "desktop" : root.pageFor(root.primary), true, null)
+                    }
                 }
             }
         }
 
-        // ── Expanded presentations ───────────────────────────────────────
+    }
+
+    ClippingRectangle {
+        id: extension
+        readonly property real targetWidth: root.extensionRole === "page" ? root.expandedWidth
+            : Math.round(320 * root.d)
+        readonly property real targetHeight: root.extensionRole === "page"
+            ? (details.item?.implicitHeight ?? 0) + root.padding * 2
+            : root.compactHeight
+        readonly property real targetRadius: root.extensionRole === "page"
+            ? Math.max(IrisStyle.radius, 30 * root.d) : root.compactHeight / 2
+        readonly property alias presentation: extensionSpring.value
+        IrisSpring { id: extensionSpring; surface: "island"; to: root.extensionOpen ? 1 : 0; minimum: 0 }
+        readonly property real reach: Math.round((root.vertical ? extension.targetWidth : extension.targetHeight) * extension.presentation)
+        readonly property real liveWidth: Math.round(root.originWidth
+            + ((root.vertical ? extension.targetHeight : extension.targetWidth) - root.originWidth) * extension.presentation)
+        x: !extension.anchoredShape ? chassis.x
+            : root.vertical ? (root.rightEdge ? chassis.x - extension.reach : chassis.x + chassis.width)
+            : root.extensionX(root.originWidth) + (root.extensionX(extension.targetWidth)
+                - root.extensionX(root.originWidth)) * extension.presentation
+        y: !extension.anchoredShape ? chassis.y
+            : root.vertical ? root.extensionY(root.originWidth) + (root.extensionY(extension.targetHeight)
+                - root.extensionY(root.originWidth)) * extension.presentation
+            : root.bottomEdge ? root.height - chassis.bodyHeight - extension.reach : chassis.bodyHeight
+        width: !extension.anchoredShape ? chassis.width : root.vertical ? extension.reach : extension.liveWidth
+        height: !extension.anchoredShape ? chassis.height : root.vertical ? extension.liveWidth : extension.reach
+        radius: extension.anchoredShape
+            ? root.originWidth / 2 + (extension.targetRadius - root.originWidth / 2) * extension.presentation
+            : chassis.radius
+        color: IrisStyle.bodyClip
+        readonly property bool anchoredShape: root.anchored
+        HoverHandler { id: extensionHover }
+        WheelHandler {
+            enabled: root.expanded
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: event => root.wheelPages(event, false)
+        }
+        PointHandler {
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onActiveChanged: if (active && root.expanded) root.pinned = true
+        }
+        visible: extension.anchoredShape ? extension.presentation > 0
+            : (details.opacity > 0 || artBackdrop.opacity > 0)
+
+        Loader {
+            id: artBackdrop
+            anchors.fill: parent
+            property real shown: root.effectivePage === "media" ? 1 : 0
+            Behavior on shown {
+                enabled: root.visualExpanded && details.opacity >= 1
+                NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve }
+            }
+            active: details.active && (root.effectivePage === "media" || artBackdrop.shown > 0)
+                && (Config.options?.iris?.player?.artworkBackground ?? true) && !IrisStyle.glassy
+                && MediaArtwork.displaySource.length > 0
+            opacity: details.opacity * artBackdrop.shown
+            layer.enabled: true
+            sourceComponent: IrisMediaBackdrop {
+                source: MediaArtwork.displaySource
+                edgeTop: !root.anchored && chassis.topInset > 0 ? (chassis.topInset + root.fillet + 4 * root.d) / 0.45 : 0
+                edgeBottom: !root.anchored && chassis.bottomInset > 0 ? (chassis.bottomInset + root.fillet + 4 * root.d) / 0.45 : 0
+            }
+        }
         Loader {
             id: details
-            anchors.top: parent.top
-            anchors.topMargin: root.padding + chassis.topInset
+            y: root.padding + (root.anchored ? 0 : chassis.topInset)
+                - (root.anchored || root.bottomEdge ? 0 : Math.round(Math.max(0, chassis.openH - chassis.bodyHeight)))
             anchors.horizontalCenter: parent.horizontalCenter
             width: Math.max(0, root.expandedWidth - root.padding * 2)
-            active: root.expanded || opacity > 0
-            // The requested page survives until the content has faded out, so
-            // closing never swaps pages (and heights) mid-collapse.
-            onActiveChanged: if (!active) root.page = ""
-            opacity: root.visualExpanded ? 1 : 0
-            // Opening, the page appears where it rests and the chassis grows around
-            // it: scaling it in as well moved every part again after it had
-            // arrived, a second travel on the settle tail. Closing may shrink it.
-            scale: root.visualExpanded ? 1 : 0.96
-            transformOrigin: root.bottomEdge ? Item.Bottom : Item.Top
-            visible: opacity > 0
-            enabled: root.expanded
-            Behavior on opacity {
-                id: detailsFade
-                SequentialAnimation {
-                    PauseAnimation { duration: detailsFade.targetValue > 0 ? IrisStyle.duration(70) : 0 }
-                    NumberAnimation {
-                        duration: IrisStyle.duration(detailsFade.targetValue > 0 ? 170 : 90)
-                        easing.type: detailsFade.targetValue > 0 ? Easing.OutCubic : Easing.OutQuad
-                    }
+            // The page costs ~90 ms to build; paid on the first frame of the open it
+            // is the hitch the morph never recovers from. Hover warms it, and it
+            // stays warm briefly after closing so reopening is free.
+            active: root.expanded || details.opacity > 0.004 || details.warm
+            property bool warm: false
+            Timer { id: pageWarmth; interval: 20000; onTriggered: details.warm = false }
+            Connections {
+                target: root
+                function onPointerOnIslandChanged(): void {
+                    if (!root.pointerOnIsland) return
+                    details.warm = true
+                    pageWarmth.stop()
+                }
+                function onExpandedChanged(): void {
+                    if (root.expanded) { details.warm = true; pageWarmth.stop() }
+                    else pageWarmth.restart()
                 }
             }
-            Behavior on scale {
-                enabled: !root.visualExpanded
-                NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve }
-            }
+            onActiveChanged: { if (!active) root.page = "" }
+            readonly property real presentation: root.anchored ? extension.presentation : chassis.presentation
+            opacity: (root.anchored && root.extensionRole !== "page" ? 0 : 1) * IrisStyle.recompose * (IrisStyle.revealDrops
+                ? IrisStyle.ramp(details.presentation, IrisStyle.dropRise, IrisStyle.dropSpan)
+                : IrisStyle.contentAt(details.presentation))
+            scale: IrisStyle.revealInflates
+                ? Math.max(0.35, Math.min(1, (root.anchored ? extension.height : chassis.bodyHeight)
+                    / Math.max(1, root.anchored ? extension.targetHeight : chassis.openH)))
+                : IrisStyle.revealFades ? 1 : 0.96 + 0.04 * details.opacity
+            transformOrigin: root.bottomEdge ? Item.Bottom : Item.Top
+            // Kept in the scene while warm: hiding it drops its render nodes, and
+            // the first frame of the next open pays for building them all again.
+            visible: opacity > 0 || details.warm
+            enabled: root.expanded
 
-            // Navigation sits on the attached edge: pages grow and shrink away
-            // from it, so switching pages never slides the row (and the next
-            // click) out from under the pointer.
             sourceComponent: GridLayout {
                 id: expandedContent
                 columns: 1
                 rowSpacing: 14 * root.d
 
-                // Content replace: the chassis morphs to the next page's size while
-                // the old content clears and the new one settles in from a
-                // slightly smaller scale. A page whose material bleeds to the
-                // chassis edges (wallpaper hero) only fades, so no edge shows.
                 component Page: ColumnLayout {
                     id: pageItem
                     property string name: ""
                     property bool bleeds: false
                     readonly property bool current: root.effectivePage === pageItem.name
-                    // Opening and closing the Island are the chassis' motion alone.
+                    readonly property bool resident: pageItem.current || pageItem.opacity > 0.004
+                        || root.pageIntent === pageItem.name
                     readonly property bool switching: root.visualExpanded && details.opacity >= 1
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -1731,10 +2113,6 @@ Item {
                     transformOrigin: root.bottomEdge ? Item.Bottom : Item.Top
                     visible: opacity > 0
                     enabled: pageItem.current
-                    // The new page waits for the old one to clear: two layouts never
-                    // show through each other.
-                    // Timing reads the Behavior's target: `current` may not have
-                    // re-evaluated in these bindings yet when the fade starts.
                     Behavior on opacity {
                         id: pageFade
                         enabled: pageItem.switching
@@ -1742,7 +2120,7 @@ Item {
                             PauseAnimation { duration: pageFade.targetValue > 0 ? IrisStyle.duration(50) : 0 }
                             NumberAnimation {
                                 duration: IrisStyle.duration(pageFade.targetValue > 0 ? 170 : 80)
-                                easing.type: pageFade.targetValue > 0 ? Easing.OutCubic : Easing.OutQuad
+                                easing.type: IrisStyle.feedbackEasing
                             }
                         }
                     }
@@ -1756,7 +2134,8 @@ Item {
                     id: pageStack
                     Layout.row: root.bottomEdge ? 0 : 1
                     Layout.fillWidth: true
-                    implicitHeight: root.effectivePage === "media" ? mediaPage.implicitHeight
+                    implicitHeight: root.effectivePage === "controls" ? controlsPage.implicitHeight
+                        : root.effectivePage === "media" ? mediaPage.implicitHeight
                         : root.effectivePage === "activity" ? activityPage.implicitHeight
                         : root.effectivePage === "tray" ? trayPage.implicitHeight
                         : root.effectivePage === "tools" ? toolsPage.implicitHeight
@@ -1765,918 +2144,249 @@ Item {
                     Page {
                         id: trayPage
                         name: "tray"
-                        Flickable {
+                        Loader {
+                            id: trayLoader
                             Layout.fillWidth: true
-                            implicitHeight: Math.min(300 * root.d, trayContent.implicitHeight)
-                            contentHeight: trayContent.implicitHeight
-                            clip: true
-                            boundsBehavior: Flickable.StopAtBounds
-                            IrisTray { id: trayContent; width: parent.width; bottomEdge: root.bottomEdge; items: root.trayItems }
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: trayPage.resident
+                            asynchronous: !trayPage.current
+                            sourceComponent: Flickable {
+                                id: trayView
+                                width: trayLoader.width
+                                implicitHeight: Math.min(300 * root.d, trayContent.implicitHeight)
+                                contentHeight: trayContent.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                IrisTray { id: trayContent; width: parent.width; bottomEdge: root.bottomEdge; items: root.trayItems }
+                            }
+                        }
+                    }
+                    Page {
+                        id: controlsPage
+                        name: "controls"
+                        Loader {
+                            id: controlsLoader
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: controlsPage.resident
+                            asynchronous: !controlsPage.current
+                            visible: active
+                            sourceComponent: IrisQuickPanel { width: controlsLoader.width; targetScreen: root.targetScreen }
                         }
                     }
                     Page {
                         id: toolsPage
                         name: "tools"
-                        IrisTools {
+                        Loader {
+                            id: toolsLoader
                             Layout.fillWidth: true
-                            onActivityRequested: root.page = "activity"
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: toolsPage.resident
+                            asynchronous: !toolsPage.current
+                            sourceComponent: IrisTools {
+                                width: toolsLoader.width
+                                onActivityRequested: root.page = "activity"
+                            }
                         }
                     }
 
-                    // Now playing
                     Page {
                         id: mediaPage
                         name: "media"
                         spacing: 14 * root.d
-
-                        PlayerBase {
-                            id: media
-                            player: root.player
-                            positionUpdatesActive: mediaPage.current && root.visualExpanded
-                        }
-
-                        RowLayout {
+                        Loader {
+                            id: mediaLoader
                             Layout.fillWidth: true
-                            spacing: 14 * root.d
-                            IrisArtwork {
-                                id: pageCover
-                                opacity: coverFlight.hides(pageCover) ? 0 : 1
-                                Component.onCompleted: root.pageCover = pageCover
-                                Layout.preferredWidth: 68 * root.d
-                                Layout.preferredHeight: 68 * root.d
-                                source: MediaArtwork.displaySource
-                                circular: Config.options?.iris?.player?.roundCover ?? true
-                                radius: circular ? width / 2 : 16 * root.d
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 2 * root.d
-                                // Long titles take a second line before they elide.
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    text: media.effectiveTitle
-                                    font.pixelSize: 15 * IrisStyle.typeScale
-                                    font.weight: Font.DemiBold
-                                    wrapMode: Text.Wrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    text: media.effectiveArtist
-                                    visible: text.length > 0
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.62)
-                                    font.pixelSize: 13 * IrisStyle.typeScale
-                                    elide: Text.ElideRight
-                                }
-                            }
-                            Waveform {
-                                Layout.alignment: Qt.AlignVCenter
-                                running: media.effectiveIsPlaying && mediaPage.current && root.visualExpanded
-                                tint: root.artTint
-                                barHeight: 20 * root.d
-                            }
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            visible: media.effectiveLength > 0
-                            spacing: 3 * root.d
-                            IrisScrubber {
-                                Layout.fillWidth: true
-                                seekable: media.effectiveCanSeek
-                                value: media.effectiveLength > 0 ? media.effectivePosition / media.effectiveLength : 0
-                                // The activity's own colour: progress wears the artwork tint
-                                // like the waveform (plain text for greyscale covers).
-                                fillColor: root.artTint
-                                trackColor: ColorUtils.applyAlpha(root.artTint, 0.2)
-                                onSeekRequested: next => media.seek(next * media.effectiveLength)
-                            }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Tabular {
-                                    text: root.clockText(media.effectivePosition)
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.55)
-                                    font.pixelSize: 11 * IrisStyle.typeScale
-                                    font.weight: Font.Medium
-                                }
-                                Item { Layout.fillWidth: true }
-                                Tabular {
-                                    text: "-" + root.clockText(media.effectiveLength - media.effectivePosition)
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.55)
-                                    font.pixelSize: 11 * IrisStyle.typeScale
-                                    font.weight: Font.Medium
-                                }
-                            }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.topMargin: -6 * root.d
-                            Layout.bottomMargin: -4 * root.d
-                            spacing: 18 * root.d
-                            Item { Layout.fillWidth: true }
-                            GlyphButton {
-                                glyph: "fast_rewind"
-                                glyphSize: 26 * root.d
-                                implicitWidth: 44 * root.d
-                                enabled: media.effectiveCanGoPrevious
-                                Accessible.name: Translation.tr("Previous track")
-                                onClicked: media.previous()
-                            }
-                            GlyphButton {
-                                glyph: media.effectiveIsPlaying ? "pause" : "play_arrow"
-                                glyphSize: 36 * root.d
-                                implicitWidth: 52 * root.d
-                                enabled: root.hasMedia
-                                Accessible.name: media.effectiveIsPlaying ? Translation.tr("Pause") : Translation.tr("Play")
-                                onClicked: media.togglePlaying()
-                            }
-                            GlyphButton {
-                                glyph: "fast_forward"
-                                glyphSize: 26 * root.d
-                                implicitWidth: 44 * root.d
-                                enabled: media.effectiveCanGoNext
-                                Accessible.name: Translation.tr("Next track")
-                                onClicked: media.next()
-                            }
-                            Item { Layout.fillWidth: true }
-                        }
-
-                        // Everything else that makes sound: other players (paused ones
-                        // included) to take over the page, and each app's own level.
-                        readonly property var otherPlayers: (MprisController.displayPlayers ?? []).filter(p => p && p !== root.player)
-                        // One row per app: a browser with several tabs playing is one level.
-                        readonly property var streams: {
-                            const groups = []
-                            for (const node of (Audio.outputAppNodes ?? [])) {
-                                if (!node?.audio) continue
-                                const name = Audio.appNodeDisplayName(node)
-                                const group = groups.find(g => g.name === name)
-                                if (group) group.nodes.push(node)
-                                else groups.push({ name: name, nodes: [node] })
-                            }
-                            return groups
-                        }
-                        Rectangle {
-                            visible: mediaPage.otherPlayers.length > 0 || mediaPage.streams.length > 0
-                            Layout.fillWidth: true
-                            implicitHeight: 1
-                            color: IrisStyle.hairline
-                        }
-                        Flow {
-                            visible: mediaPage.otherPlayers.length > 0
-                            Layout.fillWidth: true
-                            spacing: 6 * root.d
-                            Repeater {
-                                model: mediaPage.otherPlayers
-                                IrisButton {
-                                    id: playerChip
-                                    required property var modelData
-                                    implicitHeight: Math.round(32 * root.d)
-                                    implicitWidth: chipRow.implicitWidth + Math.round(20 * root.d)
-                                    buttonRadius: height / 2
-                                    buttonRadiusPressed: height / 2
-                                    colBackground: ColorUtils.applyAlpha(IrisStyle.text, 0.08)
-                                    colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.text, 0.16)
-                                    Accessible.name: Translation.tr("Control %1").arg(playerChip.modelData?.identity ?? "")
-                                    onClicked: MprisController.setActivePlayer(playerChip.modelData)
-                                    RowLayout {
-                                        id: chipRow
-                                        anchors.centerIn: parent
-                                        spacing: 6 * root.d
-                                        IrisArtwork {
-                                            Layout.preferredWidth: Math.round(20 * root.d)
-                                            Layout.preferredHeight: Layout.preferredWidth
-                                            source: String(playerChip.modelData?.trackArtUrl ?? "")
-                                        }
-                                        IrisText {
-                                            text: String(playerChip.modelData?.trackTitle || playerChip.modelData?.identity || "")
-                                            font.pixelSize: 11.5 * IrisStyle.typeScale
-                                            font.weight: Font.Medium
-                                            elide: Text.ElideRight
-                                            Layout.maximumWidth: Math.round(150 * root.d)
-                                        }
-                                        Glyph {
-                                            text: playerChip.modelData?.isPlaying ? "graphic_eq" : "pause"
-                                            iconSize: 14 * root.d
-                                            color: playerChip.modelData?.isPlaying ? root.artTint : IrisStyle.muted
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Repeater {
-                            model: mediaPage.streams.slice(0, 4)
-                            RowLayout {
-                                id: appLevel
-                                required property var modelData
-                                readonly property var nodes: appLevel.modelData.nodes
-                                readonly property bool muted: appLevel.nodes.every(node => node?.audio?.muted)
-                                Layout.fillWidth: true
-                                spacing: 10 * root.d
-                                Image {
-                                    Layout.preferredWidth: Math.round(22 * root.d)
-                                    Layout.preferredHeight: Layout.preferredWidth
-                                    sourceSize: Qt.size(Math.round(44 * root.d), Math.round(44 * root.d))
-                                    source: Quickshell.iconPath(MprisController.streamIconName(appLevel.nodes[0]), "audio-x-generic")
-                                    opacity: appLevel.muted ? 0.45 : 1
-                                }
-                                IrisText {
-                                    Layout.preferredWidth: Math.round(110 * root.d)
-                                    text: appLevel.nodes.length > 1 ? appLevel.modelData.name + " · " + appLevel.nodes.length : appLevel.modelData.name
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, appLevel.muted ? 0.45 : 0.8)
-                                    font.pixelSize: 12 * IrisStyle.typeScale
-                                    font.weight: Font.Medium
-                                    elide: Text.ElideRight
-                                }
-                                IrisScrubber {
-                                    Layout.fillWidth: true
-                                    fillColor: appLevel.muted ? IrisStyle.muted : IrisStyle.text
-                                    value: Math.min(1, Math.max(...appLevel.nodes.map(node => node?.audio?.volume ?? 0)))
-                                    onMoved: next => appLevel.nodes.forEach(node => { if (node?.audio) node.audio.volume = next })
-                                }
-                                GlyphButton {
-                                    glyph: appLevel.muted ? "volume_off" : "volume_up"
-                                    glyphSize: 17 * root.d
-                                    implicitWidth: Math.round(30 * root.d)
-                                    glyphColor: appLevel.muted ? IrisStyle.danger : IrisStyle.text
-                                    Accessible.name: appLevel.muted ? Translation.tr("Unmute") : Translation.tr("Mute")
-                                    onClicked: {
-                                        const mute = !appLevel.muted
-                                        appLevel.nodes.forEach(node => { if (node?.audio) node.audio.muted = mute })
-                                    }
-                                }
-                            }
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: mediaPage.resident
+                            asynchronous: !mediaPage.current
+                            sourceComponent: IslandMediaPage { width: mediaLoader.width; island: root }
                         }
                     }
 
-                    // Live activities
                     Page {
                         id: activityPage
                         name: "activity"
                         spacing: 12 * root.d
-
-                        RowLayout {
+                        Loader {
+                            id: activityLoader
                             Layout.fillWidth: true
-                            visible: root.recording
-                            spacing: 12 * root.d
-                            Item {
-                                Layout.preferredWidth: 40 * root.d
-                                Layout.preferredHeight: 40 * root.d
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: width / 2
-                                    color: ColorUtils.applyAlpha(IrisStyle.danger, 0.16)
-                                }
-                                RecordDot { anchors.centerIn: parent; width: 14 * root.d; height: width }
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 1
-                                IrisText {
-                                    text: Translation.tr("Screen recording")
-                                    font.pixelSize: 14 * IrisStyle.typeScale
-                                    font.weight: Font.DemiBold
-                                }
-                                IrisText {
-                                    text: RecorderStatus.effectiveAudioMode === "none" ? Translation.tr("No audio")
-                                        : RecorderStatus.effectiveAudioMode === "microphone" ? Translation.tr("Microphone")
-                                        : RecorderStatus.effectiveAudioMode === "both" ? Translation.tr("System and microphone")
-                                        : Translation.tr("System audio")
-                                    role: IrisText.Meta
-                                }
-                            }
-                            IrisNumber {
-                                text: root.clockText(RecorderStatus.elapsedSeconds)
-                                color: IrisStyle.danger
-                                pixelSize: 28 * IrisStyle.typeScale
-                                weight: Font.Bold
-                                letterSpacing: -0.6
-                            }
-                            GlyphButton {
-                                glyph: "stop"
-                                emphasized: true
-                                danger: true
-                                Accessible.name: Translation.tr("Stop recording")
-                                onClicked: {
-                                    Quickshell.execDetached([Directories.recordScriptPath, "--stop"])
-                                    RecorderStatus.scheduleQuickCheck()
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.fillWidth: true
-                            visible: root.recording && root.timerKind.length > 0
-                            implicitHeight: 1
-                            color: ColorUtils.applyAlpha(IrisStyle.text, 0.1)
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            visible: root.timerKind.length > 0
-                            spacing: 12 * root.d
-                            Item {
-                                Layout.preferredWidth: 40 * root.d
-                                Layout.preferredHeight: 40 * root.d
-                                ProgressRing {
-                                    anchors.fill: parent
-                                    visible: root.timerKind !== "stopwatch"
-                                    tint: IrisStyle.secondaryAccent
-                                    stroke: 3 * root.d
-                                    progress: root.timerProgress
-                                }
-                                Glyph {
-                                    anchors.centerIn: parent
-                                    text: root.timerGlyph
-                                    iconSize: 18 * root.d
-                                    color: IrisStyle.secondaryAccent
-                                }
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 1
-                                IrisText {
-                                    text: root.timerLabel
-                                    font.pixelSize: 14 * IrisStyle.typeScale
-                                    font.weight: Font.DemiBold
-                                }
-                                IrisText {
-                                    text: root.timerPaused ? Translation.tr("Paused")
-                                        : root.timerKind === "pomodoro"
-                                            ? Translation.tr("Cycle %1 of %2").arg(TimerService.pomodoroCycle + 1).arg(TimerService.cyclesBeforeLongBreak)
-                                        : Translation.tr("Running")
-                                    role: IrisText.Meta
-                                }
-                            }
-                            IrisNumber {
-                                text: root.clockText(root.timerSeconds)
-                                countDown: root.timerKind !== "stopwatch"
-                                color: root.timerPaused ? IrisStyle.subtext : IrisStyle.secondaryAccent
-                                pixelSize: 28 * IrisStyle.typeScale
-                                weight: Font.Bold
-                                letterSpacing: -0.6
-                            }
-                            GlyphButton {
-                                glyph: root.timerPaused ? "play_arrow" : "pause"
-                                colBackground: ColorUtils.applyAlpha(IrisStyle.secondaryAccent, 0.18)
-                                colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.secondaryAccent, 0.28)
-                                glyphColor: IrisStyle.secondaryAccent
-                                Accessible.name: root.timerPaused ? Translation.tr("Resume") : Translation.tr("Pause")
-                                onClicked: {
-                                    if (root.timerKind === "pomodoro") TimerService.togglePomodoro()
-                                    else if (root.timerKind === "countdown") TimerService.toggleCountdown()
-                                    else TimerService.toggleStopwatch()
-                                }
-                            }
-                            GlyphButton {
-                                glyph: "close"
-                                colBackground: ColorUtils.applyAlpha(IrisStyle.text, 0.1)
-                                colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.text, 0.18)
-                                glyphSize: 18 * root.d
-                                Accessible.name: Translation.tr("Stop timer")
-                                onClicked: {
-                                    if (root.timerKind === "pomodoro") TimerService.stopPomodoro()
-                                    else if (root.timerKind === "countdown") TimerService.stopCountdown()
-                                    else TimerService.stopStopwatch()
-                                }
-                            }
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: activityPage.resident
+                            asynchronous: !activityPage.current
+                            sourceComponent: IslandActivityPage { width: activityLoader.width; island: root }
                         }
                     }
 
-                    // Desktop: a glanceable dashboard — time and weather, this
-                    // output's workspaces, the focused app, system status and
-                    // any custom modules configured for the bar.
                     Page {
                         id: desktopPage
                         name: "desktop"
-                        bleeds: desktopPage.showBanner
+                        bleeds: desktopLoader.item?.showBanner ?? false
                         spacing: 14 * root.d
-
-                        readonly property var workspaces: CompositorService.isNiri
-                            ? (NiriService.allWorkspaces ?? []).filter(ws => ws.output === root.targetScreen?.name) : []
-                        readonly property var activeWorkspace: desktopPage.workspaces.find(ws => ws.is_active) ?? null
-                        // A pinned Island holds keyboard focus, so read the workspace's
-                        // own active window instead of the compositor's focused one.
-                        readonly property var focusedWindow: {
-                            const ws = desktopPage.activeWorkspace
-                            if (!ws) return null
-                            const onWorkspace = (NiriService.windows ?? []).filter(w => w.workspace_id === ws.id)
-                            const stamp = w => (w.focus_timestamp?.secs ?? 0) * 1e9 + (w.focus_timestamp?.nanos ?? 0)
-                            return onWorkspace.find(w => w.id === ws.active_window_id)
-                                ?? onWorkspace.slice().sort((a, b) => stamp(b) - stamp(a))[0] ?? null
-                        }
-                        readonly property var customModules: ["left", "center", "right"]
-                            .reduce((all, slot) => all.concat(root.options?.[slot + "Modules"] ?? []), [])
-                            .filter(id => String(id).startsWith("custom:"))
-                        readonly property bool weatherReady: Weather.enabled && !String(Weather.data?.temp ?? "--").startsWith("--")
-                        readonly property string bannerSource: String(root.options?.desktopBanner ?? "wallpaper") === "wallpaper"
-                            ? WallpaperListener.wallpaperUrlForScreen(root.targetScreen) : ""
-                        readonly property bool showBanner: desktopPage.bannerSource.length > 0
-                        readonly property bool showProfile: root.options?.desktopProfile ?? true
-
-                        // Hero: time and weather over this output's wallpaper. The image
-                        // bleeds to the chassis edges (the chassis clips it) and melts
-                        // into the black body, so it reads as the Island's own material
-                        // rather than a card inside it.
-                        Item {
-                            id: hero
+                        Loader {
+                            id: desktopLoader
                             Layout.fillWidth: true
-                            implicitHeight: desktopPage.showBanner
-                                ? Math.max(Math.round(112 * root.d), heroRow.implicitHeight + Math.round(26 * root.d))
-                                : heroRow.implicitHeight
-
-                            Item {
-                                id: heroBleed
-                                visible: desktopPage.showBanner
-                                // The navigation above a top Island's pages sits on the
-                                // melt, which stays dark enough behind its glyphs.
-                                readonly property real navBand: root.bottomEdge ? 0 : navRow.height + expandedContent.rowSpacing
-                                readonly property real topBleed: root.padding + chassis.topInset + heroBleed.navBand
-                                // Fades as one picture: faded separately, the image shows
-                                // through the black scrim and the band reads as a vignette.
-                                layer.enabled: desktopPage.opacity > 0 && desktopPage.opacity < 1
-                                // Image and scrim arrive together: the vignette never shows
-                                // over an empty chassis while the picture loads.
-                                opacity: heroImage.status === Image.Ready ? 1 : 0
-                                x: -root.padding
-                                y: -heroBleed.topBleed
-                                width: hero.width + root.padding * 2
-                                height: hero.height + heroBleed.topBleed + Math.round(12 * root.d)
-
-                                Image {
-                                    id: heroImage
-                                    anchors.fill: parent
-                                    source: desktopPage.showBanner ? desktopPage.bannerSource : ""
-                                    fillMode: Image.PreserveAspectCrop
-                                    // Decoded ahead by heroPreload (same source and size), so
-                                    // this reads the cache on the page's first frame instead of
-                                    // showing the scrim alone while it decodes.
-                                    asynchronous: heroPreload.status !== Image.Ready
-                                    cache: true
-                                    smooth: true
-                                    sourceSize.width: root.heroDecodeWidth
-                                }
-                                // A notch hangs from the screen edge: the image starts in black
-                                // so the concave fillets beside it stay continuous.
-                                Rectangle {
-                                    id: heroScrim
-                                    anchors.fill: parent
-                                    readonly property bool hangs: (root.notch && !root.bottomEdge) || heroBleed.navBand > 0
-                                    readonly property real solidTop: (root.notch && !root.bottomEdge ? chassis.topInset : 0)
-                                        + (heroBleed.navBand > 0 ? root.padding + heroBleed.navBand * 0.5 : 0)
-                                    readonly property real edge: hangs ? solidTop / Math.max(1, height) : 0
-                                    readonly property real topFade: hangs ? (solidTop + 30 * root.d + heroBleed.navBand * 0.5) / Math.max(1, height) : 0.001
-                                    gradient: Gradient {
-                                        GradientStop { position: 0; color: ColorUtils.applyAlpha(IrisStyle.surface, heroScrim.hangs ? 1 : 0.12) }
-                                        GradientStop { position: heroScrim.edge; color: ColorUtils.applyAlpha(IrisStyle.surface, heroScrim.hangs ? 1 : 0.12) }
-                                        GradientStop { position: heroScrim.topFade; color: ColorUtils.applyAlpha(IrisStyle.surface, 0.12) }
-                                        GradientStop { position: 0.42; color: ColorUtils.applyAlpha(IrisStyle.surface, 0.2) }
-                                        GradientStop { position: 1; color: IrisStyle.surface }
-                                    }
-                                }
-                            }
-
-                            // The wallpaper shown here is also the way to change it.
-                            GlyphButton {
-                                visible: desktopPage.showBanner
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.topMargin: -Math.round(6 * root.d)
-                                glyph: "wallpaper"
-                                glyphSize: 17 * root.d
-                                implicitWidth: Math.round(32 * root.d)
-                                colBackground: ColorUtils.applyAlpha(IrisStyle.surface, 0.42)
-                                colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.surface, 0.62)
-                                Accessible.name: Translation.tr("Change wallpaper")
-                                onClicked: {
-                                    GlobalStates.wallpaperSelectorTargetMonitor = root.targetScreen?.name ?? ""
-                                    GlobalStates.wallpaperSelectorOpen = true
-                                }
-                            }
-
-                            RowLayout {
-                                id: heroRow
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                spacing: 12 * root.d
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    Layout.alignment: Qt.AlignBottom
-                                    spacing: -2 * root.d
-                                    IrisText {
-                                        // Weekday carries the accent above the figure, like a
-                                        // calendar leaf; the rest of the date stays quiet.
-                                        textFormat: Text.StyledText
-                                        text: "<font color='" + IrisStyle.secondaryAccent + "'><b>"
-                                            + Qt.locale().toString(DateTime.clock.date, "dddd") + "</b></font> "
-                                            + Qt.locale().toString(DateTime.clock.date, "d MMMM")
-                                        color: ColorUtils.applyAlpha(IrisStyle.text, desktopPage.showBanner ? 0.82 : 0.62)
-                                        font.pixelSize: 13 * IrisStyle.typeScale
-                                        font.weight: Font.Medium
-                                    }
-                                    IrisClock {
-                                        id: heroClock
-                                        pixelSize: 46 * IrisStyle.typeScale
-                                        opacity: clockFlight.hides(heroClock) ? 0 : 1
-                                        Component.onCompleted: root.heroClock = heroClock
-                                    }
-                                }
-                                ColumnLayout {
-                                    visible: desktopPage.weatherReady
-                                    Layout.alignment: Qt.AlignBottom
-                                    spacing: 0
-                                    RowLayout {
-                                        Layout.alignment: Qt.AlignRight
-                                        spacing: 6 * root.d
-                                        Glyph {
-                                            text: Icons.getWeatherIcon(Weather.data?.wCode, Weather.isNightNow()) ?? "cloud"
-                                            iconSize: 22 * root.d
-                                        }
-                                        Metric {
-                                            readonly property string raw: String(Weather.data?.temp ?? "")
-                                            value: raw.replace(/°?[CF]$/, "")
-                                            unit: raw.length > value.length ? raw.slice(value.length) : ""
-                                            pixelSize: 26 * IrisStyle.typeScale
-                                            weight: Font.DemiBold
-                                        }
-                                    }
-                                    IrisText {
-                                        Layout.alignment: Qt.AlignRight
-                                        Layout.maximumWidth: 150 * root.d
-                                        text: String(Weather.data?.description ?? "")
-                                        color: ColorUtils.applyAlpha(IrisStyle.text, desktopPage.showBanner ? 0.78 : 0.6)
-                                        font.pixelSize: 12 * IrisStyle.typeScale
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-                        }
-
-                        // Who is signed in. The avatar is the editor: click to choose a
-                        // picture (AccountsService, same path as Material's Settings).
-                        RowLayout {
-                            Layout.fillWidth: true
-                            visible: desktopPage.showProfile
-                            spacing: 11 * root.d
-
-                            Item {
-                                id: avatar
-                                Layout.preferredWidth: Math.round(40 * root.d)
-                                Layout.preferredHeight: Layout.preferredWidth
-                                property int sourceIndex: 0
-                                readonly property string primarySource: Directories.userAvatarSourcePrimary
-                                onPrimarySourceChanged: avatar.sourceIndex = 0
-                                Accessible.role: Accessible.Button
-                                Accessible.name: Translation.tr("Change profile picture")
-
-                                HoverHandler { id: avatarHover; cursorShape: Qt.PointingHandCursor }
-                                TapHandler { gesturePolicy: TapHandler.WithinBounds; onTapped: root.chooseAvatar() }
-
-                                ClippingRectangle {
-                                    anchors.fill: parent
-                                    radius: width / 2
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.12)
-                                    scale: avatarHover.hovered ? 1.05 : 1
-                                    Behavior on scale { NumberAnimation { duration: IrisStyle.duration(120); easing.type: Easing.OutCubic } }
-
-                                    Image {
-                                        id: avatarImage
-                                        anchors.fill: parent
-                                        source: Directories.avatarSourceAt(avatar.sourceIndex)
-                                        fillMode: Image.PreserveAspectCrop
-                                        asynchronous: true
-                                        smooth: true
-                                        sourceSize.width: avatar.width * 2
-                                        sourceSize.height: avatar.height * 2
-                                        onStatusChanged: {
-                                            if (status === Image.Error && avatar.sourceIndex + 1 < Directories.userAvatarPaths.length)
-                                                Qt.callLater(() => avatar.sourceIndex++)
-                                        }
-                                    }
-                                    IrisText {
-                                        anchors.centerIn: parent
-                                        visible: avatarImage.status !== Image.Ready
-                                        text: (SystemInfo.displayName || SystemInfo.username || "?").charAt(0).toUpperCase()
-                                        font.pixelSize: 17 * IrisStyle.typeScale
-                                        font.weight: Font.DemiBold
-                                    }
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        color: ColorUtils.applyAlpha(IrisStyle.surface, avatarHover.hovered ? 0.5 : 0)
-                                        Behavior on color { ColorAnimation { duration: IrisStyle.duration(120) } }
-                                        Glyph {
-                                            anchors.centerIn: parent
-                                            text: "edit"
-                                            iconSize: 17 * root.d
-                                            opacity: avatarHover.hovered ? 1 : 0
-                                            Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(120) } }
-                                        }
-                                    }
-                                }
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    text: SystemInfo.displayName || SystemInfo.username || "user"
-                                    font.pixelSize: 13.5 * IrisStyle.typeScale
-                                    font.weight: Font.DemiBold
-                                    elide: Text.ElideRight
-                                }
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    readonly property string distro: String(SystemInfo.distroId ?? "").trim()
-                                    text: (SystemInfo.username || "user")
-                                        + (distro.length > 0 && distro !== "unknown" ? "@" + distro : "")
-                                        + " · " + Translation.tr("Up %1").arg(DateTime.uptime)
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.55)
-                                    font.pixelSize: 11.5 * IrisStyle.typeScale
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            GlyphButton {
-                                glyph: "lock"
-                                glyphSize: 18 * root.d
-                                implicitWidth: Math.round(34 * root.d)
-                                colBackground: ColorUtils.applyAlpha(IrisStyle.text, 0.08)
-                                colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.text, 0.16)
-                                Accessible.name: Translation.tr("Lock")
-                                onClicked: {
-                                    root.expanded = false
-                                    Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "lock", "activate"])
-                                }
-                            }
-                            GlyphButton {
-                                glyph: "power_settings_new"
-                                glyphSize: 18 * root.d
-                                implicitWidth: Math.round(34 * root.d)
-                                colBackground: ColorUtils.applyAlpha(IrisStyle.text, 0.08)
-                                colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.danger, 0.22)
-                                Accessible.name: Translation.tr("Session")
-                                onClicked: { root.expanded = false; GlobalStates.sessionOpen = true }
-                            }
-                        }
-
-                        // Where you are: the workspace's active app, its workspace, and the
-                        // output's workspaces as page dots (active one in the accent).
-                        RowLayout {
-                            id: contextRow
-                            Layout.fillWidth: true
-                            visible: desktopPage.focusedWindow !== null || desktopPage.workspaces.length > 1
-                            spacing: 11 * root.d
-
-                            readonly property string workspaceName: desktopPage.activeWorkspace
-                                ? (String(desktopPage.activeWorkspace.name ?? "").length > 0
-                                    ? desktopPage.activeWorkspace.name
-                                    : Translation.tr("Workspace %1").arg(desktopPage.activeWorkspace.idx))
-                                : ""
-                            readonly property var entry: AppSearch.lookupDesktopEntry(desktopPage.focusedWindow?.app_id ?? "")
-
-                            // Same slot as the avatar above, so both text columns share an edge.
-                            Item {
-                                visible: desktopPage.focusedWindow !== null
-                                Layout.preferredWidth: Math.round(40 * root.d)
-                                Layout.preferredHeight: Math.round(30 * root.d)
-                                SmartAppIcon {
-                                    anchors.centerIn: parent
-                                    icon: contextRow.entry?.icon ?? (desktopPage.focusedWindow?.app_id ?? "")
-                                    fallback: "application-x-executable"
-                                    iconSize: Math.round(28 * root.d)
-                                }
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    text: desktopPage.focusedWindow ? String(desktopPage.focusedWindow.title ?? "") : contextRow.workspaceName
-                                    font.pixelSize: 13 * IrisStyle.typeScale
-                                    font.weight: Font.DemiBold
-                                    elide: Text.ElideRight
-                                }
-                                IrisText {
-                                    Layout.fillWidth: true
-                                    readonly property string app: contextRow.entry?.name ?? String(desktopPage.focusedWindow?.app_id ?? "")
-                                    text: desktopPage.focusedWindow
-                                        ? app + (contextRow.workspaceName.length > 0 ? " · " + contextRow.workspaceName : "")
-                                        : Translation.tr("No windows")
-                                    color: ColorUtils.applyAlpha(IrisStyle.text, 0.55)
-                                    font.pixelSize: 11.5 * IrisStyle.typeScale
-                                    elide: Text.ElideRight
-                                }
-                            }
-                            Row {
-                                visible: desktopPage.workspaces.length > 1
-                                spacing: 2 * root.d
-                                Repeater {
-                                    model: desktopPage.workspaces
-                                    MouseArea {
-                                        id: dot
-                                        required property var modelData
-                                        readonly property bool active: dot.modelData.is_active
-                                        readonly property bool occupied: (NiriService.windows ?? []).some(w => w.workspace_id === dot.modelData.id)
-                                        width: indicator.width + 6 * root.d
-                                        height: 20 * root.d
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        Accessible.role: Accessible.Button
-                                        Accessible.name: Translation.tr("Workspace %1").arg(dot.modelData.idx)
-                                        onClicked: NiriService.switchToWorkspaceById(dot.modelData.id)
-                                        Rectangle {
-                                            id: indicator
-                                            anchors.centerIn: parent
-                                            width: dot.active ? 20 * root.d : 7 * root.d
-                                            height: 7 * root.d
-                                            radius: height / 2
-                                            color: dot.active ? IrisStyle.accent
-                                                : ColorUtils.applyAlpha(IrisStyle.text, dot.containsMouse ? 0.7 : dot.occupied ? 0.45 : 0.2)
-                                            Behavior on width { NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
-                                            Behavior on color { ColorAnimation { duration: IrisStyle.duration(120) } }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Vitals: how the machine is doing, the one thing Control Center
-                        // does not show. Rings turn red past their warning level.
-                        Rectangle {
-                            id: vitals
-                            Layout.fillWidth: true
-                            implicitHeight: Math.round(44 * root.d)
-                            radius: 14 * root.d
-                            color: ColorUtils.applyAlpha(IrisStyle.text, 0.07)
-                            // Sensors poll only while this page is on screen.
-                            readonly property bool polling: desktopPage.current && root.visualExpanded
-                            property bool holdingSensors: false
-                            onPollingChanged: {
-                                if (polling && !holdingSensors) { ResourceUsage.keepAlive(); holdingSensors = true }
-                                else if (!polling && holdingSensors) { ResourceUsage.releaseKeepAlive(); holdingSensors = false }
-                            }
-                            Component.onDestruction: if (holdingSensors) ResourceUsage.releaseKeepAlive()
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: Math.round(10 * root.d)
-                                anchors.rightMargin: Math.round(10 * root.d)
-                                spacing: 6 * root.d
-                                Repeater {
-                                    model: [
-                                        { label: Translation.tr("CPU"), glyph: "memory", level: ResourceUsage.cpuUsage, value: Math.round(ResourceUsage.cpuUsage * 100), unit: "%", warn: 0.85 },
-                                        { label: Translation.tr("Memory"), glyph: "memory_alt", level: ResourceUsage.memoryUsedPercentage, value: Math.round(ResourceUsage.memoryUsedPercentage * 100), unit: "%", warn: 0.85 },
-                                        { label: Translation.tr("Heat"), glyph: "device_thermostat", level: ResourceUsage.tempPercentage, value: ResourceUsage.maxTemp, unit: "°", warn: ResourceUsage.tempWarningThreshold / 100 },
-                                        { label: Translation.tr("Disk"), glyph: "hard_drive", level: ResourceUsage.diskUsedPercentage, value: Math.round(ResourceUsage.diskUsedPercentage * 100), unit: "%", warn: 0.9 }
-                                    ]
-                                    RowLayout {
-                                        id: vital
-                                        required property var modelData
-                                        readonly property real level: Math.max(0, Math.min(1, Number(vital.modelData.level) || 0))
-                                        readonly property color tint: vital.level >= vital.modelData.warn ? IrisStyle.danger : IrisStyle.accent
-                                        Layout.fillWidth: true
-                                        Layout.preferredWidth: 1
-                                        spacing: 6 * root.d
-                                        Accessible.name: vital.modelData.label + ", " + vital.modelData.value + vital.modelData.unit
-                                        Item {
-                                            Layout.preferredWidth: Math.round(26 * root.d)
-                                            Layout.preferredHeight: Layout.preferredWidth
-                                            ProgressRing {
-                                                anchors.fill: parent
-                                                stroke: Math.max(2, 2.2 * root.d)
-                                                tint: vital.tint
-                                                progress: vital.level
-                                                Behavior on progress { NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.OutCubic } }
-                                            }
-                                            Glyph {
-                                                anchors.centerIn: parent
-                                                text: vital.modelData.glyph
-                                                iconSize: 12 * root.d
-                                                color: vital.tint
-                                            }
-                                        }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: -2 * root.d
-                                            IrisText {
-                                                Layout.fillWidth: true
-                                                text: vital.modelData.label
-                                                color: IrisStyle.muted
-                                                font.pixelSize: 9.5 * IrisStyle.typeScale
-                                                font.weight: Font.Medium
-                                                elide: Text.ElideRight
-                                            }
-                                            Metric {
-                                                value: vital.modelData.value
-                                                unit: vital.modelData.unit
-                                                pixelSize: 12.5 * IrisStyle.typeScale
-                                                weight: Font.Bold
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // User extensions from the bar slots keep a place here.
-                        Flow {
-                            Layout.fillWidth: true
-                            visible: desktopPage.customModules.length > 0
-                            spacing: 6 * root.d
-                            Repeater {
-                                model: desktopPage.customModules
-                                IrisCustomModule {
-                                    required property string modelData
-                                    widgetId: modelData.slice("custom:".length)
-                                    targetScreen: root.targetScreen
-                                    slot: "island.desktop"
-                                }
+                            Layout.preferredHeight: item?.implicitHeight ?? 0
+                            active: desktopPage.resident
+                            asynchronous: !desktopPage.current
+                            sourceComponent: IslandDesktopPage {
+                                width: desktopLoader.width
+                                island: root
+                                navOffset: navRow.height + expandedContent.rowSpacing
                             }
                         }
                     }
                 }
 
-                // Page navigation shared by every expanded presentation.
                 RowLayout {
                     id: navRow
                     Layout.row: root.bottomEdge ? 1 : 0
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 4 * root.d
 
-                    component NavButton: IrisButton {
-                        id: nav
-                        property string glyph: ""
-                        property string target: ""
-                        selected: nav.target.length > 0 && root.effectivePage === nav.target
-                        quiet: !nav.selected
-                        implicitWidth: Math.round(36 * root.d)
-                        implicitHeight: Math.round(30 * root.d)
-                        buttonRadius: height / 2
-                        buttonRadiusPressed: height / 2
-                        colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.text, 0.13)
-                        onClicked: if (nav.target.length > 0) root.page = nav.target
-                        Glyph {
-                            anchors.centerIn: parent
-                            text: nav.glyph
-                            fill: nav.selected ? 1 : 0
-                            iconSize: 18 * root.d
-                            color: nav.selected ? IrisStyle.accent : ColorUtils.applyAlpha(IrisStyle.text, 0.6)
-                        }
+                    WheelHandler {
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: event => root.wheelPages(event, true)
                     }
 
-                    NavButton {
-                        visible: root.hasMedia
-                        glyph: "music_note"
-                        target: "media"
-                        Accessible.name: Translation.tr("Now playing")
-                    }
-                    NavButton {
-                        visible: root.hasSystemActivity
-                        glyph: root.recording ? "radio_button_checked" : root.timerGlyph
-                        target: "activity"
-                        Accessible.name: Translation.tr("Live activities")
-                    }
-                    NavButton {
-                        glyph: "space_dashboard"
-                        target: "desktop"
-                        Accessible.name: Translation.tr("Desktop")
-                    }
-                    NavButton { glyph: "apps"; target: "tray"; Accessible.name: Translation.tr("Tray") }
-                    NavButton { glyph: "timer"; target: "tools"; Accessible.name: Translation.tr("Timers") }
-                    Rectangle {
-                        Layout.preferredWidth: 1
-                        Layout.preferredHeight: 14 * root.d
-                        Layout.leftMargin: 4 * root.d
-                        Layout.rightMargin: 4 * root.d
-                        color: ColorUtils.applyAlpha(IrisStyle.text, 0.14)
-                    }
-                    NavButton {
-                        visible: Config.options?.iris?.sidebars?.left?.enable ?? true
-                        glyph: "left_panel_open"
-                        Accessible.name: Translation.tr("Focus panel")
-                        onClicked: { root.expanded = false; GlobalStates.openSidebarLeft(root.targetScreen?.name ?? "") }
-                    }
-                    NavButton {
-                        visible: Config.options?.iris?.sidebars?.right?.enable ?? true
-                        glyph: "right_panel_open"
-                        Accessible.name: Translation.tr("Today panel")
-                        onClicked: { root.expanded = false; GlobalStates.openSidebarRight(root.targetScreen?.name ?? "") }
-                    }
-                    NavButton {
-                        glyph: "tune"
-                        Accessible.name: Translation.tr("Quick controls")
-                        onClicked: root.openControlCenterFrom(chassis)
-                    }
-                    NavButton {
-                        glyph: "settings"
-                        Accessible.name: Translation.tr("Settings")
-                        onClicked: root.openSettingsFrom(chassis)
+                    Repeater {
+                        model: root.navEntries
+                        delegate: Item {
+                            id: navSlot
+                            required property var modelData
+                            implicitWidth: navSlot.modelData.kind === "|" ? Math.round(9 * root.d) : navButton.implicitWidth
+                            implicitHeight: navButton.implicitHeight
+                            Rectangle {
+                                visible: navSlot.modelData.kind === "|"
+                                anchors.centerIn: parent
+                                width: 1
+                                height: Math.round(14 * root.d)
+                                color: IrisStyle.fill
+                            }
+                            IrisButton {
+                                id: navButton
+                                visible: navSlot.modelData.kind !== "|"
+                                readonly property string target: navSlot.modelData.page ?? ""
+                                selected: navButton.target.length > 0 && root.effectivePage === navButton.target
+                                quiet: !navButton.selected
+                                implicitWidth: Math.round(36 * root.d)
+                                implicitHeight: Math.round(30 * root.d)
+                                buttonRadius: height / 2
+                                buttonRadiusPressed: height / 2
+                                colBackgroundHover: IrisStyle.fillHover
+                                Accessible.name: Translation.tr(navSlot.modelData.label ?? "")
+                                onHoveredChanged: {
+                                    if (navButton.target.length > 0) {
+                                        if (navButton.hovered) {
+                                            pageIntentExpiry.stop()
+                                            root.pageIntent = navButton.target
+                                        } else if (root.pageIntent === navButton.target) {
+                                            pageIntentExpiry.restart()
+                                        }
+                                    }
+                                    if (navSlot.modelData.kind === "settings" && root.focusedOutput)
+                                        root.settingsIntent = navButton.hovered
+                                }
+                                onClicked: root.activateNav(navSlot.modelData.kind)
+                                Glyph {
+                                    anchors.centerIn: parent
+                                    text: navSlot.modelData.glyph ?? ""
+                                    fill: navButton.selected ? 1 : 0
+                                    iconSize: 18 * root.d
+                                    color: navButton.selected ? IrisStyle.accent
+                                        : navButton.hovered ? IrisStyle.text : IrisStyle.textSecondary
+                                }
+                            }
+                        }
                     }
                 }
+            }
+        }
+        RowLayout {
+            id: hudRow
+            anchors.fill: parent
+            anchors.leftMargin: 16 * root.d
+            anchors.rightMargin: 17 * root.d
+            spacing: 11 * root.d
+            opacity: extension.anchoredShape && root.extensionRole === "feedback" && root.extensionOpen ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
+
+            Glyph {
+                text: root.feedbackIcon
+                iconSize: 18 * root.d
+                color: root.feedbackMuted ? IrisStyle.subtext : IrisStyle.text
+                Layout.preferredWidth: 20 * root.d
+            }
+            IrisScrubber {
+                Layout.fillWidth: true
+                seekable: false
+                value: root.feedbackMuted ? 0 : Math.min(1, root.feedbackValue)
+                fillColor: IrisStyle.text
+                Behavior on value { NumberAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
+            }
+            Item {
+                Layout.preferredWidth: 38 * root.d
+                Layout.fillHeight: true
+                Metric {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    value: Math.round(root.feedbackValue * 100)
+                    unit: "%"
+                    pixelSize: 14 * IrisStyle.typeScale
+                    weight: Font.Bold
+                    color: root.feedbackMuted ? IrisStyle.subtext : IrisStyle.text
+                }
+            }
+        }
+        RowLayout {
+            id: hudEventRow
+            anchors.fill: parent
+            anchors.leftMargin: 6 * root.d
+            anchors.rightMargin: 14 * root.d
+            spacing: 9 * root.d
+            opacity: extension.anchoredShape && root.extensionRole === "event" && root.extensionOpen ? 1 : 0
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
+            Rectangle {
+                Layout.preferredWidth: root.compactHeight - Math.round(12 * root.d)
+                Layout.preferredHeight: Layout.preferredWidth
+                radius: width / 2
+                color: IrisStyle.tintFill(root.event.tint)
+                Glyph {
+                    anchors.centerIn: parent
+                    text: root.event.icon
+                    iconSize: 16 * root.d
+                    color: root.event.tint
+                }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: -1 * root.d
+                IrisText {
+                    Layout.fillWidth: true
+                    text: root.event.title
+                    font.pixelSize: 12.5 * IrisStyle.typeScale
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                }
+                IrisText {
+                    Layout.fillWidth: true
+                    visible: text.length > 0
+                    text: root.event.detail
+                    color: IrisStyle.muted
+                    font.pixelSize: 10.5 * IrisStyle.typeScale
+                    elide: Text.ElideRight
+                }
+            }
+            Metric {
+                visible: root.event.value >= 0
+                Layout.alignment: Qt.AlignVCenter
+                value: Math.round(root.event.value * 100)
+                unit: "%"
+                pixelSize: 14 * IrisStyle.typeScale
+                weight: Font.Bold
+                color: root.event.tint
             }
         }
     }

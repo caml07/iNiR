@@ -76,18 +76,43 @@ IconToolbarButton {
             height: 28
             radius: Math.round(width * 0.26)
             scale: root.down ? 0.9 : root.buttonHovered ? 1.1 : 1
-            Behavior on scale { NumberAnimation { duration: IrisStyle.duration(120); easing.type: Easing.OutCubic } }
-            readonly property color base: root.toggled ? root.tileTint : IrisStyle.surfaceHighest
-            gradient: Gradient {
-                GradientStop { position: 0; color: Qt.lighter(tile.base, root.toggled ? 1.18 : 1.25) }
-                GradientStop { position: 1; color: tile.base }
+            Behavior on scale { NumberAnimation { duration: IrisStyle.duration(120); easing.type: IrisStyle.feedbackEasing } }
+            color: root.toggled ? root.tileTint : root.buttonHovered ? IrisStyle.fillHover : IrisStyle.fillQuiet
+            gradient: root.toggled ? onGradient : null
+            border.width: root.toggled ? 0 : 1
+            border.color: ColorUtils.applyAlpha(root.tileTint, root.buttonHovered ? 0.7 : 0.38)
+            Behavior on color { ColorAnimation { duration: IrisStyle.duration(140) } }
+            Gradient {
+                id: onGradient
+                GradientStop { position: 0; color: Qt.lighter(root.tileTint, 1.18) }
+                GradientStop { position: 1; color: root.tileTint }
             }
             MaterialSymbol {
                 anchors.centerIn: parent
                 text: root.iconName
-                fill: 1
+                fill: root.toggled ? 1 : 0
                 iconSize: 17
-                color: root.toggled ? "#ffffff" : IrisStyle.subtext
+                color: root.toggled ? IrisStyle.onTint : ColorUtils.applyAlpha(root.tileTint, root.buttonHovered ? 1 : 0.78)
+            }
+            Rectangle {
+                x: parent.width - width * 0.7
+                y: -height * 0.3
+                width: 13
+                height: 13
+                radius: width / 2
+                color: root.toggled ? IrisStyle.danger : IrisStyle.accent
+                border.width: 1.5
+                border.color: IrisStyle.surface
+                opacity: root.buttonHovered ? 1 : 0
+                scale: opacity > 0 ? 1 : 0.6
+                Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(120) } }
+                Behavior on scale { NumberAnimation { duration: IrisStyle.duration(120); easing.type: IrisStyle.feedbackEasing } }
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    text: root.toggled ? "remove" : "add"
+                    iconSize: 11
+                    color: IrisStyle.onTint
+                }
             }
         }
         Rectangle {

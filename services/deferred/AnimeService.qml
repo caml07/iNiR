@@ -324,6 +324,7 @@ Singleton {
             id: anime.id,
             title: anime.title?.english ?? anime.title?.romaji ?? "",
             titleEnglish: anime.title?.english ?? anime.title?.romaji ?? "",
+            titleRomaji: anime.title?.romaji ?? "",
             titleJapanese: anime.title?.native ?? "",
             image: anime.coverImage?.large ?? anime.coverImage?.medium ?? "",
             imageSmall: anime.coverImage?.medium ?? "",

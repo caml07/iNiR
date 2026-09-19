@@ -7,13 +7,20 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Widgets
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.iris.style
+import qs.modules.iris.settings
+import qs.modules.iris.preview
+import qs.modules.iris.components as Iris
+import qs.modules.waffle.looks
 
 Scope {
     id: root
@@ -28,45 +35,80 @@ Scope {
     readonly property bool veryCompact: screenHeight < 720
     readonly property int screenPadding: veryCompact ? 12 : compact ? 24 : 60
     readonly property int cardPadding: compact ? 22 : 30
-    readonly property real stepWidth: Math.min(1040,
-        screenWidth - 2 * screenPadding - 2 * cardPadding)
+    readonly property real stepWidth: Math.max(0, wizardCard.width
+        - 2 * (root.compact ? 22 : 28)
+        - (root.irisFamily ? 2 * IrisStyle.concentricPad(IrisStyle.radiusPanel, 10) : 0))
     readonly property int totalSteps: 5
     property var focusedScreen: GlobalStates.primaryScreen
+    readonly property real screenAspect: root.screenWidth / Math.max(1, root.screenHeight)
 
-    // The first-run frame stays a stable Material surface while the shell itself
-    // changes style. Onboarding chrome should never morph under the user's cursor.
-    readonly property color welcomeSurfaceRaised: Appearance.m3colors.m3surfaceContainer
-    readonly property color welcomeSurfaceHigh: Appearance.m3colors.m3surfaceContainerHigh
-    readonly property color welcomeSurfaceHighest: Appearance.m3colors.m3surfaceContainerHighest
-    readonly property color welcomeSurfaceRaisedHover: ColorUtils.mix(welcomeSurfaceRaised, welcomeOnSurface, 0.94)
-    readonly property color welcomeOnSurface: Appearance.m3colors.m3onSurface
-    readonly property color welcomeOnSurfaceVariant: Appearance.m3colors.m3onSurfaceVariant
-    readonly property color welcomeOutline: Appearance.m3colors.m3outlineVariant
+    property string requestedFamily: ""
+    readonly property string family: root.requestedFamily.length > 0
+        ? root.requestedFamily : (Config.options?.panelFamily ?? "ii")
+    readonly property bool irisFamily: root.family === "iris"
+    readonly property bool waffleFamily: root.family === "waffle"
+    readonly property string familyTitle: root.irisFamily ? "iRiS" : root.waffleFamily ? "Waffle" : "Material II"
+
+    // Onboarding follows the selected family, independently of ii's Global Style.
+    readonly property color welcomeSurfaceRaised: root.irisFamily ? IrisStyle.surface
+        : root.waffleFamily ? Looks.colors.bg0 : Appearance.m3colors.m3surfaceContainer
+    readonly property color welcomeSurfaceHigh: root.irisFamily ? IrisStyle.surfaceHigh
+        : root.waffleFamily ? Looks.colors.bg1Base : Appearance.m3colors.m3surfaceContainerHigh
+    readonly property color welcomeSurfaceHighest: root.irisFamily ? IrisStyle.surfaceHighest
+        : root.waffleFamily ? Looks.colors.bg2Base : Appearance.m3colors.m3surfaceContainerHighest
+    readonly property color welcomeSurfaceRaisedHover: root.irisFamily ? IrisStyle.fillHover
+        : root.waffleFamily ? Looks.colors.bg1Hover
+        : ColorUtils.mix(welcomeSurfaceRaised, welcomeOnSurface, 0.94)
+    readonly property color welcomeOnSurface: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeOnSurfaceVariant: root.irisFamily ? IrisStyle.textSecondary
+        : root.waffleFamily ? Looks.colors.subfg : Appearance.m3colors.m3onSurfaceVariant
+    readonly property color welcomeOutline: root.irisFamily ? IrisStyle.border
+        : root.waffleFamily ? Looks.settings.strokeStrong : Appearance.m3colors.m3outlineVariant
     readonly property color welcomeScrim: Appearance.m3colors.m3scrim
-    readonly property color welcomePrimary: Appearance.m3colors.m3primary
-    readonly property color welcomeOnPrimary: Appearance.m3colors.m3onPrimary
-    readonly property color welcomePrimaryContainer: Appearance.m3colors.m3primaryContainer
-    readonly property color welcomeOnPrimaryContainer: Appearance.m3colors.m3onPrimaryContainer
-    readonly property color welcomeSecondary: Appearance.m3colors.m3secondary
-    readonly property color welcomeSecondaryContainer: Appearance.m3colors.m3secondaryContainer
-    readonly property color welcomeOnSecondaryContainer: Appearance.m3colors.m3onSecondaryContainer
-    readonly property color welcomeTertiary: Appearance.m3colors.m3tertiary
-    readonly property color welcomeTertiaryContainer: Appearance.m3colors.m3tertiaryContainer
-    readonly property color welcomeOnTertiaryContainer: Appearance.m3colors.m3onTertiaryContainer
-    // Welcome keeps a stable Material chassis while its accent follows the palette
-    // generated from the active wallpaper. Global Style selection must not restyle
-    // the wizard itself, but wallpaper colour is useful first-run feedback.
+    readonly property color welcomePrimary: root.irisFamily ? IrisStyle.accent
+        : root.waffleFamily ? Looks.colors.accent : Appearance.m3colors.m3primary
+    readonly property color welcomeOnPrimary: root.irisFamily ? IrisStyle.onAccent
+        : root.waffleFamily ? Looks.colors.accentFg : Appearance.m3colors.m3onPrimary
+    readonly property color welcomePrimaryContainer: root.irisFamily ? IrisStyle.tintFill(IrisStyle.accent)
+        : root.waffleFamily ? ColorUtils.mix(Looks.colors.bg1Base, Looks.colors.accent, 0.84)
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainerHigh,
+            Appearance.m3colors.m3primaryContainer, 0.72)
+    readonly property color welcomeOnPrimaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeSecondary: root.irisFamily ? IrisStyle.secondaryAccent
+        : root.waffleFamily ? Looks.colors.accentUnfocused : Appearance.m3colors.m3secondary
+    readonly property color welcomeSecondaryContainer: root.irisFamily ? IrisStyle.fill
+        : root.waffleFamily ? Looks.settings.tile : Appearance.m3colors.m3surfaceContainer
+    readonly property color welcomeOnSecondaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.fg : Appearance.m3colors.m3onSurface
+    readonly property color welcomeTertiary: root.irisFamily ? IrisStyle.secondaryAccent
+        : root.waffleFamily ? Looks.colors.accentUnfocused : Appearance.m3colors.m3tertiary
+    readonly property color welcomeTertiaryContainer: root.irisFamily ? IrisStyle.tintFill(IrisStyle.secondaryAccent)
+        : root.waffleFamily ? Looks.settings.tile
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainer,
+            Appearance.m3colors.m3tertiaryContainer, 0.84)
+    readonly property color welcomeOnTertiaryContainer: root.irisFamily ? IrisStyle.textStrong
+        : root.waffleFamily ? Looks.colors.subfg : Appearance.m3colors.m3onSurfaceVariant
+    // Wallpaper colour provides feedback without switching ii's wizard dialect.
     readonly property color welcomeAccent: welcomePrimary
     readonly property color welcomeAccentAlt: welcomeTertiary
     readonly property color welcomeAccentContainer: welcomePrimaryContainer
-    readonly property color welcomeAccentHover: ColorUtils.mix(welcomePrimaryContainer, welcomeOnPrimaryContainer, 0.90)
+    readonly property color welcomeAccentHover: root.irisFamily ? IrisStyle.tintFillHover(IrisStyle.accent)
+        : root.waffleFamily ? ColorUtils.mix(Looks.colors.bg1Hover, Looks.colors.accent, 0.80)
+        : ColorUtils.mix(Appearance.m3colors.m3surfaceContainerHighest,
+            Appearance.m3colors.m3primaryContainer, 0.68)
     readonly property color welcomeOnAccent: welcomeOnPrimary
     readonly property color welcomeOnAccentContainer: welcomeOnPrimaryContainer
     readonly property color welcomeGuideContainer: welcomeTertiaryContainer
     readonly property color welcomeGuideText: welcomeOnTertiaryContainer
-    readonly property string welcomeFontMain: Config.options?.appearance?.typography?.mainFont ?? "Roboto Flex"
-    readonly property string welcomeFontTitle: Config.options?.appearance?.typography?.titleFont ?? "Gabarito"
-    readonly property string welcomeFontNumbers: "Rubik"
+    readonly property string welcomeFontMain: root.irisFamily ? IrisStyle.fontMain
+        : root.waffleFamily ? Looks.fontFamily
+        : (Config.options?.appearance?.typography?.mainFont ?? "Roboto Flex")
+    readonly property string welcomeFontTitle: root.irisFamily ? IrisStyle.fontTitle
+        : root.waffleFamily ? Looks.fontFamily
+        : (Config.options?.appearance?.typography?.titleFont ?? "Gabarito")
+    readonly property string welcomeFontNumbers: root.irisFamily ? IrisStyle.fontNumbers : "Rubik"
     readonly property string welcomeFontExpressive: "Space Grotesk"
     readonly property int welcomeFontMeta: Math.max(13, Appearance.font.pixelSize.smallest)
     readonly property int welcomeFontCaption: Math.max(14, Appearance.font.pixelSize.smaller)
@@ -76,6 +118,14 @@ Scope {
         welcomeOnSurfaceVariant, welcomeSurfaceRaised, 4.5)
     readonly property color welcomeTertiaryText: ColorUtils.ensureReadable(
         ColorUtils.applyAlpha(welcomeOnSurfaceVariant, 0.86), welcomeSurfaceRaised, 4.0)
+    readonly property real welcomePanelRadius: root.irisFamily ? IrisStyle.radiusPanel
+        : root.waffleFamily ? Looks.settings.radiusXLarge : 24
+    readonly property real welcomeControlRadius: root.irisFamily ? IrisStyle.radiusRow
+        : root.waffleFamily ? Looks.settings.radiusMedium : 12
+    readonly property real welcomeChoiceRadius: root.irisFamily ? IrisStyle.radiusTile
+        : root.waffleFamily ? Looks.settings.radiusLarge : 14
+    readonly property real welcomeCardRadius: root.irisFamily ? IrisStyle.radiusPlate
+        : root.waffleFamily ? Looks.settings.radiusLarge : 16
 
     readonly property string selectedProfile: Config.options?.welcomeWizard?.profile ?? "balanced"
     readonly property string selectedStylePreset: Config.options?.welcomeWizard?.stylePreset ?? "material"
@@ -94,6 +144,14 @@ Scope {
         : selectedProfile === "full"
             ? Translation.tr("More local tools, richer sidebars and a small system monitor.")
             : Translation.tr("Useful sidebars, eight everyday toggles and one desktop clock.")
+    readonly property var profileChoices: [
+        { id: "minimum", name: Translation.tr("Minimum"), icon: "filter_1",
+            detail: Translation.tr("Core controls with no desktop widgets.") },
+        { id: "balanced", name: Translation.tr("Balanced"), icon: "tune", badge: Translation.tr("Recommended"),
+            detail: Translation.tr("Sidebars, daily toggles and a desktop clock.") },
+        { id: "full", name: Translation.tr("Full"), icon: "auto_awesome",
+            detail: Translation.tr("More local tools, fuller sidebars and a system monitor.") }
+    ]
     readonly property var stylePresets: [
         {
             id: "material", name: Translation.tr("Flow"), icon: "category",
@@ -543,21 +601,89 @@ Scope {
 
     function setProfileFeature(path: string, value: var): void {
         root.profileCustomized = true
-        if (path === "panelFamily") {
-            Quickshell.execDetached([
-                Quickshell.shellPath("scripts/inir"),
-                "panelFamily", "set", String(value)
-            ])
-            return
-        }
         Config.setNestedValue(path, value)
+    }
+
+    function chooseFamily(id: string): void {
+        root.requestedFamily = id
+        Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "panelFamily", "set", id])
+    }
+
+    readonly property var irisArrangements: [
+        {
+            id: "signature", name: Translation.tr("Signature"), icon: "crop_free",
+            badge: Translation.tr("Recommended"),
+            description: Translation.tr("Island attached to its edge, Surround on, Dock opposite."),
+            values: {
+                "iris.bar.layout": "island",
+                "iris.bar.notch": true,
+                "iris.surround.enable": true,
+                "iris.bar.composition": "cluster",
+                "iris.dock.enable": true,
+                "iris.dock.position": "auto",
+                "iris.dock.notch": true
+            }
+        },
+        {
+            id: "floating", name: Translation.tr("Floating"), icon: "layers",
+            description: Translation.tr("Island and Dock float above the wallpaper."),
+            values: {
+                "iris.bar.layout": "island",
+                "iris.bar.notch": false,
+                "iris.surround.enable": false,
+                "iris.bar.composition": "cluster",
+                "iris.dock.enable": true,
+                "iris.dock.position": "auto",
+                "iris.dock.notch": false
+            }
+        },
+        {
+            id: "full", name: Translation.tr("Full bar"), icon: "width_full",
+            description: Translation.tr("Island spans the edge with start, center and end zones."),
+            values: {
+                "iris.bar.layout": "full",
+                "iris.bar.notch": true,
+                "iris.surround.enable": false,
+                "iris.bar.composition": "unified",
+                "iris.dock.enable": true,
+                "iris.dock.position": "auto",
+                "iris.dock.notch": false
+            }
+        }
+    ]
+    readonly property var irisWelcomeThemeIds: [
+        "iris", "liquid-glass", "frost", "aurora", "terminal", "adaptive"
+    ]
+    readonly property var irisWelcomeThemes: IrisThemes.curated.filter(
+        theme => root.irisWelcomeThemeIds.includes(theme.id))
+
+    readonly property string effectiveIrisArrangement: {
+        for (const arrangement of root.irisArrangements) {
+            if (root.valuesMatch(arrangement.values))
+                return arrangement.id
+        }
+        return "custom"
+    }
+    readonly property var currentIrisArrangement: root.presetById(root.irisArrangements,
+        root.effectiveIrisArrangement)
+    readonly property string irisLook: Config.options?.iris?.appearance?.preset ?? "iris"
+    readonly property string irisMaterial: Config.options?.iris?.appearance?.theme?.surface ?? "black"
+    readonly property string irisAccent: Config.options?.iris?.appearance?.accent ?? "blue"
+
+    function applyIrisArrangement(id: string): void {
+        Config.setNestedValues(root.presetById(root.irisArrangements, id).values)
+    }
+
+    function applyIrisTheme(id: string): void {
+        const theme = IrisThemes.find(id)
+        if (theme) IrisThemes.apply(theme)
     }
 
     onCurrentStepChanged: {
         if (!root.firstRunSetup)
             return
         if (root.currentStep === 1) {
-            if (!root.initialProfileApplied) {
+            if (!root.irisFamily && !root.initialProfileApplied) {
                 root.initialProfileApplied = true
                 root.applyProfile(root.selectedProfile)
             }
@@ -579,22 +705,34 @@ Scope {
         {
             icon: "waving_hand", title: Translation.tr("Welcome"),
             headline: Translation.tr("Welcome to iNiR"),
-            subtitle: Translation.tr("Five quick steps. You can change everything later in Settings.")
+            subtitle: Translation.tr("Pick the desktop you want to start with. The next steps adapt to it.")
         },
         {
             icon: "tune", title: Translation.tr("Starting point"),
-            headline: Translation.tr("Choose your starting setup"),
-            subtitle: Translation.tr("Start simple, balanced or with more tools. You can change every module later.")
+            headline: root.irisFamily ? Translation.tr("Choose an iRiS layout")
+                : Translation.tr("Choose your starting setup"),
+            subtitle: root.irisFamily
+                ? Translation.tr("Signature, floating, or a full bar.")
+                : Translation.tr("Start simple, balanced or with more tools. You can change every module later.")
         },
         {
             icon: "palette", title: Translation.tr("Appearance"),
-            headline: Translation.tr("Make it yours"),
-            subtitle: Translation.tr("Wallpaper sets the colors. Style sets the shape and feel.")
+            headline: root.irisFamily ? Translation.tr("Choose an iRiS theme")
+                : Translation.tr("Make it yours"),
+            subtitle: root.irisFamily
+                ? Translation.tr("Themes set material, shape, type and motion together.")
+                : root.waffleFamily
+                    ? Translation.tr("Wallpaper sets the colors across the shell and your apps.")
+                    : Translation.tr("Wallpaper sets the colors. Style sets the shape and feel.")
         },
         {
             icon: "dashboard", title: Translation.tr("Layout"),
             headline: Translation.tr("Arrange the desktop"),
-            subtitle: Translation.tr("Choose your shell family and where the bar and dock go.")
+            subtitle: root.irisFamily
+                ? Translation.tr("Set the Island edge, Dock and desktop widgets.")
+                : root.waffleFamily
+                    ? Translation.tr("Choose where the taskbar sits and how it lines up apps.")
+                    : Translation.tr("Choose where the bar and dock go.")
         },
         {
             icon: "celebration", title: Translation.tr("Ready"),
@@ -655,91 +793,6 @@ Scope {
         onTriggered: root._contentReady = true
     }
 
-    component WelcomeText: StyledText {
-        defaultFont: root.welcomeFontMain
-        font.letterSpacing: 0
-        font.variableAxes: ({})
-    }
-
-    component WelcomeActionButton: RippleButton {
-        id: actionButton
-
-        property string label: ""
-        property string materialIcon: ""
-        property bool primary: false
-
-        implicitWidth: actionContent.implicitWidth + 24
-        implicitHeight: 42
-        buttonRadius: 12
-        rippleEnabled: true
-        cookieMorphing: false
-        colBackground: primary ? root.welcomeAccent : "transparent"
-        colBackgroundHover: primary
-            ? ColorUtils.mix(root.welcomeAccent, root.welcomeOnAccent, 0.88)
-            : root.welcomeSurfaceHigh
-        colRipple: primary
-            ? ColorUtils.applyAlpha(root.welcomeOnAccent, 0.22)
-            : root.welcomeSurfaceHighest
-
-        contentItem: RowLayout {
-            id: actionContent
-            anchors.centerIn: parent
-            spacing: actionButton.materialIcon.length > 0 ? 6 : 0
-
-            MaterialSymbol {
-                visible: actionButton.materialIcon.length > 0
-                text: actionButton.materialIcon
-                iconSize: 17
-                color: actionButton.primary ? root.welcomeOnAccent : root.welcomeAccent
-            }
-
-            WelcomeText {
-                text: actionButton.label
-                font.family: root.welcomeFontTitle
-                font.pixelSize: root.welcomeFontBody
-                font.weight: actionButton.primary ? Font.Bold : Font.Medium
-                color: actionButton.primary ? root.welcomeOnAccent : root.welcomeOnSurface
-                horizontalAlignment: Text.AlignHCenter
-            }
-        }
-    }
-
-    component WelcomeStepMark: Item {
-        id: stepMark
-
-        property string icon: "category"
-        property string indexText: "01"
-
-        implicitWidth: 104
-        implicitHeight: 58
-
-        WelcomeText {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: stepMark.indexText
-            font.family: root.welcomeFontNumbers
-            font.pixelSize: 44
-            font.weight: Font.DemiBold
-            color: ColorUtils.applyAlpha(root.welcomeAccent, 0.105)
-        }
-
-        MaterialCookie {
-            anchors.right: parent.right
-            anchors.rightMargin: 48
-            anchors.verticalCenter: parent.verticalCenter
-            implicitSize: 42
-            sides: 8
-            color: ColorUtils.applyAlpha(root.welcomeAccentContainer, 0.92)
-
-            MaterialSymbol {
-                anchors.centerIn: parent
-                text: stepMark.icon
-                iconSize: 21
-                color: root.welcomeAccent
-            }
-        }
-    }
-
     component WelcomeMetric: Item {
         id: metric
 
@@ -785,6 +838,64 @@ Scope {
         }
     }
 
+
+    component WelcomeText: StyledText {
+        defaultFont: root.welcomeFontMain
+        font.letterSpacing: 0
+        font.variableAxes: ({})
+    }
+
+    component WelcomeIrisFill: Rectangle {
+        anchors.fill: parent
+        visible: root.irisFamily
+        radius: IrisStyle.radiusPlate
+        color: IrisStyle.fillQuiet
+        border.width: 0
+    }
+
+    component WelcomeActionButton: RippleButton {
+        id: actionButton
+
+        property string label: ""
+        property string materialIcon: ""
+        property bool primary: false
+
+        implicitWidth: actionContent.implicitWidth + 24
+        implicitHeight: 42
+        buttonRadius: root.welcomeControlRadius
+        rippleEnabled: true
+        cookieMorphing: false
+        colBackground: primary ? root.welcomeAccent : "transparent"
+        colBackgroundHover: primary
+            ? ColorUtils.mix(root.welcomeAccent, root.welcomeOnAccent, 0.88)
+            : root.welcomeSurfaceHigh
+        colRipple: primary
+            ? ColorUtils.applyAlpha(root.welcomeOnAccent, 0.22)
+            : root.welcomeSurfaceHighest
+
+        contentItem: RowLayout {
+            id: actionContent
+            anchors.centerIn: parent
+            spacing: actionButton.materialIcon.length > 0 ? 6 : 0
+
+            MaterialSymbol {
+                visible: actionButton.materialIcon.length > 0
+                text: actionButton.materialIcon
+                iconSize: 17
+                color: actionButton.primary ? root.welcomeOnAccent : root.welcomeAccent
+            }
+
+            WelcomeText {
+                text: actionButton.label
+                font.family: root.welcomeFontTitle
+                font.pixelSize: root.welcomeFontBody
+                font.weight: actionButton.primary ? Font.Bold : Font.Medium
+                color: actionButton.primary ? root.welcomeOnAccent : root.welcomeOnSurface
+                horizontalAlignment: Text.AlignHCenter
+            }
+        }
+    }
+
     component WelcomeSegmentedControl: RowLayout {
         id: segmented
 
@@ -804,10 +915,11 @@ Scope {
                 implicitHeight: 36
                 readonly property bool active: segmented.currentValue != null
                     && segmented.currentValue == modelData.value
-                buttonRadius: 10
+                buttonRadius: root.welcomeControlRadius
                 rippleEnabled: true
                 cookieMorphing: false
-                colBackground: active ? root.welcomeAccentContainer : root.welcomeSurfaceRaised
+                colBackground: active ? root.welcomeAccentContainer
+                    : root.irisFamily ? IrisStyle.fill : root.welcomeSurfaceRaised
                 colBackgroundHover: active ? root.welcomeAccentHover : root.welcomeSurfaceHigh
                 colRipple: root.welcomeSurfaceHighest
                 onClicked: segmented.selected(modelData.value)
@@ -819,7 +931,7 @@ Scope {
                         font.family: root.welcomeFontTitle
                         font.pixelSize: root.welcomeFontCaption
                         font.weight: segmentButton.active ? Font.Bold : Font.Medium
-                        color: segmentButton.active ? root.welcomeOnAccentContainer : root.welcomeSecondaryText
+                        color: segmentButton.active ? root.welcomeOnSurface : root.welcomeSecondaryText
                         horizontalAlignment: Text.AlignHCenter
                     }
 
@@ -842,7 +954,7 @@ Scope {
 
         implicitWidth: keyLabel.implicitWidth + 14
         implicitHeight: 24
-        radius: 7
+        radius: root.irisFamily ? IrisStyle.radiusChip : 7
         color: root.welcomeSurfaceHighest
         border.width: 1
         border.color: ColorUtils.applyAlpha(root.welcomeOutline, 0.55)
@@ -866,10 +978,10 @@ Scope {
         property string subtitle: ""
 
         implicitHeight: 46
-        buttonRadius: 12
+        buttonRadius: root.welcomeControlRadius
         rippleEnabled: true
         cookieMorphing: false
-        colBackground: root.welcomeSurfaceRaised
+        colBackground: root.irisFamily ? IrisStyle.fill : root.welcomeSurfaceRaised
         colBackgroundHover: root.welcomeSurfaceHigh
         colRipple: root.welcomeSurfaceHighest
 
@@ -958,13 +1070,13 @@ Scope {
         // same flat sections, dense rows and selective tonal groups used by iNiR.
         Item {
             id: wizardCard
-            readonly property real preferredHeight: root.currentStep === 4 ? (root.compact ? 720 : 760)
-                : root.currentStep === 2 || root.currentStep === 3 ? (root.compact ? 680 : 720)
-                : (root.compact ? 640 : 670)
+            readonly property real preferredHeight: root.currentStep === 4 ? (root.compact ? 720 : 770)
+                : root.currentStep === 0 ? (root.compact ? 660 : 720)
+                : (root.compact ? 690 : 750)
             anchors.centerIn: parent
             width: Math.max(360, Math.min(1120,
-                parent.width - 2 * root.screenPadding))
-            height: Math.max(360, Math.min(parent.height - 2 * root.screenPadding,
+                root.screenWidth - 2 * root.screenPadding))
+            height: Math.max(360, Math.min(root.screenHeight - 2 * root.screenPadding,
                 preferredHeight))
             focus: true
 
@@ -1001,18 +1113,32 @@ Scope {
 
             PanelSurface {
                 id: cardBg
+                visible: !root.irisFamily
                 anchors.fill: parent
                 surfaceDialect: "material"
                 elevation: 1
-                opaqueSurface: false
+                borderless: root.irisFamily
+                opaqueSurface: true
                 cardStyle: true
                 outlined: true
-                radiusOverride: 20
+                radiusOverride: root.welcomePanelRadius
                 clipContent: true
+
+            }
+
+            Iris.IrisMorphSurface {
+                anchors.fill: parent
+                visible: root.irisFamily
+                open: root._contentReady
+                radius: IrisStyle.radiusPanel
+                color: IrisStyle.surfaceHigh
+                light: IrisStyle.wallpaperLight
+                motionSurface: "settings"
             }
 
             ColumnLayout {
                 anchors.fill: parent
+                anchors.margins: root.irisFamily ? IrisStyle.concentricPad(IrisStyle.radiusPanel, 10) : 0
                 spacing: 0
 
                 // First-run navigation follows the same quiet tab grammar used
@@ -1031,17 +1157,15 @@ Scope {
                         RowLayout {
                             Layout.preferredWidth: wizardCard.width >= 820 ? 138 : 46
                             spacing: 9
-                            MaterialCookie {
-                                implicitSize: 34
-                                sides: 8
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "deployed_code"
-                                    iconSize: 18
-                                    color: root.welcomeAccent
-                                }
+                            Iris.IrisMark {
+                                visible: root.irisFamily
+                                implicitSize: 30
+                            }
+                            MaterialSymbol {
+                                visible: !root.irisFamily
+                                text: "deployed_code"
+                                iconSize: 26
+                                color: root.welcomeAccent
                             }
                             ColumnLayout {
                                 visible: wizardCard.width >= 820
@@ -1078,7 +1202,7 @@ Scope {
                                     opacity: enabled ? 1 : 0.62
                                     buttonRadius: 10
                                     colBackground: index === root.currentStep
-                                        ? ColorUtils.applyAlpha(root.welcomeAccentContainer, 0.94)
+                                        ? root.welcomeAccentContainer
                                         : "transparent"
                                     colBackgroundHover: index === root.currentStep
                                         ? root.welcomeAccentHover
@@ -1096,7 +1220,7 @@ Scope {
                                             font.pixelSize: root.welcomeFontCaption
                                             font.weight: stepTab.index === root.currentStep ? Font.Bold : Font.Medium
                                             color: stepTab.index === root.currentStep
-                                                ? root.welcomeOnAccentContainer : root.welcomeSecondaryText
+                                                ? root.welcomeOnSurface : root.welcomeSecondaryText
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
                                             elide: Text.ElideRight
@@ -1110,7 +1234,7 @@ Scope {
                                             text: stepTab.index < root.currentStep ? "check" : stepTab.modelData.icon
                                             iconSize: 15
                                             color: stepTab.index === root.currentStep
-                                                ? root.welcomeOnAccentContainer
+                                                ? root.welcomeAccent
                                                 : stepTab.index < root.currentStep
                                                     ? root.welcomeAccent
                                                     : root.welcomeSecondaryText
@@ -1120,8 +1244,8 @@ Scope {
                                             anchors.bottom: parent.bottom
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             width: stepTab.index === root.currentStep ? Math.min(parent.width - 18, 58) : 0
-                                            height: 3
-                                            radius: 1.5
+                                            height: 2
+                                            radius: 1
                                             color: root.welcomeAccent
                                             Behavior on width {
                                                 enabled: Appearance.animationsEnabled
@@ -1174,8 +1298,6 @@ Scope {
                     color: ColorUtils.applyAlpha(root.welcomeOutline, 0.55)
                 }
 
-                // Page body: strong textual hierarchy, then one task-specific
-                // composition. Avoid repeating a decorative icon card at every step.
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -1193,36 +1315,12 @@ Scope {
                             Layout.fillWidth: true
                             spacing: 3
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
-
-                                Rectangle {
-                                    Layout.preferredWidth: 22
-                                    Layout.preferredHeight: 3
-                                    radius: 2
-                                    color: root.welcomeAccentAlt
-                                }
-
-                                WelcomeText {
-                                    Layout.fillWidth: true
-                                    text: String(root.currentStep + 1).padStart(2, "0") + "  "
-                                        + root.steps[root.currentStep].title.toUpperCase()
-                                    font.family: root.welcomeFontNumbers
-                                    font.pixelSize: root.welcomeFontMeta
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.0
-                                    color: root.welcomeAccentAlt
-                                }
-                            }
-
                             WelcomeText {
                                 Layout.fillWidth: true
                                 text: root.steps[root.currentStep].headline
-                                font.family: root.welcomeFontExpressive
-                                font.pixelSize: root.compact
-                                    ? Appearance.font.pixelSize.huge * 1.22
-                                    : Appearance.font.pixelSize.hugeass * 1.34
+                                font.family: root.welcomeFontTitle
+                                font.pixelSize: root.irisFamily ? 26 * IrisStyle.typeScale
+                                    : root.compact ? 28 : 32
                                 font.weight: Font.Bold
                                 font.letterSpacing: -0.42
                                 color: root.welcomeOnSurface
@@ -1242,26 +1340,8 @@ Scope {
                                 maximumLineCount: 2
                                 elide: Text.ElideRight
                             }
-
-                            Rectangle {
-                                Layout.topMargin: 3
-                                Layout.preferredWidth: Math.min(116, parent.width * 0.16)
-                                Layout.preferredHeight: 3
-                                radius: 2
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: root.welcomeAccent }
-                                    GradientStop { position: 1.0; color: root.welcomeAccentAlt }
-                                }
-                            }
                         }
 
-                        WelcomeStepMark {
-                            visible: wizardCard.width >= 850
-                            icon: root.steps[root.currentStep].icon
-                            indexText: String(root.currentStep + 1).padStart(2, "0")
-                            Layout.alignment: Qt.AlignTop | Qt.AlignRight
-                        }
                     }
 
                     Item {
@@ -1293,9 +1373,21 @@ Scope {
                             }
 
                             Item { WelcomeContent { id: welcomePage; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom } ScrollEdgeFade { target: welcomePage; visible: welcomePage.contentHeight > welcomePage.height } }
-                            Item { FeaturesContent { id: featuresPage; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom } ScrollEdgeFade { target: featuresPage; visible: featuresPage.contentHeight > featuresPage.height } }
-                            Item { ThemeContent { id: themePage; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom } ScrollEdgeFade { target: themePage; visible: themePage.contentHeight > themePage.height } }
-                            Item { LayoutContent { id: layoutPage; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom } ScrollEdgeFade { target: layoutPage; visible: layoutPage.contentHeight > layoutPage.height } }
+                            Item {
+                                FeaturesContent { id: featuresPage; visible: !root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                IrisStartContent { id: irisStartPage; visible: root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                ScrollEdgeFade { target: root.irisFamily ? irisStartPage : featuresPage; visible: target.contentHeight > target.height }
+                            }
+                            Item {
+                                ThemeContent { id: themePage; visible: !root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                IrisAppearanceContent { id: irisAppearancePage; visible: root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                ScrollEdgeFade { target: root.irisFamily ? irisAppearancePage : themePage; visible: target.contentHeight > target.height }
+                            }
+                            Item {
+                                LayoutContent { id: layoutPage; visible: !root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                IrisLayoutContent { id: irisLayoutPage; visible: root.irisFamily; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom }
+                                ScrollEdgeFade { target: root.irisFamily ? irisLayoutPage : layoutPage; visible: target.contentHeight > target.height }
+                            }
                             Item { ReadyContent { id: readyPage; anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.bottom: parent.bottom } }
                         }
                     }
@@ -1361,7 +1453,7 @@ Scope {
 
         Layout.fillWidth: true
         implicitHeight: compactRow ? 50 : (detail.length > 0 ? 76 : 52)
-        buttonRadius: 14
+        buttonRadius: choiceRow.compactRow ? root.welcomeControlRadius : root.welcomeChoiceRadius
         colBackground: selected
             ? root.welcomeAccentContainer
             : "transparent"
@@ -1393,7 +1485,7 @@ Scope {
 
                     MaterialCookie {
                         anchors.centerIn: parent
-                        visible: choiceRow.selected && !choiceRow.compactRow
+                        visible: !root.irisFamily && choiceRow.selected && !choiceRow.compactRow
                         implicitSize: 32
                         sides: 8
                         color: ColorUtils.applyAlpha(root.welcomeSurfaceHighest, 0.96)
@@ -1486,14 +1578,44 @@ Scope {
                 rowSpacing: 18
 
                 ColumnLayout {
+                    visible: !root.irisFamily || welcomeFlickable.width >= 720
                     Layout.fillWidth: true
                     Layout.preferredWidth: welcomeFlickable.width < 720
-                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * 0.43
+                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * (root.irisFamily ? 0.58 : 0.43)
                     Layout.alignment: Qt.AlignTop
                     Layout.topMargin: root.compact ? 2 : 6
                     spacing: 10
 
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: width / root.screenAspect
+                        visible: root.irisFamily
+                        IrisScreenPreview {
+                            anchors.fill: parent
+                            screen: root.focusedScreen
+                            maxScale: 1
+                        }
+                    }
+
+                    WelcomeText {
+                        visible: root.irisFamily
+                        text: "iRiS"
+                        font.family: root.welcomeFontTitle
+                        font.pixelSize: 28 * IrisStyle.typeScale
+                        font.weight: Font.Bold
+                        color: root.welcomeOnSurface
+                    }
+                    WelcomeText {
+                        visible: root.irisFamily
+                        Layout.fillWidth: true
+                        text: Translation.tr("Your desktop, built around the Island.")
+                        font.pixelSize: root.welcomeFontBody
+                        color: root.welcomeSecondaryText
+                        wrapMode: Text.WordWrap
+                    }
+
                     RowLayout {
+                        visible: !root.irisFamily
                         Layout.fillWidth: true
                         spacing: 6
 
@@ -1550,44 +1672,18 @@ Scope {
                             Layout.preferredHeight: visible ? (root.compact ? 162 : 194) : 0
                             Layout.alignment: Qt.AlignBottom
 
-                            MaterialCookie {
+                            MaterialSymbol {
                                 anchors.centerIn: parent
-                                implicitSize: root.compact ? 104 : 126
-                                sides: 9
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "deployed_code"
-                                    iconSize: root.compact ? 42 : 50
-                                    color: root.welcomeAccent
-                                }
-                            }
-
-                            MaterialCookie {
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.rightMargin: 8
-                                anchors.topMargin: 18
-                                implicitSize: 34
-                                sides: 7
-                                color: ColorUtils.mix(root.welcomeSurfaceHighest, root.welcomeAccentAlt, 0.62)
-                            }
-
-                            MaterialCookie {
-                                anchors.left: parent.left
-                                anchors.bottom: parent.bottom
-                                anchors.leftMargin: 10
-                                anchors.bottomMargin: 20
-                                implicitSize: 24
-                                sides: 6
-                                color: ColorUtils.applyAlpha(root.welcomeAccent, 0.42)
+                                text: "deployed_code"
+                                iconSize: root.compact ? 42 : 50
+                                color: root.welcomeAccent
                             }
                         }
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
+                        visible: !root.irisFamily
                         Layout.topMargin: root.compact ? 8 : 16
                         spacing: 12
                         Repeater {
@@ -1632,13 +1728,14 @@ Scope {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     Layout.preferredWidth: welcomeFlickable.width < 720
-                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * 0.57
+                        ? welcomeFlickable.width : (welcomeFlickable.width - (root.compact ? 22 : 34)) * (root.irisFamily ? 0.42 : 0.57)
                     Layout.alignment: Qt.AlignTop
                     implicitHeight: welcomeSetupColumn.implicitHeight + 28
                     surfaceDialect: "material"
                     elevation: 2
+                    borderless: root.irisFamily
                     outlined: false
-                    radiusOverride: 16
+                    radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
 
                     ColumnLayout {
                         id: welcomeSetupColumn
@@ -1649,20 +1746,13 @@ Scope {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 8
-                            MaterialCookie {
-                                implicitSize: 34
-                                sides: 8
-                                color: root.welcomeAccentContainer
-
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    text: "tune"
-                                    iconSize: 17
-                                    color: root.welcomeAccent
-                                }
+                            MaterialSymbol {
+                                text: "dashboard"
+                                iconSize: 20
+                                color: root.welcomeAccent
                             }
                             WelcomeText {
-                                text: Translation.tr("Settings view")
+                                text: Translation.tr("Desktop family")
                                 font.family: root.welcomeFontTitle
                                 font.pixelSize: root.welcomeFontSection
                                 font.weight: Font.Bold
@@ -1672,26 +1762,34 @@ Scope {
 
                         WelcomeText {
                             Layout.fillWidth: true
-                            text: Translation.tr("Focused keeps everyday pages up front. Complete shows everything.")
+                            text: Translation.tr("You can change this later in Settings.")
                             font.pixelSize: root.welcomeFontCaption
                             color: root.welcomeSecondaryText
                             wrapMode: Text.WordWrap
                         }
 
                         WelcomeChoiceRow {
-                            title: Translation.tr("Focused")
-                            detail: Translation.tr("Everyday settings, with advanced pages out of the way.")
-                            symbol: "school"
-                            selected: (Config.options?.settingsUi?.easyMode ?? false) === true
-                            onClicked: Config.setNestedValue("settingsUi.easyMode", true)
+                            title: "Material II"
+                            detail: Translation.tr("Modular bars, sidebars and Material controls.")
+                            symbol: "dashboard"
+                            selected: root.family === "ii"
+                            onClicked: root.chooseFamily("ii")
                         }
 
                         WelcomeChoiceRow {
-                            title: Translation.tr("Complete")
-                            detail: Translation.tr("All settings pages and advanced controls.")
-                            symbol: "tune"
-                            selected: (Config.options?.settingsUi?.easyMode ?? false) === false
-                            onClicked: Config.setNestedValue("settingsUi.easyMode", false)
+                            title: "Waffle"
+                            detail: Translation.tr("Taskbar, Start menu, Action Center and notification center.")
+                            symbol: "grid_view"
+                            selected: root.family === "waffle"
+                            onClicked: root.chooseFamily("waffle")
+                        }
+
+                        WelcomeChoiceRow {
+                            title: "iRiS"
+                            detail: Translation.tr("Island, pieces and a Dock on any edge.")
+                            symbol: "visibility"
+                            selected: root.family === "iris"
+                            onClicked: root.chooseFamily("iris")
                         }
 
                         Item {
@@ -1700,12 +1798,14 @@ Scope {
                         }
 
                         Rectangle {
+                            visible: !root.irisFamily
                             Layout.fillWidth: true
                             implicitHeight: 1
                             color: ColorUtils.applyAlpha(root.welcomeOutline, 0.34)
                         }
 
                         RowLayout {
+                            visible: !root.irisFamily
                             Layout.fillWidth: true
                             spacing: 10
 
@@ -2117,25 +2217,25 @@ Scope {
                     title: "Material II"
                     detail: Translation.tr("M3 bar, dock and sidebars with shared Material controls.")
                     symbol: "dashboard"
-                    selected: (Config.options?.panelFamily ?? "ii") === "ii"
+                    selected: root.family === "ii"
                     badge: Translation.tr("Default")
-                    onClicked: root.setProfileFeature("panelFamily", "ii")
+                    onClicked: root.chooseFamily("ii")
                 }
 
                 WelcomeChoiceRow {
                     title: "Waffle"
                     detail: Translation.tr("Taskbar, Start menu and Action Center.")
                     symbol: "grid_view"
-                    selected: (Config.options?.panelFamily ?? "ii") === "waffle"
-                    onClicked: root.setProfileFeature("panelFamily", "waffle")
+                    selected: root.family === "waffle"
+                    onClicked: root.chooseFamily("waffle")
                 }
 
                 WelcomeChoiceRow {
                     title: "iRiS"
-                    detail: Translation.tr("Minimal bar, Palette and controls with the lowest idle footprint.")
+                    detail: Translation.tr("Edge-aware Island, movable pieces, Dock, Themes and Studio.")
                     symbol: "visibility"
-                    selected: (Config.options?.panelFamily ?? "ii") === "iris"
-                    onClicked: root.setProfileFeature("panelFamily", "iris")
+                    selected: root.family === "iris"
+                    onClicked: root.chooseFamily("iris")
                 }
             }
 
@@ -2772,6 +2872,492 @@ Scope {
         }
     }
 
+    component IrisStartContent: Flickable {
+        id: irisStartFlickable
+        width: root.stepWidth
+        contentHeight: irisStartGrid.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        bottomMargin: 24
+        topMargin: Math.max(root.compact ? 8 : 12,
+            Math.min(root.compact ? 20 : 28,
+                Math.round((height - irisStartGrid.implicitHeight - bottomMargin) / 2)))
+
+        GridLayout {
+            id: irisStartGrid
+            width: parent.width
+            columns: irisStartFlickable.width < 760 ? 1 : 2
+            columnSpacing: root.compact ? 22 : 30
+            rowSpacing: 16
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.preferredWidth: irisStartFlickable.width < 760
+                    ? irisStartFlickable.width : (irisStartFlickable.width - (root.compact ? 22 : 30)) * 0.42
+                Layout.alignment: Qt.AlignTop
+                spacing: 7
+
+                RowLayout {
+                    spacing: 8
+                    MaterialSymbol { text: "view_compact"; iconSize: 18; color: root.welcomeAccent }
+                    WelcomeText {
+                        text: Translation.tr("iRiS layout")
+                        font.family: root.welcomeFontTitle
+                        font.pixelSize: root.welcomeFontSection
+                        font.weight: Font.Bold
+                        color: root.welcomeOnSurface
+                    }
+                }
+
+                WelcomeText {
+                    Layout.fillWidth: true
+                    text: Translation.tr("Start with an Island or a full bar. Adjust its position next.")
+                    font.pixelSize: root.welcomeFontCaption
+                    color: root.welcomeSecondaryText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: root.irisArrangements
+                    WelcomeChoiceRow {
+                        required property var modelData
+                        title: modelData.name
+                        detail: modelData.description
+                        symbol: modelData.icon
+                        badge: modelData.badge ?? ""
+                        selected: root.effectiveIrisArrangement === modelData.id
+                        onClicked: root.applyIrisArrangement(modelData.id)
+                    }
+                }
+            }
+
+            PanelSurface {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredWidth: irisStartFlickable.width < 760
+                    ? irisStartFlickable.width : (irisStartFlickable.width - (root.compact ? 22 : 30)) * 0.58
+                Layout.alignment: Qt.AlignTop
+                implicitHeight: Math.max(irisStartPreviewColumn.implicitHeight + 28, root.compact ? 310 : 350)
+                surfaceDialect: "material"
+                elevation: 2
+                borderless: root.irisFamily
+                outlined: false
+                radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
+
+                WelcomeIrisFill {}
+
+                ColumnLayout {
+                    id: irisStartPreviewColumn
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol { text: "desktop_windows"; iconSize: 18; color: root.welcomeAccent }
+                        WelcomeText {
+                            text: root.effectiveIrisArrangement === "custom"
+                                ? Translation.tr("Custom layout") : root.currentIrisArrangement.name
+                            font.family: root.welcomeFontTitle
+                            font.pixelSize: root.welcomeFontSection
+                            font.weight: Font.Bold
+                            color: root.welcomeOnSurface
+                        }
+                        Item { Layout.fillWidth: true }
+                        WelcomeText {
+                            text: root.familyTitle
+                            font.pixelSize: root.welcomeFontMeta
+                            font.weight: Font.Bold
+                            color: root.welcomeAccent
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: width / root.screenAspect
+                        IrisScreenPreview {
+                            anchors.fill: parent
+                            screen: root.focusedScreen
+                            maxScale: 1
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 1
+                        color: ColorUtils.applyAlpha(root.welcomeOutline, 0.34)
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol { text: "speed"; iconSize: 17; color: root.welcomeAccent }
+                        WelcomeText {
+                            text: Translation.tr("Effects")
+                            font.family: root.welcomeFontTitle
+                            font.pixelSize: root.welcomeFontBody
+                            font.weight: Font.Bold
+                            color: root.welcomeOnSurface
+                        }
+                        Item { Layout.fillWidth: true }
+                        WelcomeText {
+                            text: root.effectivePerformancePreset === "custom"
+                                ? Translation.tr("Custom") : root.currentPerformancePreset.name
+                            font.pixelSize: root.welcomeFontMeta
+                            color: root.welcomeSecondaryText
+                        }
+                    }
+
+                    WelcomeSegmentedControl {
+                        Layout.fillWidth: true
+                        currentValue: root.effectivePerformancePreset
+                        options: root.performancePresets.map(preset => ({
+                            displayName: preset.name, icon: preset.icon, value: preset.id
+                        }))
+                        onSelected: value => root.applyPerformancePreset(value)
+                    }
+                }
+            }
+        }
+    }
+
+    component IrisAppearanceContent: Flickable {
+        id: irisAppearanceFlickable
+        width: root.stepWidth
+        contentHeight: irisAppearanceGrid.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        bottomMargin: 24
+        topMargin: Math.max(root.compact ? 8 : 12,
+            Math.min(root.compact ? 20 : 28,
+                Math.round((height - irisAppearanceGrid.implicitHeight - bottomMargin) / 2)))
+
+        GridLayout {
+            id: irisAppearanceGrid
+            width: parent.width
+            columns: irisAppearanceFlickable.width < 760 ? 1 : 2
+            columnSpacing: root.compact ? 22 : 30
+            rowSpacing: 16
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.preferredWidth: irisAppearanceFlickable.width < 760
+                    ? irisAppearanceFlickable.width : (irisAppearanceFlickable.width - (root.compact ? 22 : 30)) * 0.42
+                Layout.alignment: Qt.AlignTop
+                spacing: 5
+
+                RowLayout {
+                    spacing: 8
+                    MaterialSymbol { text: "palette"; iconSize: 18; color: root.welcomeAccent }
+                    WelcomeText {
+                        text: Translation.tr("Themes")
+                        font.family: root.welcomeFontTitle
+                        font.pixelSize: root.welcomeFontSection
+                        font.weight: Font.Bold
+                        color: root.welcomeOnSurface
+                    }
+                }
+
+                WelcomeText {
+                    Layout.fillWidth: true
+                    text: Translation.tr("Material, shape and motion. More themes in Studio.")
+                    font.pixelSize: root.welcomeFontCaption
+                    color: root.welcomeSecondaryText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: root.irisWelcomeThemes
+                    WelcomeChoiceRow {
+                        required property var modelData
+                        compactRow: true
+                        title: modelData.name
+                        symbol: modelData.id === "terminal" ? "terminal"
+                            : modelData.id === "adaptive" ? "auto_awesome"
+                            : modelData.id === "frost" ? "ac_unit"
+                            : modelData.id === "aurora" ? "gradient"
+                            : modelData.id === "liquid-glass" ? "water_drop" : "visibility"
+                        selected: IrisThemes.activeId === modelData.id && !IrisThemes.modified
+                        onClicked: root.applyIrisTheme(modelData.id)
+                    }
+                }
+            }
+
+            PanelSurface {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredWidth: irisAppearanceFlickable.width < 760
+                    ? irisAppearanceFlickable.width : (irisAppearanceFlickable.width - (root.compact ? 22 : 30)) * 0.58
+                Layout.alignment: Qt.AlignTop
+                implicitHeight: Math.max(irisThemePreviewColumn.implicitHeight + 28, root.compact ? 310 : 350)
+                surfaceDialect: "material"
+                elevation: 2
+                borderless: root.irisFamily
+                outlined: false
+                radiusOverride: IrisStyle.radiusPlate
+
+                WelcomeIrisFill {}
+
+                ColumnLayout {
+                    id: irisThemePreviewColumn
+                    anchors.fill: parent
+                    anchors.margins: IrisStyle.concentricPad(IrisStyle.radiusPlate, 14)
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+                            WelcomeText {
+                                text: IrisThemes.active?.name ?? Translation.tr("Custom theme")
+                                font.family: root.welcomeFontTitle
+                                font.pixelSize: root.welcomeFontSection
+                                font.weight: Font.Bold
+                                color: root.welcomeOnSurface
+                            }
+                            WelcomeText {
+                                Layout.fillWidth: true
+                                text: IrisThemes.modified
+                                    ? Translation.tr("Modified")
+                                    : (IrisThemes.active?.description ?? "")
+                                font.pixelSize: root.welcomeFontCaption
+                                color: root.welcomeSecondaryText
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: width / root.screenAspect
+                        IrisScreenPreview {
+                            anchors.fill: parent
+                            screen: root.focusedScreen
+                            maxScale: 1
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        Repeater {
+                            model: [
+                                { icon: "texture", value: IrisStyle.glassy ? Translation.tr("Glass") : Translation.tr("Solid") },
+                                { icon: "rounded_corner", value: String(Math.round(IrisStyle.shapeScale * 100)) + "%" },
+                                { icon: "motion_mode", value: IrisStyle.morphName }
+                            ]
+                            RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 5
+                                MaterialSymbol { text: modelData.icon; iconSize: 15; color: root.welcomeAccent }
+                                WelcomeText {
+                                    Layout.fillWidth: true
+                                    text: modelData.value
+                                    font.pixelSize: root.welcomeFontMeta
+                                    font.weight: Font.DemiBold
+                                    color: root.welcomeSecondaryText
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    component IrisLayoutContent: Flickable {
+        id: irisLayoutFlickable
+        width: root.stepWidth
+        contentHeight: irisLayoutGrid.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        bottomMargin: 24
+        topMargin: Math.max(root.compact ? 8 : 12,
+            Math.min(root.compact ? 20 : 28,
+                Math.round((height - irisLayoutGrid.implicitHeight - bottomMargin) / 2)))
+
+        GridLayout {
+            id: irisLayoutGrid
+            width: parent.width
+            columns: irisLayoutFlickable.width < 760 ? 1 : 2
+            columnSpacing: root.compact ? 22 : 30
+            rowSpacing: 16
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.preferredWidth: irisLayoutFlickable.width < 760
+                    ? irisLayoutFlickable.width : (irisLayoutFlickable.width - (root.compact ? 22 : 30)) * 0.48
+                Layout.alignment: Qt.AlignTop
+                spacing: 9
+
+                RowLayout {
+                    spacing: 8
+                    MaterialSymbol { text: "open_in_full"; iconSize: 18; color: root.welcomeAccent }
+                    WelcomeText {
+                        text: Translation.tr("Placement")
+                        font.family: root.welcomeFontTitle
+                        font.pixelSize: root.welcomeFontSection
+                        font.weight: Font.Bold
+                        color: root.welcomeOnSurface
+                    }
+                }
+
+                WelcomeText {
+                    text: Translation.tr("Island edge")
+                    font.pixelSize: root.welcomeFontBody
+                    font.weight: Font.Medium
+                    color: root.welcomeOnSurface
+                }
+                WelcomeSegmentedControl {
+                    Layout.fillWidth: true
+                    currentValue: Config.options?.iris?.bar?.position ?? "top"
+                    options: [
+                        { displayName: Translation.tr("Top"), icon: "vertical_align_top", value: "top" },
+                        { displayName: Translation.tr("Bottom"), icon: "vertical_align_bottom", value: "bottom" },
+                        { displayName: Translation.tr("Left"), icon: "align_horizontal_left", value: "left" },
+                        { displayName: Translation.tr("Right"), icon: "align_horizontal_right", value: "right" }
+                    ]
+                    onSelected: value => Config.setNestedValue("iris.bar.position", value)
+                }
+
+                WelcomeText {
+                    text: Translation.tr("Island layout")
+                    font.pixelSize: root.welcomeFontBody
+                    font.weight: Font.Medium
+                    color: root.welcomeOnSurface
+                }
+                WelcomeSegmentedControl {
+                    Layout.fillWidth: true
+                    currentValue: Config.options?.iris?.bar?.layout ?? "island"
+                    options: [
+                        { displayName: Translation.tr("Island"), icon: "pill", value: "island" },
+                        { displayName: Translation.tr("Full bar"), icon: "width_full", value: "full" }
+                    ]
+                    onSelected: value => Config.setNestedValue("iris.bar.layout", value)
+                }
+
+                WelcomeText {
+                    text: Translation.tr("Dock edge")
+                    font.pixelSize: root.welcomeFontBody
+                    font.weight: Font.Medium
+                    color: root.welcomeOnSurface
+                }
+                WelcomeSegmentedControl {
+                    Layout.fillWidth: true
+                    currentValue: Config.options?.iris?.dock?.position ?? "auto"
+                    options: [
+                        { displayName: Translation.tr("Auto"), icon: "swap_calls", value: "auto" },
+                        { displayName: Translation.tr("Top"), icon: "north", value: "top" },
+                        { displayName: Translation.tr("Bottom"), icon: "south", value: "bottom" },
+                        { displayName: Translation.tr("Left"), icon: "west", value: "left" },
+                        { displayName: Translation.tr("Right"), icon: "east", value: "right" }
+                    ]
+                    onSelected: value => Config.setNestedValue("iris.dock.position", value)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    WelcomeText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Attach Island to edge")
+                        font.pixelSize: root.welcomeFontCaption
+                        color: root.welcomeOnSurface
+                    }
+                    WelcomeSegmentedControl {
+                        Layout.preferredWidth: 170
+                        currentValue: (Config.options?.iris?.bar?.notch ?? true) ? "on" : "off"
+                        options: [
+                            { displayName: Translation.tr("Off"), icon: "", value: "off" },
+                            { displayName: Translation.tr("On"), icon: "", value: "on" }
+                        ]
+                        onSelected: value => Config.setNestedValue("iris.bar.notch", value === "on")
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    WelcomeText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Desktop widgets")
+                        font.pixelSize: root.welcomeFontCaption
+                        color: root.welcomeOnSurface
+                    }
+                    WelcomeSegmentedControl {
+                        Layout.preferredWidth: 170
+                        currentValue: (Config.options?.iris?.modules?.desktopWidgets ?? true) ? "on" : "off"
+                        options: [
+                            { displayName: Translation.tr("Off"), icon: "", value: "off" },
+                            { displayName: Translation.tr("On"), icon: "", value: "on" }
+                        ]
+                        onSelected: value => Config.setNestedValue("iris.modules.desktopWidgets", value === "on")
+                    }
+                }
+            }
+
+            PanelSurface {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredWidth: irisLayoutFlickable.width < 760
+                    ? irisLayoutFlickable.width : (irisLayoutFlickable.width - (root.compact ? 22 : 30)) * 0.52
+                Layout.alignment: Qt.AlignTop
+                implicitHeight: Math.max(irisLayoutPreviewColumn.implicitHeight + 28, root.compact ? 310 : 350)
+                surfaceDialect: "material"
+                elevation: 2
+                borderless: root.irisFamily
+                outlined: false
+                radiusOverride: IrisStyle.radiusPlate
+
+                WelcomeIrisFill {}
+
+                ColumnLayout {
+                    id: irisLayoutPreviewColumn
+                    anchors.fill: parent
+                    anchors.margins: IrisStyle.concentricPad(IrisStyle.radiusPlate, 14)
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        MaterialSymbol { text: "desktop_windows"; iconSize: 18; color: root.welcomeAccent }
+                        WelcomeText {
+                            text: Translation.tr("Live layout")
+                            font.family: root.welcomeFontTitle
+                            font.pixelSize: root.welcomeFontSection
+                            font.weight: Font.Bold
+                            color: root.welcomeOnSurface
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: width / root.screenAspect
+                        IrisScreenPreview {
+                            anchors.fill: parent
+                            screen: root.focusedScreen
+                            maxScale: 1
+                        }
+                    }
+
+                    WelcomeText {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Auto keeps the Dock opposite the Island. Choosing the same edge swaps them.")
+                        font.pixelSize: root.welcomeFontCaption
+                        color: root.welcomeSecondaryText
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+    }
+
     component ReadyContent: Flickable {
         id: readyFlickable
         width: root.stepWidth
@@ -2794,8 +3380,11 @@ Scope {
                 implicitHeight: readySummaryColumn.implicitHeight + 24
                 surfaceDialect: "material"
                 elevation: 2
+                borderless: root.irisFamily
                 outlined: false
-                radiusOverride: 16
+                radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
+
+                WelcomeIrisFill {}
 
                 ColumnLayout {
                     id: readySummaryColumn
@@ -2806,7 +3395,12 @@ Scope {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 12
+                        Iris.IrisMark {
+                            visible: root.irisFamily
+                            implicitSize: 36
+                        }
                         MaterialCookie {
+                            visible: !root.irisFamily
                             implicitSize: 46
                             sides: 8
                             color: root.welcomeAccentContainer
@@ -2861,9 +3455,13 @@ Scope {
 
                         Repeater {
                             model: [
-                                { icon: "tune", label: Translation.tr("Starting point"), value: root.selectedProfileTitle },
-                                { icon: "palette", label: Translation.tr("Style"), value: root.effectiveStylePreset === "custom" ? Translation.tr("Custom") : root.currentStylePreset.name },
-                                { icon: "dashboard", label: Translation.tr("Family"), value: (Config.options?.panelFamily ?? "ii") === "waffle" ? "Waffle" : (Config.options?.panelFamily ?? "ii") === "iris" ? "iRiS" : "Material II" },
+                                { icon: "tune", label: Translation.tr("Starting point"), value: root.irisFamily
+                                    ? (root.effectiveIrisArrangement === "custom" ? Translation.tr("Custom") : root.currentIrisArrangement.name)
+                                    : root.selectedProfileTitle },
+                                { icon: "palette", label: Translation.tr("Style"), value: root.irisFamily
+                                    ? (IrisThemes.active?.name ?? Translation.tr("Custom"))
+                                    : (root.effectiveStylePreset === "custom" ? Translation.tr("Custom") : root.currentStylePreset.name) },
+                                { icon: "dashboard", label: Translation.tr("Family"), value: root.familyTitle },
                                 { icon: "speed", label: Translation.tr("Effects"), value: root.effectivePerformancePreset === "custom" ? Translation.tr("Custom") : root.currentPerformancePreset.name }
                             ]
 
@@ -2916,8 +3514,11 @@ Scope {
                     implicitHeight: shortcutsCardCol.implicitHeight + 20
                     surfaceDialect: "material"
                     elevation: 1
+                    borderless: root.irisFamily
                     outlined: false
-                    radiusOverride: 16
+                    radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
+
+                    WelcomeIrisFill {}
 
                     ColumnLayout {
                         id: shortcutsCardCol
@@ -2987,8 +3588,11 @@ Scope {
                     implicitHeight: tryItCardCol.implicitHeight + 20
                     surfaceDialect: "material"
                     elevation: 2
+                    borderless: root.irisFamily
                     outlined: false
-                    radiusOverride: 16
+                    radiusOverride: root.irisFamily ? IrisStyle.radiusPlate : 16
+
+                    WelcomeIrisFill {}
 
                     ColumnLayout {
                         id: tryItCardCol

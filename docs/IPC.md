@@ -133,6 +133,7 @@ Floating tools (Super+G): notes, images, crosshair, recorder, resources and othe
 | Function | Description |
 |----------|-------------|
 | `toggle` | Open/close Floating tools |
+| `tool` | Show or hide one floating tool by id (`crosshair`, `fpsLimiter`, `floatingImage`, `recorder`, `resources`, `notes`, `discord`, `volumeMixer`, `notifications`): `on`, `off` or `toggle` |
 
 ```kdl
 bind "Super+G" { spawn "inir" "overlay" "toggle"; }
@@ -488,10 +489,13 @@ Wallpaper picker with grid, coverflow and compact launcher styles.
 | `openLauncher <mode>` | Open the compact launcher in `static` or `animated` mode |
 | `toggleOnMonitor <name>` | Open wallpaper selector on a specific monitor |
 | `random` | Pick a random wallpaper from the current folder |
+| `set <path>` | Apply a wallpaper (picture, GIF or video) by path, the same way the picker does |
+| `browse <source> <query>` | Open the picker on a source — `library`, `wallhaven` or `live` (anime live wallpapers) — with a search, a folder to open (`~/Videos`), or `-` for none. Sources are an iRiS feature; other families just open the picker |
 | `status` | Return picker style, open surface, target monitor and selection target as JSON |
 
 ```kdl
 bind "Ctrl+Alt+T" { spawn "inir" "wallpaperSelector" "toggle"; }
+bind "Ctrl+Alt+L" { spawn "inir" "wallpaperSelector" "browse" "live" "-"; }
 bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; }
 ```
 
@@ -649,6 +653,25 @@ On-screen volume indicator.
 
 ---
 
+### osd
+
+On-screen feedback for any family. The active family's OSD or Island decides where it is drawn.
+
+| Function | Description |
+|----------|-------------|
+| `volume` | Show the volume level |
+| `brightness` | Show the brightness level |
+| `mic` | Show the microphone level |
+| `keyboard` | Show the keyboard layout |
+| `media <action>` | Show now playing with a transport action: `play`, `pause`, `next` or `previous` |
+| `hide` | Hide whatever is showing |
+
+```kdl
+bind "Mod+Shift+K" { spawn "inir" "osd" "keyboard"; }
+```
+
+---
+
 ### cliphistService
 
 Clipboard history service. The backend that makes clipboard panel work. You probably don't need to call this directly.
@@ -724,14 +747,36 @@ iRiS bar and Island design. Available while the iRiS bar is enabled.
 |----------|-------------|
 | `open` | Expand the island on the focused output |
 | `close` | Collapse the island |
-| `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools` |
+| `page` | Expand the island on a page: `media`, `activity`, `desktop`, `tray` or `tools`, or step through its navigation with `next` / `prev` (the same path as scrolling over the navigation row) |
 | `toggle` | Expand or collapse the island on the focused output |
 | `card` | `open`, `close` or `toggle` the media bubble's floating card, or `pin` to keep it open |
-| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system` |
-| `bubble` | Place an Island bubble (`left`, `right`, `utility`) or an extra bubble (`weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media`, `tray`): a zone (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`), `x,y` fractions of the output, `island` (slots) or `off` (extras) |
+| `settings` | Open iRiS Settings on a section: `bar`, `player`, `bubbles`, `dock`, `appearance`, `desktop`, `sidebars`, `surfaces` or `system`; add `/<group>` to open that group, e.g. `bubbles/behaviour` |
+| `bubble` | Place an Island bubble (`left`, `right`, `utility`) or an extra bubble (`weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media`, `tray`): a zone (`top-left`, `top-right`, `left`, `right`, `bottom-left`, `bottom-right`), `edge:<top|bottom|left|right>` with an optional `:<fraction>` along that edge (e.g. `edge:top:0.3`), `x,y` fractions of the output, `island` (slots) or `off` (extras) |
 | `dock` | `reveal`, `hide` or `toggle` the iRiS Dock (revealed stays until hidden or an app is chosen) |
+| `dockApp` | Open a Dock app's `windows` or `menu` by app id (e.g. `kitty windows`), or `<any> close` |
+| `appBubble` | Carry a Dock app out as a bubble of its own (e.g. `kitty right`): a zone, `x,y` fractions of the output, or `dock` to send it back |
 | `pin` | Keep the `left` (Focus) or `right` (Today) panel open beside windows, or stop |
 | `accent` | Set iRiS accent: `blue`, `mint`, `rose`, `lilac` or `wallpaper` |
+| `arrange` | Arrange the Island's desktop page in place — move, remove and add its blocks: `on`, `off` or `toggle` |
+| `activity` | Publish a live activity into the Island from any script: `<action> <id> <value>` — `start <id> <title>`, `title`, `progress` (`0.4`, `40`, `40%` or `-1` for indeterminate), `detail`, `glyph` (a Material Symbol), `tint` (`blue`, `sky`, `teal`, `green`, `yellow`, `orange`, `red`, `pink`, `indigo`, `purple`, `lavender`, `gray`), `end <id> <detail>` (shows a done event and retires), `dismiss <id> -`, `clear all -`. Values cannot contain commas |
+| `activities` | Return the live activities scripts have published, as JSON |
+| `edit` | Edit iRiS in place: every piece becomes grabbable and the edit bar holds the pieces, the look and the sizes — `on`, `off`, `toggle`, a tab of the edit bar (`tab:pieces`, `tab:look`, `tab:motion`, `tab:layout`), a target to inspect (`material`, `colour`, `type`, `motion`, `island`, `pieces`, `bodies`, `places`, `transients`, `dock`, `desktop`) or a piece (`vitals`, `left`, `app:kitty`) |
+| `studio` | Open iRiS Studio, the live editor for the whole family's appearance: `on`, `off`, `toggle`, or a target to open it on (`material`, `colour`, `type`, `motion`, `island`, `pieces`, `bodies`, `places`, `transients`, `dock`, `desktop`, `themes`) |
+| `barPiece` | Turn one of the Island's own pieces on or off: `weather`, `notifications`, `controls`, `sound`, `mic`, `tools`, `media` or `tray`, plus `on`, `off` or `toggle` |
+| `notch` | Melt the Island into its edge (or into the Surround band): `on`, `off` or `toggle` |
+| `surround` | Close the shell around the screen with a band on every edge: `on`, `off` or `toggle` |
+| `layout` | How the Island sits on its edge: `island`, `left`, `right` or `full` |
+| `edge` | Move the Island to a screen edge: `top`, `bottom`, `left` or `right` (on a side edge it rests as an upright capsule and its pages grow inward) |
+| `dockEdge` | Move the Dock: `auto` (opposite the Island), `top`, `bottom`, `left` or `right` |
+| `zone` | What a full-width Island carries in a zone: `start`, `center` or `end`, then kinds joined by `+` (`island`, `workspaces`, `window`, `time` or a piece kind), or `none` |
+| `preset` | Set the iRiS appearance preset: `iris`, `soft`, `round`, `crisp`, `angular` or `contrast` |
+| `theme <action>` | iRiS themes, each a whole redesign of the family: `list`, `apply:<id>`, `save:<name>` (what you see now becomes a theme file), `import:<path>` (a shared `.json`), `export` or `export:<id>` (prints the theme as JSON to share) and `folder` (where theme files live, `~/.config/inir/iris/themes`) |
+| `morph` | Set how iRiS morphs: `direct`, `liquid`, `glide`, `snap`, `elastic` or `instant` |
+| `set` | Set any iRiS option by path, e.g. `iris.appearance.theme.pieceShape squircle` or `iris.bubbles.scale 120` (values are JSON when they parse) |
+| `adaptive` | How much the wallpaper shapes iRiS, `0`-`100`; any other word prints what was read from the wallpaper |
+| `spotlight` | Open Spotlight with a query already typed, e.g. `firefox` or `12*7` (empty for suggestions) |
+| `bubbleCard` | Grow a bubble's own card: `weather`, `notifications`, `sound`, `mic`, `tools` or `tray` (from the bubble showing it, else the Island), or `close` |
+| `bubbleMenu` | Open a floating bubble's own menu — what it opens, where it rests and how to put it away — by kind (`weather`, `sound`, …) or piece id (`app:kitty`) |
 | `utility` | Set the utility satellite: `tray`, `tools`, `sound`, `mic` or `none` |
 | `status` | JSON with the Island, Dock, Control Center, Spotlight and side panel state |
 
@@ -742,6 +787,7 @@ inir iris toggle
 inir iris dock toggle
 inir iris card toggle
 inir iris bubble right top-right
+inir iris appBubble kitty top-right
 inir iris pin right
 inir iris status
 inir iris close
@@ -749,7 +795,7 @@ inir iris close
 
 ### panelFamily
 
-Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight).
+Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (the Island family).
 
 | Function | Description |
 |----------|-------------|
@@ -952,16 +998,6 @@ Waffle taskbar visibility.
 | `toggle` | Show/hide taskbar |
 | `open` | Show taskbar |
 | `close` | Hide taskbar |
-
----
-
-### osd
-
-Waffle on-screen display indicator (volume, brightness).
-
-| Function | Description |
-|----------|-------------|
-| `trigger` | Show the OSD indicator |
 
 ---
 

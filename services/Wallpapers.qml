@@ -218,20 +218,18 @@ Singleton {
         return root.currentThemingWallpaperPath()
     }
 
-    readonly property string effectiveWallpaperUrl: {
-        const path = root.effectiveWallpaperPath
-        if (!path || path.length === 0) return ""
-        // For videos, return image-safe URL (all consumers are Image/ColorQuantizer)
-        if (root.isVideoFile(path)) {
-            const _dep = root.videoFirstFrames // reactive binding
-            const ff = root.videoFirstFrames[path]
-            // Cache-bust so Image(cache:true) surfaces reload when the first frame appears.
-            if (ff) return (ff.startsWith("file://") ? ff : "file://" + ff) + "?ff=1"
-            const expected = root._videoThumbDir + "/" + MD5.hash(path) + ".jpg"
-            root.ensureVideoFirstFrame(path)
-            return "file://" + expected + "?ff=0"
-        }
-        return path.startsWith("file://") ? path : ("file://" + path)
+    readonly property string effectiveWallpaperUrl: root.stillUrlFor(root.effectiveWallpaperPath)
+
+    // An image-safe URL for a wallpaper: the file itself, or a video's cached still frame.
+    // Empty until that frame exists, so Image consumers never request a missing file.
+    function stillUrlFor(path: string): string {
+        const clean = FileUtils.trimFileProtocol(String(path ?? ""))
+        if (!clean) return ""
+        if (!root.isVideoFile(clean)) return "file://" + clean
+        const frame = root.videoFirstFrames[clean]
+        if (frame) return frame.startsWith("file://") ? frame : "file://" + frame
+        root.ensureVideoFirstFrame(clean)
+        return ""
     }
 
     onEffectiveWallpaperUrlChanged: {
@@ -249,6 +247,16 @@ Singleton {
         id: _gcTimer
         interval: 2000
         onTriggered: gc()
+    }
+
+    // Whether a live wallpaper may animate on an output: "never" pauses nothing,
+    // "fullscreen" pauses behind a fullscreen window, "covered" also once tiled windows span the output.
+    readonly property string videoPauseMode: Config.options?.background?.videoPause ?? "covered"
+    function videoMotionAllowedOn(outputName: string): bool {
+        if (root.videoPauseMode === "never") return true
+        const output = String(outputName ?? "")
+        if (output.length > 0 ? GameMode.hasFullscreenOnOutput(output) : GameMode.hasVisibleFullscreenWindow) return false
+        return root.videoPauseMode !== "covered" || !(CompositorService.isNiri && output.length > 0 && NiriService.activeWorkspaceCovers(output))
     }
 
     // ── Video first-frame system ──────────────────────────────────────────
@@ -336,10 +344,10 @@ Singleton {
                     // this file a nearly black palette — and this frame is what the
                     // theming pipeline quantizes. Pick a representative frame.
                     "mkdir -p " + JSON.stringify(root._videoThumbDir) +
-                    " && ffmpeg -y -i " + JSON.stringify(_ffCheckProc._videoPath) +
-                    " -vf " + JSON.stringify("thumbnail=n=100") +
+                    " && ffmpeg -hide_banner -loglevel error -y -ss 1 -i " + JSON.stringify(_ffCheckProc._videoPath) +
+                    " -vf " + JSON.stringify("thumbnail=n=30") +
                     " -frames:v 1 -update 1 -q:v 2 " + JSON.stringify(_ffCheckProc._outputPath) +
-                    " || ffmpeg -y -i " + JSON.stringify(_ffCheckProc._videoPath) +
+                    " || ffmpeg -hide_banner -loglevel error -y -i " + JSON.stringify(_ffCheckProc._videoPath) +
                     " -vframes 1 -update 1 -q:v 2 " + JSON.stringify(_ffCheckProc._outputPath)]
                 _ffGenProc.running = true
             }
@@ -1067,7 +1075,7 @@ Singleton {
         const outputDir = FileUtils.parentDirectory(item.outputPath)
         const commandBody = root.isVideoFile(item.filePath)
             ? "mkdir -p " + JSON.stringify(outputDir)
-                + " && [ -f " + JSON.stringify(item.outputPath) + " ] && exit 0 || { ffmpeg -y -i " + JSON.stringify(item.filePath)
+                + " && [ -f " + JSON.stringify(item.outputPath) + " ] && exit 0 || { ffmpeg -hide_banner -loglevel error -y -i " + JSON.stringify(item.filePath)
                 + " -vf " + JSON.stringify(`thumbnail=n=100,scale='min(${maxSize},iw)':'min(${maxSize},ih)':force_original_aspect_ratio=decrease`)
                 + " -frames:v 1 -update 1 "
                 + " " + JSON.stringify(item.outputPath) + " >/dev/null 2>&1 && exit 1; }"

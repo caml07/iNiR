@@ -17,11 +17,15 @@ StyledImage {
     required property string sourcePath
     property string thumbnailSizeName: Images.thumbnailSizeNameForDimensions(sourceSize.width, sourceSize.height)
     property bool isVideo: Images.isValidVideoByName(sourcePath)
+    // Videos use iNiR's own still: the shared freedesktop cache may hold a film-strip frame.
+    property bool cleanVideoStill: false
+    readonly property bool _ownsStill: root.cleanVideoStill && root.isVideo
     property bool thumbnailAvailable: false
     property string resolvedThumbnailSource: ""
     property string _queuedThumbnailCheck: ""
     property string thumbnailPath: {
         if (sourcePath.length === 0) return ""
+        if (root._ownsStill) return Wallpapers.videoStillPath(sourcePath)
 
         let cleanPath = FileUtils.trimFileProtocol(String(sourcePath ?? ""))
         if (!cleanPath.startsWith("/"))
@@ -59,6 +63,7 @@ StyledImage {
         if (!root.generateThumbnail) return
         if (!root.sourcePath || root.sourcePath.length === 0) return
         // Batch generator already running — it will emit thumbnailGeneratedFile
+        if (root._ownsStill) { Wallpapers.ensureVideoStill(root.sourcePath); return }
         if (Wallpapers.thumbnailGenerationRunning) return
         Wallpapers.ensureThumbnailForPath(root.sourcePath, root.thumbnailSizeName)
     }

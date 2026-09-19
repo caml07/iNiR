@@ -60,6 +60,8 @@ Singleton {
         }
         openEqualizer(outputName)
     }
+    property real irisLevelQuietUntil: 0
+    function quietIrisLevels(): void { root.irisLevelQuietUntil = Date.now() + 700 }
     property bool osdBrightnessOpen: false
     property bool osdVolumeOpen: false
     property bool osdMicOpen: false
@@ -213,6 +215,8 @@ Singleton {
     property bool superDown: false
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
+    property string wallpaperSelectorSource: ""
+    property string wallpaperSelectorQuery: ""
     property bool wallpaperLauncherOpen: false
     property string wallpaperLauncherMode: "static"
     property bool widgetEditMode: false
@@ -334,20 +338,46 @@ Singleton {
     property string irisMorphOwner: ""
     // True while a surface is mid-morph out of or back into that origin; the
     // Island hides the published part so only one shape is ever on screen.
-    property bool irisMorphHandoff: false
     // iRiS intent preloading: the pointer resting on the Island (controls) or an
     // expanded Island (settings) instantiates those surfaces hidden, so the
     // morph starts on the click frame instead of after an async load.
     property bool irisControlsWarm: false
-    // iRiS media bubble card: opened from the bubble (transient), the bubble's
-    // screen-local rect published by the Island ({x, y, width, height, radius,
-    // screen}), and whether the card is on screen (the bubble hides meanwhile).
-    property bool irisMediaCardOpen: false
-    property var irisMediaBubble: null
-    property bool irisMediaCardShown: false
     // Asks the focused Island to open a page ("media", "desktop", "activity",
     // "tray", "tools") from a surface that is not the Island (card, floating bubble).
     property string irisIslandPageRequest: ""
+    // A bubble's own card: { kind, x, y, width, height, radius, screen, source }
+    // with the screen-local rect of the bubble it grows out of; `source` names
+    // that bubble ("island-<slot>" or "float-<slot>") so it can hide meanwhile.
+    property var irisBubbleCard: null
+    // The Island's desktop page is being arranged in place (iRiS Studio).
+    property bool irisArrange: false
+    // The Dock's body per output, so the chassis field draws it in the same pass
+    // as the frame and the Island instead of the Dock carrying a second surface.
+    property var irisDockBody: ({})
+    // iRiS is being edited in place: every piece is grabbable, the edit bar
+    // holds the pieces, the look and the sizes, and Done ends it.
+    property bool irisEdit: false
+    // What the edit bar is inspecting: a piece slot ("extra:vitals", "left",
+    // "app:kitty"), a surface ("island", "dock", "cards"…) or "" for the family.
+    property string irisEditSelection: ""
+    // A Studio target the edit bar should inspect ("" = keep what it shows).
+    property string irisEditTarget: ""
+    property string irisEditTab: "pieces"
+    property int irisChassisEpoch: 0
+    onIrisEditChanged: if (!irisEdit) { irisEditSelection = ""; irisEditTarget = "" }
+    // iRiS Studio, the live appearance editor, is open.
+    property bool irisStudioOpen: false
+    // Where Studio is on screen while it is presented ({ screen, x, y, width,
+    // height }), so surfaces it edits can leave its area out of their input.
+    property var irisStudioRect: null
+    // A target Studio should show when it opens or is already open ("" = keep).
+    property string irisStudioTarget: ""
+    // The `source` of the card on screen (kept while it collapses), "" when none.
+    // Asks whichever bubble shows this kind (floating first, then the Island)
+    // to open its card; IPC and keyboard paths use it.
+    property string irisBubbleCardRequest: ""
+    // A floating piece asked to open its own menu, by kind (IPC).
+    property string irisBubbleMenuRequest: ""
     // A bubble being carried: { slot, kind, screen, x, y (screen-local centre),
     // size, released }. The bubble layer draws it and resolves the drop.
     property var irisBubbleDrag: null
@@ -355,6 +385,8 @@ Singleton {
     // the resting Island's screen-local geometry, published by each Island.
     property var irisBubbleKinds: ({})
     property var irisIslandGeometry: ({})
+    // Per output: pieces an edge owner carries instead of floating over it ({ island: [...], dock: [...] }).
+    property var irisAbsorbed: ({})
     property bool irisSettingsWarm: false
     // iRiS side panel ("left"/"right") that was revealed by resting at its screen
     // edge: it closes when the pointer leaves until a press inside commits it.
@@ -362,10 +394,15 @@ Singleton {
     // iRiS Dock held on screen by IPC (`inir iris dock show`) until hidden again
     // or an app is chosen from it.
     property bool irisDockShown: false
+    // Opens an app's windows or menu on the focused Dock: { appId, mode: "windows" | "menu" }.
+    property var irisDockMenuRequest: null
+    // A query for Spotlight to type as it opens (IPC); taken and cleared by the palette.
+    property string irisSpotlightQuery: ""
     // Desktop widget manager toggle routed to the output that should show it.
     signal desktopWidgetManagerToggleRequested(string outputName)
     // Whether any output's Island is expanded, published for `inir iris status`.
     property bool irisIslandExpanded: false
+    property string irisIslandPage: ""
     property bool dashboardOpen: false
     property bool workspaceShowNumbers: false
     property var activeBooruImageMenu: null  // Track which BooruImage has its menu open

@@ -176,8 +176,9 @@ Singleton {
         return Translation.tr("Hazardous")
     }
 
-    function describeWeather(code): string {
+    function describeWeather(code, night): string {
         const weatherCode = String(code ?? "113")
+        if (weatherCode === "113" && night === true) return Translation.tr("Clear")
         const descriptions = {
             "113": Translation.tr("Sunny"),
             "116": Translation.tr("Partly cloudy"),
@@ -244,7 +245,7 @@ Singleton {
         result.sunset = astro?.sunset ?? "--:--";
         result.windDir = current.winddir16Point ?? "N";
         result.wCode = current.weatherCode ?? "113";
-        result.description = root.describeWeather(result.wCode);
+        result.description = root.describeWeather(result.wCode, root.isNightNow());
         result.city = root.location.name || "Unknown";
 
         if (root.useUSCS) {
@@ -353,8 +354,9 @@ Singleton {
         result.sunrise = sunrise ? sunrise.split("T")[1] ?? sunrise : "--:--"
         result.sunset = sunset ? sunset.split("T")[1] ?? sunset : "--:--"
         result.windDir = root._degToCompass(current.wind_direction_10m)
-        result.wCode = String(current.weather_code ?? 113)
-        result.description = root.describeWeather(result.wCode)
+        // Current conditions speak wttr codes too, like the daily and hourly rows.
+        result.wCode = root._wmoToWttr(current.weather_code ?? 0)
+        result.description = root.describeWeather(result.wCode, root.isNightNow())
         result.city = root.location.name || "Unknown"
 
         result.temp = (current.temperature_2m ?? 0) + (units.temperature_2m ?? (root.useUSCS ? "°F" : "°C"))
@@ -825,7 +827,7 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.trim().length === 0) {
-                    console.warn("[Weather] GPS failed, falling back to IP");
+                    console.info("[Weather] GPS unavailable, using IP location");
                     gpsLocator._handledFallback = true;
                     root.getLocation();
                     return;
@@ -851,7 +853,7 @@ Singleton {
         }
         onExited: (code) => {
             if (code !== 0 && !root.location.valid && !gpsLocator._handledFallback) {
-                console.warn("[Weather] GPS process failed (code " + code + "), falling back to IP");
+                console.info("[Weather] GPS unavailable (code " + code + "), using IP location");
                 gpsLocator._handledFallback = true;
                 root.getLocation();
             }

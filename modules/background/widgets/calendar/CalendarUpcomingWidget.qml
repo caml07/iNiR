@@ -10,6 +10,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -31,10 +32,17 @@ AbstractBackgroundWidget {
         x: 80, y: 80
     })
 
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 280)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 280)
         * root.scaleFactor)
-    implicitHeight: Math.round(Number(root._readConfigKey("contentHeight") ?? 240)
+    implicitHeight: root.irisFaced ? root.irisFaceHeight : Math.round(Number(root._readConfigKey("contentHeight") ?? 240)
         * root.scaleFactor)
+    irisFace: Component { IrisAgendaFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "groupByDay", raw: true, label: Translation.tr("Group by day"), icon: "event_list", fallback: true },
+        { key: "showLocation", raw: true, label: Translation.tr("Location"), icon: "location_on", fallback: false }
+    ]
 
     visibleWhenLocked: true
     needsColText: true
@@ -198,6 +206,7 @@ AbstractBackgroundWidget {
 
     // ── Card background ────────────────────────────────────────
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.cardRadius
@@ -213,11 +222,12 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
+        shown: !root.irisFaced && !root.instrument && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
     // ── Content ────────────────────────────────────────────────
     ColumnLayout {
+        visible: !root.irisFaced
         anchors.fill: parent
         anchors.margins: Math.round(12 * root.scaleFactor)
         clip: true

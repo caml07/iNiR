@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Wayland → GPU
 - **Wayland**: Linux 디스플레이 프로토콜 (새것, X11 대체)
 - **QML**: Qt의 선언적 UI 언어, iNiR은 이걸로 작성됨
 - **Material You**: 이미지에서 팔레트 생성하는 Google 색상 시스템 (자동 테마가 이렇게 작동함)
-- **ii / waffle**: 두 패널 스타일. ii = Material Design 느낌, waffle = Windows 11 느낌. `Super+Shift+W`로 전환
+- **ii / waffle / iRiS**: 세 가지 패널 패밀리. ii = Material Design, waffle = Windows 11, iRiS = 연 항목으로 변형되는 Island. `Super+Shift+W`로 전환
 
 </details>
 
@@ -110,9 +110,10 @@ Wayland → GPU
 
 ## 기능
 
-**두 가지 패널 패밀리**, `Super+Shift+W`로 즉시 전환:
+**세 가지 패널 패밀리**, `Super+Shift+W`로 즉시 전환:
 - **Material ii** — 플로팅 바, 사이드바, 독, 9가지 글로벌 스타일 (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — Windows 11 스타일 작업 표시줄, 시작 메뉴, 알림 센터, 액션 센터
+- **iRiS** — 새로운 Island 패밀리. 모든 화면 가장자리, Pieces, 어느 가장자리든 가능한 Dock, Glass, Themes, Studio
 
 **자동 테마** — 배경화면을 고르면 모든 것이 맞춰짐:
 - Material You를 통한 셸 색상, GTK3/4, Qt, 터미널, Firefox, Discord, SDDM으로 전파

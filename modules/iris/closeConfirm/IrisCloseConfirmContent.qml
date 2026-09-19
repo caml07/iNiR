@@ -8,6 +8,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.iris.style
 import qs.modules.iris.components
+import qs.modules.iris.pieces
 
 Item {
     id: root
@@ -31,20 +32,26 @@ Item {
         }
     }
 
+    property real shown: 0
+    Component.onCompleted: root.shown = 1
+    Behavior on shown { NumberAnimation { duration: IrisStyle.emergeDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.emergeCurve } }
+
     Rectangle {
         anchors.fill: parent
+        opacity: Math.min(1, root.shown)
         color: IrisStyle.scrim
         MouseArea { anchors.fill: parent; onClicked: root.cancel() }
     }
 
     readonly property string appName: root.desktopEntry?.name ?? (root.appId.length > 0 ? root.appId : Translation.tr("this app"))
 
-    // Island: a centred alert — app icon, question, context, two equal buttons.
     IrisSurface {
         anchors.centerIn: parent
+        opacity: Math.min(1, root.shown * 1.6)
+        scale: 1.08 - 0.08 * root.shown
         width: Math.min(300 * IrisStyle.density, parent.width - 40)
         implicitHeight: alert.implicitHeight + 40 * IrisStyle.density
-        radius: Math.round(22 * IrisStyle.density)
+        radius: IrisStyle.radiusPlate
         raised: true
         MouseArea { anchors.fill: parent }
 
@@ -59,7 +66,7 @@ Item {
 
             SmartAppIcon {
                 Layout.alignment: Qt.AlignHCenter
-                icon: root.desktopEntry?.icon ?? root.appId
+                icon: IrisPieces.appIcon(root.appId)
                 fallback: "application-x-executable"
                 iconSize: Math.round(52 * IrisStyle.density)
             }
@@ -92,16 +99,16 @@ Item {
                 IrisButton {
                     Layout.fillWidth: true
                     implicitHeight: Math.round(32 * IrisStyle.density)
-                    buttonRadius: Math.round(10 * IrisStyle.density)
-                    colBackground: ColorUtils.applyAlpha(IrisStyle.text, 0.12)
-                    colBackgroundHover: ColorUtils.applyAlpha(IrisStyle.text, 0.2)
+                    buttonRadius: IrisStyle.radiusRow
+                    colBackground: IrisStyle.fill
+                    colBackgroundHover: IrisStyle.fillHover
                     text: Translation.tr("Cancel")
                     onClicked: root.cancel()
                 }
                 IrisButton {
                     Layout.fillWidth: true
                     implicitHeight: Math.round(32 * IrisStyle.density)
-                    buttonRadius: Math.round(10 * IrisStyle.density)
+                    buttonRadius: IrisStyle.radiusRow
                     emphasized: true
                     danger: true
                     text: Translation.tr("Close")

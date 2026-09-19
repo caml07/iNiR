@@ -11,6 +11,18 @@ Target release: **2.31.0**.
 
 ### Added
 
+- **iRiS, the third panel family.** An Island that lives on a screen edge and turns into whatever you opened, pieces you can carry around, bodies that grow out of what you clicked, and a Studio that edits the whole thing live. It is built for Niri and it is the flagship from here on, so expect it to get most of the love.
+- **iRiS Themes** are whole redesigns, not palettes: 14 curated ones, plus your own as plain JSON files in `~/.config/inir/iris/themes`. Save, import, export and share them from Studio or with `inir iris theme`. A theme never touches what you placed, only how it looks and moves.
+- **The Island goes on any edge.** Top, bottom, left or right (`inir iris edge <side>`, or drag it there). On a side it stands up as a capsule with a stacked clock and its bubbles above and below, and everything it opens grows inward.
+- **The Dock goes on any edge too** (`iris.dock.position`, `inir iris dockEdge <side|auto>`). Auto sits opposite the Island, and if you send one to the other's edge they just trade places.
+- **Pieces that share an edge with the Dock or the Island join them** instead of floating on top: the Dock gives them a section of their own after a separator, and the Island carries them as part of its body.
+- **The Island can also be a full width bar** with start, center and end zones (`iris.bar.fullStart`, `fullCenter`, `fullEnd`) for the Island itself, workspaces, the focused window, the time or any piece. Settings, Island, Bar, or `inir iris zone start|center|end kinds+joined+with+plus`.
+- **Glass is the iRiS material**: the wallpaper, frosted and tinted, behind every body, with text that keeps its contrast on bright wallpapers. Real compositor blur is in there too, labelled as experimental because it is.
+- **Studio and Settings show what you are changing**, with live miniatures and small animated scenes for the Island edge, the bar zones, Light, Fusion, Glass and the Dock. Not a fan? Animated previews in Settings, Appearance, Previews turns them all off.
+- **Multiple monitors**: every output gets its own Island, frame and Dock, while Spotlight, the Dock reveal and editing in place follow the output you are on.
+- **Desktop widgets get an iRiS face system** instead of a second widget backend: glass, transparent, solid and tinted materials, per-widget controls and native faces for the everyday set. Controls and Screen Time join the desktop library too.
+- **The iRiS wallpaper gallery** browses the local library, Wallhaven and live anime scenery with showcase/strip/wall layouts, pinned folders and one-at-a-time muted video previews. Live wallpaper decoding pauses when it is not useful instead of burning through frames under covered desktops.
+- **iRiS keeps the expensive stuff on demand**: inactive Island pages, external Controls, Settings previews and floating bubble bodies are not kept alive just because the family is selected. The family stays feature-heavy without making every feature resident.
 - **Editorial global style** adds a configurable Material-based visual system across Settings, bars, dock, dashboard, sidebars, media, notifications, wallpaper flows, desktop widgets, lock/session surfaces and shared paper components, with separate paper/accent controls instead of one hard-coded treatment.
 - **Organic Edge** brings the Organic audio renderer to screen edges and desktop backgrounds with layout-aware spectrum behavior, configurable placement/composition and dedicated Settings controls.
 - **Desktop composition tools** add a dashboard focus timer, decorative shape/date-badge widgets, Editorial typography compositions and a substantially expanded widget editor for placement, shape, visibility and per-widget controls.
@@ -21,15 +33,18 @@ Target release: **2.31.0**.
 
 ### Changed
 
+- **First-run setup is family-aware.** The family is chosen before its setup pages; iRiS gets its own Themes, live chassis preview and real Island/Dock placement controls instead of inheriting Material ii profiles and controls that do not own iRiS.
 - **Settings architecture and search** now use the rebuilt Material ii host/navigation model, generated search registry, clearer focus/readability states and consistent embedded/window lifecycle behavior.
 - **M3 bar layout editing** has been rebuilt for clearer module placement and better compression on constrained widths while preserving the existing bar ownership model.
 - **Localization tooling and runtime switching** now separate source coverage from locale parity, improve translations across the shipped catalogs and scope locale discovery to actual translation files.
 - **Organic audio behavior** is more layout-aware across bars and screen edges, follows the active playback sink more reliably and uses less fragment work for edge rendering.
 - **Runtime work is more demand-driven**: resource polling is scoped to visible consumers, countdowns share a second-aligned clock, hidden/reduced-motion widget animations stop unnecessary work and Settings search reuses edit-distance state.
 - **Default Niri animation timing** is slower and more deliberate on fresh/default configurations.
+- **Fresh CachyOS installs** enable `niri-focused-booster` when the official package and DMEM cgroup interface are available. Existing installations are left alone.
 
 ### Fixed
 
+- **The iRiS desktop menu stays available with desktop widgets disabled.** Turning off the widget canvas no longer removes bare-desktop right-click actions such as Wallpaper, Studio, Search and Settings.
 - **Update/crash recovery** now refreshes Niri-owned session environment from the running compositor and limits `cleanup-orphans` to Quickshell processes owned by `inir.service`, fixing the two failure paths reported in [#257](https://github.com/snowarch/iNiR/issues/257). Doctor also surfaces a failed/start-limit shell service with the normal concise `inir logs` path instead of requiring full framework logs.
 - **Terminal update completion** now captures the real `setup update` exit status without relying on `PIPESTATUS`, so successful VM updates no longer end with Bash unary-operator errors and a false failure summary.
 - **Uninstall restoration** now restores pre-iNiR Kitty and Foot configuration, removes generated terminal theme links safely, preserves a final uninstall backup and removes only iNiR-owned shell integration ([#256](https://github.com/snowarch/iNiR/issues/256)).

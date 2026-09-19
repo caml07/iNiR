@@ -26,19 +26,21 @@ Wayland protocol --> GPU
 2. Waits for `Config.ready` (JSON config loaded from disk)
 3. Applies the current theme
 4. Loads the selected family's small critical host for first-frame surfaces
-5. After the entry frame, enables deferred services and the thin `ShellIiPanels.qml` / `ShellWafflePanels.qml` wrapper, which loads the corresponding `modules/*/Shell*PanelsImpl.qml`
+5. After the entry frame, enables deferred services and the thin `ShellIiPanels.qml` / `ShellWafflePanels.qml` / `ShellIrisPanels.qml` wrapper, which loads the corresponding `modules/*/Shell*PanelsImpl.qml`
 
 Boot phases are recorded to `~/.cache/inir/last-boot.json`; `inir status` can report the measured phase breakdown instead of relying on a fixed startup-time claim.
 
-## Two panel families
+## Three panel families
 
-The shell has two completely separate visual identities that share the same services layer:
+The shell has three separate visual identities that share the same services layer:
 
 **Material ii** uses the shared `Appearance` system with nine global styles: material, cards, aurora, inir, angel, regalia, zzz, cookie and editorial. Bar at the top/edge. Sidebars from the edges. Overview launcher.
 
 **Waffle** uses Windows 11 Fluent Design. Taskbar at the bottom. Start menu. Action center. Notification center. Its layout/components remain Waffle-owned while `Looks` can adapt colors/material semantics from the selected global style.
 
-They're mutually exclusive at runtime. Switch with `Super+Shift+W`. Both families read from the same Config singleton and the same services, but use completely different visual token systems (`Appearance.*` vs `Looks.*`), different panel definitions, and different settings UIs.
+**iRiS** uses its own `IrisStyle` system. Its Island can live on any edge or become a full-width bar, the Dock can move independently, and pieces can attach to the chassis or float on the desktop. Studio and shareable Themes edit the family without changing ii or Waffle.
+
+They're mutually exclusive at runtime. Switch with `Super+Shift+W`. All three read from the same Config singleton and shared services, while their presentation stays family-owned through `Appearance.*`, `Looks.*` or `IrisStyle.*`.
 
 More details: [Panel Families](PANEL_FAMILIES.md)
 

@@ -12,6 +12,7 @@ import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.background.widgets
 import qs.modules.background.widgets.instrument
+import qs.modules.iris.widgets
 
 AbstractBackgroundWidget {
     id: root
@@ -34,8 +35,10 @@ AbstractBackgroundWidget {
     readonly property int meterColumns: Math.max(1, Math.min(root._resourceModel.length,
         Math.floor((root.implicitWidth + 10 * root.scaleFactor) / (110 * root.scaleFactor))))
     readonly property int meterRows: Math.ceil(root._resourceModel.length / root.meterColumns)
-    implicitWidth: Math.round(Number(root._readConfigKey("contentWidth") ?? 320) * scaleFactor)
+    implicitWidth: root.irisFaced ? root.irisFaceWidth : Math.round(Number(root._readConfigKey("contentWidth") ?? 320) * scaleFactor)
     implicitHeight: {
+        if (root.irisFaced)
+            return root.irisFaceHeight;
         const stored = Math.round(Number(root._readConfigKey("contentHeight") ?? 120) * scaleFactor);
         if (root.displayMode === "tiles")
             return Math.max(stored, root._tilesMinHeight);
@@ -46,6 +49,17 @@ AbstractBackgroundWidget {
 
     visibleWhenLocked: false
     needsColText: true
+    irisFace: Component { IrisVitalsFace { widget: root } }
+    irisSizes: ["small", "medium", "large"]
+    irisDefaultSize: "medium"
+    irisOptions: [
+        { key: "showCpu", raw: true, label: Translation.tr("CPU"), icon: "memory", fallback: true },
+        { key: "showMemory", raw: true, label: Translation.tr("Memory"), icon: "storage", fallback: true },
+        { key: "showGpu", raw: true, label: Translation.tr("GPU"), icon: "developer_board", fallback: true },
+        { key: "showTemp", raw: true, label: Translation.tr("CPU heat"), icon: "thermostat", fallback: false },
+        { key: "showGpuTemp", raw: true, label: Translation.tr("GPU heat"), icon: "device_thermostat", fallback: false },
+        { key: "showDisk", raw: true, label: Translation.tr("Disk"), icon: "hard_drive", fallback: false }
+    ]
     resizableAxes: ({ width: "contentWidth", height: "contentHeight" })
     resizeMinWidth: root.displayMode === "tiles" ? 100
         : root.displayMode === "instrument" ? 150 : 120
@@ -329,6 +343,7 @@ AbstractBackgroundWidget {
     }
 
     WidgetSurface {
+        irisPresentation: root.widgetIris
         regionBrightness: root.regionBrightness
         anchors.fill: parent
         surfaceRadius: root.cornerRadiusOverride >= 0 ? root.cornerRadiusOverride : root.cardRadius
@@ -344,7 +359,7 @@ AbstractBackgroundWidget {
         screenY: root.y
         screenWidth: root.scaledScreenWidth
         screenHeight: root.scaledScreenHeight
-        shown: root.displayMode !== "tiles" && root.displayMode !== "instrument"
+        shown: !root.irisFaced && root.displayMode !== "tiles" && root.displayMode !== "instrument"
             && (root.backgroundOpacity > 0 || root.borderWidth > 0 || root.effectiveBlur)
     }
 
@@ -355,7 +370,7 @@ AbstractBackgroundWidget {
     Grid {
         anchors.centerIn: parent
         opacity: root.displayMode === "instrument" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "instrument"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -463,7 +478,7 @@ AbstractBackgroundWidget {
         anchors.margins: root._innerMargin
         spacing: Appearance.sizes.spacingSmall ?? 4
         opacity: root.displayMode === "bars" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "bars"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -539,7 +554,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: root._innerMargin
         opacity: root.displayMode === "graph" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "graph"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -653,7 +668,7 @@ AbstractBackgroundWidget {
         anchors.centerIn: parent
         spacing: Appearance.sizes.spacingNormal ?? 8
         opacity: root.displayMode === "rings" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "rings"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -752,7 +767,7 @@ AbstractBackgroundWidget {
         anchors.centerIn: parent
         spacing: Appearance.sizes.spacingSmall ?? 4
         opacity: root.displayMode === "text" ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "text"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -815,7 +830,7 @@ AbstractBackgroundWidget {
         anchors.fill: parent
         anchors.margins: root._innerMargin
         opacity: root.displayMode === "tiles" && root._resourceModel.length > 0 ? 1 : 0
-        visible: opacity > 0
+        visible: !root.irisFaced && opacity > 0
         enabled: root.displayMode === "tiles"
         Behavior on opacity {
             enabled: root.animationsActive
@@ -916,7 +931,7 @@ AbstractBackgroundWidget {
     }
 
     Column {
-        visible: root._resourceModel.length === 0
+        visible: !root.irisFaced && root._resourceModel.length === 0
         anchors.centerIn: parent
         spacing: Math.round((Appearance.sizes.spacingSmall ?? 8) / 2)
 

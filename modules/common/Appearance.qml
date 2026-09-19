@@ -7,7 +7,6 @@ import Quickshell.Io
 import qs.modules.common.functions
 import qs.modules.common.models
 import qs.services
-import "root:modules/common/functions/md5.js" as MD5
 
 Singleton {
     id: root
@@ -31,22 +30,7 @@ Singleton {
     ColorQuantizer {
         id: wallColorQuant
         property string wallpaperPath: Wallpapers.effectiveWallpaperPath
-        property bool wallpaperIsVideo: wallpaperPath.endsWith(".mp4") || wallpaperPath.endsWith(".webm") || wallpaperPath.endsWith(".mkv") || wallpaperPath.endsWith(".avi") || wallpaperPath.endsWith(".mov")
-        property string _videoImageSource: {
-            if (!wallpaperIsVideo) return ""
-            const _dep = Wallpapers.videoFirstFrames // reactive binding
-            const ff = Wallpapers.getVideoFirstFramePath(wallpaperPath)
-            // When first-frame becomes available, we add a cache-bust suffix so
-            // ColorQuantizer reloads even if the path is identical.
-            if (ff) return ff + "?ff=1"
-            if (wallpaperPath) {
-                Wallpapers.ensureVideoFirstFrame(wallpaperPath)
-                const expected = Wallpapers._videoThumbDir + "/" + MD5.hash(wallpaperPath) + ".jpg"
-                return expected + "?ff=0"
-            }
-            return ""
-        }
-        source: Qt.resolvedUrl(wallpaperIsVideo ? _videoImageSource : wallpaperPath)
+        source: Wallpapers.stillUrlFor(wallpaperPath)
         depth: 0 // 2^0 = 1 color
         rescaleSize: 10
     }

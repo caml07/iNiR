@@ -334,6 +334,7 @@ Singleton {
                 'WorkspacesChanged',
                 'OutputsChanged',
                 'ConfigLoaded',
+                'OverviewOpenedOrClosed',
                 'KeyboardLayoutsChanged',
                 'KeyboardLayoutSwitched',
             ]
@@ -1121,6 +1122,29 @@ Singleton {
         }
 
         return enriched
+    }
+
+    function hasWindowsOnActiveWorkspace(outputName: string): bool {
+        const active = Object.values(root.workspaces ?? {}).filter(workspace => workspace?.is_active
+            && (outputName.length === 0 || workspace.output === outputName))
+        if (active.length === 0 || !Array.isArray(root.windows)) return false
+        return root.windows.some(window => !window?.is_minimized
+            && active.some(workspace => workspace.id === window.workspace_id))
+    }
+
+    // True when the tiled columns of the output's active workspace span its width,
+    // so only gaps of the wallpaper remain visible.
+    function activeWorkspaceCovers(outputName: string): bool {
+        const workspace = Object.values(root.workspaces ?? {}).find(entry => entry?.is_active && entry.output === outputName)
+        const width = Number(root.outputs?.[outputName]?.logical?.width ?? 0)
+        if (!workspace || width <= 0 || !Array.isArray(root.windows)) return false
+        const columns = {}
+        for (const window of root.windows) {
+            const pos = window?.layout?.pos_in_scrolling_layout
+            if (window?.workspace_id !== workspace.id || window.is_floating || window.is_minimized || !pos) continue
+            columns[pos[0]] = Math.max(columns[pos[0]] ?? 0, Number(window.layout?.tile_size?.[0] ?? 0))
+        }
+        return Object.values(columns).reduce((sum, column) => sum + column, 0) >= width * 0.95
     }
 
     function filterCurrentWorkspace(toplevels, screenName) {

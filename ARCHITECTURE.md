@@ -2,7 +2,7 @@
 
 > A complete desktop shell built on [Quickshell](https://quickshell.org/) for the [Niri](https://github.com/YaLTeR/niri) Wayland compositor.
 
-**Version**: 2.30.0 · **Stack**: QML (Quickshell), Bash, Python, Go
+**Version**: 2.31.0 · **Stack**: QML (Quickshell), Bash, Python, Go
 
 Originally forked from [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (illogical-impulse). iNiR is built and tested for Niri; legacy Hyprland compatibility paths remain in the tree but are not the primary supported/tested target.
 
@@ -28,8 +28,8 @@ Three mutually exclusive UI families, switchable at runtime (`Super+Shift+W`):
 |---|---|---|---|
 | Active when | `panelFamily === "ii"` | `panelFamily === "waffle"` | `panelFamily === "iris"` |
 | Visual tokens | `Appearance.*` | `Looks.*` | `IrisStyle.*` |
-| Global styles | material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial | Waffle keeps its Fluent layout/tokens while `Looks` adapts shared global-style color/material semantics | Stable minimal grammar using semantic Material palette colors without inheriting ii surface composition |
-| Bar | Top (or vertical; bar.appearanceStyle selects classic/islands/scenic/frame, pill, or m3) | Bottom (Win11 taskbar) | Compact top/bottom modular bar |
+| Global styles | material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial | Waffle keeps its Fluent layout/tokens while `Looks` adapts shared global-style color/material semantics | iRiS owns its own presets and shareable full Themes through `IrisStyle` |
+| Bar | Top (or vertical; bar.appearanceStyle selects classic/islands/scenic/frame, pill, or m3) | Bottom (Win11 taskbar) | Island on any edge, or a full-width zoned bar |
 | App launcher | Overview | StartMenu with search | IrisPalette |
 | Right panel | SidebarRight | ActionCenter + NotificationCenter | IrisControlCenter |
 | Panels | ii (iiBar, iiDock, iiSidebarLeft, ...) | w (wBar, wStartMenu, wActionCenter, ... + shared ii panels) | iris (irisBar, irisBackground, irisPalette, irisControlCenter, ...) |
@@ -83,7 +83,7 @@ modules/                      # UI module directories
 │   └── widgets/              # Reusable widgets + qmldir
 ├── bar/                      # Top bar (ii family)
 ├── barM3/                    # Material 3 bar — independent layout model, bar.appearanceStyle "m3"
-├── iris/                     # Minimal iRiS family, visual primitives and surfaces
+├── iris/                     # iRiS Island family, chassis, surfaces, Studio, widgets and themes
 ├── background/               # Wallpaper backdrop + desktop widgets + desktop items
 ├── ii/                       # ii composition implementation + critical host + ii-only overlay pieces
 │   ├── ShellIiPanelsImpl.qml # Deferred/on-demand ii composition authority

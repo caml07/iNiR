@@ -31,6 +31,8 @@ Item {
     readonly property string idleMode: String(root.value("idleMode"))
     readonly property real restPresence: root.number("restPresence", 0, 100) / 100
     readonly property bool renderAllowed: configuredEnabled && outputAllowed
+        && !(Config.options?.panelFamily === "iris" && (Config.options?.iris?.surround?.enable ?? false)
+            && String(Config.options?.iris?.surround?.music ?? "widget") === "frame")
         && !GlobalStates.screenLocked && !GameMode.visualizersSuppressed
         && !Appearance.gameModeMinimal && WidgetPowerManager.widgetsActiveForOutput(root.screenName)
     readonly property var insets: root.value("respectPanels")

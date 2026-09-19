@@ -3,10 +3,21 @@
 
 import os
 os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
+# Per-widget samples are tiny; library thread pools spinning on every core cost more than the work.
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
 import cv2
 import numpy as np
 import argparse
+import fcntl
+import hashlib
 import json
+import tempfile
+
+cv2.setNumThreads(1)
+
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "inir", "region-sampling")
+CACHE_KEEP = 8
 
 def center_crop(img, target_w, target_h):
     h, w = img.shape[:2]
@@ -18,30 +29,60 @@ def center_crop(img, target_w, target_h):
     y2 = y1 + target_h
     return img[y1:y2, x1:x2]
 
+def _read_screen_image(image_path, flags, screen_width, screen_height, screen_mode):
+    img = cv2.imread(image_path, flags)
+    if img is None:
+        return None
+    orig_h, orig_w = img.shape[:2]
+    scale_w = screen_width / orig_w
+    scale_h = screen_height / orig_h
+    scale = max(scale_w, scale_h) if screen_mode == "fill" else min(scale_w, scale_h)
+    img = cv2.resize(img, (int(orig_w * scale), int(orig_h * scale)), interpolation=cv2.INTER_LANCZOS4)
+    return center_crop(img, screen_width, screen_height)
+
+def load_screen_image(image_path, screen_width=None, screen_height=None, screen_mode="fill", grayscale=False):
+    """Wallpaper scaled and cropped to the screen, cached per file revision and screen geometry."""
+    flags = cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR
+    if screen_width is None or screen_height is None:
+        return cv2.imread(image_path, flags)
+    try:
+        st = os.stat(image_path)
+        key = hashlib.sha1(f"{os.path.realpath(image_path)}|{st.st_mtime_ns}|{st.st_size}|{screen_width}x{screen_height}|{screen_mode}|{'gray' if grayscale else 'bgr'}".encode()).hexdigest()
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        cache_path = os.path.join(CACHE_DIR, key + ".npy")
+        lock = open(os.path.join(CACHE_DIR, key + ".lock"), "w")
+    except OSError:
+        return _read_screen_image(image_path, flags, screen_width, screen_height, screen_mode)
+    with lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            return np.load(cache_path)
+        except (OSError, ValueError):
+            pass
+        img = _read_screen_image(image_path, flags, screen_width, screen_height, screen_mode)
+        if img is None:
+            return None
+        try:
+            with tempfile.NamedTemporaryFile(dir=CACHE_DIR, suffix=".tmp", delete=False) as tmp:
+                np.save(tmp, img)
+            os.replace(tmp.name, cache_path)
+            entries = sorted((e for e in os.scandir(CACHE_DIR) if e.name.endswith(".npy")), key=lambda e: e.stat().st_mtime, reverse=True)
+            for stale in entries[CACHE_KEEP:]:
+                for suffix in (".npy", ".lock"):
+                    try:
+                        os.unlink(stale.path[:-4] + suffix)
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+        return img
+
 def find_least_busy_region(image_path, region_width=300, region_height=200, screen_width=None, screen_height=None, verbose=False, stride=2, screen_mode="fill", horizontal_padding=50, vertical_padding=50, busiest=False):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    img = load_screen_image(image_path, screen_width, screen_height, screen_mode, grayscale=True)
     if img is None:
         raise FileNotFoundError(f"Image not found: {image_path}")
-    orig_h, orig_w = img.shape
-    scale = 1.0
-    if screen_width is not None and screen_height is not None:
-        scale_w = screen_width / orig_w
-        scale_h = screen_height / orig_h
-        if screen_mode == "fill":
-            scale = max(scale_w, scale_h)
-        else:
-            scale = min(scale_w, scale_h)
-        new_w = int(orig_w * scale)
-        new_h = int(orig_h * scale)
-        if verbose:
-            print(f"Scaling image from {orig_w}x{orig_h} to {new_w}x{new_h} (scale: {scale:.3f}, mode: {screen_mode})")
-        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
-        img = center_crop(img, screen_width, screen_height)
-        if verbose:
-            print(f"Cropped image to {screen_width}x{screen_height}")
-    else:
-        if verbose:
-            print(f"Using original image size: {orig_w}x{orig_h}")
+    if verbose:
+        print(f"Using screen image of {img.shape[1]}x{img.shape[0]} (mode: {screen_mode})")
     arr = img.astype(np.float64)
     h, w = arr.shape
     # Validate & adjust stride
@@ -111,30 +152,11 @@ def find_least_busy_region(image_path, region_width=300, region_height=200, scre
         return min_coords, min_var
 
 def find_largest_region(image_path, screen_width=None, screen_height=None, verbose=False, stride=2, screen_mode="fill", threshold=100.0, aspect_ratio=1.0, horizontal_padding=50, vertical_padding=50):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    img = load_screen_image(image_path, screen_width, screen_height, screen_mode, grayscale=True)
     if img is None:
         raise FileNotFoundError(f"Image not found: {image_path}")
-    orig_h, orig_w = img.shape
-    # ...existing scaling logic...
-    scale = 1.0
-    if screen_width is not None and screen_height is not None:
-        scale_w = screen_width / orig_w
-        scale_h = screen_height / orig_h
-        if screen_mode == "fill":
-            scale = max(scale_w, scale_h)
-        else:
-            scale = min(scale_w, scale_h)
-        new_w = int(orig_w * scale)
-        new_h = int(orig_h * scale)
-        if verbose:
-            print(f"Scaling image from {orig_w}x{orig_h} to {new_w}x{new_h} (scale: {scale:.3f}, mode: {screen_mode})")
-        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
-        img = center_crop(img, screen_width, screen_height)
-        if verbose:
-            print(f"Cropped image to {screen_width}x{screen_height}")
-    else:
-        if verbose:
-            print(f"Using original image size: {orig_w}x{orig_h}")
+    if verbose:
+        print(f"Using screen image of {img.shape[1]}x{img.shape[0]} (mode: {screen_mode})")
     arr = img.astype(np.float64)
     h, w = arr.shape
     stride = max(1, int(stride) if stride else 1)
@@ -271,16 +293,9 @@ def get_region_brightness(image_path, x, y, w, h, screen_width=None, screen_heig
     the region is, so consumers can target worst-case legibility instead of
     trusting the mean (which lies on textured wallpapers).
     """
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    img = load_screen_image(image_path, screen_width, screen_height, screen_mode, grayscale=True)
     if img is None:
         return 128.0, 0.0
-    orig_h, orig_w = img.shape[:2]
-    if screen_width is not None and screen_height is not None:
-        scale_w = screen_width / orig_w
-        scale_h = screen_height / orig_h
-        scale = max(scale_w, scale_h) if screen_mode == "fill" else min(scale_w, scale_h)
-        img = cv2.resize(img, (int(orig_w * scale), int(orig_h * scale)), interpolation=cv2.INTER_LANCZOS4)
-        img = center_crop(img, screen_width, screen_height)
     x = max(0, x)
     y = max(0, y)
     w = max(1, min(w, img.shape[1] - x))
@@ -291,21 +306,9 @@ def get_region_brightness(image_path, x, y, w, h, screen_width=None, screen_heig
     return float(np.mean(region)), float(np.std(region))
 
 def get_dominant_color(image_path, x, y, w, h, screen_width=None, screen_height=None, screen_mode="fill"):
-    img = cv2.imread(image_path)
+    img = load_screen_image(image_path, screen_width, screen_height, screen_mode)
     if img is None:
         raise FileNotFoundError(f"Image not found: {image_path}")
-    orig_h, orig_w = img.shape[:2]
-    if screen_width is not None and screen_height is not None:
-        scale_w = screen_width / orig_w
-        scale_h = screen_height / orig_h
-        if screen_mode == "fill":
-            scale = max(scale_w, scale_h)
-        else:
-            scale = min(scale_w, scale_h)
-        new_w = int(orig_w * scale)
-        new_h = int(orig_h * scale)
-        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
-        img = center_crop(img, screen_width, screen_height)
     # Ensure region is within bounds
     x = max(0, x)
     y = max(0, y)

@@ -1036,6 +1036,7 @@ ContentPage {
                         Config.setNestedValue("regionSelector.japaneseLookup.anki.enabled", checked)
                         if (checked) JapaneseDictionary.checkAnki()
                     }
+                    Component.onCompleted: if (checked) JapaneseDictionary.checkAnki()
                 }
 
                 Rectangle {

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Wayland → GPU
 - **Wayland**：Linux 的显示协议（新的，替代 X11）
 - **QML**：Qt 的声明式 UI 语言，iNiR 就是用这个写的
 - **Material You**：Google 的配色系统，从图片生成调色板（自动主题就是这么工作的）
-- **ii / waffle**：两种面板风格。ii = Material Design 风，waffle = Windows 11 风。`Super+Shift+W` 切换
+- **ii / waffle / iRiS**：三套面板家族。ii = Material Design，waffle = Windows 11，iRiS = 会变形成当前内容的 Island。`Super+Shift+W` 切换
 
 </details>
 
@@ -110,9 +110,10 @@ Wayland → GPU
 
 ## 功能
 
-**两套面板家族**，通过 `Super+Shift+W` 随时切换：
+**三套面板家族**，通过 `Super+Shift+W` 随时切换：
 - **Material ii** — 浮动栏、侧边栏、Dock、9 种全局风格（material、cards、aurora、inir、angel、regalia、zzz、cookie、editorial）
 - **Waffle** — Windows 11 风格任务栏、开始菜单、操作中心、通知中心
+- **iRiS** — 新的 Island 家族：四边可用、Pieces、任意边 Dock、Glass、Themes 和 Studio
 
 **自动主题** — 选一张壁纸，一切自动适配：
 - 通过 Material You 生成 Shell 配色，传播到 GTK3/4、Qt、终端、Firefox、Discord、SDDM

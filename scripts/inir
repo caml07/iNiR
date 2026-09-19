@@ -98,7 +98,7 @@ Quick start:
   inir settings          Toggle settings
   inir welcome           Re-open the welcome wizard (first-run tour)
   inir restart           Restart the shell
-  inir logs              View runtime logs (--full: all categories, --debug: foreground debug, -f: follow)
+  inir logs              View runtime logs (--issues: every warning/error since start, grouped; -n N: last N lines; --full: all categories; --debug: foreground debug)
   inir status            Shell status info
   inir doctor            Health checks (--perf: runtime graphics/media snapshot)
 
@@ -2457,7 +2457,29 @@ show_logs() {
         exec "$qs_bin" -p "$config_dir" log --rules "*=true" "$@"
     fi
 
-    "$qs_bin" -p "$config_dir" log | tail -50
+    if [[ "${1:-}" == "--issues" ]]; then
+        "$qs_bin" -p "$config_dir" log 2>&1 \
+            | sed -E 's/\x1b\[[0-9;]*m//g' \
+            | awk '
+                /(WARN|ERROR|CRIT|FATAL)/ || /Binding loop|TypeError|ReferenceError|is not a type|unavailable|non-existent/ {
+                    line = $0
+                    gsub(/0x[0-9a-f]+/, "0x_", line)
+                    gsub(/^[[:space:]]+/, "", line)
+                    if (!(line in count)) order[++n] = line
+                    count[line]++
+                }
+                END {
+                    if (n == 0) { print "No warnings or errors since the shell started."; exit }
+                    for (i = 1; i <= n; i++) printf "%5d  %s\n", count[order[i]], order[i]
+                }'
+        return
+    fi
+
+    local lines=50
+    if [[ "${1:-}" == "-n" && -n "${2:-}" ]]; then
+        lines="$2"
+    fi
+    "$qs_bin" -p "$config_dir" log | tail -n "$lines"
 }
 
 run_repair() {
@@ -3914,7 +3936,7 @@ case "$command_name" in
             usage
             exit 0
         fi
-        show_logs "${1:-}"
+        show_logs "$@"
         ;;
     terminal)
         while [[ $# -gt 0 ]]; do

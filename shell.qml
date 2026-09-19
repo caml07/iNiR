@@ -358,6 +358,28 @@ ShellRoot {
         function toggle(): void { GlobalStates.osdVolumeOpen = !GlobalStates.osdVolumeOpen }
     }
 
+    IpcHandler {
+        target: "osd"
+        function volume(): void { GlobalStates.osdVolumeOpen = true }
+        function brightness(): void { GlobalStates.osdBrightnessOpen = true }
+        function mic(): void { GlobalStates.osdMicOpen = true }
+        function keyboard(): void { GlobalStates.osdKeyboardLayoutOpen = true }
+        function media(action: string): string {
+            const normalized = action.length === 0 ? "play" : action
+            if (!["play", "pause", "next", "previous"].includes(normalized))
+                return "Unknown action: play, pause, next or previous"
+            GlobalStates.showMediaAction(normalized)
+            return normalized
+        }
+        function hide(): void {
+            GlobalStates.osdVolumeOpen = false
+            GlobalStates.osdBrightnessOpen = false
+            GlobalStates.osdMicOpen = false
+            GlobalStates.osdMediaOpen = false
+            GlobalStates.osdKeyboardLayoutOpen = false
+        }
+    }
+
     // Keep the SDK command available without paying for widget discovery at
     // startup. The singleton is instantiated only when this IPC is actually
     // used (or a Settings/bar consumer requests it).
@@ -670,6 +692,15 @@ ShellRoot {
     IpcHandler {
         target: "overlay"
         function toggle(): void { GlobalStates.overlayOpen = !GlobalStates.overlayOpen }
+        function tool(identifier: string, action: string): string {
+            const state = Persistent.states.overlay
+            if (!state || typeof state[identifier] !== "object") return "Unknown tool"
+            const open = state.open.includes(identifier)
+            const wanted = action === "on" ? true : action === "off" ? false : !open
+            if (wanted && !open) state.open.push(identifier)
+            else if (!wanted && open) state.open = state.open.filter(id => id !== identifier)
+            return wanted ? "on" : "off"
+        }
     }
 
     IpcHandler {

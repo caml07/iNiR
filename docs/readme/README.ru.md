@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Wayland → GPU
 - **Wayland**: протокол дисплея Linux (новый, замена X11)
 - **QML**: декларативный язык UI от Qt, на нём написан iNiR
 - **Material You**: система цветов Google, генерирует палитры из картинок (так работает авто-тематизация)
-- **ii / waffle**: два стиля панелей. ii = Material Design вайбы, waffle = Windows 11 вайбы. `Super+Shift+W` переключает
+- **ii / waffle / iRiS**: три семейства панелей. ii = Material Design, waffle = Windows 11, iRiS = Island, которая превращается в открытый контент. `Super+Shift+W` переключает между ними
 
 </details>
 
@@ -110,9 +110,10 @@ Wayland → GPU
 
 ## Возможности
 
-**Два семейства панелей**, переключаемые на лету через `Super+Shift+W`:
+**Три семейства панелей**, переключаемые на лету через `Super+Shift+W`:
 - **Material ii** — плавающая панель, сайдбары, док, 9 глобальных стилей (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — панель задач в стиле Windows 11, стартовое меню, центр действий, центр уведомлений
+- **iRiS** — новое семейство Island: любой край экрана, Pieces, Dock на любом краю, Glass, Themes и Studio
 
 **Автоматическая тематизация** — выбираете обои и всё подстраивается:
 - Цвета шелла через Material You, распространяются на GTK3/4, Qt, терминалы, Firefox, Discord, SDDM

@@ -506,6 +506,8 @@ with (root / "defaults/config.json").open(encoding="utf-8") as handle:
     config = json.load(handle)
 schema = (root / "modules/common/Config.qml").read_text(encoding="utf-8")
 wizard = (root / "welcome.qml").read_text(encoding="utf-8")
+iris_background = (root / "modules/iris/background/IrisBackground.qml").read_text(encoding="utf-8")
+iris_panels = (root / "modules/iris/ShellIrisPanelsImpl.qml").read_text(encoding="utf-8")
 bar_settings = (root / "modules/settings/BarConfig.qml").read_text(encoding="utf-8")
 right_sidebar_button = (root / "modules/barM3/RightSidebarButton.qml").read_text(encoding="utf-8")
 m3_bar_content = (root / "modules/barM3/BarContent.qml").read_text(encoding="utf-8")
@@ -587,10 +589,34 @@ schema_checks = {
             "property real backgroundOpacity: 0.16",
             "property real borderWidth: 1",
         ]),
-    "wizard applies initial balanced profile": "root.applyProfile(root.selectedProfile)" in wizard,
+    "wizard applies initial balanced profile only outside iRiS": all(fragment in wizard for fragment in [
+        "if (!root.irisFamily && !root.initialProfileApplied)",
+        "root.applyProfile(root.selectedProfile)"
+    ]),
     "wizard applies initial graphics budget": "root.applyPerformancePreset(root.selectedPerformancePreset)" in wizard,
     "wizard does not auto-apply a style on page entry": 'if (root.currentStep === 2' not in wizard,
-    "wizard has no invented Signature preset": 'id: "signature"' not in wizard,
+    "wizard iRiS starting layouts use real iRiS owners": all(fragment in wizard for fragment in [
+        'id: "signature"', 'id: "floating"', 'id: "full"',
+        '"iris.bar.layout": "island"', '"iris.bar.layout": "full"',
+        '"iris.bar.notch": true', '"iris.surround.enable": true',
+        '"iris.dock.position": "auto"'
+    ]) and 'id: "minimal"' not in wizard,
+    "wizard iRiS appearance uses curated Themes": all(fragment in wizard for fragment in [
+        "irisWelcomeThemeIds", "IrisThemes.curated.filter", "IrisThemes.apply(theme)",
+        "IrisThemes.activeId", "IrisScreenPreview"
+    ]),
+    "wizard iRiS placement writes iRiS geometry": all(fragment in wizard for fragment in [
+        'Config.setNestedValue("iris.bar.position", value)',
+        'Config.setNestedValue("iris.bar.layout", value)',
+        'Config.setNestedValue("iris.dock.position", value)',
+        'Config.setNestedValue("iris.bar.notch", value === "on")',
+        'Config.setNestedValue("iris.modules.desktopWidgets", value === "on")'
+    ]),
+    "iRiS lightweight background retains bare-desktop menu": all(fragment in iris_background for fragment in [
+        "IrisDesktopMenu {", "acceptedButtons: Qt.RightButton | Qt.LeftButton",
+        'Config.setNestedValue("iris.modules.desktopWidgets", true)'
+    ]) and 'component: IrisBackground {}' in (root / "modules/iris/critical/ShellIrisCriticalPanels.qml").read_text(encoding="utf-8")
+        and 'component: Background {}' in iris_panels,
     "wizard style catalog covers all ii global styles": all(preset in wizard for preset in [
         'id: "material"', 'id: "cards"', 'id: "aurora"', 'id: "inir"',
         'id: "angel"', 'id: "regalia"', 'id: "zzz"', 'id: "cookie"',
@@ -642,11 +668,11 @@ schema_checks = {
         and 'ThemeService.setGlobalStyle(newValue)' not in wizard,
     "wizard preserves independent Waffle family selection": all(fragment in wizard for fragment in [
         'title: "Waffle"',
-        'onClicked: root.setProfileFeature("panelFamily", "waffle")'
+        'onClicked: root.chooseFamily("waffle")'
     ]),
     "wizard exposes independent iRiS family selection": all(fragment in wizard for fragment in [
         'title: "iRiS"',
-        'onClicked: root.setProfileFeature("panelFamily", "iris")'
+        'onClicked: root.chooseFamily("iris")'
     ]),
     "wizard graphics catalog": all(preset in wizard for preset in [
         'id: "minimum"', 'id: "efficient"', 'id: "balanced"'
@@ -672,12 +698,16 @@ schema_checks = {
     "wizard dock not hover-only": '"dock.hoverToReveal": false' in wizard,
     "wizard right sidebar full height": '"sidebar.collapseEmptyNotifications": false' in wizard,
     "wizard left sidebar full height": '"sidebar.collapseWidgetsTab": false' in wizard,
-    "wizard layout refinements mark the profile custom": all(fragment in wizard for fragment in [
+    "wizard ii layout refinements mark the profile custom": all(fragment in wizard for fragment in [
         'root.setProfileFeature("bar.bottom", value === "bottom")',
-        'root.setProfileFeature("dock.position", value)',
-        'root.setProfileFeature("panelFamily", "ii")',
-        'root.setProfileFeature("panelFamily", "waffle")',
-        'root.setProfileFeature("panelFamily", "iris")'
+        'root.setProfileFeature("dock.position", value)'
+    ]),
+    "wizard family selection goes through the runtime family owner": all(fragment in wizard for fragment in [
+        'function chooseFamily(id: string): void',
+        '"panelFamily", "set", id',
+        'root.chooseFamily("ii")',
+        'root.chooseFamily("waffle")',
+        'root.chooseFamily("iris")'
     ]),
     "wizard responsive grids collapse on narrow widths": all(fragment in wizard for fragment in [
         'columns: welcomeFlickable.width < 720 ? 1 : 2',
@@ -729,6 +759,27 @@ if ! grep -Fq 'pacman -T "${_all_official[@]}"' "$arch_installer" \
 fi
 if grep -Fq 'pacman -S $installflags "${_all_official[@]}"' "$arch_installer"; then
     printf 'FAIL: Arch installer can still reinstall or downgrade satisfied dependencies\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'OS_SPECIFIC_ID:-}" == "cachyos"' "$arch_installer" \
+        || ! grep -Fq 'pacman -Si niri-focused-booster' "$arch_installer" \
+        || ! grep -Fq 'OFFICIAL_PACKAGES+=(niri-focused-booster)' "$arch_installer"; then
+    printf 'FAIL: CachyOS fresh installs no longer provision the Niri DMEM focus booster from configured repos\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'ID="?cachyos"?' "$runtime_root/sdata/lib/dist-determine.sh"; then
+    printf 'FAIL: CachyOS detection ignores /etc/os-release ID=cachyos\n' >&2
+    exit 1
+fi
+files_installer="$runtime_root/sdata/subcmd-install/3.files.sh"
+if ! grep -Fq 'INSTALL_FIRSTRUN}" == true && "${OS_SPECIFIC_ID:-}" == "cachyos"' "$files_installer" \
+        || ! grep -Fq 'command -v niri-focused-booster >/dev/null 2>&1' "$files_installer" \
+        || ! grep -Fq '[ -r /sys/fs/cgroup/dmem.capacity ] && exec niri-focused-booster' "$files_installer"; then
+    printf 'FAIL: fresh CachyOS installs do not conditionally wire the Niri DMEM focus booster\n' >&2
+    exit 1
+fi
+if grep -Fq 'niri-focused-booster' "$runtime_root/defaults/niri/config.d/50-startup.kdl"; then
+    printf 'FAIL: generic Niri defaults contain CachyOS-only DMEM integration\n' >&2
     exit 1
 fi
 
@@ -3199,6 +3250,15 @@ rm -rf "$worktree_root"
 if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-ipc-registry.py" ]]; then
     step "IPC registry freshness"
     python3 "$runtime_root/scripts/lib/generate-ipc-registry.py" --check
+
+    step "iRiS style tokens"
+    python3 "$runtime_root/scripts/test-iris-style-tokens.py"
+
+    step "iRiS defaults"
+    python3 "$runtime_root/scripts/test-iris-defaults.py"
+
+    step "iRiS performance contract"
+    python3 "$runtime_root/scripts/test-iris-performance-contract.py"
 fi
 
 if [[ "$run_runtime" == true ]]; then

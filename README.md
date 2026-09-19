@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/da6beb4a-ccee-40ba-a372-5eea77b595f8" alt="iNiR" width="800">
-</p>
-
 <h1 align="center">iNiR</h1>
 
 <p align="center">
@@ -9,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License"></a>
@@ -75,7 +71,7 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 - **Wayland**: Linux display protocol (the new one, replaces X11)
 - **QML**: Qt's declarative UI language, what iNiR is written in
 - **Material You**: Google's color system that makes palettes from images (that's the auto-theming)
-- **ii / waffle**: the two panel styles. ii = Material Design vibes, waffle = Windows 11 vibes. `Super+Shift+W` switches between them
+- **ii / waffle / iRiS**: the three panel families. ii = Material Design vibes, waffle = Windows 11 vibes, iRiS = an Island that becomes whatever you open. `Super+Shift+W` cycles through them
 
 </details>
 
@@ -111,9 +107,10 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 
 ## Features
 
-**Two panel families**, switchable on the fly with `Super+Shift+W`:
+**Three panel families**, switchable on the fly with `Super+Shift+W`:
 - **Material ii**: floating bar, sidebars, dock, and 9 global styles (Material, Cards, Aurora, iNiR, Angel, Regalia, ZZZ, Cookie Shapes, Editorial)
 - **Waffle**: Windows 11-inspired taskbar, start menu, action center, notification center
+- **iRiS**: the new flagship. An Island on any screen edge that grows into pages, cards and panels, pieces you can carry, a Dock on any edge, glass, whole-redesign Themes and a Studio that edits all of it live
 
 **Automatic theming**. Pick a wallpaper and everything adapts:
 - Shell colors via Material You, propagated to GTK3/4, Qt, terminals, Firefox, Discord, SDDM
@@ -126,6 +123,18 @@ I wanted my desktop to look and work a certain way and nothing else did exactly 
 
 <details>
 <summary><b>Full feature list</b></summary>
+
+### iRiS
+
+- **The Island**: one shape on a screen edge that answers "what's happening" and becomes the page, card or panel you opened, then folds back into itself. Top, bottom, left or right (`inir iris edge <side>`, or drag it there). On a side it stands up with a stacked clock and bubbles above and below
+- **Full width bar mode** with start, center and end zones for the Island, workspaces, the focused window, the time or any piece (`inir iris zone start|center|end kinds+joined+with+plus`)
+- **Pieces**: weather, sound, mic, tray, notifications, tools, media and your own apps as bubbles you can park on the Island, on the screen contour or loose on the desktop
+- **Pieces join what they touch**: park one on the Dock's or the Island's edge and it becomes part of that body instead of floating on top
+- **Dock** on any edge (`inir iris dockEdge <side|auto>`); auto sits opposite the Island, and sending one to the other's edge makes them trade places
+- **Glass** that frosts the wallpaper under every surface, and keeps text readable even on bright or busy wallpapers. Compositor Blur exists too, but it is still under construction, so don't judge it yet
+- **Themes**: 14 curated redesigns (iRiS, Liquid Glass, Frost, Obsidian, Aurora, Terminal, Neo Tokyo, Monolith, Sakura, Meadow, Unit-01, Signal, iNiR Theme, Adaptive) plus your own as shareable JSON files (`inir iris theme`)
+- **Studio**: a live editor for material, colour, type, motion and every surface, with undo, search and previews that follow where your Island and Dock actually live (`inir iris studio`)
+- **Edit in place**: grab pieces straight off the screen and rearrange them (`inir iris edit`)
 
 ### Theming and appearance
 

@@ -13,7 +13,6 @@ import Qt5Compat.GraphicalEffects as GE
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import "root:modules/common/functions/md5.js" as MD5
 
 Variants {
     id: root
@@ -128,14 +127,8 @@ Variants {
         // For ColorQuantizer: needs an image source (can't decode video files)
         // Uses first-frame cache for videos, config thumbnail as fallback
         readonly property string colorSourcePath: {
-            if (wallpaperIsVideo) {
-                const _dep = Wallpapers.videoFirstFrames // reactive binding
-                const ff = Wallpapers.getVideoFirstFramePath(wallpaperPathRaw)
-                // Cache-bust so ColorQuantizer reloads when the first frame appears.
-                if (ff) return ff + "?ff=1"
-                Wallpapers.ensureVideoFirstFrame(wallpaperPathRaw)
-                return Wallpapers._videoThumbDir + "/" + MD5.hash(wallpaperPathRaw) + ".jpg?ff=0"
-            }
+            if (wallpaperIsVideo)
+                return Wallpapers.stillUrlFor(wallpaperPathRaw)
             return wallpaperPathRaw
         }
 
@@ -178,6 +171,7 @@ Variants {
                 anchors.margins: parent.mediaMargin
                 fillMode: backdropWindow.imageFillMode
                 source: backdropWindow.effectiveWallpaperPath && !backdropWindow.wallpaperIsGif && !backdropWindow.wallpaperIsVideo
+                        && !Wallpapers.isVideoFile(backdropWindow.effectiveWallpaperPath)
                     ? (backdropWindow.effectiveWallpaperPath.startsWith("file://")
                         ? backdropWindow.effectiveWallpaperPath
                         : "file://" + backdropWindow.effectiveWallpaperPath)
@@ -216,6 +210,7 @@ Variants {
                 mipmap: false
                 visible: !backdropWindow.useAuroraStyle && backdropWindow.wallpaperIsGif
                 playing: visible && backdropWindow.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                    && (!CompositorService.isNiri || NiriService.inOverview)
 
                 layer.enabled: visible && Appearance.effectsEnabled
                     && backdropWindow.enableAnimatedBlur
@@ -278,6 +273,7 @@ Variants {
                 autoPlay: true
 
                 readonly property bool shouldPlay: backdropWindow.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                    && (!CompositorService.isNiri || NiriService.inOverview)
 
                 function pauseAndShowFirstFrame() {
                     pause()
@@ -368,6 +364,7 @@ Variants {
                 mipmap: false
                 visible: backdropWindow.useAuroraStyle && backdropWindow.wallpaperIsGif
                 playing: visible && backdropWindow.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                    && (!CompositorService.isNiri || NiriService.inOverview)
 
                 layer.enabled: visible && Appearance.effectsEnabled
                     && backdropWindow.enableAnimatedBlur
@@ -432,6 +429,7 @@ Variants {
                 autoPlay: true
 
                 readonly property bool shouldPlay: backdropWindow.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
+                    && (!CompositorService.isNiri || NiriService.inOverview)
 
                 function pauseAndShowFirstFrame() {
                     pause()

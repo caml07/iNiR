@@ -640,6 +640,93 @@ configure_void_ydotool_uinput() {
   log_info "Then add a udev rule granting group input mode 0660 on /dev/uinput and load the uinput module"
 }
 
+# Enable Void's packaged SDDM runit service without replacing another display manager.
+# The service root is overridable so this policy can be tested without touching /var/service.
+configure_void_sddm_service() {
+  [[ "${OS_GROUP_ID:-}" == void ]] || return 0
+
+  local service_dir="${INIR_SDDM_SERVICE_DIR:-/etc/sv/sddm}"
+  local service_root="${INIR_RUNIT_SERVICE_ROOT:-/var/service}"
+  local service_link="${service_root}/sddm"
+  local niri_session_entry="${INIR_NIRI_SESSION_ENTRY:-/usr/share/wayland-sessions/niri.desktop}"
+  local dbus_system_socket="${INIR_DBUS_SYSTEM_SOCKET:-/run/dbus/system_bus_socket}"
+  local dm competitor attempt
+  local dbus_ready=false
+
+  if [[ ! -d "$service_dir" ]]; then
+    log_warning "SDDM service directory missing (${service_dir}); reinstall the sddm package"
+    return 1
+  fi
+
+  if [[ ! -f "$niri_session_entry" ]] \
+      || ! grep -Eq '^Exec=.*/niri[[:space:]]+--session([[:space:]]|$)' "$niri_session_entry"; then
+    log_warning "Niri display-manager session entry is missing or invalid (${niri_session_entry})"
+    return 1
+  fi
+
+  if [[ ! -L "${service_root}/dbus" ]]; then
+    log_warning "D-Bus runit service is not enabled; refusing to enable SDDM"
+    log_info "Enable the Void session services first, then retry ./setup install"
+    return 1
+  fi
+
+  if [[ -S "$dbus_system_socket" ]]; then
+    dbus_ready=true
+  elif command -v sv >/dev/null 2>&1; then
+    for attempt in 1 2 3; do
+      if sv status "${service_root}/dbus" 2>/dev/null | grep -q '^run:'; then
+        dbus_ready=true
+        break
+      fi
+      sleep 1
+    done
+  fi
+  if [[ "$dbus_ready" != true ]]; then
+    log_warning "D-Bus system bus is not reachable; refusing to enable SDDM"
+    return 1
+  fi
+
+  if [[ -L "$service_link" ]] \
+      && [[ "$(readlink -f "$service_link" 2>/dev/null)" == "$(readlink -f "$service_dir" 2>/dev/null)" ]]; then
+    log_success "SDDM runit service already enabled"
+    return 0
+  fi
+
+  if [[ -e "$service_link" || -L "$service_link" ]]; then
+    log_warning "Existing ${service_link} is not the packaged SDDM service; leaving it unchanged"
+    return 0
+  fi
+
+  for dm in gdm lightdm lxdm greetd xdm; do
+    competitor="${service_root}/${dm}"
+    if [[ -e "$competitor" || -L "$competitor" ]]; then
+      log_warning "Competing display manager detected (${dm}); skipping SDDM activation"
+      log_info "Disable ${competitor} first if you want SDDM to own graphical login"
+      return 0
+    fi
+  done
+
+  if [[ "${ask:-true}" == true ]]; then
+    if ! tui_confirm "Enable SDDM display manager?" "yes"; then
+      log_info "SDDM left disabled; start Niri manually with: niri --session"
+      log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
+      return 0
+    fi
+  else
+    log_info "SDDM left disabled in non-interactive mode"
+    log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
+    return 0
+  fi
+
+  if elevate ln -s "$service_dir" "$service_link"; then
+    log_success "SDDM display manager enabled for this boot and future boots"
+    return 0
+  fi
+
+  log_warning "Could not enable SDDM display manager"
+  return 1
+}
+
 # Install only iNiR-owned service files; never replace a local WARP service.
 configure_void_warp_service() {
   [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0

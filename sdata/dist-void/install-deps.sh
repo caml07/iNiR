@@ -18,10 +18,12 @@ fi
 
 # Base: Niri, Quickshell, Qt6, session services, essential utilities
 VOID_BASE_PACKAGES=(
-  # Core compositor and shell
+  # Core compositor, shell, and graphical login
   niri
   quickshell
   fish-shell
+  sddm
+  xorg-minimal
 
   # Qt6 (required for Quickshell)
   qt6-base

@@ -74,11 +74,15 @@ services are preserved, and the systemd tier removes the owned ones.
 
 ## Session
 
-- Supported session entry: `niri --session` (Void's `niri` package provides
-  `/usr/bin/niri` with a desktop entry `Exec=/usr/bin/niri --session`; the
-  `niri-session` wrapper was not present in the tested package).
-   Under the turnstile profile, start it after a normal tty login; turnstile
-   creates the user services and session D-Bus bus during login.
+- Normal installed entry is SDDM. The Void base profile installs `sddm` plus
+  `xorg-minimal`; after all setup tasks complete, the interactive installer
+  offers to enable `/etc/sv/sddm` through runit. On the next boot (and as soon
+  as the service is enabled), SDDM presents the graphical login and launches
+  Void's packaged Niri desktop entry, whose command is
+  `Exec=/usr/bin/niri --session`.
+- `niri --session` remains the supported manual fallback from a local TTY for
+  recovery/debugging or when the user intentionally declines SDDM. The
+  `niri-session` wrapper was not present in the tested Void package.
 - Manual `niri` launches are unsupported: doctor warns when the session
   lacks a D-Bus bus.
 - Env propagation without systemd: `dbus-update-activation-environment`
@@ -93,9 +97,11 @@ Auto-enabled with confirmation during setup (`ln -s /etc/sv/<svc> /var/service/`
 - `polkitd` — policykit daemon (GUI sudo prompts)
 - `turnstiled` — per-user services + session bus (tier 2 supervisor)
 - `power-profiles-daemon` — Quickshell Power Profiles D-Bus provider
+- `sddm` — graphical login/display manager. It is offered only after the
+  install is complete, refuses activation when D-Bus/Niri session metadata is
+  unavailable, and never replaces another enabled display manager.
 
-Guided only (never auto-enabled): `seatd` (+ `_seatd` group) and `sddm`
-(package built with `-DUSE_ELOGIND=ON`).
+Guided only (never auto-enabled): `seatd` (+ `_seatd` group).
 
 Note: the session D-Bus bus under turnstile is provided by a **user**
 service (`~/.config/service/dbus`), not the system `dbus` service.
@@ -104,6 +110,7 @@ service (`~/.config/service/dbus`), not the system `dbus` service.
 
 Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
 `fish-shell` (provides `/usr/bin/fish` used by terminal and iNiR launchers),
+`sddm`, `xorg-minimal`,
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
 `uv` (repo), `NetworkManager`, `bluez`, `blueman`, `pipewire`,
@@ -281,7 +288,9 @@ qemu-system-x86_64 \
 - Verification order in the VM:
   0. Quickshell 0.3.0 (repo) runs iNiR — the make-or-break check.
   1. Installer end-to-end on a fresh Void.
-  2. Session: `niri --session` → shell supervised (runsvdir fallback, then turnstile).
+  2. Session: SDDM → packaged Niri entry (`niri --session`) → shell supervised
+     by the selected non-systemd user supervisor. Direct TTY launch remains a
+     recovery path, not the normal installed flow.
   3. Services: dbus/elogind/polkitd/turnstiled up.
   4. UI: updates list, search/install/remove via xbps.
   5. `test-local-distribution.sh` with predicate-conditional invariants.

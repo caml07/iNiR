@@ -99,7 +99,7 @@ should_apply_theme() {
 if ! command -v sddm &>/dev/null; then
     log_warn "SDDM not installed. Skipping theme setup."
     if command -v xbps-install >/dev/null 2>&1; then
-        log_info "Install with: sudo xbps-install -S sddm qt6-declarative qt6-qt5compat"
+        log_info "Install with: sudo xbps-install -S sddm xorg-minimal qt6-declarative qt6-qt5compat"
     elif command -v pacman >/dev/null 2>&1; then
         log_info "Install with: sudo pacman -S sddm qt6-declarative qt6-5compat"
     else
@@ -274,7 +274,8 @@ elif command -v xbps-query >/dev/null 2>&1 \
     if [[ -L /var/service/sddm ]]; then
         log_info "SDDM runit service is already enabled"
     else
-        log_info "Void uses runit; enable SDDM when ready with: sudo ln -s /etc/sv/sddm /var/service/"
+        log_info "Void uses runit; ./setup install offers SDDM activation after setup completes"
+        log_info "Manual fallback: sudo ln -s /etc/sv/sddm /var/service/"
     fi
 fi
 

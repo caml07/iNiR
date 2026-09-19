@@ -82,7 +82,7 @@ done
 check grep -Fq 'has_usable_systemd_user_manager' "$dolphin_migration"
 check grep -Fq 'systemd/private' "$orbit_audit"
 check grep -Fq 'timeout 3s systemctl --user show-environment' "$orbit_audit"
-for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
+for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt sddm xorg-minimal; do
   check array_has_package VOID_BASE_PACKAGES "$package"
 done
 check grep -Fq 'command -v qml6 || command -v qml' "$repo_root/services/WebWallpaper.qml"
@@ -176,8 +176,13 @@ else
 fi
 check grep -Fq 'Translation.tr("Install pacman, apt, or dnf") + " / xbps"' "$software_view"
 check grep -Fq 'sudo xbps-install -S ffmpeg' "$switchwall"
-check grep -Fq 'sudo xbps-install -S sddm qt6-declarative qt6-qt5compat' "$sddm_installer"
+check grep -Fq 'sudo xbps-install -S sddm xorg-minimal qt6-declarative qt6-qt5compat' "$sddm_installer"
 check grep -Fq 'sudo ln -s /etc/sv/sddm /var/service/' "$sddm_installer"
+check grep -Fq 'configure_void_sddm_service' "$repo_root/sdata/lib/functions.sh"
+check grep -Fq 'configure_void_sddm_service' "$setup_cli"
+check grep -Fq 'Competing display manager detected' "$repo_root/sdata/lib/functions.sh"
+check grep -Fq 'Niri display-manager session entry is missing or invalid' "$repo_root/sdata/lib/functions.sh"
+check grep -Fq 'INIR_DBUS_SYSTEM_SOCKET' "$repo_root/sdata/lib/functions.sh"
 check grep -Fq 'xbps-query -p pkgver quickshell' "$setup_cli"
 check grep -Fq 'xbps-query -p repository quickshell' "$setup_cli"
 check grep -Fq 'xbps-install -S sudo' "$package_installers"
@@ -250,7 +255,7 @@ check command -v xbps-install
 check command -v xbps-uhelper
 check command -v qs
 check xbps-query -p pkgver quickshell
-for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire ImageMagick kde-cli-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-chi_sim tesseract-ocr-chi_tra; do
+for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt sddm xorg-minimal plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire ImageMagick kde-cli-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-chi_sim tesseract-ocr-chi_tra; do
   check xbps-query -R -p pkgver "$package"
 done
 for package in awww util-linux kf6-kconfig translate-shell; do

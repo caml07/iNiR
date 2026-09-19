@@ -692,6 +692,15 @@ ShellRoot {
     IpcHandler {
         target: "overlay"
         function toggle(): void { GlobalStates.overlayOpen = !GlobalStates.overlayOpen }
+        function tool(identifier: string, action: string): string {
+            const state = Persistent.states.overlay
+            if (!state || typeof state[identifier] !== "object") return "Unknown tool"
+            const open = state.open.includes(identifier)
+            const wanted = action === "on" ? true : action === "off" ? false : !open
+            if (wanted && !open) state.open.push(identifier)
+            else if (!wanted && open) state.open = state.open.filter(id => id !== identifier)
+            return wanted ? "on" : "off"
+        }
     }
 
     IpcHandler {

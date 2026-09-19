@@ -836,3 +836,118 @@ With this sweep, no open **code** finding remains from the Arch-to-Void parity
 or technical-debt review. Remaining release evidence is intentionally
 operational: live privileged Power Profiles activation and the external-disk
 validation.
+
+## 2.31 clean release-VM closure (2026-09-19)
+
+Snow's prerelease was merged through `7bf10565` and the Void closure fixes were
+validated at `212bb3ae` (`VERSION=2.31.0`) on the disposable
+`voidlinux-release-clean` VM. The release checkout was clean and tracked the
+exact commit under test.
+
+### Fresh-install and disk-space evidence
+
+The clean VM initially had a 20 GiB root disk. The first normal
+`./setup install -y` reached the default font profile and failed while unpacking
+`nerd-fonts-ttf` with `No space left on device`. XBPS rolled its package DB back
+cleanly, but the failed unpack left a large unowned font tree; that tree was
+removed after ownership/package-DB checks. The disposable VM disk was then
+expanded to 30 GiB and `resize2fs` grew the root filesystem.
+
+After the resize, the normal installer completed with `RC=0`. The code now
+performs a preflight using `xbps-install -n` for only packages still missing,
+summing installed bytes plus download bytes and adding 2 GiB of download/build
+headroom. A later full idempotent install at the same 2.31 candidate passed
+with roughly 7.2 GiB free, proving the preflight does not impose a fixed disk
+size once dependencies are already satisfied.
+
+### System services and reboot
+
+The confirmed-elevation activation path was exercised for `dbus`, `elogind`,
+`polkitd`, `turnstiled`, `power-profiles-daemon`, and `bluetoothd`.
+NetworkManager replaced the pre-existing `dhcpcd` service under a timed rollback
+guard; `nmcli` reported `connected`. After subsequent reboots all service links
+persisted, NetworkManager restored the DHCP lease, and Turnstile owned the
+per-user `runsvdir`.
+
+Power Profiles is now live-validated rather than metadata-only:
+
+- `/var/service/power-profiles-daemon` remained active after reboot;
+- `powerprofilesctl list` returned the available profiles;
+- `org.freedesktop.UPower.PowerProfiles` owned its system D-Bus name;
+- the PR7 provider/package checks passed.
+
+BlueZ likewise owned `org.bluez`; no physical Bluetooth adapter is exposed by
+the VM, so radio operation remains a hardware limitation rather than a port
+failure.
+
+The final reboot changed boot ID from
+`9e3f0aec-9317-481e-829a-7224cd58e874` to
+`577312c8-b440-46be-9a83-f8df9d4190ce`. Kernel `6.18.52_1` booted normally,
+NetworkManager returned `connected`, and the 30 GiB root remained healthy.
+
+### Niri, Turnstile, Doctor, and interaction
+
+The local tty1 login launched `niri --session` on seat0. Niri exposed
+`Virtual-1` at 1280x800 and exactly one supervised iNiR Quickshell process.
+Quickshell inherited the new live `NIRI_SOCKET`, `WAYLAND_DISPLAY`, runtime
+directory, session bus, and iNiR virtualenv through Turnstile. The usable
+systemd-user-manager predicate remained false.
+
+`niri validate` passed. `inir doctor` completed with `Passed 27`, `Fixed 0`,
+`Failed 0`. Left and right sidebar IPC toggles passed. PipeWire, WirePlumber,
+PipeWire Pulse, and ydotool user services were active; `pactl info` reported
+PipeWire 1.6.8 with default sink/source. A temporary Kitty window was focused
+through Niri and a real Meta+Q sequence was injected through ydotool/uinput;
+the focused window closed (`MODQ_FINAL=PASS`).
+
+### Web Wallpaper and 2.31 runtime compatibility
+
+The earlier Quickshell-host fallback for Web Wallpaper reproduced a real
+QtWebEngine crash (`base::CommandLine cannot be properly initialized`) in the
+clean VM. Void ships the Qt runner at `/usr/lib/qt6/bin/qml`, outside the
+default PATH. The host was changed to pure Qt QML and the service now prefers
+`qml6`/`qml`, falling back to that Void path instead of using `qs`.
+
+The final host probe returned `RC=0`; a live local HTML Web Wallpaper remained
+alive without module-load, renderer-termination, fatal, or crash errors and was
+captured successfully with `grim`.
+
+Snow 2.31 also added `inir logs --issues` and `inir logs -n`. The existing Void
+runit adapter originally intercepted every `inir logs` invocation with
+`sv status`, making those new options unreachable. The adapter now uses
+`sv status` only for a bare `inir logs`; the option forms continue to
+Quickshell. A local regression test and the live post-reboot command both pass.
+
+The final `inir logs --issues` run returned `RC=0`. It reported only non-fatal
+environment/UI warnings in this VM (the unused Hyprland signature and a missing
+AccountsService avatar). A separate severe scan found no missing QML module,
+`ReferenceError`, `TypeError`, stale Niri socket, failed component load, fatal,
+crash, or segmentation pattern. One `SidebarProfileHeader` binding loop is
+pre-existing and identical in upstream `main`; it is not introduced by the
+Void port.
+
+### Optional Super-tap and versioned checker sweep
+
+`II_ENABLE_SUPER_DAEMON=1` was exercised through the real installer. It created
+the Turnstile-managed `inir-super-overview` service, whose Python daemon ran
+under the session supervisor. A normal reinstall without the variable removed
+the managed service and helper and left no daemon process, confirming the
+default-off cleanup path.
+
+With `INIR_EXPECTED_BRANCH=fix/void-final-fatcheck` and
+`INIR_EXPECTED_COMMIT=212bb3ae4cfd68fa17e256f8b15a07edc074f8d4`, every
+versioned checker from PR3.2 through PR7 passed on the final boot. This includes
+the PR6 isolated real XBPS install/query/remove transaction and the PR7
+Quickshell/Qt ABI no-op/provider sweep. Host `make test-local`, shell syntax,
+IPC registry freshness, iRiS style/default/performance tests, and
+`git diff --check` also passed.
+
+`scripts/verify-docs.sh` remains non-zero on the 2.31 tree. Running it in a
+separate clean worktree at `212bb3ae` produced the same `customWidgets` IPC
+finding and the same runtime-locale missing counts as the documented tree;
+there is no new verifier regression from this closure documentation.
+
+The remaining release gate is the external-disk/hardware test. That test must
+prepare the machine's own GPU driver/firmware/Mesa stack before iNiR: the port
+installs the shell and userland capability providers, not hardware-specific
+graphics drivers.

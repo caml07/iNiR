@@ -7,13 +7,15 @@ live in `docs/adr/`; capability status lives in
 
 ## Current checkpoint
 
-As of 2026-09-18:
+As of 2026-09-19:
 
-- Integration branch: `feat/void-pr5`.
-- PR1 through PR7 engineering closure are implemented, VM validated, and
-  integrated into `feat/void-pr5`.
-- Remaining release evidence is operational: privileged live activation of the
-  Power Profiles runit service and the planned external-disk validation.
+- Integration/release-validation branch: `fix/void-final-fatcheck`.
+- Snow prerelease is merged through `7bf10565` (iNiR 2.31.0); Void closure tip
+  is `212bb3ae`.
+- PR1 through PR7 engineering closure, the 2.31 runtime compatibility fixes,
+  clean-VM install, reboot/runtime, privileged Power Profiles activation,
+  Web Wallpaper, and the versioned PR3.2-PR7 checker sweep are VM validated.
+- Remaining release evidence is the external-disk/hardware validation.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
 Do not infer current state from an old feature branch. Check the integration
@@ -145,16 +147,20 @@ No commit is allowed when that scan reports a secret.
 
 ## Void VM
 
-Current VM:
+Current release-validation VM:
 
 ```text
-libvirt domain: voidlinux
-guest: 192.168.122.140
+libvirt domain: voidlinux-release-clean
+guest: DHCP lease (192.168.122.126 at the 2026-09-19 checkpoint)
 user: voidcaml
-canonical repo: /home/voidcaml/inir-src
+canonical repo: /home/voidcaml/inir-release-test
 ```
 
-The guest disk is 30 GiB. Credentials are operator-owned and must never be
+The guest disk is 30 GiB. The initial 20 GiB release clone was insufficient for
+the default dependency profile because the Nerd Fonts transaction exhausted
+the root filesystem. The installer now performs a dynamic XBPS space preflight
+for missing packages plus 2 GiB of download/build headroom. Credentials are
+operator-owned and must never be
 written to source, docs, shell history, or skills.
 
 A clean audit checkout/worktree is preferred for versioned checkers. Do not

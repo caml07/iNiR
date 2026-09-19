@@ -15,13 +15,12 @@ implementation is complete through the PR7 engineering-closure sweep. Decisions:
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-18): PR1 through PR7 engineering closure are
-  integrated into `feat/void-pr5` and VM validated. PR7 closed
-  provider/dependency parity, Doctor/versioning, XBPS package actions, migration
-  coverage, runtime QML loads, and the final non-systemd/ABI checker pass.
-  Remaining release evidence is operational only:
-  a privileged live activation of the newly added Power Profiles system service
-  and the planned external-disk validation.
+- Current checkpoint (2026-09-19): the Void integration includes Snow's
+  prerelease through `7bf10565` (iNiR 2.31.0) plus the final Void runtime fixes
+  at `212bb3ae`. A clean release VM passed the normal installer, reboot/runtime
+  validation, Doctor 27/27, Web Wallpaper, Power Profiles, Super-tap opt-in,
+  end-to-end Super+Q through ydotool/uinput, and every versioned PR3.2-PR7
+  checker. The remaining release evidence is the planned external-disk test.
 
 ## How the port decides what to do
 
@@ -125,10 +124,10 @@ Notes:
   the `org.freedesktop.UPower.PowerProfiles` D-Bus service, and polkit policy.
   Setup activates it only through the confirmed-elevation system-service step.
 - Interactive Web Wallpaper uses the official Void `qt6-webengine` and
-  `layer-shell-qt` QML providers. If Void does not provide a standalone
-  `qml6`/`qml` runner, iNiR launches the host with the packaged Quickshell
-  binary (`qs -p`) and passes host arguments through environment variables.
-  Doctor repairs either missing QML provider through XBPS.
+  `layer-shell-qt` QML providers. The host is pure Qt QML and prefers `qml6`
+  or `qml`; Void's packaged fallback is `/usr/lib/qt6/bin/qml`. Quickshell is
+  deliberately not used as the QtWebEngine host. Doctor repairs either missing
+  QML provider through XBPS.
 - The legacy opt-in Super-tap daemon follows the same user-supervisor tiers as
   the shell: systemd when the ADR-0002 predicate succeeds, otherwise Turnstile
   or the runsvdir fallback. It remains disabled unless
@@ -224,6 +223,27 @@ The final integration gate is a clean Void installation on an external disk:
 clone the fork at the merged implementation commit, run iNiR's normal one-line
 installer, and record the exact commands and observations in
 `docs/VOID_VM_VALIDATION.md`.
+
+### External hardware prerequisites
+
+iNiR installs the shell/rice and its userland capability providers. It does not
+install or choose kernel GPU drivers, firmware, Mesa/Vulkan drivers, proprietary
+GPU stacks, bootloader configuration, or hardware-specific kernel parameters.
+Those remain the base Void installation's responsibility.
+
+Before running iNiR on a new machine, the tester should first confirm that the
+base Void installation can boot normally and that its graphics stack is usable
+for Wayland/Niri on that hardware. This matters especially when the external
+disk will be moved between machines with different GPUs. iNiR can provision its
+own desktop dependencies afterward, but it should not guess which hardware
+driver is correct for an unknown machine.
+
+The default dependency set is large because `nerd-fonts-ttf` alone expands to
+several GiB. The Void installer now performs a dynamic XBPS disk-space preflight
+for only the packages still missing and includes 2 GiB of download/build
+headroom. In the clean release VM, a 20 GiB root filesystem ran out of space
+during the initial font transaction; a 30 GiB virtual disk completed the full
+install and later idempotent installs passed with about 7 GiB free.
 
 ## VM validation
 

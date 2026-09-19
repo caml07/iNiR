@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Wayland → GPU
 - **Wayland**: Linux का display protocol (नया वाला, X11 की जगह)
 - **QML**: Qt की declarative UI भाषा, iNiR इसमें लिखा है
 - **Material You**: Google का color system जो इमेज से palette बनाता है (auto-theming ऐसे काम करता है)
-- **ii / waffle**: दो panel styles। ii = Material Design वाइब, waffle = Windows 11 वाइब। `Super+Shift+W` से switch करो
+- **ii / waffle / iRiS**: तीन panel families। ii = Material Design, waffle = Windows 11, iRiS = खुली चीज़ के अनुसार बदलने वाली Island। `Super+Shift+W` से switch करो
 
 </details>
 
@@ -110,9 +110,10 @@ Wayland → GPU
 
 ## विशेषताएँ
 
-**दो पैनल फ़ैमिली**, `Super+Shift+W` से तुरंत स्विच:
+**तीन पैनल फ़ैमिली**, `Super+Shift+W` से तुरंत स्विच:
 - **Material ii** — फ़्लोटिंग बार, साइडबार, डॉक, 9 ग्लोबल स्टाइल (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — Windows 11 शैली टास्कबार, स्टार्ट मेन्यू, एक्शन सेंटर, नोटिफ़िकेशन सेंटर
+- **iRiS** — नई Island फ़ैमिली: किसी भी edge पर Island और Dock, Pieces, Glass, Themes और Studio
 
 **ऑटोमैटिक थीमिंग** — वॉलपेपर चुनें और सब कुछ अनुकूलित हो जाता है:
 - Material You के माध्यम से शेल रंग, GTK3/4, Qt, टर्मिनल, Firefox, Discord, SDDM तक प्रसारित

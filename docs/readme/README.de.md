@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Ich wollte dass mein Desktop auf eine bestimmte Art aussieht und funktioniert, u
 - **Wayland**: Linux Display-Protokoll (das neue, ersetzt X11)
 - **QML**: Qts deklarative UI-Sprache, iNiR ist darin geschrieben
 - **Material You**: Googles Farbsystem das Paletten aus Bildern generiert (so funktioniert das Auto-Theming)
-- **ii / waffle**: die zwei Panel-Stile. ii = Material Design Vibes, waffle = Windows 11 Vibes. `Super+Shift+W` wechselt
+- **ii / waffle / iRiS**: die drei Panel-Familien. ii = Material Design, waffle = Windows 11, iRiS = eine Island, die sich in geöffnete Inhalte verwandelt. `Super+Shift+W` wechselt zwischen ihnen
 
 </details>
 
@@ -110,9 +110,10 @@ Ich wollte dass mein Desktop auf eine bestimmte Art aussieht und funktioniert, u
 
 ## Funktionen
 
-**Zwei Panel-Familien**, im laufenden Betrieb umschaltbar mit `Super+Shift+W`:
+**Drei Panel-Familien**, im laufenden Betrieb umschaltbar mit `Super+Shift+W`:
 - **Material ii** — schwebende Leiste, Seitenleisten, Dock, 9 globale Stile (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — Taskleiste im Windows-11-Stil, Startmenü, Aktionscenter, Benachrichtigungscenter
+- **iRiS** — die neue Island-Familie mit frei wählbaren Kanten, Pieces, Dock an jeder Kante, Glass, Themes und Studio
 
 **Automatische Thematisierung** — Hintergrundbild wählen und alles passt sich an:
 - Shell-Farben über Material You, weitergeleitet an GTK3/4, Qt, Terminals, Firefox, Discord, SDDM

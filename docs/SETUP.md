@@ -59,6 +59,8 @@ inir run
 
 Add `-y` for non-interactive mode.
 
+On a fresh CachyOS install, setup also enables `niri-focused-booster` when the package is available and the kernel exposes the required DMEM cgroup interface. Existing installs are not rewritten by this release path.
+
 If you want a packaging-style local install surface instead of the normal setup-managed `repo-copy` installer:
 
 ```bash

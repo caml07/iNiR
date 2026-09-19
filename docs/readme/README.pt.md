@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Queria que meu desktop tivesse uma cara e funcionasse de um jeito, e nada mais f
 - **Wayland**: protocolo de display do Linux (o novo, substitui X11)
 - **QML**: linguagem declarativa de UI do Qt, iNiR é escrito nisso
 - **Material You**: sistema de cores do Google que gera paletas de imagens (assim funciona o auto-theming)
-- **ii / waffle**: os dois estilos de painel. ii = vibe Material Design, waffle = vibe Windows 11. `Super+Shift+W` alterna
+- **ii / waffle / iRiS**: as três famílias de painéis. ii = Material Design, waffle = Windows 11, iRiS = uma Island que vira o que você abre. `Super+Shift+W` alterna entre elas
 
 </details>
 
@@ -110,9 +110,10 @@ Queria que meu desktop tivesse uma cara e funcionasse de um jeito, e nada mais f
 
 ## Funcionalidades
 
-**Duas famílias de painéis**, alternáveis em tempo real com `Super+Shift+W`:
+**Três famílias de painéis**, alternáveis em tempo real com `Super+Shift+W`:
 - **Material ii** — barra flutuante, sidebars, dock, 9 estilos globais (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra de tarefas estilo Windows 11, menu iniciar, centro de ações, centro de notificações
+- **iRiS** — a nova família Island com bordas configuráveis, peças, Dock em qualquer lado, Glass, Themes e Studio
 
 **Tematização automática** — escolha um wallpaper e tudo se adapta:
 - Cores do shell via Material You, propagadas para GTK3/4, Qt, terminais, Firefox, Discord, SDDM

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Wayland → GPU
 - **Wayland**：Linux のディスプレイプロトコル（X11 の後継）
 - **QML**：Qt の宣言的 UI 言語、iNiR はこれで書かれてる
 - **Material You**：Google の配色システム、画像からパレットを生成（自動テーマの仕組み）
-- **ii / waffle**：2つのパネルスタイル。ii = Material Design 風、waffle = Windows 11 風。`Super+Shift+W` で切り替え
+- **ii / waffle / iRiS**：3つのパネルファミリー。ii = Material Design、waffle = Windows 11、iRiS = 開いた内容へ変形する Island。`Super+Shift+W` で切り替え
 
 </details>
 
@@ -110,9 +110,10 @@ Wayland → GPU
 
 ## 機能
 
-**2つのパネルファミリー**、`Super+Shift+W` でオンザフライ切り替え：
+**3つのパネルファミリー**、`Super+Shift+W` でオンザフライ切り替え：
 - **Material ii** — フローティングバー、サイドバー、ドック、9つのグローバルスタイル（material、cards、aurora、inir、angel、regalia、zzz、cookie、editorial）
 - **Waffle** — Windows 11 スタイルのタスクバー、スタートメニュー、アクションセンター、通知センター
+- **iRiS** — 新しい Island ファミリー。全エッジ対応、Pieces、どの辺にも置ける Dock、Glass、Themes、Studio
 
 **自動テーマ** — 壁紙を選ぶだけですべてが適応：
 - Material You によるシェルカラー、GTK3/4、Qt、ターミナル、Firefox、Discord、SDDM に伝播

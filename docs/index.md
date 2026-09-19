@@ -11,6 +11,7 @@ It provides the bar, dock, sidebars, notifications, settings, wallpapers, overvi
 - [Keybinds](KEYBINDS)
 - [IPC reference](IPC)
 - [Panel families](PANEL_FAMILIES)
+- [iRiS](IRIS)
 - [Configuration](CONFIG_SYSTEM)
 - [Known limitations](LIMITATIONS)
 - [Managed desktop items](DESKTOP_ITEMS)
@@ -51,6 +52,7 @@ The shell is configurable through Settings and `config.json`. Persistent writes 
 |---|---|
 | Installation and packages | [Install](INSTALL), [Packages](PACKAGES) |
 | Runtime and architecture | [Runtime](RUNTIME), [Architecture](ARCHITECTURE_OVERVIEW) |
+| iRiS | [iRiS family guide](IRIS), [Panel families](PANEL_FAMILIES) |
 | Services and modules | [Services](SERVICES), [Modules](MODULES) |
 | Wallpapers and theming | [Wallpaper](WALLPAPER), [Theming](THEMING_ARCHITECTURE) |
 | Desktop references | [Managed desktop items](DESKTOP_ITEMS) |

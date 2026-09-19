@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Je voulais que mon bureau ressemble et fonctionne d'une certaine façon, et rien
 - **Wayland** : protocole d'affichage Linux (le nouveau, remplace X11)
 - **QML** : langage déclaratif UI de Qt, iNiR est écrit dedans
 - **Material You** : système de couleurs Google qui génère des palettes à partir d'images (c'est comme ça que marche l'auto-theming)
-- **ii / waffle** : les deux styles de panneaux. ii = vibes Material Design, waffle = vibes Windows 11. `Super+Shift+W` pour changer
+- **ii / waffle / iRiS** : les trois familles de panneaux. ii = Material Design, waffle = Windows 11, iRiS = une Island qui devient ce que vous ouvrez. `Super+Shift+W` permet de les parcourir
 
 </details>
 
@@ -110,9 +110,10 @@ Je voulais que mon bureau ressemble et fonctionne d'une certaine façon, et rien
 
 ## Fonctionnalités
 
-**Deux familles de panneaux**, interchangeables à la volée avec `Super+Shift+W` :
+**Trois familles de panneaux**, interchangeables à la volée avec `Super+Shift+W` :
 - **Material ii** — barre flottante, barres latérales, dock, 9 styles globaux (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barre des tâches style Windows 11, menu démarrer, centre d'actions, centre de notifications
+- **iRiS** — la nouvelle famille Island : bords configurables, pièces, Dock sur n'importe quel bord, Glass, Themes et Studio
 
 **Thématisation automatique** — choisissez un fond d'écran et tout s'adapte :
 - Couleurs du shell via Material You, propagées vers GTK3/4, Qt, terminaux, Firefox, Discord, SDDM

@@ -20,7 +20,7 @@ Change them. Break them. Make them yours. We won't judge.
 | `Mod+,` | Settings |
 | `Mod+Alt+L` | Lock screen |
 | `Ctrl+Alt+T` | Wallpaper selector |
-| `Mod+Shift+W` | Cycle panel family (ii ↔ waffle) |
+| `Mod+Shift+W` | Cycle panel family (ii → waffle → iRiS → ii) |
 | `Mod+Shift+Q` | Session / power dialog |
 
 ---

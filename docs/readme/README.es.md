@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.30.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.31.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -78,7 +78,7 @@ Quería que mi escritorio se vea y funcione de cierta forma y nada lo hacía exa
 - **Wayland**: protocolo de display de Linux (el nuevo, reemplaza X11)
 - **QML**: lenguaje declarativo de UI de Qt, en lo que está escrito iNiR
 - **Material You**: sistema de colores de Google que hace paletas de imágenes (así funciona el auto-theming)
-- **ii / waffle**: los dos estilos de panel. ii = onda Material Design, waffle = onda Windows 11. `Super+Shift+W` cambia entre ellos
+- **ii / waffle / iRiS**: las tres familias de paneles. ii = onda Material Design, waffle = onda Windows 11, iRiS = una Island que se transforma en lo que abrís. `Super+Shift+W` cambia entre ellas
 
 </details>
 
@@ -110,9 +110,10 @@ Quería que mi escritorio se vea y funcione de cierta forma y nada lo hacía exa
 
 ## Features
 
-**Dos familias de paneles**, intercambiables al vuelo con `Super+Shift+W`:
+**Tres familias de paneles**, intercambiables al vuelo con `Super+Shift+W`:
 - **Material ii** — barra flotante, sidebars, dock, 9 estilos globales (material, cards, aurora, inir, angel, regalia, zzz, cookie, editorial)
 - **Waffle** — barra de tareas estilo Windows 11, menú inicio, centro de acciones, centro de notificaciones
+- **iRiS** — la nueva familia Island: bordes configurables, piezas, Dock en cualquier lado, Glass, Themes y Studio
 
 **Tematización automática** — elegís un wallpaper y todo se adapta:
 - Colores del shell vía Material You, propagados a GTK3/4, Qt, terminales, Firefox, Discord, SDDM

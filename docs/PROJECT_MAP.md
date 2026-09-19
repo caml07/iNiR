@@ -96,9 +96,9 @@ A change in either Waffle composition owner affects the Windows-11-like family a
 
 ### iRiS composition chain
 
-`modules/iris/critical/ShellIrisCriticalPanels.qml` owns only the iRiS background and modular bar. `ShellIrisPanels.qml` is the deferred wrapper and `modules/iris/ShellIrisPanelsImpl.qml` owns Palette, Controls, notification feedback, OSD, session/auth surfaces and shared utilities loaded on demand.
+`modules/iris/critical/ShellIrisCriticalPanels.qml` owns the first-frame iRiS background and Island chassis. `ShellIrisPanels.qml` is the deferred wrapper and `modules/iris/ShellIrisPanelsImpl.qml` owns the heavier transient composition: Palette, Controls, Settings/Studio, notification feedback, OSD, session/auth surfaces and shared utilities loaded on demand.
 
-iRiS deliberately has a smaller resident contract than the other families. Its visual owner is `modules/iris/style/IrisStyle.qml`; user-facing extension rules are documented in `modules/iris/DESIGN.md` and `defaults/widgets/IRIS-SDK.md`.
+iRiS keeps a deliberately small resident contract even though the family is feature-rich. Its visual owner is `modules/iris/style/IrisStyle.qml`; the chassis/field owns joined edge geometry, while page bodies and floating/transient content are loaded only when needed. User-facing behavior is documented in `docs/IRIS.md`, and extension rules live in `defaults/widgets/IRIS-SDK.md`.
 
 ### `modules/`
 

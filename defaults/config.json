@@ -2328,14 +2328,14 @@
         "sidebars": {
             "left": {
                 "enable": true, "width": 380, "height": 88,
-                "alignment": "center", "pinned": false,
+                "alignment": "center", "pinned": false, "reserveSpace": true,
                 "notch": false, "hoverReveal": false,
                 "sections": ["media", "tasks", "notes"],
                 "expanded": []
             },
             "right": {
                 "enable": true, "width": 380, "height": 88,
-                "alignment": "center", "pinned": false,
+                "alignment": "center", "pinned": false, "reserveSpace": true,
                 "notch": false, "hoverReveal": false,
                 "sections": ["calendar", "weather", "notifications"],
                 "expanded": []
@@ -2345,10 +2345,11 @@
         "dock": {
             "enable": true,
             "autoHide": true,
+            "reserveSpace": true,
             "blur": false,
-            "notch": false,
+            "notch": true,
             "iconSize": 40,
-            "magnification": true,
+            "magnification": false,
             "badges": true,
             "launcher": true,
             "revealOnEmpty": true
@@ -2364,19 +2365,126 @@
             "motionDuration": 220,
             "accent": "blue",
             "expandedRadius": 28,
-            "preset": "iris"
+            "preset": "iris",
+            "morph": "direct",
+            "tint": 0,
+            "aura": "subtle",
+            "adaptive": 0,
+            "studioPreview": true,
+            "saved": [],
+            "theme": {
+                "surface": "black",
+                "fill": 100,
+                "lines": 100,
+                "contrast": 100,
+                "shadow": 100,
+                "shape": 100,
+                "melt": 0,
+                "bounce": 100,
+                "text": 100,
+                "rim": true,
+                "accentHue": 212,
+                "highlightHue": 32,
+                "lightReach": 100,
+                "badge": "alert",
+                "air": 8,
+                "placement": "auto",
+                "curve": "expressive",
+                "curvePoints": [
+                    0.16,
+                    1,
+                    0.3,
+                    1
+                ],
+                "openTime": 100,
+                "moveTime": 100,
+                "contentTiming": 100,
+                "press": 100,
+                "pieceShape": "circle"
+            },
+            "surfaces": {
+                "island": {
+                    "speed": 100
+                },
+                "controlCenter": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                },
+                "cards": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "width": 0,
+                    "speed": 100,
+                    "joinOrigin": true,
+                    "header": true,
+                    "devices": true,
+                    "mixer": true
+                },
+                "panels": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                },
+                "spotlight": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                },
+                "settings": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                },
+                "gallery": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                },
+                "menus": {
+                    "radius": 0,
+                    "light": "inherit",
+                    "speed": 100
+                }
+            }
         },
         "bar": {
             "position": "top",
-            "composition": "unified",
-            "notch": false,
+            "composition": "cluster",
+            "notch": true,
+            "notchCurve": 100,
+            "satelliteGap": 6,
+            "clockScale": 100,
+            "clockAccent": "highlight",
+            "padding": 100,
+            "satelliteScale": 100,
             "layout": "island",
             "pieces": [],
             "hoverExpand": true,
-            "hoverDelay": 160,
+            "hoverDelay": 300,
+            "pageWidth": 440,
+            "navItems": [
+                "media",
+                "activity",
+                "desktop",
+                "tray",
+                "tools",
+                "focus",
+                "today",
+                "controls",
+                "settings"
+            ],
+            "blockStyle": "plain",
             "scrollAction": "volume",
             "desktopBanner": "wallpaper",
-            "desktopBlocks": ["profile", "context", "vitals", "modules"],
+            "desktopBlocks": ["profile", "context", "forecast", "agenda", "modules"],
+            "mediaBlocks": [
+                "player",
+                "timeline",
+                "transport",
+                "players",
+                "levels"
+            ],
             "clockStyle": "dateTime",
             "auxiliary": "tray",
             "events": true,
@@ -2391,6 +2499,7 @@
             "rightModules": []
         },
         "palette": {
+            "opens": "floating",
             "width": 640,
             "maxResults": 8,
             "showHints": true
@@ -2412,6 +2521,7 @@
             "cardPinned": false
         },
         "bubbles": {
+            "scale": 100,
             "left": { "place": "island", "fx": 0.5, "fy": 0.5 },
             "right": { "place": "island", "fx": 0.5, "fy": 0.5 },
             "utility": { "place": "island", "fx": 0.5, "fy": 0.5 },
@@ -2423,7 +2533,16 @@
                 "mic": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
                 "tools": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
                 "media": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
-                "tray": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 }
+                "tray": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "calendar": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "clock": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "battery": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "focus": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "network": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "bluetooth": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "vitals": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 },
+                "workspaces": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5, "opens": "card" },
+                "updates": { "enable": false, "place": "right", "fx": 0.5, "fy": 0.5 }
             },
             "edgeGap": 20,
             "opens": "card",
@@ -2434,11 +2553,13 @@
             "apps": []
         },
         "surround": {
-            "enable": false,
+            "enable": true,
             "thickness": 10,
             "radius": 22
         },
         "controlCenter": {
+            "opens": "island",
+            "controls": "tiles",
             "width": 360,
             "sections": ["connectivity", "media", "shortcuts", "levels", "notifications"]
         },

@@ -3812,6 +3812,7 @@ Singleton {
                         property int height: 88
                         property string alignment: "center"
                         property bool pinned: false
+                        property bool reserveSpace: true
                         property bool notch: false // attach to the screen edge
                         property bool hoverReveal: false // open by resting at the screen edge
                         property list<string> sections: ["media", "tasks", "notes"]
@@ -3823,6 +3824,7 @@ Singleton {
                         property int height: 88
                         property string alignment: "center"
                         property bool pinned: false
+                        property bool reserveSpace: true
                         property bool notch: false // attach to the screen edge
                         property bool hoverReveal: false // open by resting at the screen edge
                         property list<string> sections: ["calendar", "weather", "notifications"]
@@ -3839,16 +3841,17 @@ Singleton {
                 property JsonObject dock: JsonObject {
                     property bool enable: true
                     property bool autoHide: true
+                    property bool reserveSpace: true
                     property bool blur: false
                     property int iconSize: 40
-                    property bool notch: false
-                    property bool magnification: true
+                    property bool notch: true
+                    property bool magnification: false
                     property bool badges: true // Unread notification counts on app icons
                     property bool launcher: true // Applications button at the start of the Dock
                     property bool revealOnEmpty: true // Auto-hide keeps the dock shown on an empty workspace
                 }
                 property JsonObject appearance: JsonObject {
-                    property string preset: "iris" // "iris", "soft", "crisp" or "contrast" (IrisStyle.presets)
+                    property string preset: "iris" // IrisStyle.presets: iris, soft, round, crisp, angular, contrast
                     property string morph: "direct" // IrisStyle.morphStyles: direct, liquid, glide, snap, elastic, instant
                     property string accent: "blue" // "blue", "mint", "rose", "lilac" or "wallpaper"
                     property string highlight: "orange" // "orange", "yellow", "red", "pink", "green", "accent" or "wallpaper"
@@ -3861,6 +3864,7 @@ Singleton {
                     // colour, or the wallpaper's when it has none: "off",
                     // "subtle" or "vivid" (IrisStyle.aura).
                     property string aura: "subtle"
+                    property int adaptive: 0 // how much the wallpaper's brightness, contrast and colour shape iRiS (0-100)
                     property string figureWeight: "bold" // "light", "regular" or "bold"
                     property int expandedRadius: 28
                     property int motionDuration: 220
@@ -3890,7 +3894,6 @@ Singleton {
                         property int lightReach: 100   // how far into a body its light reaches
                         property string badge: "alert" // unread counts: "alert", "accent", "highlight" or "neutral"
                         property int air: 8            // gap between an opened body and the bar or piece it came from
-                        property int neck: 62          // width of the join to that piece, % of the piece
                         property string placement: "auto" // where bodies open from a piece: "auto" (away from its edge) or "along" (along its edge)
                         property string curve: "expressive" // direct motion curve: "expressive", "standard", "gentle", "swift" or "custom"
                         property list<real> curvePoints: [0.16, 1, 0.3, 1] // the custom curve's two control points
@@ -3898,7 +3901,10 @@ Singleton {
                         property int moveTime: 100     // how long open shapes take to adjust, % of the style
                         property int contentTiming: 100 // when content shows up inside a growing shape, % of the style
                         property int press: 100        // how deep controls dip when pressed
+                        property string pieceShape: "circle" // bubbles, bars and satellites: "circle", "squircle" or "square"
                     }
+                    // iRiS Studio shows the target's preview beside its controls.
+                    property bool studioPreview: true
                     // Looks saved from iRiS Studio: [{ name, values: { "iris.…": value } }].
                     property list<var> saved: []
                     // Per surface: its own corners (0 = the family's) and its light
@@ -3906,7 +3912,7 @@ Singleton {
                     property JsonObject surfaces: JsonObject {
                         property JsonObject island: JsonObject { property int speed: 100 }
                         property JsonObject controlCenter: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject cards: JsonObject { property int radius: 0; property string light: "inherit"; property int width: 0; property int speed: 100; property bool header: true; property bool devices: true; property bool mixer: true }
+                        property JsonObject cards: JsonObject { property int radius: 0; property string light: "inherit"; property int width: 0; property int speed: 100; property bool joinOrigin: true; property bool header: true; property bool devices: true; property bool mixer: true }
                         property JsonObject panels: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
                         property JsonObject spotlight: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
                         property JsonObject settings: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
@@ -3916,11 +3922,15 @@ Singleton {
                 }
                 property JsonObject bar: JsonObject {
                     property string position: "top" // "top" or "bottom"
-                    property string composition: "unified" // "unified" or "cluster"
-                    property bool notch: false
+                    property string composition: "cluster" // "unified" or "cluster"
+                    property bool notch: true
                     // Notch shoulders: how far the Island melts into its edge (%).
                     property int notchCurve: 100
                     property int satelliteGap: 6
+                    property int clockScale: 100 // resting clock and date size, %
+                    property string clockAccent: "highlight" // time separator and day number: "highlight", "accent" or "plain"
+                    property int padding: 100 // room around the resting Island's content, %
+                    property int satelliteScale: 100 // bubbles beside the Island, % of its height
                     // How the resting Island sits on its edge: "island" hugs its
                     // content in the middle, "left"/"right" hug an end, "full"
                     // spans the whole edge as a bar.
@@ -3929,12 +3939,17 @@ Singleton {
                     // switched on: registry kinds (weather, sound, tray, ...).
                     property list<string> pieces: []
                     property bool hoverExpand: true
-                    property int hoverDelay: 160
+                    property int hoverDelay: 300
+                    // Expanded Island: page width (px) and its navigation, in order (media, activity, desktop,
+                    // tray, tools, focus, today, controls, settings).
+                    property int pageWidth: 440
+                    property list<string> navItems: ["media", "activity", "desktop", "tray", "tools", "focus", "today", "controls", "settings"]
+                    property string blockStyle: "plain" // desktop page blocks: "plain" on the Island's black or "grouped" on quiet plates
                     property string scrollAction: "volume" // "volume", "brightness" or "none"
                     property string desktopBanner: "wallpaper" // Island Desktop page header: "wallpaper" or "none"
                     // Island Desktop page blocks under the hero, in order:
                     // "profile", "context", "vitals", "modules".
-                    property list<string> desktopBlocks: ["profile", "context", "vitals", "modules"]
+                    property list<string> desktopBlocks: ["profile", "context", "forecast", "agenda", "modules"]
                     property list<string> mediaBlocks: ["player", "timeline", "transport", "players", "levels"]
                     property string clockStyle: "dateTime" // resting clock: "time", "dateTime" or "weather"
                     property string auxiliary: "tray" // "tray", "tools", "sound", "mic" or "none"
@@ -3950,6 +3965,7 @@ Singleton {
                     property list<string> rightModules: [] // Island Desktop page: "custom:<widget-id>" modules
                 }
                 property JsonObject palette: JsonObject {
+                    property string opens: "floating" // "floating" below the Island, or "island": the Island itself becomes Spotlight
                     property int width: 640
                     property int maxResults: 8
                     property bool showHints: true
@@ -4044,6 +4060,61 @@ Singleton {
                             property real fx: 0.5
                             property real fy: 0.5
                         }
+                        property JsonObject calendar: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject clock: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject battery: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject focus: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject network: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject bluetooth: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject vitals: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject workspaces: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                            property string opens: "card"
+                        }
+                        property JsonObject updates: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
                     }
                     // Distance (px) floating bubbles keep from the screen edges.
                     property int edgeGap: 20
@@ -4070,11 +4141,12 @@ Singleton {
                 // Surround: the shell closes around the display with one band on
                 // every edge, turning the screen's corners inward.
                 property JsonObject surround: JsonObject {
-                    property bool enable: false
+                    property bool enable: true
                     property int thickness: 10
                     property int radius: 22
                 }
                 property JsonObject controlCenter: JsonObject {
+                    property string opens: "island" // "island": the Island becomes the Control Center; "panel": a panel hangs from it
                     // "tiles" (wide glyph tiles on the panel) or "round" (the
                     // same round body as the connectivity toggles, in a module).
                     property string controls: "tiles"

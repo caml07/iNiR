@@ -1,7 +1,7 @@
 # Void VM validation log
 
-Validation record for the Void Linux port work performed on 2026-08-29,
-2026-08-30 and 2026-08-31. This is an execution log, not a replacement for the port
+Validation record for the Void Linux port work performed from 2026-08-29
+through 2026-09-18. This is an execution log, not a replacement for the port
 specification in `docs/VOID.md`.
 
 ## Host and VM
@@ -686,5 +686,72 @@ The rendered top-bar Void icon was not separately visually inspected during
 this automated gate, and tty1 was not screen-captured to prove absence of log
 spam. The runtime asset/mapping and WARP logger path were verified instead.
 
-With these limits recorded, PR1 through PR5.5 are considered fat-checked and
-PR6 is the next implementation phase.
+With these limits recorded, PR1 through PR5.5 are considered fat-checked.
+
+## PR6 XBPS UI validation (2026-09-18)
+
+PR6 was implemented on `feat/void-xbps-ui` from integration tip
+`3ce80fe5`. VM validation used a separate audit worktree based on the same
+tip so the canonical checkout and older dirty audit worktrees were left
+untouched.
+
+The initial PR6 spec used `xbps-remove -Rns`. A direct VM dry-run proved that
+this is invalid XBPS syntax: `-n` means dry-run and XBPS has no `-s` remove
+flag. The implemented and documented remove command is therefore:
+
+```bash
+sudo xbps-remove -R -- "<pkg>"
+```
+
+The versioned `scripts/check-void-pr6.sh` then passed in the Void VM. It
+verified:
+
+- `xbps-install -nu` update checking (zero pending updates at this checkpoint);
+- repository search with `xbps-query -Rs firefox`;
+- installed search with `xbps-query -s firefox`;
+- every one of the 34 curated `targets.xbps` entries against the live
+  configured repository;
+- exact package names whose capitalization differs from common distro names,
+  including `Signal-Desktop`, `MangoHud`, and `Thunar`;
+- a real XBPS install/query/remove transaction for `sl`.
+
+The VM does not permit non-interactive `sudo -n`. Rather than claim an
+interactive password was supplied, the checker created a temporary user-owned
+XBPS root under `/tmp`, copied the system repository signing keys, installed
+`sl` plus its dependencies from the live Void repository, queried the
+installed package, dry-ran recursive removal, removed it for real, and
+confirmed that it was absent afterward. The temporary root was deleted at the
+end of the check.
+
+Quickshell was also loaded offscreen against the PR6 files. Runtime results
+were:
+
+```text
+PR6_QMLCHECK_PM xbps
+PR6_QMLCHECK_SEARCH xbps true Mozilla Firefox web browser
+PR6_QMLCHECK_CATALOG xbps firefox true
+PR6_QMLCHECK_UPDATES true 0
+```
+
+A second harness replaced the configured terminal with a temporary logger and
+called the real service methods. `PackageSearch.installPackage`,
+`PackageSearch.removePackage`, `AppCatalog.installApp`, and
+`AppCatalog.removeApp` all returned true. The captured terminal invocations
+contained the expected XBPS actions:
+
+```text
+sudo xbps-install -S -- "$1"
+sudo xbps-remove -R -- "$1"
+```
+
+This separates two claims precisely: the QML operation path to the terminal was
+exercised, and XBPS install/remove semantics were exercised with a real
+transaction. The system-root interactive sudo password prompt itself was not
+automated.
+
+After the `-Rns` correction, host-side `make test-local`, PR6 static checks,
+`bash -n scripts/check-void-pr6.sh`, and `git diff --check` passed.
+ShellCheck is not installed on the host. The host `qmllint` binary returns
+255 without diagnostics even for unchanged repository QML, so it is not
+counted as validation evidence; the successful Quickshell loads above are the
+runtime QML evidence.

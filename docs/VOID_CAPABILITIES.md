@@ -23,7 +23,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | Required UI fonts | fonts/theme | XBPS `nerd-fonts-ttf`, `noto-fonts-emoji`, `fontconfig` + pinned Material Symbols Rounded, Roboto Flex 3.200, Gabarito, Oxanium, and Rubik | Fontconfig cache + Void-only alias for Google Sans Flex | VM validated: exact family resolution, checksums, selective repair, and idempotency | PR5.3/PR5.5 |
 | Darkly Qt style | fonts/theme | pinned Darkly v0.5.39 source + Void Qt6/KF6 build dependencies | Qt6 KStyle plugin | VM validated: native Qt6 build, runtime linkage, style loading, and idempotency | PR5.4 |
 | Shell desktop parity | base/fonts/theme | XBPS `plasma-integration`, `kf6-syntax-highlighting`, iNiR Turnstile env handoff, Void distro asset | Niri + Quickshell user session | VM validated: valid KDL, KDE platform integration, sidebars, Void icon asset/mapping, refreshed `NIRI_SOCKET`, and end-to-end `Mod+Q` input path; rendered-icon visual confirmation is not separately recorded | PR5.5 |
-| Package updates/search/catalog | base | XBPS | direct commands with confirmed elevation | not implemented | PR6 |
+| Package updates/search/catalog | base | XBPS | direct terminal commands; install/remove request sudo elevation | VM validated: update count, repository/installed search, 34 catalog targets, QML backend/target resolution, UI install/remove command wiring, and a real isolated-root XBPS install/remove transaction; system-root password entry was not automated because `sudo -n` is unavailable in the VM | PR6 |
 | Doctor and ABI repair | base | XBPS diagnostics | direct commands | partial | PR7 |
 
 ## Rules

@@ -5,9 +5,9 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The current integration branch is `feat/void-pr5` (target: upstream
-`prerelease`). PR1 through PR5.5 are implemented and fat-checked locally and
-in the Void VM. PR6 (XBPS UI) is next; PR7 remains the mandatory final closure
-gate.
+`prerelease`). PR6 is implemented and VM validated on
+`feat/void-xbps-ui`, based on that integration tip. PR7 remains the
+mandatory final closure gate after PR6 is integrated.
 
 ## Current progress (2026-09-18)
 
@@ -22,13 +22,18 @@ gate.
   KDE/Qt integration, QML runtime dependencies, Void identity, and session
   closure are complete. All PR5 checkers passed in the VM with their
   idempotency modes enabled.
+- PR6: XBPS update counting, package search/installed search, install/remove
+  terminal actions, and app-catalog targets are implemented and VM validated.
+  The checker also caught and corrected an invalid draft command:
+  XBPS removal uses `xbps-remove -R -- <pkg>`, not pacman-style `-Rns`.
 - Fat-check fixes integrated into `feat/void-pr5` include systemd-predicate
   cleanup, required desktop tools, git-worktree detection, Niri/Turnstile
   socket lifecycle, WARP runit logging, a real Void distro icon, supported
   Void installer messaging, dunst client-package handling, and a self-contained
   OCR checker.
-- `make test-local`, `bash -n`, and `git diff --check` pass after the current
-  PR5 closure work. ShellCheck is not installed on the host.
+- `make test-local`, the PR6 static/full VM checker, `bash -n`, and
+  `git diff --check` pass after the current PR6 work. ShellCheck is not
+  installed on the host.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 Repo-local procedures are also available under `.agents/skills/`:
@@ -102,7 +107,7 @@ requirement can be identified.
 - `sdata/migrations/022-service-compositor-wants.sh` — predicate guard.
 - `services/Updates.qml` — `xbps-install -nu` check, `-Su` update.
 - `services/deferred/PackageSearch.qml` — `xbps-query -Rs/-s`,
-  `sudo xbps-install -S/--`, `sudo xbps-remove -Rns`.
+  `sudo xbps-install -S/--`, `sudo xbps-remove -R`.
 - `services/AppCatalog.qml` + `defaults/app-catalog.json` — `xbps` targets.
 - `sdata/lib/functions.sh` — supervisor selection and turnstile user-service
   rendering; detects active turnstile without requiring user access to its

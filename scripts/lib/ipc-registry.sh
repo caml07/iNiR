@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: e9d389ab824db160
+# IPC.md hash: 6a5129aafe655556
 # Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
@@ -42,7 +42,7 @@ declare -gA IPC_TARGET_DESC=(
   [osk]="On-screen keyboard."
   [overlay]="Floating tools (Super+G): notes, images, crosshair, recorder, resources and other pinnable desktop tools."
   [overview]="Toggle the workspace overview panel. The one with all your windows looking tiny and organized."
-  [packageSearch]="Package search service. Searches pacman repos and installed packages."
+  [packageSearch]="Package search service. Searches pacman/AUR or XBPS repositories and installed packages."
   [panelFamily]="Switch between the three shell families: Material ii (default), Waffle (Windows 11-like), and iRiS (minimal/lightweight)."
   [pill]="The pill bar's morphing surfaces (only registered while Bar appearance is set to Pill). Valid surface names: \`power\`, \`media\`, \`battery\`, \`calendar\`, \`link\`, \`mixer\`, \`sysmon\`, \`clipboard\`, \`glance\`, \`launcher\`, \`recorder\`."
   [recordingOsd]="Screen recording floating pill OSD. Shows elapsed time and stop button during active recording."

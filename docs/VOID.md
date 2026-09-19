@@ -17,8 +17,9 @@ built against and will be revised after VM validation. Decisions: see
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
 - Current checkpoint (2026-09-18): PR1 through PR5.5 are implemented,
-  fat-checked, and merged into `feat/void-pr5`. PR6 (XBPS UI) is next; PR7
-  remains the mandatory closure/release-validation gate.
+  fat-checked, and merged into `feat/void-pr5`. PR6 (XBPS UI) is implemented
+  and VM validated on `feat/void-xbps-ui`; PR7 remains the mandatory
+  closure/release-validation gate after PR6 integration.
 
 ## How the port decides what to do
 
@@ -144,7 +145,7 @@ service.
 - Update all: `sudo xbps-install -Su` (terminal, `_runTerminalScript`).
 - Search: `xbps-query -Rs "<query>" | head -200`.
 - Installed: `xbps-query -s "<query>"`.
-- Install: `sudo xbps-install -S -- "<pkg>"`; remove: `sudo xbps-remove -Rns -- "<pkg>"`.
+- Install: `sudo xbps-install -S -- "<pkg>"`; remove: `sudo xbps-remove -R -- "<pkg>"`.
 - App catalog: add `xbps` targets to `defaults/app-catalog.json`.
 
 ## Packaging

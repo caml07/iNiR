@@ -11,7 +11,7 @@ As of 2026-09-18:
 
 - Integration branch: `feat/void-pr5`.
 - PR1 through PR5.5 are implemented and fat-checked.
-- PR6 (XBPS UI) is next.
+- PR6 (XBPS UI) is implemented and VM validated on `feat/void-xbps-ui`.
 - PR7 is the mandatory closure/release-validation gate.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
@@ -319,6 +319,7 @@ scripts/check-void-pr52.sh
 scripts/check-void-pr53.sh
 scripts/check-void-pr54.sh
 scripts/check-void-pr55.sh
+scripts/check-void-pr6.sh
 ```
 
 For an integration/audit branch, use `INIR_EXPECTED_BRANCH` rather than
@@ -337,6 +338,13 @@ temporary change is understood and recorded.
 PR5.1 is intentionally self-contained: it exposes the user-local bin directory
 on PATH before testing the `tesseract` adapter so SSH transport does not create
 a false negative.
+
+PR6 validates update/search/catalog operations against the live Void
+repositories. For install/remove it prefers a real system-root transaction when
+`sudo -n` is available. Otherwise it creates a user-owned temporary XBPS root,
+copies the repository signing keys, and performs a real install/query/remove
+transaction there. The latter proves XBPS transaction semantics without
+pretending that an interactive sudo password was supplied.
 
 ## Idempotency
 
@@ -390,7 +398,9 @@ These are not evidence of a broken provider unless scope changes:
   current `spice-vdagent` expects X11;
 - rendered top-bar Void icon visual confirmation is separate from mechanical
   asset/mapping validation;
-- PR6 XBPS UI and PR7 final closure are not implemented yet.
+- PR6's system-root sudo password prompt was not automated in the VM;
+  QML action wiring and a real isolated-root XBPS install/remove transaction
+  were validated separately. PR7 final closure is not implemented yet.
 
 ## Documentation update rules
 

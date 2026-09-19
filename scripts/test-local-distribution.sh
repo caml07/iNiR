@@ -331,7 +331,15 @@ fi
 
 step "legacy allocator repair"
 allocator_root="$(mktemp -d)"
-mkdir -p "$allocator_root/xdg/environment.d" "$allocator_root/bin"
+mkdir -p "$allocator_root/xdg/environment.d" "$allocator_root/bin" "$allocator_root/runtime/systemd"
+python3 - "$allocator_root/runtime/systemd/private" <<'PY'
+import socket
+import sys
+
+sock = socket.socket(socket.AF_UNIX)
+sock.bind(sys.argv[1])
+sock.close()
+PY
 cat > "$allocator_root/bin/systemctl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -358,6 +366,7 @@ EOF
 printf 'MALLOC_ARENA_MAX=2\nMALLOC_MMAP_THRESHOLD_=131072\n' > "$allocator_root/manager-env"
 if ! (
     export XDG_CONFIG_HOME="$allocator_root/xdg"
+    export XDG_RUNTIME_DIR="$allocator_root/runtime"
     export PATH="$allocator_root/bin:$PATH"
     export INIR_TEST_MANAGER_ENV="$allocator_root/manager-env"
     export MALLOC_ARENA_MAX=2 MALLOC_MMAP_THRESHOLD_=131072
@@ -380,6 +389,7 @@ cp "$allocator_root/xdg/environment.d/quickshell-mem.conf" "$allocator_root/mana
 allocator_before="$(sha256sum "$allocator_root/xdg/environment.d/quickshell-mem.conf" | cut -d' ' -f1)"
 if ! (
     export XDG_CONFIG_HOME="$allocator_root/xdg"
+    export XDG_RUNTIME_DIR="$allocator_root/runtime"
     export PATH="$allocator_root/bin:$PATH"
     export INIR_TEST_MANAGER_ENV="$allocator_root/manager-env"
     export MALLOC_ARENA_MAX=8 MALLOC_MMAP_THRESHOLD_=262144

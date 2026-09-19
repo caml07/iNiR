@@ -196,6 +196,14 @@ Scope {
             root.toggle()
         }
         function random(): void { Wallpapers.randomFromCurrentFolder() }
+        function set(path: string): void { Wallpapers.select(path) }
+        function browse(source: string, query: string): void {
+            GlobalStates.wallpaperSelectorSource = ["library", "wallhaven", "live"].includes(source) ? source : "library"
+            GlobalStates.wallpaperSelectorQuery = query === "-" ? "" : query
+            if (GlobalStates.wallpaperSelectorOpen) return
+            if (!GlobalStates.wallpaperLauncherOpen && !GlobalStates.coverflowSelectorOpen)
+                root.toggle()
+        }
         function status(): string {
             return JSON.stringify({
                 style: Config.options?.wallpaperSelector?.style ?? "grid",

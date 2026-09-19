@@ -215,6 +215,8 @@ Singleton {
     property bool superDown: false
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
+    property string wallpaperSelectorSource: ""
+    property string wallpaperSelectorQuery: ""
     property bool wallpaperLauncherOpen: false
     property string wallpaperLauncherMode: "static"
     property bool widgetEditMode: false

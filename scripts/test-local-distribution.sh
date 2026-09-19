@@ -162,7 +162,15 @@ done
 
 step "service mask handling"
 service_mask_root="$(mktemp -d)"
-mkdir -p "$service_mask_root/systemd/user" "$service_mask_root/bin"
+mkdir -p "$service_mask_root/systemd/user" "$service_mask_root/bin" "$service_mask_root/runtime/systemd"
+python3 - "$service_mask_root/runtime/systemd/private" <<'PY'
+import socket
+import sys
+
+sock = socket.socket(socket.AF_UNIX)
+sock.bind(sys.argv[1])
+sock.close()
+PY
 cat > "$service_mask_root/bin/systemctl" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "${INIR_TEST_SYSTEMCTL_STATE:-disabled}"
@@ -171,6 +179,7 @@ chmod +x "$service_mask_root/bin/systemctl"
 ln -s /dev/null "$service_mask_root/systemd/user/inir.service"
 if ! (
     export XDG_CONFIG_HOME="$service_mask_root"
+    export XDG_RUNTIME_DIR="$service_mask_root/runtime"
     export PATH="$service_mask_root/bin:$PATH"
     source "$runtime_root/sdata/lib/functions.sh"
     inir_user_service_is_masked
@@ -183,6 +192,7 @@ rm -f "$service_mask_root/systemd/user/inir.service"
 printf '[Unit]\nDescription=test\n' > "$service_mask_root/systemd/user/inir.service"
 if (
     export XDG_CONFIG_HOME="$service_mask_root"
+    export XDG_RUNTIME_DIR="$service_mask_root/runtime"
     export PATH="$service_mask_root/bin:$PATH"
     source "$runtime_root/sdata/lib/functions.sh"
     inir_user_service_is_masked
@@ -193,6 +203,7 @@ if (
 fi
 if ! (
     export XDG_CONFIG_HOME="$service_mask_root"
+    export XDG_RUNTIME_DIR="$service_mask_root/runtime"
     export PATH="$service_mask_root/bin:$PATH"
     export INIR_TEST_SYSTEMCTL_STATE=masked-runtime
     source "$runtime_root/sdata/lib/functions.sh"

@@ -1346,8 +1346,15 @@ step "Void release checker canonical branch"
 pr7_branch_root="$(mktemp -d)"
 if ! (
     git clone --quiet --shared "$runtime_root" "$pr7_branch_root/repo"
-    git -C "$pr7_branch_root/repo" switch --quiet -c prerelease
-    cp "$runtime_root/scripts/check-void-pr7.sh" "$pr7_branch_root/repo/scripts/check-void-pr7.sh"
+    git -C "$pr7_branch_root/repo" switch --quiet -C prerelease
+    for path in \
+        scripts/check-void-pr7.sh \
+        scripts/sddm/install-pixel-sddm.sh \
+        sdata/dist-void/install-deps.sh \
+        sdata/lib/functions.sh \
+        setup; do
+        cp "$runtime_root/$path" "$pr7_branch_root/repo/$path"
+    done
     expected_commit="$(git -C "$pr7_branch_root/repo" rev-parse HEAD)"
     INIR_STATIC_ONLY=true \
         INIR_ALLOW_DIRTY=true \
@@ -2812,7 +2819,7 @@ if ! grep -Fq 'sudo xbps-install -S ffmpeg' "$void_switchwall" \
     printf 'FAIL: wallpaper dependency recovery still assumes Arch on Void\n' >&2
     exit 1
 fi
-if ! grep -Fq 'sudo xbps-install -S sddm qt6-declarative qt6-qt5compat' "$void_sddm_installer"; then
+if ! grep -Fq 'sudo xbps-install -S sddm xorg-minimal qt6-declarative qt6-qt5compat' "$void_sddm_installer"; then
     printf 'FAIL: optional SDDM setup still gives only an Arch install hint\n' >&2
     exit 1
 fi
@@ -2957,6 +2964,141 @@ if ! grep -Fq 'turnstile-ready/conf' "$runtime_root/sdata/lib/functions.sh"; the
 fi
 if ! grep -Fq 'Could not configure the iNiR supervisor' "$runtime_root/sdata/subcmd-install/3.files.sh"; then
     printf 'FAIL: file installation does not propagate supervisor setup failures\n' >&2
+    exit 1
+fi
+
+step "Void SDDM provider"
+void_functions="$runtime_root/sdata/lib/functions.sh"
+void_base_packages="$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"
+if ! grep -Eq '^[[:space:]]+sddm$' <<< "$void_base_packages" \
+        || ! grep -Eq '^[[:space:]]+xorg-minimal$' <<< "$void_base_packages"; then
+    printf 'FAIL: Void base profile does not install the SDDM graphical-login provider\n' >&2
+    exit 1
+fi
+
+sddm_test_root="$(mktemp -d)"
+mkdir -p "$sddm_test_root/bin" "$sddm_test_root/etc/sv/sddm" "$sddm_test_root/etc/sv/dbus" \
+    "$sddm_test_root/usr/share/wayland-sessions" "$sddm_test_root/var/service"
+cat > "$sddm_test_root/bin/sv" <<'EOF'
+#!/usr/bin/env sh
+if [ "$1" = status ]; then
+    printf 'run: %s: (pid 123) 1s\n' "$2"
+    exit 0
+fi
+exit 0
+EOF
+chmod +x "$sddm_test_root/bin/sv"
+printf '%s\n' '[Desktop Entry]' 'Name=Niri' 'Exec=/usr/bin/niri --session' \
+    > "$sddm_test_root/usr/share/wayland-sessions/niri.desktop"
+ln -s "$sddm_test_root/etc/sv/dbus" "$sddm_test_root/var/service/dbus"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=true
+    export INIR_SDDM_SERVICE_DIR="$sddm_test_root/etc/sv/sddm"
+    export INIR_RUNIT_SERVICE_ROOT="$sddm_test_root/var/service"
+    export INIR_NIRI_SESSION_ENTRY="$sddm_test_root/usr/share/wayland-sessions/niri.desktop"
+    export PATH="$sddm_test_root/bin:$PATH"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { [[ "$1" == "Enable SDDM display manager?" && "$2" == "yes" ]]; }
+    elevate() { "$@"; }
+
+    configure_void_sddm_service
+    test -L "$INIR_RUNIT_SERVICE_ROOT/sddm"
+    test "$(readlink "$INIR_RUNIT_SERVICE_ROOT/sddm")" = "$INIR_SDDM_SERVICE_DIR"
+
+    # Idempotence: the already-correct link must be accepted without prompting.
+    tui_confirm() { return 1; }
+    configure_void_sddm_service
+); then
+    rm -rf "$sddm_test_root"
+    printf 'FAIL: Void SDDM provider does not enable the runit service idempotently\n' >&2
+    exit 1
+fi
+
+rm -f "$sddm_test_root/var/service/sddm"
+mkdir -p "$sddm_test_root/etc/sv/lightdm"
+ln -s "$sddm_test_root/etc/sv/lightdm" "$sddm_test_root/var/service/lightdm"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=true
+    export INIR_SDDM_SERVICE_DIR="$sddm_test_root/etc/sv/sddm"
+    export INIR_RUNIT_SERVICE_ROOT="$sddm_test_root/var/service"
+    export INIR_NIRI_SESSION_ENTRY="$sddm_test_root/usr/share/wayland-sessions/niri.desktop"
+    export PATH="$sddm_test_root/bin:$PATH"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 0; }
+    elevate() { "$@"; }
+
+    configure_void_sddm_service
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/sddm"
+); then
+    rm -rf "$sddm_test_root"
+    printf 'FAIL: Void SDDM provider overwrites a competing display manager\n' >&2
+    exit 1
+fi
+rm -rf "$sddm_test_root"
+
+# On real Void installs, unprivileged `sv status /var/service/dbus` can be
+# inaccessible even while the system bus is healthy. Verify the provider
+# accepts the authoritative D-Bus socket in that case.
+sddm_socket_root="$(mktemp -d)"
+mkdir -p "$sddm_socket_root/bin" "$sddm_socket_root/etc/sv/sddm" \
+    "$sddm_socket_root/etc/sv/dbus" "$sddm_socket_root/usr/share/wayland-sessions" \
+    "$sddm_socket_root/var/service"
+printf '%s\n' '[Desktop Entry]' 'Name=Niri' 'Exec=/usr/bin/niri --session' \
+    > "$sddm_socket_root/usr/share/wayland-sessions/niri.desktop"
+ln -s "$sddm_socket_root/etc/sv/dbus" "$sddm_socket_root/var/service/dbus"
+cat > "$sddm_socket_root/bin/sv" <<'EOF'
+#!/usr/bin/env sh
+printf 'warning: %s: unable to open supervise/ok: access denied\n' "$2" >&2
+exit 1
+EOF
+chmod +x "$sddm_socket_root/bin/sv"
+python3 -c 'import socket,sys,time; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(1); time.sleep(30)' \
+    "$sddm_socket_root/system_bus_socket" &
+sddm_socket_pid=$!
+for _ in 1 2 3 4 5; do
+    [[ -S "$sddm_socket_root/system_bus_socket" ]] && break
+    sleep 0.1
+done
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=true
+    export INIR_SDDM_SERVICE_DIR="$sddm_socket_root/etc/sv/sddm"
+    export INIR_RUNIT_SERVICE_ROOT="$sddm_socket_root/var/service"
+    export INIR_NIRI_SESSION_ENTRY="$sddm_socket_root/usr/share/wayland-sessions/niri.desktop"
+    export INIR_DBUS_SYSTEM_SOCKET="$sddm_socket_root/system_bus_socket"
+    export PATH="$sddm_socket_root/bin:$PATH"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 0; }
+    elevate() { "$@"; }
+    configure_void_sddm_service
+    test -L "$INIR_RUNIT_SERVICE_ROOT/sddm"
+); then
+    kill "$sddm_socket_pid" 2>/dev/null || true
+    wait "$sddm_socket_pid" 2>/dev/null || true
+    rm -rf "$sddm_socket_root"
+    printf 'FAIL: Void SDDM provider rejects live D-Bus when sv status is inaccessible\n' >&2
+    exit 1
+fi
+kill "$sddm_socket_pid" 2>/dev/null || true
+wait "$sddm_socket_pid" 2>/dev/null || true
+rm -rf "$sddm_socket_root"
+
+if ! grep -Fq 'configure_void_sddm_service' "$runtime_root/setup"; then
+    printf 'FAIL: setup does not offer the Void SDDM provider after installation\n' >&2
     exit 1
 fi
 

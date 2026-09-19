@@ -45,6 +45,12 @@ external-disk/hardware test.
 - `make test-local`, the PR7 static/full VM checker, real-Wayland QML smoke,
   package-action terminal capture, `bash -n`, and `git diff --check` pass
   after the closure sweep. ShellCheck is not installed on the host.
+- Final graphical-login parity is closed with a Void SDDM provider:
+  `sddm` + `xorg-minimal` are base dependencies and setup offers the runit
+  service only after installation completes. The release VM passed persistent
+  SDDM greeter boot plus an SDDM-launched Niri/Quickshell session with Doctor
+  27/27. Manual `niri --session` is the recovery path rather than the intended
+  normal boot flow.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 Repo-local procedures are also available under `.agents/skills/`:
@@ -57,8 +63,11 @@ Repo-local procedures are also available under `.agents/skills/`:
   canonical checkout `/home/voidcaml/inir-release-test`. Its DHCP address is
   intentionally not treated as stable state. The root filesystem is 30 GiB.
 - The 2026-09-19 release VM completed real reboots. The resulting local session
-  was `login` on tty1, type Wayland, with `niri --session` and a single
-  supervised Quickshell shell.
+  now normally starts at the SDDM `ii-pixel` greeter. A temporary validation
+  autologin proved SDDM launches the packaged `niri.desktop` entry
+  (`/usr/bin/niri --session`) into a seat0 Wayland user session with a single
+  supervised Quickshell shell; the temporary autologin was then removed and a
+  final boot returned to the normal greeter.
 - The usable-systemd-user-manager predicate remained false. Turnstile's user
   runsvdir supervised iNiR, PipeWire, WirePlumber, PipeWire Pulse, and ydotool.
 - Quickshell inherited the new Niri socket after boot. Niri config validation,

@@ -8,6 +8,7 @@ after provider, provisioning, activation, operation, and verification pass.
 |---|---|---|---|---|---|
 | Niri + Quickshell | base | XBPS `niri`, `quickshell`, Qt 6 packages | session supervisor | VM validated | PR1-PR3.2 |
 | Session D-Bus and login | base | XBPS `dbus`, `elogind`, `turnstile` | confirmed runit services + turnstile | VM validated | PR3.1 |
+| Graphical login | base | XBPS `sddm`, `xorg-minimal` + packaged Niri desktop entry | confirmed SDDM runit service | VM validated: ii-pixel greeter persisted across reboot; validation autologin proved SDDM launches `niri --session` into a seat0 Wayland session with one Quickshell instance; Doctor 27/27; autologin removed and final boot returned to greeter | final SDDM closure |
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
 | Network | base | XBPS `NetworkManager` | runit service | VM validated: conflict guard, activation, group, runit process, D-Bus ownership, and `nmcli` reports `connected` after reboot | PR4.0 |
 | Bluetooth | toolkit | XBPS `bluez`, `blueman`; audio adds `libspa-bluetooth` | confirmed `bluetoothd` runit service | VM validated: packages, service, D-Bus, and group; physical adapter operation pending | PR4.1 |

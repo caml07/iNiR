@@ -993,3 +993,74 @@ documentation mismatch, 498 runtime literals missing from the canonical locale,
 catalog), and generated CLI-registry drift. The filtered verifier outputs were
 identical, so this branch/checker maintenance introduced no new documentation or
 locale verifier regression.
+
+## SDDM graphical-login parity closure (2026-09-19)
+
+The post-closure review found that the validated VM flow still required a local
+tty login followed by `niri --session`. That was a valid Niri session test but
+not parity with the normal iNiR graphical-login experience.
+
+The Void base profile now includes `sddm` and `xorg-minimal`. The installer
+keeps SDDM disabled while dependencies, system setup, configs, theming, and
+version tracking are being written. Only after the installation completion
+screen does it offer to enable the packaged `/etc/sv/sddm` runit service. The
+provider verifies the packaged Niri desktop entry and an enabled/running D-Bus
+service first, treats an already-correct SDDM link idempotently, and refuses to
+replace another enabled display manager such as LightDM.
+
+Host TDD evidence for this slice:
+
+1. **RED:** the new public distribution fixture failed because the Void base
+   profile did not install the SDDM graphical-login provider.
+2. **GREEN:** after adding the provider, the same fixture passed both initial
+   enablement and reinstall/idempotence, and a competing LightDM fixture was
+   preserved without creating an SDDM link.
+3. The PR7 static checker now carries the same SDDM/base-package invariants.
+
+The candidate was also overlaid onto the running `voidlinux-release-clean`
+checkout without changing the remote branch. Inside Void itself:
+
+- `scripts/check-void-pr7.sh` passed in static mode with the new SDDM/base
+  package invariants;
+- XBPS resolved `sddm-0.21.0_2` and `xorg-minimal-1.2_2` from the configured
+  repository, and an `xbps-install -n sddm xorg-minimal` transaction plan
+  resolved successfully;
+- `make test-local` passed completely on Void after making the canonical-branch
+  fixture tolerant of an already-existing local `prerelease` branch and
+  replacing the fixture's accidental call to the host `sv` binary with a
+  deterministic fake supervisor response.
+
+The live root/reboot gate then passed on the same VM:
+
+- `sddm-0.21.0_2` and `xorg-minimal-1.2_2` were installed through XBPS;
+- the `ii-pixel` theme was installed and configured successfully;
+- the first real provider run exposed one Void-specific false negative:
+  unprivileged `sv status /var/service/dbus` returns `access denied` even while
+  the system D-Bus daemon and `/run/dbus/system_bus_socket` are healthy. The
+  provider predicate was corrected to accept the live system-bus socket as the
+  primary runtime proof and retain `sv` as a fallback. A regression fixture now
+  covers that exact access-denied case;
+- `/var/service/sddm -> /etc/sv/sddm` was created by the provider and SDDM,
+  Xorg, and `sddm-greeter-qt6` started with the `ii-pixel` theme;
+- rerunning the real provider with the correct link already present returned
+  `SDDM runit service already enabled` without prompting or elevation and left
+  the link unchanged, closing the live idempotency gate;
+- after a real reboot at 17:44 local VM time, runit restored SDDM automatically
+  and the VM returned to the graphical greeter without `niri --session` being
+  typed manually;
+- a temporary validation-only SDDM autologin was used to exercise the complete
+  display-manager path. SDDM launched `/usr/bin/niri --session` through
+  `sddm-helper`; `loginctl` reported a local seat0 Wayland user session; exactly
+  one Quickshell process started; `niri msg outputs` returned the active
+  `Virtual-1` output; and Doctor finished `Passed 27 / Fixed 0 / Failed 0`;
+- `inir logs --issues` contained only the already-known Hyprland-signature and
+  missing AccountsService avatar warnings, with no new severe runtime error;
+- the temporary autologin file was deleted. After recovering one VM-only ACPI
+  shutdown/network hang with a libvirt hardware reset, the final clean boot at
+  17:49 local VM time returned to the SDDM greeter with no Niri process before
+  login, NetworkManager `connected/full`, and the D-Bus system socket healthy;
+- `make test-local` passed again inside Void after the final provider changes.
+
+This closes the VM graphical-login parity gate. `niri --session` remains the
+documented local-TTY recovery/debug path, not the normal installed startup
+flow. The remaining release gate is the external-disk/hardware test.

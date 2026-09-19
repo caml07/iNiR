@@ -17,7 +17,8 @@ As of 2026-09-19:
   subsequent Snow release commits only touch release/docs/Arch surfaces.
 - PR1 through PR7 engineering closure, the 2.31 runtime compatibility fixes,
   clean-VM install, reboot/runtime, privileged Power Profiles activation,
-  Web Wallpaper, and the versioned PR3.2-PR7 checker sweep are VM validated.
+  Web Wallpaper, SDDM graphical-login parity, and the versioned PR3.2-PR7
+  checker sweep are VM validated.
 - Remaining release evidence is the external-disk/hardware validation.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
@@ -192,7 +193,12 @@ reuse a dirty runtime checkout merely to make a checker pass.
 
 ### Graphical session contract
 
-Supported Void entry:
+The normal installed Void entry is SDDM. The base profile installs `sddm` and
+`xorg-minimal`; after all installer work is complete, `./setup install` offers
+to enable the packaged `/etc/sv/sddm` runit service. SDDM then launches the
+packaged Niri desktop entry (`Exec=/usr/bin/niri --session`).
+
+Manual recovery entry from a local TTY remains:
 
 ```bash
 niri --session
@@ -204,7 +210,7 @@ Expected primary profile:
 - elogind;
 - turnstile;
 - no usable systemd user manager;
-- local tty login;
+- SDDM graphical login for the normal flow (local tty for recovery/debugging);
 - Niri Wayland session;
 - Quickshell supervised through `~/.config/service/inir`.
 

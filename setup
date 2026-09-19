@@ -1939,6 +1939,16 @@ run_install() {
 
     echo ""
     show_install_completion
+
+    # On Void, SDDM is a runit service. Enabling a runit service starts it
+    # immediately, so offer graphical-login activation only after every install
+    # task and version-tracking write has completed.
+    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+        echo ""
+        if ! configure_void_sddm_service; then
+            tui_warn "SDDM could not be enabled; use 'niri --session' from a local TTY and inspect the SDDM service"
+        fi
+    fi
 }
 
 ###############################################################################

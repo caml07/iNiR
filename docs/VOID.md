@@ -16,8 +16,10 @@ implementation is complete through the PR7 engineering-closure sweep. Decisions:
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
 - Current checkpoint (2026-09-19): the Void integration includes Snow's
-  prerelease through `7bf10565` (iNiR 2.31.0) plus the final Void runtime fixes
-  at `212bb3ae`. A clean release VM passed the normal installer, reboot/runtime
+  prerelease through `9574fa42` (iNiR 2.31.0). The final Void runtime fixes
+  were VM validated at `212bb3ae`; Snow's later `7bf10565..9574fa42` release
+  commits only touch release/docs/Arch surfaces and pass the local suite. A
+  clean release VM passed the normal installer, reboot/runtime
   validation, Doctor 27/27, Web Wallpaper, Power Profiles, Super-tap opt-in,
   end-to-end Super+Q through ydotool/uinput, and every versioned PR3.2-PR7
   checker. The remaining release evidence is the planned external-disk test.

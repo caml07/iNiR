@@ -839,10 +839,14 @@ validation.
 
 ## 2.31 clean release-VM closure (2026-09-19)
 
-Snow's prerelease was merged through `7bf10565` and the Void closure fixes were
-validated at `212bb3ae` (`VERSION=2.31.0`) on the disposable
+Snow's runtime prerelease was merged through `7bf10565` and the Void closure
+fixes were validated at `212bb3ae` (`VERSION=2.31.0`) on the disposable
 `voidlinux-release-clean` VM. The release checkout was clean and tracked the
-exact commit under test.
+exact commit under test. Snow subsequently advanced prerelease through
+`9574fa42`; those four commits touch README/screenshots, release tooling,
+changelog/readmes, and the Arch dependency installer only. They were merged
+after the VM runtime gate and passed the local suite without changing a Void
+runtime surface.
 
 ### Fresh-install and disk-space evidence
 

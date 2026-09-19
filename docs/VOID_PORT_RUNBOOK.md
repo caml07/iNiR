@@ -10,8 +10,9 @@ live in `docs/adr/`; capability status lives in
 As of 2026-09-19:
 
 - Integration/release-validation branch: `fix/void-final-fatcheck`.
-- Snow prerelease is merged through `7bf10565` (iNiR 2.31.0); Void closure tip
-  is `212bb3ae`.
+- Snow prerelease is merged through `9574fa42` (iNiR 2.31.0); the final
+  runtime-changing Void closure tip validated in the VM is `212bb3ae`. The
+  subsequent Snow release commits only touch release/docs/Arch surfaces.
 - PR1 through PR7 engineering closure, the 2.31 runtime compatibility fixes,
   clean-VM install, reboot/runtime, privileged Power Profiles activation,
   Web Wallpaper, and the versioned PR3.2-PR7 checker sweep are VM validated.

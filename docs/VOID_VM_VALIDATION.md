@@ -755,3 +755,84 @@ ShellCheck is not installed on the host. The host `qmllint` binary returns
 255 without diagnostics even for unchanged repository QML, so it is not
 counted as validation evidence; the successful Quickshell loads above are the
 runtime QML evidence.
+
+## PR7 engineering-closure sweep (2026-09-18)
+
+The final side-by-side sweep compared the Void port against iNiR's shared
+runtime surfaces and Arch dependency-profile contracts instead of relying only
+on the historical PR checkers. It found and closed several real parity gaps:
+
+- package UI surfaces still containing Arch-only `yay -Syu`, `paccache`,
+  and persisted `arch-update` defaults now delegate to the package-manager
+  backend; Void emits `sudo xbps-install -Su` and `sudo xbps-remove -O`;
+- migrations 012 and 029 now have explicit XBPS install paths;
+- uninstall analysis/guidance now uses `xbps-query -X` and
+  `xbps-remove -R`;
+- `kf6-kirigami`, `kdialog`, `breeze-icons`, and `qt6ct` are guaranteed
+  by the base profile instead of arriving accidentally through optional theme
+  work;
+- OCR is owned by a shared Void OCR profile and is provisioned whenever either
+  toolkit or screencapture is selected, eliminating the previous cross-profile
+  dependency;
+- the stale nonexistent `font-jetbrains-mono-nerd` Void mapping was replaced
+  by the validated `nerd-fonts-ttf` provider;
+- the redundant distro `python3-ytmusicapi` package was removed so the managed
+  iNiR Python runtime remains the single owner;
+- audio gained the official `alsa-pipewire` and `libdbusmenu-gtk3`
+  providers, and toolkit now owns ImageMagick independently of screencapture;
+- wallpaper dependency recovery and optional SDDM guidance no longer assume
+  pacman/yay on Void.
+
+The sweep also exposed Power Profiles as a visible shell capability without a
+declared Void provider. The port now installs XBPS
+`power-profiles-daemon`, maps `powerprofilesctl` for selective repair, and
+activates `/etc/sv/power-profiles-daemon` through the existing
+confirmed-elevation runit setup. Repository metadata on the live VM verified
+`power-profiles-daemon-0.30_1`, the runit service, the
+`org.freedesktop.UPower.PowerProfiles` D-Bus activation file, and its polkit
+policy. A system-root XBPS dry-run also produced the expected transaction plan
+for `power-profiles-daemon-0.30_1 install x86_64` from the configured Void
+mirror.
+
+The VM has no non-interactive sudo authorization and the package was not
+already installed, so the closure does **not** claim a live root installation
+or service activation. An attempted isolated-root full install was stopped
+after the configured mirror delivered glibc at roughly tens of KiB/s; no
+partial root was retained. Provider availability and package contents were
+verified from the signed repository metadata instead. This is an explicit
+operator-elevation validation limit, not a hidden code path.
+
+The final PR7 checker was copied to the clean audit worktree and passed in full:
+
+- every newly required XBPS provider resolved from the live configured repo;
+- Power Profiles runit/D-Bus/polkit package contents passed;
+- Quickshell/Qt ABI repair was a clean no-op;
+- the VM remained on the non-systemd user-manager path;
+- `make test-local`, PR7 static checks, shell syntax, JSON parsing, and
+  `git diff --check` passed on the host.
+
+`scripts/verify-docs.sh` still exits non-zero for two repository-wide baseline
+issues: `customWidgets` is documented without a matching service IPC endpoint,
+and the canonical English translation catalog is missing 296 runtime literals.
+The verifier was run again at the PR7 base commit `152511db`; it reported the
+same `customWidgets` finding and the same 296 missing canonical strings. The
+closure sweep therefore introduces no new docs/i18n verifier regression.
+
+Runtime QML validation loaded `ToolsView`, `SoftwareView`, and the Waffle
+updates button on the VM's real Niri Wayland session with no missing-module,
+type-unavailable, syntax, or component-load errors. A terminal-capture harness
+also proved that the new UI operations route to:
+
+```text
+sudo xbps-install -Su
+sudo xbps-remove -O
+```
+
+The only QML/runtime warnings observed were the already-known missing
+AccountsService avatar and unavailable Power Profiles daemon on the pre-provider
+VM image. The latter is exactly the capability closed by the new provider.
+
+With this sweep, no open **code** finding remains from the Arch-to-Void parity
+or technical-debt review. Remaining release evidence is intentionally
+operational: live privileged Power Profiles activation and the external-disk
+validation.

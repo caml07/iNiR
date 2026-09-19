@@ -102,6 +102,16 @@ Singleton {
         )
     }
 
+    function cleanPackageCache(): void {
+        root._runTerminalScript(
+            "if command -v pacman &>/dev/null; then " +
+                "if command -v paccache &>/dev/null; then sudo paccache -rk1; else printf 'paccache is unavailable; install pacman-contrib\\n' >&2; exit 127; fi; " +
+            "elif command -v xbps-remove &>/dev/null; then sudo xbps-remove -O; " +
+            "else printf 'No supported package cache cleaner found\\n' >&2; exit 127; fi",
+            []
+        )
+    }
+
     function _xbpsSearchPipeline(mode: string, limit: int): string {
         return "xbps-query " + mode + " \"$1\" 2>/dev/null | head -" + limit + " | " +
             "while IFS= read -r line; do " +

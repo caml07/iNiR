@@ -33,6 +33,10 @@ VOID_BASE_PACKAGES=(
   qt6-imageformats
   qt6-virtualkeyboard
   kf6-syntax-highlighting
+  kf6-kirigami
+  kdialog
+  breeze-icons
+  qt6ct
 
   # Session services (system services enabled separately in setup)
   elogind
@@ -53,6 +57,9 @@ VOID_BASE_PACKAGES=(
   NetworkManager
   network-manager-applet
 
+  # Power profiles exposed directly by Quickshell
+  power-profiles-daemon
+
   # Wayland utilities
   wl-clipboard
   cliphist
@@ -69,6 +76,22 @@ VOID_BASE_PACKAGES=(
   gum
   dunst
   jq
+  curl
+  wget
+  git
+  ripgrep
+  bc
+  xdg-utils
+  xdg-user-dirs
+  libnotify
+
+  # Default desktop/runtime providers
+  xwayland-satellite
+  xdg-desktop-portal-gnome
+  gnome-keyring
+  libsecret
+  nautilus
+  kitty
 
   # Default wallpaper backend
   awww
@@ -92,27 +115,30 @@ VOID_BASE_PACKAGES=(
 VOID_AUDIO_PACKAGES=(
   pipewire
   wireplumber
+  alsa-pipewire
   playerctl
+  libdbusmenu-gtk3
   pavucontrol
   easyeffects
   mpv
   mpv-mpris
   yt-dlp
-  python3-ytmusicapi
   socat
   cava
+  plasma-browser-integration
+  lsp-plugins-lv2
   libspa-bluetooth
   songrec
 )
 
 # Toolkit: input, desktop, backlight, bluetooth, OCR, KDE integration
 VOID_TOOLKIT_PACKAGES=(
-  curl
   cmake
   upower
   wtype
   python3-evdev
   python3-Pillow
+  ImageMagick
   hyprpicker
   translate-shell
   fprintd
@@ -134,15 +160,6 @@ VOID_TOOLKIT_PACKAGES=(
   # Desktop applications delivered through maintained Flatpaks
   flatpak
 
-  # OCR
-  tesseract-ocr
-  tesseract-ocr-eng
-  tesseract-ocr-spa
-  tesseract-ocr-rus
-  tesseract-ocr-jpn
-  tesseract-ocr-chi_sim
-  tesseract-ocr-chi_tra
-
   # Cloudflare WARP upstream provider extraction
   binutils
   dbus-libs
@@ -150,6 +167,18 @@ VOID_TOOLKIT_PACKAGES=(
   nss
   tpm2-tss
 
+)
+
+# OCR is shared by the toolkit and screencapture profiles. Keep the package
+# set independent so --no-toolkit does not silently disable screenshot OCR.
+VOID_OCR_PACKAGES=(
+  tesseract-ocr
+  tesseract-ocr-eng
+  tesseract-ocr-spa
+  tesseract-ocr-rus
+  tesseract-ocr-jpn
+  tesseract-ocr-chi_sim
+  tesseract-ocr-chi_tra
 )
 
 # Screencapture: screenshot, recording, annotation
@@ -182,10 +211,10 @@ VOID_FONTS_PACKAGES=(
   dejavu-fonts-ttf
   twemoji
   nerd-fonts-ttf
-  qt6ct
   kvantum
   breeze
   plasma-integration
+  kde-cli-tools
   # adw-gtk3, capitaine-cursors, and whitesur-icon-theme are not in Void repos.
   noto-fonts-emoji
 )
@@ -791,6 +820,11 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [gowall]="gowall"
     [nm-connection-editor]="network-manager-applet"
     [songrec]="songrec"
+    [notify-send]="libnotify"
+    [xdg-settings]="xdg-utils"
+    [secret-tool]="libsecret"
+    [gnome-keyring-daemon]="gnome-keyring"
+    [powerprofilesctl]="power-profiles-daemon"
     [pkg-config]="pkg-config"
     [cc]="gcc"
     [gcc]="gcc"
@@ -976,8 +1010,6 @@ if ${INSTALL_TOOLKIT:-true}; then
   install_void_ydotool || return 1
   install_void_warp || return 1
   install_void_missioncenter || return 1
-  configure_void_tesseract_command || return 1
-  install_void_ocr_models jpn_vert chi_sim_vert chi_tra_vert || return 1
 fi
 
 #####################################################################################
@@ -986,6 +1018,15 @@ fi
 if ${INSTALL_SCREENCAPTURE:-true}; then
   tui_info "Installing screencapture packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_SCREENCAPTURE_PACKAGES[@]}"
+fi
+
+# OCR belongs to both toolkit utilities and screencapture. Provision it once
+# whenever either profile is selected, including the pinned vertical models.
+if ${INSTALL_TOOLKIT:-true} || ${INSTALL_SCREENCAPTURE:-true}; then
+  tui_info "Installing OCR packages..."
+  v pkg_sudo xbps-install "${installflags[@]}" "${VOID_OCR_PACKAGES[@]}"
+  configure_void_tesseract_command || return 1
+  install_void_ocr_models jpn_vert chi_sim_vert chi_tra_vert || return 1
 fi
 
 #####################################################################################

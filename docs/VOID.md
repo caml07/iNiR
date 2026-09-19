@@ -1,8 +1,7 @@
 # iNiR on Void Linux
 
-Guide for the Void Linux port of iNiR (glibc + runit + XBPS). The port is
-**in progress** — this document is the spec the implementation is being
-built against and will be revised after VM validation. Decisions: see
+Guide for the Void Linux port of iNiR (glibc + runit + XBPS). The V1 port
+implementation is complete through the PR7 engineering-closure sweep. Decisions: see
 `docs/adr/`; glossary: see `CONTEXT.md`.
 
 ## Status
@@ -16,9 +15,13 @@ built against and will be revised after VM validation. Decisions: see
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-18): PR1 through PR6 are implemented,
-  VM validated, and integrated into `feat/void-pr5`. PR7 remains the
-  mandatory closure/release-validation gate.
+- Current checkpoint (2026-09-18): PR1 through PR6 are integrated and VM
+  validated. PR7's engineering-closure sweep is complete on
+  `feat/void-port-closure`: provider/dependency parity, Doctor/versioning,
+  XBPS package actions, migration coverage, runtime QML loads, and the final
+  non-systemd/ABI checker pass. Remaining release evidence is operational only:
+  a privileged live activation of the newly added Power Profiles system service
+  and the planned external-disk validation.
 
 ## How the port decides what to do
 
@@ -88,6 +91,7 @@ Auto-enabled with confirmation during setup (`ln -s /etc/sv/<svc> /var/service/`
 - `elogind` — logind replacement: `/run/user/$UID`, `loginctl`, power/suspend
 - `polkitd` — policykit daemon (GUI sudo prompts)
 - `turnstiled` — per-user services + session bus (tier 2 supervisor)
+- `power-profiles-daemon` — Quickshell Power Profiles D-Bus provider
 
 Guided only (never auto-enabled): `seatd` (+ `_seatd` group) and `sddm`
 (package built with `-DUSE_ELOGIND=ON`).
@@ -102,7 +106,9 @@ Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
 `elogind`, `dbus`, `polkit`, `seatd`, `turnstile`, `xdg-desktop-portal-gtk`,
 `xdg-desktop-portal-wlr`, `polkit-gnome`, `qt6-qt5compat` (not `qt6-5compat`),
 `uv` (repo), `NetworkManager`, `bluez`, `blueman`, `pipewire`,
-`libspa-bluetooth`, `wl-clipboard`, `cliphist`,
+`libspa-bluetooth`, `alsa-pipewire`, `libdbusmenu-gtk3`,
+`power-profiles-daemon`, `kf6-kirigami`, `kdialog`, `breeze-icons`,
+`qt6ct`, `wl-clipboard`, `cliphist`,
 `grim`, `slurp`, `swappy`, `swayidle`, `swaylock`, `gum`, `dunst`, `jq`,
 `awww` (official XBPS wallpaper backend), fonts, etc.
 
@@ -111,9 +117,13 @@ Notes:
 - Quickshell from the Void repo is rebuilt by Void in lockstep with Qt
   updates, so the Qt/Quickshell ABI check (`check_qs_abi`) self-heals.
   `deps-map.sh` must say `void:quickshell`, not `void:COMPILE`.
-- `kf6-syntax-highlighting` is a base runtime dependency because the shared
-  sidebar host imports `org.kde.syntaxhighlighting`. `kf6-kirigami` remains a
-  build/runtime dependency only where the selected provider requires it.
+- `kf6-syntax-highlighting` and `kf6-kirigami` are base runtime dependencies
+  because shared shell components import `org.kde.syntaxhighlighting` and
+  `org.kde.kirigami` directly.
+- Power Profiles is a visible shell capability. Void provides
+  `power-profiles-daemon`, including `powerprofilesctl`, a runit service,
+  the `org.freedesktop.UPower.PowerProfiles` D-Bus service, and polkit policy.
+  Setup activates it only through the confirmed-elevation system-service step.
 - `ydotool` is not packaged in the current Void repositories. PR4.2 provides
   verified upstream v1.0.4 source, a predicate-selected user service,
   input-group `/dev/uinput` permissions, and install/Doctor update paths.

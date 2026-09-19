@@ -1000,8 +1000,9 @@ grep -Fq 'YT Music JS runtime unavailable' "$runtime_root/sdata/lib/doctor.sh" |
 }
 
 if grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-fedora/install-deps.sh" \
-        || grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-debian/install-deps.sh"; then
-    printf 'FAIL: setup-managed Fedora/Debian still depend on a distro ytmusicapi package\n' >&2
+        || grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-debian/install-deps.sh" \
+        || grep -Fq 'python3-ytmusicapi' "$runtime_root/sdata/dist-void/install-deps.sh"; then
+    printf 'FAIL: setup-managed distros still depend on a stale distro ytmusicapi package\n' >&2
     exit 1
 fi
 for dependency in deno yt-dlp-ejs; do
@@ -1229,6 +1230,45 @@ if [[ -d "$runtime_root/distro/arch" ]]; then
         exit 1
     fi
 fi
+
+step "Void package-managed versioning"
+versioning_root="$(mktemp -d)"
+if ! (
+    export HOME="$versioning_root/home"
+    export XDG_CONFIG_HOME="$versioning_root/home/.config"
+    export XDG_CONFIG_HOME_RESOLVED="$versioning_root/home/.config"
+    export XDG_CACHE_HOME="$versioning_root/home/.cache"
+    export XDG_RUNTIME_DIR="$versioning_root/runtime-dir"
+    export REPO_ROOT="$runtime_root"
+    export INIR_INSTALL_MODE=package-managed
+    export INIR_UPDATE_STRATEGY=package-manager
+    export INIR_PACKAGE_MANAGER=xbps
+    export INIR_PACKAGE_NAME=inir
+    mkdir -p "$XDG_CONFIG_HOME_RESOLVED/inir" "$XDG_RUNTIME_DIR"
+    source "$runtime_root/sdata/lib/versioning.sh"
+    write_version_info_json "$VERSION_FILE_LOCAL" "1.2.3" "abc123" "package"
+    [[ "$(get_installed_install_mode)" == package-managed ]]
+    [[ "$(get_installed_update_strategy)" == package-manager ]]
+    [[ "$(get_installed_package_manager)" == xbps ]]
+    [[ "$(get_installed_package_update_hint)" == "sudo xbps-install -Su" ]]
+    jq -e '
+        .installMode == "package-managed" and
+        .updateStrategy == "package-manager" and
+        .packageManager == "xbps" and
+        .packageName == "inir"
+    ' "$VERSION_FILE_LOCAL" >/dev/null
+    mkdir -p "$versioning_root/runtime"
+    touch "$versioning_root/runtime/shell.qml"
+    cp "$VERSION_FILE_LOCAL" "$versioning_root/runtime/version.json"
+    INIR_RUNTIME_DIR="$versioning_root/runtime" \
+        "$runtime_root/scripts/inir" version --json \
+        | jq -e '.installMode == "package-managed" and .packageManager == "xbps"' >/dev/null
+); then
+    rm -rf "$versioning_root"
+    printf 'FAIL: Void package-managed version metadata/update contract is broken\n' >&2
+    exit 1
+fi
+rm -rf "$versioning_root"
 
 step "release polish guards"
 config_qml="$runtime_root/modules/common/Config.qml"
@@ -2075,6 +2115,8 @@ predicate_conflicts="$runtime_root/sdata/lib/conflicts.sh"
 predicate_niri_env="$runtime_root/scripts/lib/niri-session-env.sh"
 predicate_setups="$runtime_root/sdata/subcmd-install/2.setups.sh"
 predicate_launcher="$runtime_root/scripts/inir"
+predicate_dolphin_migration="$runtime_root/sdata/migrations/005-dolphin-xdg-menu.sh"
+predicate_orbit_audit="$runtime_root/scripts/orbit-visual-audit.sh"
 perf_temp_helper="$(sed -n '/^_inir_perf_detect_temp_paths() {/,/^}/p' "$predicate_launcher")"
 perf_report_helper="$(sed -n '/^_inir_doctor_perf() {/,/^}/p' "$predicate_launcher")"
 if ! grep -Fq 'has_usable_systemd_user_manager && systemctl --user daemon-reload' "$predicate_setup" \
@@ -2087,6 +2129,9 @@ if ! grep -Fq 'has_usable_systemd_user_manager && systemctl --user daemon-reload
         || ! grep -Fq 'systemd/private' "$predicate_niri_env" \
         || ! grep -Fq 'timeout 3s systemctl --user show-environment' "$predicate_niri_env" \
         || ! grep -Fq 'ydotool_service_found && has_usable_systemd_user_manager' "$predicate_setups" \
+        || ! grep -Fq 'has_usable_systemd_user_manager' "$predicate_dolphin_migration" \
+        || ! grep -Fq 'systemd/private' "$predicate_orbit_audit" \
+        || ! grep -Fq 'timeout 3s systemctl --user show-environment' "$predicate_orbit_audit" \
         || ! grep -Fq 'has_usable_systemd_user_manager' <<< "$perf_report_helper" \
         || ! grep -Fq 'return 0' <<< "$perf_temp_helper"; then
     printf 'FAIL: a systemd-sensitive maintenance path bypasses the usable-user-manager predicate\n' >&2
@@ -2128,6 +2173,31 @@ if [[ -e "$migration_test_root/systemctl.called" ]]; then
     exit 1
 fi
 rm -rf "$migration_test_root"
+
+dolphin_migration_root="$(mktemp -d)"
+mkdir -p "$dolphin_migration_root/config/niri" "$dolphin_migration_root/home"
+cat > "$dolphin_migration_root/config/niri/config.kdl" <<'KDL'
+environment {
+    XDG_CURRENT_DESKTOP "niri"
+}
+spawn-at-startup "true"
+spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+KDL
+if ! (
+    export HOME="$dolphin_migration_root/home"
+    export REPO_ROOT="$runtime_root"
+    export XDG_CONFIG_HOME="$dolphin_migration_root/config"
+    export XDG_RUNTIME_DIR="$dolphin_migration_root/runtime"
+    source "$predicate_dolphin_migration"
+    migration_apply
+    grep -Fq 'XDG_MENU_PREFIX "plasma-"' "$XDG_CONFIG_HOME/niri/config.kdl"
+    ! grep -Fq 'systemctl --user import-environment' "$XDG_CONFIG_HOME/niri/config.kdl"
+); then
+    rm -rf "$dolphin_migration_root"
+    printf 'FAIL: migration 005 injects a systemd-user startup into a non-systemd session\n' >&2
+    exit 1
+fi
+rm -rf "$dolphin_migration_root"
 
 step "rsync failure propagation"
 # rsync_dir__sync must fail when rsync fails, not succeed via awk pipe
@@ -2340,6 +2410,7 @@ rm -rf "$turnstile_test_root"
 step "Void dependency profile"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
+doctor_lib="$runtime_root/sdata/lib/doctor.sh"
 void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
 installer_conflicts="$runtime_root/sdata/lib/conflicts.sh"
 runtime_conflict_killer="$runtime_root/services/ConflictKiller.qml"
@@ -2387,17 +2458,42 @@ fi
 void_base_block="$(sed -n '/^VOID_BASE_PACKAGES=(/,/^)/p' "$void_deps")"
 void_audio_block="$(sed -n '/^VOID_AUDIO_PACKAGES=(/,/^)/p' "$void_deps")"
 void_toolkit_block="$(sed -n '/^VOID_TOOLKIT_PACKAGES=(/,/^)/p' "$void_deps")"
+void_fonts_block="$(sed -n '/^VOID_FONTS_PACKAGES=(/,/^)/p' "$void_deps")"
+void_ocr_block="$(sed -n '/^VOID_OCR_PACKAGES=(/,/^)/p' "$void_deps")"
+for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon; do
+    if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
+        printf 'FAIL: Void base profile is missing required default/runtime provider %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
 for pkg in fuzzel network-manager-applet; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
         printf 'FAIL: Void base profile is missing required shell provider %s\n' "$pkg" >&2
         exit 1
     fi
 done
-if ! grep -Eq '^[[:space:]]+songrec$' <<< "$void_audio_block"; then
-    printf 'FAIL: Void audio profile is missing required provider songrec\n' >&2
+for pkg in songrec plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire; do
+    if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_audio_block"; then
+        printf 'FAIL: Void audio profile is missing required provider %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
+if ! grep -Eq '^[[:space:]]+kde-cli-tools$' <<< "$void_fonts_block"; then
+    printf 'FAIL: Void KDE integration is missing kde-cli-tools\n' >&2
     exit 1
 fi
-for pkg in qalculate gowall; do
+for pkg in tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-chi_sim tesseract-ocr-chi_tra; do
+    if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_ocr_block"; then
+        printf 'FAIL: shared Void OCR profile is missing %s\n' "$pkg" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'INSTALL_TOOLKIT:-true} || ${INSTALL_SCREENCAPTURE:-true}' "$void_deps" \
+        || ! grep -Fq 'install_void_ocr_models jpn_vert chi_sim_vert chi_tra_vert' "$void_deps"; then
+    printf 'FAIL: OCR is not provisioned independently for toolkit or screencapture profiles\n' >&2
+    exit 1
+fi
+for pkg in qalculate gowall ImageMagick; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_toolkit_block"; then
         printf 'FAIL: Void toolkit profile is missing required provider %s\n' "$pkg" >&2
         exit 1
@@ -2408,14 +2504,93 @@ for mapping in \
     '[qalc]="qalculate"' \
     '[gowall]="gowall"' \
     '[nm-connection-editor]="network-manager-applet"' \
-    '[songrec]="songrec"'; do
+    '[songrec]="songrec"' \
+    '[notify-send]="libnotify"' \
+    '[xdg-settings]="xdg-utils"' \
+    '[secret-tool]="libsecret"' \
+    '[gnome-keyring-daemon]="gnome-keyring"' \
+    '[powerprofilesctl]="power-profiles-daemon"'; do
     if ! grep -Fq "$mapping" "$void_deps"; then
         printf 'FAIL: Void selective-repair mapping missing %s\n' "$mapping" >&2
         exit 1
     fi
 done
+if ! grep -Fq '"secret-tool:libsecret"' "$doctor_lib" \
+        || ! grep -Fq '"gnome-keyring-daemon:gnome-keyring"' "$doctor_lib" \
+        || ! grep -Fq '"powerprofilesctl:power-profiles-daemon"' "$doctor_lib" \
+        || ! grep -Fq 'sudo xbps-install -S kde-cli-tools' "$doctor_lib"; then
+    printf 'FAIL: Void Doctor does not diagnose the keyring/KDE providers installed by the profile\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'ln -sfn /etc/sv/power-profiles-daemon /var/service/power-profiles-daemon' "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
+    printf 'FAIL: Void power profiles provider is not activated through runit\n' >&2
+    exit 1
+fi
 if ! grep -Fq 'void:qalculate' "$deps_map"; then
     printf 'FAIL: Void qalc dependency map points at a non-provider package\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'void:nerd-fonts-ttf' "$deps_map" \
+        || grep -Fq 'void:font-jetbrains-mono-nerd' "$deps_map"; then
+    printf 'FAIL: Void JetBrains Nerd Font mapping does not use the validated nerd-fonts-ttf provider\n' >&2
+    exit 1
+fi
+
+void_migration_qt="$runtime_root/sdata/migrations/012-plasma-integration-qt-theming.sh"
+void_migration_browser="$runtime_root/sdata/migrations/029-plasma-browser-integration.sh"
+for migration in "$void_migration_qt" "$void_migration_browser"; do
+    if ! grep -Fq 'command -v xbps-install' "$migration" \
+            || ! grep -Fq 'xbps-install -S -y' "$migration"; then
+        printf 'FAIL: required migration lacks an XBPS install path: %s\n' "$migration" >&2
+        exit 1
+    fi
+done
+
+void_uninstall="$runtime_root/sdata/lib/uninstall.sh"
+if ! grep -Fq 'xbps-query -X' "$void_uninstall" \
+        || ! grep -Fq 'sudo xbps-remove -R' "$void_uninstall"; then
+    printf 'FAIL: uninstall analysis/guidance lacks Void XBPS support\n' >&2
+    exit 1
+fi
+
+package_search="$runtime_root/services/deferred/PackageSearch.qml"
+tools_view="$runtime_root/modules/sidebarLeft/ToolsView.qml"
+waffle_updates="$runtime_root/modules/waffle/bar/UpdatesButton.qml"
+software_view="$runtime_root/modules/sidebarLeft/SoftwareView.qml"
+if ! grep -Fq 'function cleanPackageCache()' "$package_search" \
+        || ! grep -Fq 'sudo xbps-remove -O' "$package_search"; then
+    printf 'FAIL: package actions lack a Void-aware cache-clean path\n' >&2
+    exit 1
+fi
+if grep -Fq 'yay -Syu' "$tools_view" || grep -Fq 'paccache -rk1' "$tools_view" \
+        || ! grep -Fq 'PackageSearch.updateSystem()' "$tools_view" \
+        || ! grep -Fq 'PackageSearch.cleanPackageCache()' "$tools_view"; then
+    printf 'FAIL: Tools view still hardcodes Arch package actions\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'PackageSearch.updateSystem()' "$waffle_updates"; then
+    printf 'FAIL: Waffle updates button has no package-manager-aware fallback\n' >&2
+    exit 1
+fi
+if grep -Fq '"update": "kitty -e arch-update"' "$runtime_root/defaults/config.json" \
+        || grep -Fq 'property string update: "kitty -e sudo pacman -Syu"' "$runtime_root/modules/common/Config.qml"; then
+    printf 'FAIL: fresh config still persists an Arch-only update command\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'Translation.tr("Install pacman, apt, or dnf") + " / xbps"' "$software_view"; then
+    printf 'FAIL: package-manager empty state omits XBPS\n' >&2
+    exit 1
+fi
+
+void_switchwall="$runtime_root/scripts/colors/switchwall.sh"
+void_sddm_installer="$runtime_root/scripts/sddm/install-pixel-sddm.sh"
+if ! grep -Fq 'sudo xbps-install -S ffmpeg' "$void_switchwall" \
+        || ! grep -Fq 'command -v xbps-install' "$void_switchwall"; then
+    printf 'FAIL: wallpaper dependency recovery still assumes Arch on Void\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'sudo xbps-install -S sddm qt6-declarative qt6-qt5compat' "$void_sddm_installer"; then
+    printf 'FAIL: optional SDDM setup still gives only an Arch install hint\n' >&2
     exit 1
 fi
 for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do
@@ -2433,6 +2608,22 @@ done
 # ONLY_MISSING_DEPS handling present
 if ! grep -q 'ONLY_MISSING_DEPS' "$void_deps"; then
     printf 'FAIL: Void installer missing ONLY_MISSING_DEPS handling\n' >&2
+    exit 1
+fi
+
+step "Void Quickshell ABI repair"
+inir_cli="$runtime_root/scripts/inir"
+doctor_lib="$runtime_root/sdata/lib/doctor.sh"
+if ! grep -Fq 'void-xbps:quickshell' "$inir_cli" \
+        || ! grep -Fq "void-xbps)" "$inir_cli" \
+        || ! grep -Fq "sudo xbps-install -Sf quickshell" "$inir_cli"; then
+    printf 'FAIL: inir doctor --fix-abi has no Void XBPS repair path\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'install_kind="void-xbps"; install_pkg="quickshell"' "$doctor_lib" \
+        || ! grep -Fq "void-xbps)" "$doctor_lib" \
+        || ! grep -Fq "sudo xbps-install -Sf quickshell" "$doctor_lib"; then
+    printf 'FAIL: setup Doctor has no Void XBPS Quickshell repair path\n' >&2
     exit 1
 fi
 
@@ -2503,12 +2694,13 @@ if ! grep -Fq 'install_void_missioncenter' "$void_deps" \
 fi
 
 step "Void OCR language provider"
+void_ocr_packages="$(sed -n '/^VOID_OCR_PACKAGES=(/,/^)/p' "$void_deps")"
 for package in \
     tesseract-ocr-rus \
     tesseract-ocr-jpn \
     tesseract-ocr-chi_sim \
     tesseract-ocr-chi_tra; do
-    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_toolkit_packages"; then
+    if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_ocr_packages"; then
         printf 'FAIL: Void OCR profile missing package: %s\n' "$package" >&2
         exit 1
     fi

@@ -350,7 +350,7 @@
         "taskManager": "missioncenter",
         "terminal": "kitty",
         "volumeMixer": "pavucontrol",
-        "update": "kitty -e arch-update"
+        "update": ""
     },
     "audio": {
         "protection": {

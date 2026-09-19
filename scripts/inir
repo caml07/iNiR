@@ -468,6 +468,9 @@ _inir_quickshell_install_kind() {
             fi
             return
         fi
+    elif command -v xbps-query >/dev/null 2>&1 \
+            && xbps-query -p pkgver quickshell >/dev/null 2>&1; then
+        printf 'void-xbps:quickshell'; return
     elif command -v rpm >/dev/null 2>&1; then
         local q
         q="$(rpm -qa 2>/dev/null | grep -E '^quickshell(-git)?-[0-9]' | head -1)"
@@ -499,6 +502,7 @@ _inir_quickshell_rebuild_cmd() {
         arch-repo-binary)   printf '%s -Sa --noconfirm --skipreview %s' "$helper" "$pkg" ;;
         arch-repo-official) printf 'sudo pacman -Rdd --noconfirm quickshell && %s -S --noconfirm quickshell-git' "$helper" ;;
         arch-aur-bin)       printf 'sudo pacman -Rdd --noconfirm quickshell-bin && %s -S --noconfirm quickshell-git' "$helper" ;;
+        void-xbps)          printf 'sudo xbps-install -Sf quickshell' ;;
         fedora-pkg)         printf 'sudo dnf upgrade --refresh -y %s' "$pkg" ;;
         nixos)              printf 'sudo nixos-rebuild switch --upgrade' ;;
         debian|source|unknown|*) ;;  # No automatic path

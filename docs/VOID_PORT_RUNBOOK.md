@@ -10,8 +10,7 @@ live in `docs/adr/`; capability status lives in
 As of 2026-09-18:
 
 - Integration branch: `feat/void-pr5`.
-- PR1 through PR5.5 are implemented and fat-checked.
-- PR6 (XBPS UI) is implemented and VM validated on `feat/void-xbps-ui`.
+- PR1 through PR6 are implemented, VM validated, and integrated.
 - PR7 is the mandatory closure/release-validation gate.
 - Packaging iNiR itself as an XBPS package is outside V1.
 

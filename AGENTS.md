@@ -5,9 +5,8 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The current integration branch is `feat/void-pr5` (target: upstream
-`prerelease`). PR6 is implemented and VM validated on
-`feat/void-xbps-ui`, based on that integration tip. PR7 remains the
-mandatory final closure gate after PR6 is integrated.
+`prerelease`). PR1 through PR6 are integrated there and VM validated. PR7 is
+the mandatory final closure/release-validation gate.
 
 ## Current progress (2026-09-18)
 

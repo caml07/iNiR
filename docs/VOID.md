@@ -16,10 +16,9 @@ built against and will be revised after VM validation. Decisions: see
 - Validation: QEMU VM first (see VM validation), then a small real partition.
   The graphics, runsvdir fallback, and turnstile session checkpoints are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-18): PR1 through PR5.5 are implemented,
-  fat-checked, and merged into `feat/void-pr5`. PR6 (XBPS UI) is implemented
-  and VM validated on `feat/void-xbps-ui`; PR7 remains the mandatory
-  closure/release-validation gate after PR6 integration.
+- Current checkpoint (2026-09-18): PR1 through PR6 are implemented,
+  VM validated, and integrated into `feat/void-pr5`. PR7 remains the
+  mandatory closure/release-validation gate.
 
 ## How the port decides what to do
 

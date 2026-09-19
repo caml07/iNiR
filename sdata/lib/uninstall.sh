@@ -25,6 +25,9 @@ declare -A INIR_ONLY_PATHS=(
     ["${HOME}/.local/bin/inir_super_overview_daemon.py"]="iNiR super daemon"
     ["${XDG_CONFIG_HOME}/systemd/user/inir.service"]="iNiR user service"
     ["${XDG_CONFIG_HOME}/systemd/user/inir-super-overview.service"]="iNiR daemon service"
+    ["${XDG_CONFIG_HOME}/service/inir"]="iNiR runit user service"
+    ["${XDG_CONFIG_HOME}/service/inir-xembedsniproxy"]="iNiR XEmbed runit service"
+    ["${XDG_CONFIG_HOME}/service/inir-super-overview"]="iNiR Super-tap runit service"
     ["${XDG_CONFIG_HOME}/vesktop/themes/system24.theme.css"]="iNiR Vesktop Material theme"
     ["${XDG_CONFIG_HOME}/vesktop/themes/inir-tui.theme.css"]="iNiR Vesktop TUI theme"
     ["${XDG_CONFIG_HOME}/vesktop/themes/inir-midnight.theme.css"]="iNiR Vesktop Midnight theme"
@@ -294,6 +297,19 @@ get_package_removal_safety() {
 
 uninstall_stop_services() {
     tui_info "Stopping iNiR services..."
+
+    local user_service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
+    local service_dir
+    if command -v sv >/dev/null 2>&1; then
+        for service_dir in inir inir-xembedsniproxy inir-super-overview; do
+            [[ -d "$user_service_root/$service_dir" ]] || continue
+            sv down "$user_service_root/$service_dir" >/dev/null 2>&1 || true
+        done
+        if [[ -f "$user_service_root/ydotool/run" ]] \
+                && grep -q '^# Managed by iNiR\.' "$user_service_root/ydotool/run"; then
+            sv down "$user_service_root/ydotool" >/dev/null 2>&1 || true
+        fi
+    fi
 
     # Stop quickshell inir config
     local runtime_target="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/inir"

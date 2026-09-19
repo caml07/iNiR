@@ -60,7 +60,11 @@ check grep -Fq '# Managed by iNiR.' /etc/sv/warp-svc/run
 check test -x /etc/sv/warp-svc/log/run
 check grep -Fq '# Managed by iNiR.' /etc/sv/warp-svc/log/run
 check grep -Fq 'exec vlogger -t warp-svc -p daemon' /etc/sv/warp-svc/log/run
-check sudo sv status /var/service/warp-svc
+if sudo -n true >/dev/null 2>&1; then
+  check sudo -n sv status /var/service/warp-svc
+else
+  printf 'INFO: privileged sv status skipped (sudo -n unavailable); socket/process checks remain authoritative\n'
+fi
 check test -S /run/cloudflare-warp/warp_service
 
 for warp_toggle in \

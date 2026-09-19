@@ -2,17 +2,26 @@ import QtQuick
 import QtQuick.Window
 import QtWebEngine
 import org.kde.layershell 1.0 as LayerShell
+import Quickshell
 
 Window {
     id: root
 
     readonly property var args: Qt.application.arguments
-    readonly property bool probeMode: args.indexOf("--probe") >= 0
-    readonly property bool interactive: args.indexOf("--interactive") >= 0
+    readonly property bool envRunner: String(Quickshell.env("INIR_WEB_WALLPAPER_PROBE") ?? "").length > 0
+        || String(Quickshell.env("INIR_WEB_WALLPAPER_SOURCE") ?? "").length > 0
+    readonly property bool probeMode: Quickshell.env("INIR_WEB_WALLPAPER_PROBE") === "1"
+        || args.indexOf("--probe") >= 0
+    readonly property bool interactive: envRunner
+        ? Quickshell.env("INIR_WEB_WALLPAPER_INTERACTIVE") === "1"
+        : args.indexOf("--interactive") >= 0
     readonly property int screenArg: args.indexOf("--screen")
-    readonly property string screenName: screenArg >= 0 && screenArg + 1 < args.length
-        ? args[screenArg + 1] : ""
-    readonly property string sourceArg: args.length > 1 ? String(args[args.length - 1]).trim() : ""
+    readonly property string screenName: envRunner
+        ? String(Quickshell.env("INIR_WEB_WALLPAPER_SCREEN") ?? "")
+        : (screenArg >= 0 && screenArg + 1 < args.length ? args[screenArg + 1] : "")
+    readonly property string sourceArg: envRunner
+        ? String(Quickshell.env("INIR_WEB_WALLPAPER_SOURCE") ?? "").trim()
+        : (args.length > 1 ? String(args[args.length - 1]).trim() : "")
     readonly property url sourceUrl: {
         if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(sourceArg))
             return sourceArg

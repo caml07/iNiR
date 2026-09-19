@@ -108,7 +108,7 @@ Primary profile (glibc + elogind): `niri`, `quickshell` (repo, not compiled),
 `uv` (repo), `NetworkManager`, `bluez`, `blueman`, `pipewire`,
 `libspa-bluetooth`, `alsa-pipewire`, `libdbusmenu-gtk3`,
 `power-profiles-daemon`, `kf6-kirigami`, `kdialog`, `breeze-icons`,
-`qt6ct`, `wl-clipboard`, `cliphist`,
+`qt6ct`, `qt6-webengine`, `layer-shell-qt`, `wl-clipboard`, `cliphist`,
 `grim`, `slurp`, `swappy`, `swayidle`, `swaylock`, `gum`, `dunst`, `jq`,
 `awww` (official XBPS wallpaper backend), fonts, etc.
 
@@ -124,6 +124,15 @@ Notes:
   `power-profiles-daemon`, including `powerprofilesctl`, a runit service,
   the `org.freedesktop.UPower.PowerProfiles` D-Bus service, and polkit policy.
   Setup activates it only through the confirmed-elevation system-service step.
+- Interactive Web Wallpaper uses the official Void `qt6-webengine` and
+  `layer-shell-qt` QML providers. If Void does not provide a standalone
+  `qml6`/`qml` runner, iNiR launches the host with the packaged Quickshell
+  binary (`qs -p`) and passes host arguments through environment variables.
+  Doctor repairs either missing QML provider through XBPS.
+- The legacy opt-in Super-tap daemon follows the same user-supervisor tiers as
+  the shell: systemd when the ADR-0002 predicate succeeds, otherwise Turnstile
+  or the runsvdir fallback. It remains disabled unless
+  `II_ENABLE_SUPER_DAEMON=1` is explicitly set.
 - `ydotool` is not packaged in the current Void repositories. PR4.2 provides
   verified upstream v1.0.4 source, a predicate-selected user service,
   input-group `/dev/uinput` permissions, and install/Doctor update paths.

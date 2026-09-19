@@ -268,6 +268,14 @@ if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
         
         elevate systemctl enable sddm.service 2>/dev/null && log_ok "SDDM service enabled"
     fi
+elif command -v xbps-query >/dev/null 2>&1 \
+        && xbps-query -p pkgver sddm >/dev/null 2>&1 \
+        && [[ -d /etc/sv/sddm ]]; then
+    if [[ -L /var/service/sddm ]]; then
+        log_info "SDDM runit service is already enabled"
+    else
+        log_info "Void uses runit; enable SDDM when ready with: sudo ln -s /etc/sv/sddm /var/service/"
+    fi
 fi
 
 log_ok "${THEME_NAME} installed and configured"

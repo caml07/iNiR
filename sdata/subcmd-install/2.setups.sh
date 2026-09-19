@@ -214,7 +214,12 @@ function setup_super_daemon(){
   local daemon_src="${REPO_ROOT}/scripts/daemon/inir_super_overview_daemon.py"
   local service_src="${REPO_ROOT}/scripts/systemd/inir-super-overview.service"
   local daemon_dst="${HOME}/.local/bin/inir_super_overview_daemon.py"
-  local service_dst="${XDG_CONFIG_HOME}/systemd/user/inir-super-overview.service"
+  local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}"
+  local service_dst="${config_dir}/systemd/user/inir-super-overview.service"
+  local service_wants="${config_dir}/systemd/user/default.target.wants/inir-super-overview.service"
+  local runit_dir="${config_dir}/service/inir-super-overview"
+  local runit_run="${runit_dir}/run"
+  local supervisor
   
   if [[ ! -f "$daemon_src" ]]; then
     log_warning "Super-tap daemon not found in repo, skipping"
@@ -226,47 +231,59 @@ function setup_super_daemon(){
   x cp "$daemon_src" "$daemon_dst"
   x chmod +x "$daemon_dst"
   
-  # Install systemd service
-  x mkdir -p "$(dirname "$service_dst")"
-  x cp "$service_src" "$service_dst"
-  
-  # Enable service if in graphical session
-  if has_usable_systemd_user_manager; then
+  supervisor="$(inir_supervisor)"
+  if [[ "$supervisor" == systemd ]]; then
+    if [[ -f "$runit_run" ]] && grep -q '^# Managed by iNiR\.' "$runit_run"; then
+      command -v sv >/dev/null 2>&1 && sv down "$runit_dir" >/dev/null 2>&1 || true
+      rm -rf "$runit_dir"
+    fi
+    x mkdir -p "$(dirname "$service_dst")"
+    x cp "$service_src" "$service_dst"
     v systemctl --user daemon-reload
     v systemctl --user enable inir-super-overview.service --now
   else
-    log_warning "Not in graphical session. Enable later with:"
-    echo "  systemctl --user enable inir-super-overview.service --now"
+    rm -f "$service_dst" "$service_wants"
+    x mkdir -p "$runit_dir"
+    local daemon_quoted
+    daemon_quoted="$(printf '%s' "$daemon_dst" | sed "s/'/'\\\\''/g")"
+    if [[ "$supervisor" == turnstile ]]; then
+      printf '#!/bin/sh\n# Managed by iNiR.\nexec chpst -e "$TURNSTILE_ENV_DIR" /usr/bin/env python3 '\''%s'\''\n' "$daemon_quoted" > "$runit_run"
+    else
+      printf '#!/bin/sh\n# Managed by iNiR.\nexec /usr/bin/env python3 '\''%s'\''\n' "$daemon_quoted" > "$runit_run"
+    fi
+    chmod +x "$runit_run"
+    if command -v sv >/dev/null 2>&1 && sv status "$runit_dir" 2>/dev/null | grep -q '^run:'; then
+      sv restart "$runit_dir" >/dev/null 2>&1 || return 1
+    fi
   fi
   
-  log_success "Super-tap daemon installed"
+  log_success "Super-tap daemon installed (${supervisor})"
 }
 
 function disable_super_daemon_if_present(){
   tui_info "Cleaning up legacy Super-tap daemon..."
 
-  local daemon_dst="${HOME}/.local/bin/ii_super_overview_daemon.py"
   local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}"
   local systemd_user_dir="${config_dir}/systemd/user"
-  local service_dst="${systemd_user_dir}/ii-super-overview.service"
+  local runit_dir="${config_dir}/service/inir-super-overview"
+  local service_name service_dst
 
-  # Best-effort stop/disable user service if we appear to be in a graphical session
-  if has_usable_systemd_user_manager && [[ -f "${service_dst}" ]]; then
-    systemctl --user disable --now ii-super-overview.service 2>/dev/null || true
-    systemctl --user daemon-reload 2>/dev/null || true
-  elif [[ -f "${service_dst}" ]]; then
-    log_warning "Legacy Super-tap daemon service file detected but user systemd may not be reachable. Disable it later with:"
-    echo "  systemctl --user disable --now ii-super-overview.service"
+  for service_name in ii-super-overview inir-super-overview; do
+    service_dst="${systemd_user_dir}/${service_name}.service"
+    if has_usable_systemd_user_manager && [[ -f "$service_dst" ]]; then
+      systemctl --user disable --now "${service_name}.service" 2>/dev/null || true
+    fi
+    rm -f "$service_dst" "${systemd_user_dir}/default.target.wants/${service_name}.service"
+  done
+  has_usable_systemd_user_manager && systemctl --user daemon-reload 2>/dev/null || true
+
+  if [[ -f "${runit_dir}/run" ]] && grep -q '^# Managed by iNiR\.' "${runit_dir}/run"; then
+    command -v sv >/dev/null 2>&1 && sv down "$runit_dir" >/dev/null 2>&1 || true
+    rm -rf "$runit_dir"
   fi
 
-  # Remove service definition and helper script if they exist
-  if [[ -f "${service_dst}" ]]; then
-    rm -f "${service_dst}"
-  fi
-
-  if [[ -f "${daemon_dst}" ]]; then
-    rm -f "${daemon_dst}"
-  fi
+  rm -f "${HOME}/.local/bin/ii_super_overview_daemon.py"
+  rm -f "${HOME}/.local/bin/inir_super_overview_daemon.py"
 
   log_success "Legacy Super-tap daemon disabled/removed (if it was installed)"
 }

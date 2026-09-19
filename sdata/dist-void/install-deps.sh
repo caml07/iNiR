@@ -30,6 +30,8 @@ VOID_BASE_PACKAGES=(
   qt6-wayland
   qt6-qt5compat
   qt6-multimedia
+  qt6-webengine
+  layer-shell-qt
   qt6-imageformats
   qt6-virtualkeyboard
   kf6-syntax-highlighting
@@ -797,6 +799,12 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [niri]="niri"
     [nmcli]="NetworkManager"
     [wpctl]="wireplumber"
+    [awww-daemon]="awww"
+    [flock]="util-linux"
+    [kwriteconfig6]="kf6-kconfig"
+    [trans]="translate-shell"
+    [qt-webengine]="qt6-webengine"
+    [layer-shell-qt]="layer-shell-qt"
     [jq]="jq"
     [rsync]="rsync"
     [curl]="curl"

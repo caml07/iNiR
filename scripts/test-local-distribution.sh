@@ -2460,12 +2460,29 @@ void_audio_block="$(sed -n '/^VOID_AUDIO_PACKAGES=(/,/^)/p' "$void_deps")"
 void_toolkit_block="$(sed -n '/^VOID_TOOLKIT_PACKAGES=(/,/^)/p' "$void_deps")"
 void_fonts_block="$(sed -n '/^VOID_FONTS_PACKAGES=(/,/^)/p' "$void_deps")"
 void_ocr_block="$(sed -n '/^VOID_OCR_PACKAGES=(/,/^)/p' "$void_deps")"
-for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon; do
+for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
         printf 'FAIL: Void base profile is missing required default/runtime provider %s\n' "$pkg" >&2
         exit 1
     fi
 done
+web_wallpaper_service="$runtime_root/services/WebWallpaper.qml"
+web_wallpaper_host="$runtime_root/modules/background/WebWallpaperHost.qml"
+for needle in \
+    'command -v qml6 || command -v qml || command -v qs' \
+    'INIR_WEB_WALLPAPER_PROBE' \
+    'INIR_WEB_WALLPAPER_SCREEN' \
+    'INIR_WEB_WALLPAPER_SOURCE'; do
+    if ! grep -Fq "$needle" "$web_wallpaper_service"; then
+        printf 'FAIL: Web Wallpaper lacks a Quickshell runner/provider contract: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'import Quickshell' "$web_wallpaper_host" \
+        || ! grep -Fq 'Quickshell.env("INIR_WEB_WALLPAPER_PROBE")' "$web_wallpaper_host"; then
+    printf 'FAIL: Web Wallpaper host cannot receive Quickshell-runner arguments on Void\n' >&2
+    exit 1
+fi
 for pkg in fuzzel network-manager-applet; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
         printf 'FAIL: Void base profile is missing required shell provider %s\n' "$pkg" >&2
@@ -2501,6 +2518,12 @@ for pkg in qalculate gowall ImageMagick; do
 done
 for mapping in \
     '[fuzzel]="fuzzel"' \
+    '[awww-daemon]="awww"' \
+    '[flock]="util-linux"' \
+    '[kwriteconfig6]="kf6-kconfig"' \
+    '[trans]="translate-shell"' \
+    '[qt-webengine]="qt6-webengine"' \
+    '[layer-shell-qt]="layer-shell-qt"' \
     '[qalc]="qalculate"' \
     '[gowall]="gowall"' \
     '[nm-connection-editor]="network-manager-applet"' \
@@ -2515,6 +2538,25 @@ for mapping in \
         exit 1
     fi
 done
+if ! grep -Fq 'missing_cmds+=("qt-webengine")' "$doctor_lib" \
+        || ! grep -Fq 'missing_cmds+=("layer-shell-qt")' "$doctor_lib"; then
+    printf 'FAIL: Doctor cannot repair missing Web Wallpaper QML providers on Void\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'command -v xbps-query' "$installer_conflicts" \
+        || ! grep -Fq 'xbps-query -p pkgver "$pkg"' "$installer_conflicts"; then
+    printf 'FAIL: installer conflict detection does not inspect installed XBPS packages\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'pkg_sudo xbps-remove -R -- "$pkg"' "$installer_conflicts"; then
+    printf 'FAIL: installer cannot remove confirmed critical XBPS conflicts\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'xbps-query -p pkgver "$pkg"' "$doctor_lib" \
+        || grep -Fq 'Conflicting shells (not Arch, skipped)' "$doctor_lib"; then
+    printf 'FAIL: Doctor still skips package-level conflicting shells on Void\n' >&2
+    exit 1
+fi
 if ! grep -Fq '"secret-tool:libsecret"' "$doctor_lib" \
         || ! grep -Fq '"gnome-keyring-daemon:gnome-keyring"' "$doctor_lib" \
         || ! grep -Fq '"powerprofilesctl:power-profiles-daemon"' "$doctor_lib" \
@@ -2593,6 +2635,98 @@ if ! grep -Fq 'sudo xbps-install -S sddm qt6-declarative qt6-qt5compat' "$void_s
     printf 'FAIL: optional SDDM setup still gives only an Arch install hint\n' >&2
     exit 1
 fi
+if ! grep -Fq 'sudo ln -s /etc/sv/sddm /var/service/' "$void_sddm_installer"; then
+    printf 'FAIL: optional SDDM setup lacks Void runit activation guidance\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'xbps-query -p pkgver quickshell' "$runtime_root/setup" \
+        || ! grep -Fq 'xbps-query -p repository quickshell' "$runtime_root/setup"; then
+    printf 'FAIL: setup info does not report Quickshell XBPS package origin on Void\n' >&2
+    exit 1
+fi
+for checker in check-void-pr40.sh check-void-pr41.sh check-void-pr43.sh; do
+    checker_path="$runtime_root/scripts/$checker"
+    if ! grep -Fq 'sudo -n true' "$checker_path" \
+            || ! grep -Fq 'privileged sv status skipped' "$checker_path"; then
+        printf 'FAIL: %s still treats unavailable non-interactive sudo as a provider failure\n' "$checker" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'xbps-install -S sudo' "$runtime_root/sdata/lib/package-installers.sh"; then
+    printf 'FAIL: privilege recovery instructions still lack a Void sudo path\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'void) echo -e "    ${STY_FAINT}Run: ./setup install' "$doctor_lib"; then
+    printf 'FAIL: Void Doctor theming repair hints still fall through to generic instructions\n' >&2
+    exit 1
+fi
+if grep -Fq 'Stopped conflicting: ${running[*]} (iNiR has built-in notifications, re-enable with: systemctl --user enable <service>)' "$doctor_lib"; then
+    printf 'FAIL: non-systemd Doctor still prints a systemd-only notification recovery hint\n' >&2
+    exit 1
+fi
+
+void_setups="$runtime_root/sdata/subcmd-install/2.setups.sh"
+for needle in \
+    'supervisor="$(inir_supervisor)"' \
+    'service/inir-super-overview' \
+    'exec chpst -e "$TURNSTILE_ENV_DIR"' \
+    '# Managed by iNiR.'; do
+    if ! grep -Fq "$needle" "$void_setups"; then
+        printf 'FAIL: legacy Super-tap opt-in lacks non-systemd supervisor parity: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'inir_super_overview_daemon.py' "$void_setups" \
+        || ! grep -Fq 'inir-super-overview.service' "$void_setups"; then
+    printf 'FAIL: Super-tap cleanup does not cover the current installed names\n' >&2
+    exit 1
+fi
+void_uninstall="$runtime_root/sdata/lib/uninstall.sh"
+for path in \
+    'service/inir"]="iNiR runit user service"' \
+    'service/inir-xembedsniproxy"]="iNiR XEmbed runit service"' \
+    'service/inir-super-overview"]="iNiR Super-tap runit service"'; do
+    if ! grep -Fq "$path" "$void_uninstall"; then
+        printf 'FAIL: uninstall does not own the non-systemd service path: %s\n' "$path" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'sv down "$user_service_root/$service_dir"' "$void_uninstall"; then
+    printf 'FAIL: uninstall does not stop runit services before killing Quickshell\n' >&2
+    exit 1
+fi
+
+super_daemon_fixture() (
+    set -e
+    local supervisor="$1"
+    export INIR_TEST_SUPERVISOR="$supervisor"
+    local root
+    root="$(mktemp -d)"
+    trap 'rm -rf "$root"' EXIT
+    export HOME="$root/home"
+    export XDG_CONFIG_HOME="$HOME/.config"
+    export REPO_ROOT="$runtime_root"
+    mkdir -p "$HOME/.local/bin" "$XDG_CONFIG_HOME"
+    x() { "$@"; }
+    v() { "$@"; }
+    tui_info() { :; }
+    log_success() { :; }
+    inir_supervisor() { printf '%s\n' "$INIR_TEST_SUPERVISOR"; }
+    awk '/^function setup_super_daemon\(\)/,/^}/' "$void_setups" > "$root/setup-super.sh"
+    source "$root/setup-super.sh"
+    setup_super_daemon
+    runfile="$XDG_CONFIG_HOME/service/inir-super-overview/run"
+    [[ -x "$runfile" ]]
+    grep -Fq '# Managed by iNiR.' "$runfile"
+    grep -Fq 'inir_super_overview_daemon.py' "$runfile"
+    if [[ "$supervisor" == turnstile ]]; then
+        grep -Fq 'exec chpst -e "$TURNSTILE_ENV_DIR"' "$runfile"
+    else
+        ! grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$runfile"
+    fi
+)
+super_daemon_fixture runsvdir
+super_daemon_fixture turnstile
 for mapping in 'void:pipewire' 'void:fish-shell' 'void:kf6-kconfig'; do
     if ! grep -Fq "$mapping" "$deps_map"; then
         printf 'FAIL: Void dependency map missing %s\n' "$mapping" >&2

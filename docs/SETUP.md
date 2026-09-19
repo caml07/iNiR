@@ -301,7 +301,7 @@ These checks cover:
 | Cache                                     | `~/.cache/inir/`                                                     |
 | Launcher                                  | `inir` in the install prefix                                         |
 | Super daemon                              | `~/.local/bin/inir_super_overview_daemon.py`                         |
-| Daemon service                            | `~/.config/systemd/user/inir-super-overview.service`                 |
+| Daemon service                            | systemd user unit or `~/.config/service/inir-super-overview/`        |
 
 ### Compositor & Themes
 
@@ -386,6 +386,9 @@ The following are removed without prompting (iNiR-exclusive):
 ~/.cache/inir/                                   # Cache
 ~/.local/bin/inir_super_overview_daemon.py       # Super daemon
 ~/.config/systemd/user/inir-super-overview.service # Daemon service
+~/.config/service/inir/                           # runit/Turnstile shell service
+~/.config/service/inir-xembedsniproxy/            # runit/Turnstile tray bridge
+~/.config/service/inir-super-overview/             # optional Super-tap service
 ~/.config/vesktop/themes/system24.theme.css      # Vesktop Material theme
 ~/.config/vesktop/themes/inir-tui.theme.css      # Vesktop TUI theme
 ~/.config/vesktop/themes/inir-midnight.theme.css # Vesktop Midnight theme
@@ -463,6 +466,8 @@ If the automated script fails or is unavailable:
 inir stop
 inir service disable
 systemctl --user disable --now inir-super-overview.service 2>/dev/null
+sv down ~/.config/service/inir 2>/dev/null || true
+sv down ~/.config/service/inir-super-overview 2>/dev/null || true
 
 # Remove iNiR-exclusive files
 rm -rf ~/.config/quickshell/inir
@@ -472,6 +477,9 @@ rm -rf ~/.local/state/quickshell/user
 rm -rf ~/.cache/inir
 rm -f ~/.local/bin/inir_super_overview_daemon.py
 rm -f ~/.config/systemd/user/inir-super-overview.service
+rm -rf ~/.config/service/inir
+rm -rf ~/.config/service/inir-xembedsniproxy
+rm -rf ~/.config/service/inir-super-overview
 rm -f ~/.config/vesktop/themes/system24.theme.css
 rm -f ~/.config/vesktop/themes/inir-tui.theme.css
 rm -f ~/.config/vesktop/themes/inir-midnight.theme.css

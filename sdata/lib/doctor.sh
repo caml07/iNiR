@@ -135,6 +135,20 @@ check_dependencies() {
     # Void's source provider is version-pinned, so an old binary is also a
     # repairable dependency rather than merely an available command.
     if [[ "${OS_GROUP_ID:-unknown}" == "void" ]]; then
+        local qml_root webengine_qml_found=false layershell_qml_found=false
+        for qml_root in /usr/lib/qt6/qml /usr/lib64/qt6/qml /usr/local/lib/qt6/qml /usr/local/lib64/qt6/qml; do
+            [[ -f "$qml_root/QtWebEngine/qmldir" ]] && webengine_qml_found=true
+            [[ -f "$qml_root/org/kde/layershell/qmldir" ]] && layershell_qml_found=true
+        done
+        if [[ "$webengine_qml_found" != true ]]; then
+            missing+=("Qt WebEngine QML")
+            missing_cmds+=("qt-webengine")
+        fi
+        if [[ "$layershell_qml_found" != true ]]; then
+            missing+=("LayerShellQt QML")
+            missing_cmds+=("layer-shell-qt")
+        fi
+
         local doctor_repo_root void_ydotool_version installed_ydotool_version void_warp_version installed_warp_version
         doctor_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
         void_ydotool_version="$(sed -n 's/^YDOTOOL_VERSION="\([^"]*\)"/\1/p' "$doctor_repo_root/sdata/dist-void/install-deps.sh")"
@@ -1547,7 +1561,12 @@ check_conflicting_services() {
                 systemctl --user disable --now "${proc}.service" 2>/dev/null || true
             fi
         done
-        doctor_fix "Stopped conflicting: ${running[*]} (iNiR has built-in notifications, re-enable with: systemctl --user enable <service>)"
+        if declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
+                && has_usable_systemd_user_manager; then
+            doctor_fix "Stopped conflicting: ${running[*]} (iNiR has built-in notifications; re-enable with systemctl --user if desired)"
+        else
+            doctor_fix "Stopped conflicting: ${running[*]} (iNiR has built-in notifications; restart manually if desired)"
+        fi
     else
         doctor_pass "No conflicting notification daemons"
     fi
@@ -1569,14 +1588,18 @@ check_conflicting_shells() {
     )
     local found=()
 
-    if ! command -v pacman &>/dev/null; then
-        doctor_pass "Conflicting shells (not Arch, skipped)"
+    if command -v pacman &>/dev/null; then
+        for pkg in "${shell_pkgs[@]}"; do
+            pacman -Qi "$pkg" &>/dev/null 2>&1 && found+=("$pkg")
+        done
+    elif command -v xbps-query &>/dev/null; then
+        for pkg in "${shell_pkgs[@]}"; do
+            xbps-query -p pkgver "$pkg" &>/dev/null 2>&1 && found+=("$pkg")
+        done
+    else
+        doctor_pass "Conflicting shells (package manager unsupported, skipped)"
         return 0
     fi
-
-    for pkg in "${shell_pkgs[@]}"; do
-        pacman -Qi "$pkg" &>/dev/null 2>&1 && found+=("$pkg")
-    done
 
     if [[ ${#found[@]} -gt 0 ]]; then
         doctor_fail "Conflicting Quickshell shells installed: ${found[*]}"
@@ -1732,6 +1755,7 @@ check_qt_theming() {
             arch) echo -e "    ${STY_FAINT}Run: sudo pacman -S plasma-integration${STY_RST}" ;;
             fedora) echo -e "    ${STY_FAINT}Run: sudo dnf install plasma-integration${STY_RST}" ;;
             debian|ubuntu) echo -e "    ${STY_FAINT}Run: sudo apt install plasma-integration${STY_RST}" ;;
+            void) echo -e "    ${STY_FAINT}Run: ./setup install (repairs the managed Void provider)${STY_RST}" ;;
             *) echo -e "    ${STY_FAINT}Install plasma-integration using your package manager${STY_RST}" ;;
         esac
     else
@@ -1778,6 +1802,7 @@ check_qt_theming() {
         doctor_fail "Darkly Qt style not installed (Qt apps won't have Material You style)"
         case "${OS_GROUP_ID:-unknown}" in
             arch) echo -e "    ${STY_FAINT}Run: yay -S darkly-bin${STY_RST}" ;;
+            void) echo -e "    ${STY_FAINT}Run: ./setup install (repairs the pinned Void Darkly provider)${STY_RST}" ;;
             *) echo -e "    ${STY_FAINT}Install darkly from: https://github.com/AlessioC31/darkly${STY_RST}" ;;
         esac
     else

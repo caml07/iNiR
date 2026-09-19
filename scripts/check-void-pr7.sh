@@ -52,6 +52,9 @@ default_config="$repo_root/defaults/config.json"
 config_qml="$repo_root/modules/common/Config.qml"
 switchwall="$repo_root/scripts/colors/switchwall.sh"
 sddm_installer="$repo_root/scripts/sddm/install-pixel-sddm.sh"
+conflicts_lib="$repo_root/sdata/lib/conflicts.sh"
+package_installers="$repo_root/sdata/lib/package-installers.sh"
+setup_cli="$repo_root/setup"
 
 array_has_package() {
   local array_name="$1" package="$2"
@@ -79,9 +82,11 @@ done
 check grep -Fq 'has_usable_systemd_user_manager' "$dolphin_migration"
 check grep -Fq 'systemd/private' "$orbit_audit"
 check grep -Fq 'timeout 3s systemctl --user show-environment' "$orbit_audit"
-for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon; do
+for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
   check array_has_package VOID_BASE_PACKAGES "$package"
 done
+check grep -Fq 'command -v qml6 || command -v qml || command -v qs' "$repo_root/services/WebWallpaper.qml"
+check grep -Fq 'Quickshell.env("INIR_WEB_WALLPAPER_PROBE")' "$repo_root/modules/background/WebWallpaperHost.qml"
 for package in plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire; do
   check array_has_package VOID_AUDIO_PACKAGES "$package"
 done
@@ -98,6 +103,12 @@ else
   printf 'PASS: Void YT Music uses only the managed Python runtime\n'
 fi
 for needle in \
+  '[awww-daemon]="awww"' \
+  '[flock]="util-linux"' \
+  '[kwriteconfig6]="kf6-kconfig"' \
+  '[trans]="translate-shell"' \
+  '[qt-webengine]="qt6-webengine"' \
+  '[layer-shell-qt]="layer-shell-qt"' \
   '[notify-send]="libnotify"' \
   '[xdg-settings]="xdg-utils"' \
   '[secret-tool]="libsecret"' \
@@ -105,6 +116,23 @@ for needle in \
   '[powerprofilesctl]="power-profiles-daemon"'; do
   check grep -Fq "$needle" "$void_deps"
 done
+check grep -Fq 'missing_cmds+=("qt-webengine")' "$doctor"
+check grep -Fq 'missing_cmds+=("layer-shell-qt")' "$doctor"
+check grep -Fq 'service/inir-super-overview' "$repo_root/sdata/subcmd-install/2.setups.sh"
+check grep -Fq 'exec chpst -e "$TURNSTILE_ENV_DIR"' "$repo_root/sdata/subcmd-install/2.setups.sh"
+check grep -Fq 'service/inir"]="iNiR runit user service"' "$uninstall_lib"
+check grep -Fq 'service/inir-super-overview"]="iNiR Super-tap runit service"' "$uninstall_lib"
+check grep -Fq 'sv down "$user_service_root/$service_dir"' "$uninstall_lib"
+check grep -Fq 'command -v xbps-query' "$conflicts_lib"
+check grep -Fq 'xbps-query -p pkgver "$pkg"' "$conflicts_lib"
+check grep -Fq 'pkg_sudo xbps-remove -R -- "$pkg"' "$conflicts_lib"
+check grep -Fq 'xbps-query -p pkgver "$pkg"' "$doctor"
+if grep -Fq 'Conflicting shells (not Arch, skipped)' "$doctor"; then
+  printf 'FAIL: Doctor still skips conflicting shell packages on Void\n' >&2
+  failures=$((failures + 1))
+else
+  printf 'PASS: Doctor inspects conflicting shell packages on Void\n'
+fi
 check grep -Fq '"powerprofilesctl:power-profiles-daemon"' "$doctor"
 check grep -Fq 'ln -sfn /etc/sv/power-profiles-daemon /var/service/power-profiles-daemon' "$repo_root/sdata/subcmd-install/2.setups.sh"
 check grep -Fq 'void:nerd-fonts-ttf' "$deps_map"
@@ -141,8 +169,12 @@ fi
 check grep -Fq 'Translation.tr("Install pacman, apt, or dnf") + " / xbps"' "$software_view"
 check grep -Fq 'sudo xbps-install -S ffmpeg' "$switchwall"
 check grep -Fq 'sudo xbps-install -S sddm qt6-declarative qt6-qt5compat' "$sddm_installer"
+check grep -Fq 'sudo ln -s /etc/sv/sddm /var/service/' "$sddm_installer"
+check grep -Fq 'xbps-query -p pkgver quickshell' "$setup_cli"
+check grep -Fq 'xbps-query -p repository quickshell' "$setup_cli"
+check grep -Fq 'xbps-install -S sudo' "$package_installers"
 
-check bash -n "$launcher" "$doctor" "$dolphin_migration" "$qt_migration" "$browser_migration" "$orbit_audit" "$uninstall_lib" "$switchwall" "$sddm_installer"
+check bash -n "$launcher" "$doctor" "$dolphin_migration" "$qt_migration" "$browser_migration" "$orbit_audit" "$uninstall_lib" "$switchwall" "$sddm_installer" "$conflicts_lib" "$package_installers" "$setup_cli"
 
 predicate_fixture() (
   set -e
@@ -210,7 +242,10 @@ check command -v xbps-install
 check command -v xbps-uhelper
 check command -v qs
 check xbps-query -p pkgver quickshell
-for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire ImageMagick kde-cli-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-chi_sim tesseract-ocr-chi_tra; do
+for package in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt plasma-browser-integration lsp-plugins-lv2 libdbusmenu-gtk3 alsa-pipewire ImageMagick kde-cli-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-rus tesseract-ocr-jpn tesseract-ocr-chi_sim tesseract-ocr-chi_tra; do
+  check xbps-query -R -p pkgver "$package"
+done
+for package in awww util-linux kf6-kconfig translate-shell; do
   check xbps-query -R -p pkgver "$package"
 done
 power_profiles_files="$(xbps-query -R -f power-profiles-daemon 2>/dev/null || true)"

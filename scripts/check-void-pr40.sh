@@ -55,8 +55,12 @@ done
 
 # Activation: runit symlink + live service.
 check test -L /var/service/NetworkManager
-check sudo sv status /var/service/NetworkManager
-check sudo sv status /var/service/dbus
+if sudo -n true >/dev/null 2>&1; then
+  check sudo -n sv status /var/service/NetworkManager
+  check sudo -n sv status /var/service/dbus
+else
+  printf 'INFO: privileged sv status skipped (sudo -n unavailable); operation checks remain authoritative\n'
+fi
 
 # Operation: nmcli answers and the user may manage networks.
 check nmcli -t -f STATE g

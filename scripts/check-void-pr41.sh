@@ -60,8 +60,12 @@ for package in bluez blueman libspa-bluetooth; do
 done
 
 check test -L /var/service/bluetoothd
-check sudo sv status /var/service/bluetoothd
-check sudo sv status /var/service/dbus
+if sudo -n true >/dev/null 2>&1; then
+  check sudo -n sv status /var/service/bluetoothd
+  check sudo -n sv status /var/service/dbus
+else
+  printf 'INFO: privileged sv status skipped (sudo -n unavailable); D-Bus ownership remains authoritative\n'
+fi
 
 if busctl --system --no-pager --no-legend --acquired list 2>/dev/null \
     | grep -q '^org\.bluez[[:space:]]'; then

@@ -649,6 +649,25 @@ On-screen volume indicator.
 
 ---
 
+### osd
+
+On-screen feedback for any family. The active family's OSD or Island decides where it is drawn.
+
+| Function | Description |
+|----------|-------------|
+| `volume` | Show the volume level |
+| `brightness` | Show the brightness level |
+| `mic` | Show the microphone level |
+| `keyboard` | Show the keyboard layout |
+| `media <action>` | Show now playing with a transport action: `play`, `pause`, `next` or `previous` |
+| `hide` | Hide whatever is showing |
+
+```kdl
+bind "Mod+Shift+K" { spawn "inir" "osd" "keyboard"; }
+```
+
+---
+
 ### cliphistService
 
 Clipboard history service. The backend that makes clipboard panel work. You probably don't need to call this directly.
@@ -966,16 +985,6 @@ Waffle taskbar visibility.
 | `toggle` | Show/hide taskbar |
 | `open` | Show taskbar |
 | `close` | Hide taskbar |
-
----
-
-### osd
-
-Waffle on-screen display indicator (volume, brightness).
-
-| Function | Description |
-|----------|-------------|
-| `trigger` | Show the OSD indicator |
 
 ---
 

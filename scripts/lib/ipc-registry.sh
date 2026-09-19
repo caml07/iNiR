@@ -2,7 +2,7 @@
 # Auto-generated from QML IpcHandler declarations + docs/IPC.md metadata.
 # Do not edit manually.
 # Regenerate: python3 scripts/lib/generate-ipc-registry.py
-# IPC.md hash: 6b7b1df9fd3297df
+# IPC.md hash: b9c5fccb607c64c6
 # Targets: 63
 
 declare -gA IPC_TARGET_DESC=(
@@ -37,7 +37,7 @@ declare -gA IPC_TARGET_DESC=(
   [mpris]="Media player control. Automatically detects and uses YtMusic controls when active, otherwise uses the active MPRIS player."
   [notifications]="Notification management."
   [orbit]="Niri-only Material session navigator for the ii family. Orbit presents nearby workspaces and readable window previews, with MRU Trail navigation and temporary Stash parking."
-  [osd]="Waffle on-screen display indicator (volume, brightness)."
+  [osd]="On-screen feedback for any family. The active family's OSD or Island decides where it is drawn."
   [osdVolume]="On-screen volume indicator."
   [osk]="On-screen keyboard."
   [overlay]="Floating tools (Super+G): notes, images, crosshair, recorder, resources and other pinnable desktop tools."
@@ -103,7 +103,7 @@ declare -gA IPC_TARGET_FAMILY=(
   [mpris]="shared"
   [notifications]="shared"
   [orbit]="shared"
-  [osd]="waffle"
+  [osd]="shared"
   [osdVolume]="shared"
   [osk]="shared"
   [overlay]="shared"
@@ -169,7 +169,7 @@ declare -gA IPC_TARGET_FUNCTIONS=(
   [mpris]="pauseAll playPause previous next"
   [notifications]="test clearAll toggleSilent"
   [orbit]="toggle close open pocket studio find stage orbital next previous status toggleView"
-  [osd]="trigger"
+  [osd]="volume brightness mic keyboard media hide"
   [osdVolume]="trigger hide toggle"
   [osk]="toggle close open"
   [overlay]="toggle"
@@ -381,7 +381,12 @@ declare -gA IPC_FUNCTION_DESC=(
   ["orbit:previous"]="Switch Niri to the previous workspace while Orbit stays open"
   ["orbit:status"]="Print the effective Orbit runtime state used by diagnostics and visual audits"
   ["orbit:toggleView"]="Switch the open Orbit session between Stage and Orbital"
-  ["osd:trigger"]="Show the OSD indicator"
+  ["osd:volume"]="Show the volume level"
+  ["osd:brightness"]="Show the brightness level"
+  ["osd:mic"]="Show the microphone level"
+  ["osd:keyboard"]="Show the keyboard layout"
+  ["osd:media"]="Show now playing with a transport action: \`play\`, \`pause\`, \`next\` or \`previous\`"
+  ["osd:hide"]="Hide whatever is showing"
   ["osdVolume:trigger"]="Show volume OSD"
   ["osdVolume:hide"]="Hide volume OSD"
   ["osdVolume:toggle"]="Toggle volume OSD"
@@ -584,6 +589,7 @@ declare -gA IPC_FUNCTION_ARGS=(
   ["minimize:restore"]="<windowId>"
   ["minimize:restoreOriginal"]="<windowId>"
   ["orbit:find"]="<query>"
+  ["osd:media"]="<action>"
   ["packageSearch:search"]="<query>"
   ["panelFamily:set"]="<family>"
   ["pill:open"]="<surface>"
@@ -623,6 +629,7 @@ bind "Super+M" { spawn "inir" "globalActions" "run" "toggle-mute"; }'
   [mpris]='bind "Ctrl+Mod+Space" { spawn "inir" "mpris" "playPause"; }
 bind "Mod+Alt+N" { spawn "inir" "mpris" "next"; }
 bind "Mod+Alt+P" { spawn "inir" "mpris" "previous"; }'
+  [osd]='bind "Mod+Shift+K" { spawn "inir" "osd" "keyboard"; }'
   [overlay]='bind "Super+G" { spawn "inir" "overlay" "toggle"; }'
   [overview]='bind "Mod+Space" { spawn "inir" "overview" "toggle"; }'
   [panelFamily]='bind "Mod+Shift+W" { spawn "inir" "panelFamily" "cycle"; }'
@@ -642,9 +649,9 @@ bind "Ctrl+Alt+A" { spawn "inir" "wallpaperSelector" "openLauncher" "animated"; 
 )
 
 IPC_ALL_TARGETS=(ai altSwitcher appCatalog audio autostart background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector customWidgets dashboard dev equalizer gamemode globalActions iris keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill recordingOsd region search session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wactionCenter waffleAltSwitcher wallpaperLauncher wallpaperSelector wbar widgetpower wnotificationCenter workspaceStrip wwidgets ytmusic zoom)
-IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions iris keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
+IPC_SHARED_TARGETS=(ai altSwitcher appCatalog audio background bar brightness cheatsheet clipboard cliphistService closeConfirm controlPanel coverflowSelector dashboard dev gamemode globalActions iris keyboard lock mascot mascotMood mediaControls memory minimize mpris notifications orbit osd osdVolume osk overlay overview packageSearch panelFamily pill region session settings settingsNav shellLayout shellUpdate sidebarLeft sidebarRight taskview tiling voiceSearch wallpaperLauncher wallpaperSelector workspaceStrip ytmusic zoom)
 IPC_II_TARGETS=(equalizer)
-IPC_WAFFLE_TARGETS=(autostart customWidgets osd recordingOsd search wactionCenter waffleAltSwitcher wbar widgetpower wnotificationCenter wwidgets)
+IPC_WAFFLE_TARGETS=(autostart customWidgets recordingOsd search wactionCenter waffleAltSwitcher wbar widgetpower wnotificationCenter wwidgets)
 
 declare -gA IPC_KEBAB_ALIASES=(
   [alt-switcher]=altSwitcher

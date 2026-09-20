@@ -149,6 +149,27 @@ check_dependencies() {
             missing_cmds+=("layer-shell-qt")
         fi
 
+        # Older Void Darkly provider builds disabled KDecoration support. The
+        # style itself still loaded, but darkly-settings6 then failed when it
+        # tried to load the decoration settings KCM. Treat that partial install
+        # as repairable so normal updates can rebuild the complete provider.
+        local darkly_kcm_found=false darkly_plugin_root
+        for darkly_plugin_root in \
+            "$(qtpaths6 --plugin-dir 2>/dev/null || true)" \
+            /usr/lib64/qt6/plugins \
+            /usr/lib/qt6/plugins \
+            /usr/lib/x86_64-linux-gnu/qt6/plugins; do
+            [[ -n "$darkly_plugin_root" ]] || continue
+            if [[ -f "$darkly_plugin_root/org.kde.kdecoration3.kcm/kcm_darklydecoration.so" ]]; then
+                darkly_kcm_found=true
+                break
+            fi
+        done
+        if [[ "$darkly_kcm_found" != true ]]; then
+            missing+=("Darkly settings KCM")
+            missing_cmds+=("darkly")
+        fi
+
         local doctor_repo_root void_ydotool_version installed_ydotool_version void_warp_version installed_warp_version
         doctor_repo_root="${REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
         void_ydotool_version="$(sed -n 's/^YDOTOOL_VERSION="\([^"]*\)"/\1/p' "$doctor_repo_root/sdata/dist-void/install-deps.sh")"

@@ -150,6 +150,16 @@ if ! grep -Fq 'Lock IPC was unavailable before sleep and no fallback could secur
     printf 'FAIL: before-sleep does not fail closed when the Quickshell lock target is unavailable\n' >&2
     exit 1
 fi
+cleanup_orphans_chunk="$(sed -n '/^cleanup_orphans()/,/^kill_shell()/p' "$runtime_root/scripts/inir")"
+if ! grep -Fq 'is_using_runit_supervisor' <<<"$cleanup_orphans_chunk" \
+        || ! grep -Fq 'keyboard_lock_state_daemon.py' <<<"$cleanup_orphans_chunk"; then
+    printf 'FAIL: non-systemd orphan cleanup does not own the iNiR idle/keyboard helpers\n' >&2
+    exit 1
+fi
+if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
+    printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
+    exit 1
+fi
 for lock_surface in \
         "$runtime_root/modules/lock/LockSurface.qml" \
         "$runtime_root/modules/waffle/lock/WaffleLockSurface.qml" \
@@ -1927,7 +1937,7 @@ if ! grep -Fq 'service", "restart' "$memory_service" \
         || ! grep -Fq 'inir-xembedsniproxy' "$tray_service" \
         || ! grep -Fq 'sv up' "$tray_service" \
         || ! grep -Fq 'xembed_service_dir' "$runtime_root/sdata/lib/functions.sh" \
-        || ! grep -Fq 'chpst -e "\$TURNSTILE_ENV_DIR"' "$runtime_root/sdata/lib/functions.sh" \
+        || ! grep -Fq 'exec chpst -e "$TURNSTILE_ENV_DIR" sh -c' "$runtime_root/sdata/lib/functions.sh" \
         || ! grep -Fq -- '--ignore-inhibitors' "$session_service" \
         || ! grep -Fq -- '--ignore-inhibitors suspend' "$idle_service" \
         || grep -Fq 'systemctl", "suspend' "$session_service" \
@@ -2487,6 +2497,8 @@ for audio_bin in pipewire wireplumber pipewire-pulse; do
 done
 printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/bin/ydotoold"
 chmod +x "$turnstile_test_root/bin/ydotoold"
+printf '#!/bin/sh\nexit 0\n' > "$turnstile_test_root/bin/xembedsniproxy"
+chmod +x "$turnstile_test_root/bin/xembedsniproxy"
 cat > "$turnstile_test_root/bin/pgrep" <<'SH'
 #!/bin/sh
 printf '123\n'
@@ -2525,6 +2537,10 @@ if ! (
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
     done
     grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_test_root/home/.config/service/ydotool/run"
+    xembed_run="$turnstile_test_root/home/.config/service/inir-xembedsniproxy/run"
+    grep -Fq 'exec chpst -e "$TURNSTILE_ENV_DIR" sh -c' "$xembed_run"
+    grep -Fq '[ -n "${DISPLAY:-}" ] || exec pause' "$xembed_run"
+    ! grep -Fq '\$TURNSTILE_ENV_DIR' "$xembed_run"
     grep -Fxq 'core_services="dbus"' "$turnstile_conf"
     ! grep -Fq 'runsvdir' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     cp "$turnstile_run" "$turnstile_run.before"
@@ -3104,12 +3120,107 @@ fi
 
 step "Void NetworkManager provider"
 void_setups="$runtime_root/sdata/subcmd-install/2.setups.sh"
-if ! grep -Fq 'ln -sfn /etc/sv/NetworkManager /var/service/NetworkManager' "$void_setups" \
-        || ! grep -Fq 'skipping NetworkManager activation' "$void_setups" \
-        || ! grep -Fq 'wpa_supplicant' "$void_setups" \
+if ! grep -Fq 'configure_void_networkmanager_service' "$runtime_root/setup" \
         || ! grep -Fq 'video,i2c,input,network' "$void_setups" \
         || ! grep -Eq '^[[:space:]]+NetworkManager$' "$void_deps"; then
     printf 'FAIL: Void NetworkManager provider is incomplete\n' >&2
+    exit 1
+fi
+
+nm_test_root="$(mktemp -d)"
+mkdir -p "$nm_test_root/etc/sv/NetworkManager" "$nm_test_root/etc/sv/dhcpcd" \
+    "$nm_test_root/etc/sv/wpa_supplicant" "$nm_test_root/var/service"
+ln -s "$nm_test_root/etc/sv/dhcpcd" "$nm_test_root/var/service/dhcpcd"
+ln -s "$nm_test_root/etc/sv/wpa_supplicant" "$nm_test_root/var/service/wpa_supplicant"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=true
+    export INIR_NETWORKMANAGER_SERVICE_DIR="$nm_test_root/etc/sv/NetworkManager"
+    export INIR_RUNIT_SERVICE_ROOT="$nm_test_root/var/service"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() {
+        [[ "$1" == "Replace enabled dhcpcd/wpa_supplicant/wicd services with NetworkManager?" && "$2" == "yes" ]]
+    }
+    elevate() { "$@"; }
+
+    configure_void_networkmanager_service
+    test -L "$INIR_RUNIT_SERVICE_ROOT/NetworkManager"
+    test "$(readlink "$INIR_RUNIT_SERVICE_ROOT/NetworkManager")" = "$INIR_NETWORKMANAGER_SERVICE_DIR"
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/dhcpcd"
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/wpa_supplicant"
+
+    # Idempotence: once NetworkManager owns networking, do not prompt or mutate.
+    tui_confirm() { return 1; }
+    configure_void_networkmanager_service
+); then
+    rm -rf "$nm_test_root"
+    printf 'FAIL: Void NetworkManager provider does not migrate competing runit services idempotently\n' >&2
+    exit 1
+fi
+rm -rf "$nm_test_root"
+
+nm_rollback_root="$(mktemp -d)"
+mkdir -p "$nm_rollback_root/etc/sv/NetworkManager" "$nm_rollback_root/etc/sv/dhcpcd" \
+    "$nm_rollback_root/etc/sv/wpa_supplicant" "$nm_rollback_root/var/service"
+ln -s "$nm_rollback_root/etc/sv/dhcpcd" "$nm_rollback_root/var/service/dhcpcd"
+ln -s "$nm_rollback_root/etc/sv/wpa_supplicant" "$nm_rollback_root/var/service/wpa_supplicant"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=true
+    export INIR_NETWORKMANAGER_SERVICE_DIR="$nm_rollback_root/etc/sv/NetworkManager"
+    export INIR_RUNIT_SERVICE_ROOT="$nm_rollback_root/var/service"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 0; }
+    elevate() {
+        if [[ "$1" == "ln" && "${@: -1}" == "$INIR_RUNIT_SERVICE_ROOT/NetworkManager" ]]; then
+            return 1
+        fi
+        "$@"
+    }
+
+    if configure_void_networkmanager_service; then
+        exit 1
+    fi
+    test -L "$INIR_RUNIT_SERVICE_ROOT/dhcpcd"
+    test -L "$INIR_RUNIT_SERVICE_ROOT/wpa_supplicant"
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/NetworkManager"
+); then
+    rm -rf "$nm_rollback_root"
+    printf 'FAIL: Void NetworkManager migration does not roll back competitors after activation failure\n' >&2
+    exit 1
+fi
+rm -rf "$nm_rollback_root"
+
+if ! (
+    set -euo pipefail
+    source "$runtime_root/sdata/lib/doctor.sh"
+    export OS_GROUP_ID=void
+    doctor_failed=0
+    STY_FAINT=""
+    STY_RST=""
+    has_usable_systemd_user_manager() { return 1; }
+    nmcli() { return 1; }
+    doctor_pass() { :; }
+    doctor_fail() { doctor_failed=$((doctor_failed + 1)); }
+
+    check_service_unit_health
+    test "$doctor_failed" -eq 1
+); then
+    printf 'FAIL: Doctor does not detect a stopped Void NetworkManager provider\n' >&2
+    exit 1
+fi
+
+doctor_entry_chunk="$(sed -n '/^run_doctor()/,/^}/p' "$runtime_root/setup")"
+if ! grep -Fq 'detect_distro' <<<"$doctor_entry_chunk"; then
+    printf 'FAIL: setup doctor does not detect the distro before distro-specific health checks\n' >&2
     exit 1
 fi
 

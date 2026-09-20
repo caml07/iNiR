@@ -1003,6 +1003,16 @@ check_manifest() {
 check_service_unit_health() {
     if ! declare -F has_usable_systemd_user_manager >/dev/null 2>&1 \
             || ! has_usable_systemd_user_manager; then
+        if [[ "${OS_GROUP_ID:-unknown}" == void ]]; then
+            if command -v nmcli >/dev/null 2>&1 \
+                    && nmcli -t -f STATE general >/dev/null 2>&1; then
+                doctor_pass "Void NetworkManager provider running"
+            else
+                doctor_fail "NetworkManager is installed but its Void runit service is not running"
+                echo -e "    ${STY_FAINT}Run: ./setup install and accept the NetworkManager migration prompt${STY_RST}"
+            fi
+            return 0
+        fi
         doctor_pass "User service checks skipped (no usable systemd user manager)"
         return 0
     fi

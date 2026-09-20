@@ -727,6 +727,101 @@ configure_void_sddm_service() {
   return 1
 }
 
+# Move a Void install from the base dhcpcd/wpa_supplicant stack to the
+# NetworkManager provider that iNiR's network UI controls. The service root is
+# overridable so the migration and rollback policy can be tested safely.
+configure_void_networkmanager_service() {
+  [[ "${OS_GROUP_ID:-}" == void ]] || return 0
+
+  local service_dir="${INIR_NETWORKMANAGER_SERVICE_DIR:-/etc/sv/NetworkManager}"
+  local service_root="${INIR_RUNIT_SERVICE_ROOT:-/var/service}"
+  local service_link="${service_root}/NetworkManager"
+  local competitor link index rollback_index
+  local networkmanager_enabled=false
+  local -a competitors=(dhcpcd wpa_supplicant wicd)
+  local -a enabled_links=()
+  local -a enabled_targets=()
+
+  if [[ ! -d "$service_dir" ]]; then
+    log_warning "NetworkManager service directory missing (${service_dir}); reinstall the NetworkManager package"
+    return 1
+  fi
+  if [[ ! -d "$service_root" ]]; then
+    log_warning "Void runit service root is missing (${service_root})"
+    return 1
+  fi
+
+  if [[ -L "$service_link" ]] \
+      && [[ "$(readlink -f "$service_link" 2>/dev/null)" == "$(readlink -f "$service_dir" 2>/dev/null)" ]]; then
+    networkmanager_enabled=true
+  elif [[ -e "$service_link" || -L "$service_link" ]]; then
+    log_warning "Existing ${service_link} is not the packaged NetworkManager service; leaving it unchanged"
+    return 1
+  fi
+
+  for competitor in "${competitors[@]}"; do
+    link="${service_root}/${competitor}"
+    if [[ -L "$link" ]]; then
+      enabled_links+=("$link")
+      enabled_targets+=("$(readlink "$link")")
+    fi
+  done
+
+  if [[ "$networkmanager_enabled" == true && ${#enabled_links[@]} -eq 0 ]]; then
+    log_success "NetworkManager runit service already enabled"
+    return 0
+  fi
+
+  if [[ ${#enabled_links[@]} -gt 0 ]]; then
+    if [[ "${ask:-true}" != true ]]; then
+      log_info "NetworkManager migration left unchanged in non-interactive mode"
+      log_info "Disable dhcpcd/wpa_supplicant/wicd and enable NetworkManager when a brief network interruption is acceptable"
+      return 0
+    fi
+    log_warning "Switching network managers may briefly interrupt connectivity"
+    if ! tui_confirm "Replace enabled dhcpcd/wpa_supplicant/wicd services with NetworkManager?" "yes"; then
+      log_info "Existing Void network services left unchanged"
+      return 0
+    fi
+
+    for index in "${!enabled_links[@]}"; do
+      if ! elevate rm -f -- "${enabled_links[$index]}"; then
+        for ((rollback_index = 0; rollback_index < index; rollback_index++)); do
+          elevate ln -s "${enabled_targets[$rollback_index]}" "${enabled_links[$rollback_index]}" >/dev/null 2>&1 || true
+        done
+        log_warning "Could not disable the existing Void network services; restored previous service links"
+        return 1
+      fi
+    done
+  elif [[ "$networkmanager_enabled" != true ]]; then
+    if [[ "${ask:-true}" != true ]]; then
+      log_info "NetworkManager left disabled in non-interactive mode"
+      log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
+      return 0
+    fi
+    if ! tui_confirm "Enable NetworkManager system service?" "yes"; then
+      log_info "NetworkManager left disabled"
+      return 0
+    fi
+  fi
+
+  if [[ "$networkmanager_enabled" != true ]] && ! elevate ln -s "$service_dir" "$service_link"; then
+    for rollback_index in "${!enabled_links[@]}"; do
+      elevate ln -s "${enabled_targets[$rollback_index]}" "${enabled_links[$rollback_index]}" >/dev/null 2>&1 || true
+    done
+    log_warning "Could not enable NetworkManager; restored previous Void network service links"
+    return 1
+  fi
+
+  if [[ ${#enabled_links[@]} -gt 0 ]]; then
+    log_success "NetworkManager enabled; competing Void network services disabled"
+    log_info "Reconnect through NetworkManager if the active connection does not transfer automatically"
+  else
+    log_success "NetworkManager runit service enabled"
+  fi
+  return 0
+}
+
 # Install only iNiR-owned service files; never replace a local WARP service.
 configure_void_warp_service() {
   [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0
@@ -946,9 +1041,25 @@ reconcile_inir_supervisor() {
     if command -v xembedsniproxy >/dev/null 2>&1; then
       mkdir -p "$xembed_service_dir"
       if [[ "$supervisor" == turnstile ]]; then
-        printf '#!/bin/sh\n# Managed by iNiR.\nxembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"\nexec chpst -e "\$TURNSTILE_ENV_DIR" env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"\n' > "$xembed_run_file"
+        cat > "$xembed_run_file" <<'RUN_EOF'
+#!/bin/sh
+# Managed by iNiR.
+exec chpst -e "$TURNSTILE_ENV_DIR" sh -c '
+  [ -n "${DISPLAY:-}" ] || exec pause
+  xembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"
+  [ -n "$xembed_bin" ] || exec pause
+  exec env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"
+'
+RUN_EOF
       else
-        printf '#!/bin/sh\n# Managed by iNiR.\nxembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"\nexec env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"\n' > "$xembed_run_file"
+        cat > "$xembed_run_file" <<'RUN_EOF'
+#!/bin/sh
+# Managed by iNiR.
+[ -n "${DISPLAY:-}" ] || exec pause
+xembed_bin="$(command -v xembedsniproxy 2>/dev/null || true)"
+[ -n "$xembed_bin" ] || exec pause
+exec env QT_NO_XDG_DESKTOP_PORTAL=1 QT_QPA_PLATFORM=xcb "$xembed_bin"
+RUN_EOF
       fi
       chmod +x "$xembed_run_file"
     fi

@@ -30,15 +30,25 @@ check test -z "$(git -C "$repo_root" status --porcelain 2>/dev/null)"
 check xbps-query -p pkgver NetworkManager
 check command -v nmcli
 
-# Installer provisions the provider and guards activation.
+# Installer provisions the provider and migrates competing base services only
+# after the remaining install work is complete.
 setups="$repo_root/sdata/subcmd-install/2.setups.sh"
-for needle in 'ln -sfn /etc/sv/NetworkManager /var/service/NetworkManager' \
-  'dhcpcd' 'wpa_supplicant' 'skipping NetworkManager activation' \
-  'video,i2c,input,network'; do
-  if grep -Fq "$needle" "$setups"; then
-    printf 'PASS: setup contains: %s\n' "$needle"
+functions="$repo_root/sdata/lib/functions.sh"
+setup_entry="$repo_root/setup"
+doctor="$repo_root/sdata/lib/doctor.sh"
+for contract in \
+  "$setups|video,i2c,input,network" \
+  "$functions|configure_void_networkmanager_service" \
+  "$functions|Replace enabled dhcpcd/wpa_supplicant/wicd services with NetworkManager?" \
+  "$functions|restored previous Void network service links" \
+  "$setup_entry|configure_void_networkmanager_service" \
+  "$doctor|NetworkManager is installed but its Void runit service is not running"; do
+  file="${contract%%|*}"
+  needle="${contract#*|}"
+  if grep -Fq "$needle" "$file"; then
+    printf 'PASS: provider contains: %s\n' "$needle"
   else
-    printf 'FAIL: setup missing: %s\n' "$needle" >&2
+    printf 'FAIL: provider missing: %s\n' "$needle" >&2
     failures=$((failures + 1))
   fi
 done

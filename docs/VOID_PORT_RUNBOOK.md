@@ -7,19 +7,26 @@ live in `docs/adr/`; capability status lives in
 
 ## Current checkpoint
 
-As of 2026-09-19:
+As of 2026-09-20:
 
 - Canonical integration/release-candidate branch: `prerelease`.
-- Branch-formalization checkpoint:
-  `5c13b6c4fa1b3c0459a38117e91d05e140943b0a`.
-- Snow prerelease is merged through `9574fa42` (iNiR 2.31.0); the final
-  runtime-changing Void closure tip validated in the VM is `212bb3ae`. The
-  subsequent Snow release commits only touch release/docs/Arch surfaces.
+- Snow `main` and `prerelease` currently both resolve to `9574fa42` (iNiR
+  2.31.0). A fresh fetch found no upstream commit missing from the fork's Void
+  `prerelease`.
+- Fork `prerelease` includes the external-disk NetworkManager/runit lifecycle
+  closure through merge `fd6725f2`.
 - PR1 through PR7 engineering closure, the 2.31 runtime compatibility fixes,
   clean-VM install, reboot/runtime, privileged Power Profiles activation,
   Web Wallpaper, SDDM graphical-login parity, and the versioned PR3.2-PR7
   checker sweep are VM validated.
-- Remaining release evidence is the external-disk/hardware validation.
+- The external-disk install has been performed. Its remaining evidence is one
+  booted post-migration NetworkManager capture; persistent runit ownership and
+  the reconnected NetworkManager profile were already verified offline.
+- A post-closure Void report exposed a partial Darkly provider and stale Foot
+  include. The release VM reproduced both states. Darkly was rebuilt and
+  installed with KDecoration enabled, `darkly-settings6` passed, and the second
+  provider run was idempotent. Foot now has one canonical managed color path,
+  `~/.config/foot/inir-colors.ini`.
 - Packaging iNiR itself as an XBPS package is outside V1.
 
 Do not infer current state from an old feature branch. Check `prerelease` and
@@ -464,7 +471,9 @@ These are not evidence of a broken provider unless scope changes:
   QML action wiring and a real isolated-root XBPS install/remove transaction
   were validated separately;
 - PR7 engineering and release-VM closure are implemented and validated. The
-  remaining gate is the external-disk/hardware test.
+  external-disk install has also been exercised; the only outstanding hardware
+  capture is the post-migration live NetworkManager status described in
+  `docs/VOID_VM_VALIDATION.md`.
 
 ## Documentation update rules
 

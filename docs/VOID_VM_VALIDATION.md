@@ -951,7 +951,8 @@ separate clean worktree at `212bb3ae` produced the same `customWidgets` IPC
 finding and the same runtime-locale missing counts as the documented tree;
 there is no new verifier regression from this closure documentation.
 
-The remaining release gate is the external-disk/hardware test. That test must
+At this 2026-09-19 checkpoint, the remaining release gate was the
+external-disk/hardware test. That test must
 prepare the machine's own GPU driver/firmware/Mesa stack before iNiR: the port
 installs the shell and userland capability providers, not hardware-specific
 graphics drivers.
@@ -1063,7 +1064,8 @@ The live root/reboot gate then passed on the same VM:
 
 This closes the VM graphical-login parity gate. `niri --session` remains the
 documented local-TTY recovery/debug path, not the normal installed startup
-flow. The remaining release gate is the external-disk/hardware test.
+flow. At this point the remaining release gate was the external-disk/hardware
+test; the following section records that later hardware run.
 
 ## External-disk NetworkManager and runit lifecycle closure (2026-09-20)
 
@@ -1123,3 +1125,72 @@ runit configuration contained
 NetworkManager connection profile for the reconnected Wi-Fi. This is persistent
 configuration evidence; a final booted `nmcli`/service check is still required
 before declaring the entire external-disk release gate closed.
+
+## Darkly settings and Foot theming post-closure validation (2026-09-20)
+
+A subsequent real-Void report showed `darkly-settings6` opening with:
+
+```text
+Could not find plugin org.kde.kdecoration3.kcm/kcm_darklydecoration.so
+```
+
+The release-VM baseline reproduced the partial state exactly: the normal
+`darkly6.so` KStyle and `/usr/bin/darkly-settings6` executable were installed,
+but `kcm_darklydecoration.so` was absent. The original Void provider had
+deliberately configured Darkly with `-DWITH_DECORATIONS=OFF`, so its previous
+checks proved only style loading, not the settings application's KDecoration
+module.
+
+The corrected provider adds Void's `kf6-kdecoration-devel`, configures Darkly
+v0.5.39 with `-DWITH_DECORATIONS=ON`, and treats both the style plugin and the
+settings KCM as required health state. Doctor also recognizes an older
+style-only installation as repairable instead of accepting the provider marker
+alone.
+
+Validation was performed on `voidlinux-release-clean` after first fetching the
+current fork `prerelease` (`fd6725f2`) and confirming it already contained the
+latest Snow baseline (`9574fa42`). The fix was overlaid into the VM checkout,
+then exercised through the real iNiR dependency/provider path:
+
+- XBPS installed `kf6-kdecoration-devel-6.7.5_1` from the configured Void
+  repository;
+- Darkly v0.5.39 rebuilt successfully with Qt6 and KDecoration enabled;
+- installation produced `/usr/lib64/qt6/plugins/styles/darkly6.so`,
+  `/usr/lib64/qt6/plugins/org.kde.kdecoration3/org.kde.darkly.so`, and
+  `/usr/lib64/qt6/plugins/org.kde.kdecoration3.kcm/kcm_darklydecoration.so`;
+- `ldd` on the KCM reported no missing runtime dependency;
+- an offscreen `darkly-settings6` smoke no longer emitted the missing-plugin
+  error;
+- the updated PR5.4 checker passed with `INIR_VERIFY_IDEMPOTENCY=true`, including
+  an unchanged second provider install;
+- `make test-local` completed with `All local distribution checks passed` in
+  the same Void VM.
+
+The screenshot that exposed the Darkly problem also showed Foot reading a
+missing `~/.config/foot/colors.ini`. Repository inspection found a split
+contract: the installer had already migrated Foot to `inir-colors.ini`, while
+the shipped `foot.ini` and the live color generator still used the old
+`colors.ini` path. The post-closure fix makes
+`~/.config/foot/inir-colors.ini` the single managed path across the shipped
+config, generator, installer and uninstall cleanup, with an explicit
+distribution regression test to prevent the two names from diverging again.
+
+The same release VM then installed `foot-1.28.0_1` from XBPS for a real parser
+check. Running the updated terminal generator against an existing legacy
+`include=~/.config/foot/colors.ini` configuration rewrote it to the canonical
+`inir-colors.ini` include, generated the managed color file, and
+`foot --check-config` returned success. This closes the user-visible startup
+warning shown by the real-Void report rather than relying on a static pathname
+assertion alone.
+
+At this checkpoint there are no Snow commits waiting to be ported: a fresh
+fetch resolved both `upstream/main` and `upstream/prerelease` to `9574fa42`, and
+that commit is an ancestor of the fork's current Void `prerelease`.
+
+The documentation verifier was rerun after the Void documentation sweep and
+compared with a detached `origin/prerelease` baseline. Both returned the same
+pre-existing non-zero findings: the `customWidgets` service-documentation
+scanner mismatch, 498 runtime literals missing from the canonical catalog, 194
+missing keys in most translated catalogs (19 in `es_AR`), and generated CLI
+registry drift. The Void/Foot/Darkly documentation changes introduced no new
+verifier finding.

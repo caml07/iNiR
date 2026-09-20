@@ -1,6 +1,13 @@
 # Installation
 
-> **Arch Linux only.** The installer only supports Arch-based distros. If you're on something else, you're on your own - check the manual section below and figure out the equivalent packages for your distro.
+The normal `./setup install` flow is supported on Arch-based systems and, in
+this fork, on **Void Linux glibc + runit**. Void uses XBPS for packaged
+dependencies and explicit providers for the small set of capabilities that are
+not available as suitable Void packages.
+
+> **Void scope:** glibc + elogind + runit/Turnstile is the validated profile.
+> Void musl and a seatd-only session are compatibility profiles, not release
+> targets. See [iNiR on Void Linux](VOID.md).
 >
 > **NixOS:** there is an experimental flake path. See [NixOS](NIXOS.md).
 
@@ -28,11 +35,69 @@ niri msg action load-config-file
 
 Log out and back in, or just restart Niri. Done.
 
+## The Easy Way (Void Linux)
+
+Use the Void-enabled fork and its release-candidate branch:
+
+```bash
+git clone https://github.com/caml07/iNiR.git
+cd iNiR
+git checkout prerelease
+./setup install
+```
+
+The first Void run is intentionally guided. The TUI shows a system snapshot,
+the installation plan, backup location and progress stages before changing the
+machine. It then:
+
+- installs the selected dependency profiles with XBPS;
+- checks free space before large XBPS transactions (notably the font profile);
+- installs pinned/verified providers only where Void has no suitable package;
+- configures the runit/Turnstile user-session path instead of assuming
+  `systemd --user`;
+- provisions PipeWire/WirePlumber, BlueZ, Power Profiles and other selected
+  services through their Void providers;
+- offers a rollback-safe NetworkManager handoff if Void is still using
+  `dhcpcd`/standalone `wpa_supplicant`;
+- offers SDDM only after the rest of the install is complete, using Void's
+  packaged `niri --session` desktop entry.
+
+The base Void installation must already have working hardware support for the
+machine (kernel/firmware plus a usable Mesa/Vulkan or vendor graphics stack).
+iNiR owns the rice and its userland providers; it does not guess GPU drivers,
+rewrite the bootloader or choose hardware-specific kernel parameters.
+
+Disk usage depends on what is already installed. In release testing a 20 GiB
+Void root ran out of space during the large Nerd Fonts transaction, while the
+30 GiB release VM completed the full profile and later had roughly 7 GiB free.
+The installer now calculates the missing XBPS transaction and reserves extra
+download/build headroom before starting it.
+
+The NetworkManager and SDDM prompts can briefly change connectivity/login
+ownership, so the non-interactive `./setup install -y` path leaves those two
+decisions unchanged. For a new Void desktop, use the interactive run once.
+
+After a graphical login through SDDM, iNiR should be supervised through the
+selected non-systemd user-session tier. `niri --session` from a local TTY is the
+documented recovery/debug path, not the normal installed startup flow.
+
+Useful checks after installation:
+
+```bash
+inir doctor
+inir status
+inir logs --issues
+```
+
+Package search/update surfaces use XBPS on Void. See [Packages](PACKAGES.md),
+[Void capabilities](VOID_CAPABILITIES.md) and the detailed [Void guide](VOID.md).
+
 ---
 
 ## The Hard Way (Manual)
 
-For when you're not on Arch, or you enjoy pain.
+For unsupported distributions, custom packaging, or when you intentionally do
+not want the automated setup path.
 
 ### 1. Get dependencies
 
@@ -55,6 +120,11 @@ The bare minimum to not crash immediately:
 | `darkly-bin` (AUR) | Darkly Qt style (Material You widget rendering). |
 
 For everything else, check [PACKAGES.md](PACKAGES.md). It's organized by category so you can skip what you don't need.
+
+The package names in this manual table are Arch-oriented. On Void, use the
+automated XBPS/provider path above rather than translating this table by hand;
+for example, Darkly is built from pinned source with the KF6 KDecoration
+development package so its settings KCM is available too.
 
 > **Note on quickshell package:** iNiR intentionally uses `quickshell` from official repos to avoid long AUR compile times and update-time build failures.
 >
@@ -80,7 +150,7 @@ For everything else, check [PACKAGES.md](PACKAGES.md). It's organized by categor
 > not been published by `snowarch/inir-mascot` yet. For Nix, bump the pinned
 > mascot release only after that art release exists.
 >
-> **Important for minimal installs (Arch base / netinstall):**
+> **Important for minimal Arch installs:**
 > If shell startup fails with `module "org.kde.syntaxhighlighting" is not installed`, install:
 > `syntax-highlighting kirigami kdialog`
 

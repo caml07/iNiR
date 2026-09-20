@@ -1,28 +1,74 @@
 # iNiR on Void Linux
 
 Guide for the Void Linux port of iNiR (glibc + runit + XBPS). The V1 port
-implementation is complete through the PR7 engineering-closure sweep. Decisions: see
-`docs/adr/`; glossary: see `CONTEXT.md`.
+implementation is complete through the PR7 engineering-closure sweep plus the
+post-closure hardware/provider fixes found on real Void installs. Decisions:
+see `docs/adr/`; glossary: see `CONTEXT.md`.
 
 ## Status
 
-- V1 scope: **per-user installer works on Void** (same install path as Arch,
-  with no root required for the base install). Optional system-service
-  activation is a separate, confirmed root step. An XBPS package is a
-  separate milestone (see Packaging).
+- V1 scope: **the normal per-user iNiR install path works on Void**. The shell
+  payload lives in the user install just as it does on the repo-managed Arch
+  path; XBPS dependency transactions and system-service activation still use
+  normal privilege elevation when required. Disruptive service ownership
+  changes are confirmation-gated. An iNiR XBPS package is a separate milestone
+  (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
   musl libc and `seatd` without elogind.
-- Validation: QEMU VM first (see VM validation), then a small real partition.
-  The graphics, runsvdir fallback, and turnstile session checkpoints are
+- Validation: QEMU VM first, then a real external-disk install. Both are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-19): the Void integration includes Snow's
-  prerelease through `9574fa42` (iNiR 2.31.0). The final Void runtime fixes
-  were VM validated at `212bb3ae`; Snow's later `7bf10565..9574fa42` release
-  commits only touch release/docs/Arch surfaces and pass the local suite. A
-  clean release VM passed the normal installer, reboot/runtime
-  validation, Doctor 27/27, Web Wallpaper, Power Profiles, Super-tap opt-in,
-  end-to-end Super+Q through ydotool/uinput, and every versioned PR3.2-PR7
-  checker. The remaining release evidence is the planned external-disk test.
+- Current checkpoint (2026-09-20): a fresh fetch shows Snow `main` and
+  `prerelease` both at `9574fa42` (iNiR 2.31.0), and the fork's Void
+  `prerelease` contains that complete upstream baseline plus the Void work. A
+  clean release VM passed the normal installer, reboot/runtime validation,
+  Doctor, Web Wallpaper, Power Profiles, SDDM graphical login, Super-tap
+  opt-in, end-to-end Super+Q through ydotool/uinput, and every versioned
+  PR3.2-PR7 checker. The real external-disk install then found and closed the
+  NetworkManager migration, runit orphan-helper and Turnstile xembed gaps. A
+  later real-Void report exposed two additional packaging/theming regressions:
+  Darkly had been built without its KDecoration settings KCM, and the shipped
+  Foot config referenced the obsolete `colors.ini` path. Both now have explicit
+  regression coverage; Darkly's complete Qt6/KDecoration build was installed
+  and idempotency-tested in the release VM. The only external-disk evidence
+  still not captured is a booted post-migration `nmcli`/NetworkManager service
+  check.
+
+## Installer experience on Void
+
+Use the fork's release-candidate branch for the current Void port:
+
+```bash
+git clone https://github.com/caml07/iNiR.git
+cd iNiR
+git checkout prerelease
+./setup install
+```
+
+For the first install, keep it interactive so setup can offer the
+NetworkManager and SDDM ownership handoffs described below. Later updates from
+that repo-managed checkout continue tracking `prerelease` through the normal
+`inir update` / `./setup update` flow.
+
+Void does not get a second-class manual-only path. `./setup install` uses the
+same TUI shell as the other automated installers and adapts the operations
+behind it to XBPS/runit. A normal first run presents:
+
+- the detected distro/package manager, CPU/GPU/RAM/session summary;
+- an install plan and backup destination before package/config work starts;
+- progress for dependencies, system configuration, config installation and
+  version tracking;
+- low-memory guidance when the machine is small enough for it to matter;
+- a dynamic XBPS free-space check for only the packages still missing, plus
+  download/build headroom;
+- confirmation-gated system-service changes rather than silently assuming
+  systemd or replacing existing service owners.
+
+Two first-install prompts are deliberately special. If Void is still using its
+base `dhcpcd`/standalone `wpa_supplicant` stack, setup can migrate it to
+NetworkManager with rollback if activation fails. After the install itself is
+complete, setup can enable SDDM so the next normal login uses Void's packaged
+`niri --session` entry. Non-interactive `-y` runs leave both of those ownership
+decisions unchanged.
 
 ## How the port decides what to do
 
@@ -151,6 +197,14 @@ Notes:
   The audio profile adds `libspa-bluetooth` for PipeWire Bluetooth audio.
 - `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.
 - Repo sanity: `xbps-query -L` (doctor check).
+- Darkly is built from pinned v0.5.39 source with Qt6/KF6 dependencies,
+  including `kf6-kdecoration-devel`. The provider requires both
+  `styles/darkly6.so` and
+  `org.kde.kdecoration3.kcm/kcm_darklydecoration.so`; a style-only install is
+  considered incomplete and Doctor can repair it.
+- Foot wallpaper theming writes `~/.config/foot/inir-colors.ini`. The shipped
+  `foot.ini`, generator, installer repair and uninstall paths all use that
+  managed name; the historical `colors.ini` path is legacy cleanup only.
 
 ## Capability providers
 
@@ -215,8 +269,9 @@ The implementation was delivered incrementally against
 `snowarch/inir:prerelease`. Those feature/fix branches were useful while the
 port was being built, but they are no longer active development refs. The
 canonical fork branch for the completed Void integration and release candidate
-is now `prerelease`; at the 2026-09-19 branch-formalization checkpoint it is
-`5c13b6c4fa1b3c0459a38117e91d05e140943b0a`.
+is now `prerelease`; at the 2026-09-20 pre-Darkly/Foot closure checkpoint the
+published integration tip is `fd6725f2`, which already contains Snow's complete
+`9574fa42` 2.31.0 baseline.
 
 | Order | Historical delivery | Scope | Closure evidence |
 |---|---|---|---|
@@ -239,9 +294,11 @@ Current fork policy:
 - `main` and `prerelease` are protected against deletion and force-push.
 
 Documentation and VM observations travel with the canonical integration branch.
-The remaining release gate is a clean Void installation on an external disk:
-clone the fork's `prerelease` branch, run iNiR's normal installer, and record
-the exact commands and observations in `docs/VOID_VM_VALIDATION.md`.
+The clean Void external-disk installation has been performed and its findings
+are recorded in `docs/VOID_VM_VALIDATION.md`. The remaining hardware evidence
+is narrow: capture a booted post-migration `nmcli` state and NetworkManager
+runit status. The persistent on-disk runit ownership and connection profile
+have already been verified read-only from the host.
 
 ### External hardware prerequisites
 

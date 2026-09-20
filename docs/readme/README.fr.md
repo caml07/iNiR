@@ -219,7 +219,7 @@ inir doctor                     # auto-diagnostic et réparation
 inir update                     # pull + migrations + redémarrage
 ```
 
-**Distributions supportées :** Arch (installateur automatisé). Les autres distributions peuvent installer manuellement — voir [PACKAGES.md](../PACKAGES.md).
+**Distributions supportées :** Arch ; ce fork ajoute aussi une installation automatisée et validée pour Void Linux glibc + runit via XBPS. Voir [VOID.md](../VOID.md) pour Void et [PACKAGES.md](../PACKAGES.md) pour les paquets.
 
 | Méthode | Commande |
 |--------|---------|

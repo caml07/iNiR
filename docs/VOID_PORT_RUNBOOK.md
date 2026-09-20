@@ -289,8 +289,13 @@ power-profiles-daemon
 warp-svc
 ```
 
-NetworkManager must not be enabled while a competing network service such as
-`dhcpcd` or `wpa_supplicant` is actively owning networking.
+NetworkManager must not run alongside a competing network service such as
+`dhcpcd`, standalone `wpa_supplicant`, or `wicd`. On an interactive Void
+install, the final installer stage offers a controlled migration: it removes
+the enabled competing runit links, enables NetworkManager, and restores the
+previous links if NetworkManager activation cannot be wired. The migration is
+deferred until all package/config work is complete because switching network
+managers can briefly interrupt connectivity.
 
 WARP owns a runit logger:
 

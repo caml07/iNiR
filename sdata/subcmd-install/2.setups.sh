@@ -67,27 +67,9 @@ function setup_systemd_services(){
         log_warning "Turnstile still manages /run/user; set manage_rundir = no for elogind"
       fi
     fi
-    # NetworkManager (base profile provider on Void).
-    # Void handbook requires dbus running and no competing network managers
-    # (dhcpcd, wpa_supplicant, wicd). Never disable competitors automatically:
-    # skip activation and report the conflict instead.
-    if [[ -L /var/service/dhcpcd || -L /var/service/wpa_supplicant || -L /var/service/wicd ]]; then
-      log_warning "Competing network service detected (dhcpcd/wpa_supplicant/wicd); skipping NetworkManager activation"
-      log_info "Disable the competitor first, then enable with: sudo ln -s /etc/sv/NetworkManager /var/service/"
-    elif [[ ! -d /etc/sv/NetworkManager ]]; then
-      log_warning "NetworkManager service directory missing (/etc/sv/NetworkManager); reinstall the NetworkManager package"
-    else
-      if [[ "${ask:-true}" == true ]] && tui_confirm "Enable NetworkManager system service?" "yes"; then
-        if elevate sh -c 'ln -sfn /etc/sv/NetworkManager /var/service/NetworkManager'; then
-          log_success "NetworkManager service enabled"
-        else
-          log_warning "Could not enable NetworkManager service"
-          return 1
-        fi
-      else
-        log_info "Enable NetworkManager with: sudo ln -s /etc/sv/NetworkManager /var/service/"
-      fi
-    fi
+    # NetworkManager activation is intentionally deferred until the installer
+    # has finished. Replacing Void's base dhcpcd/wpa_supplicant services can
+    # briefly interrupt the connection that is still needed during setup.
     # Power Profiles is a base UI capability; Quickshell talks to its system
     # D-Bus service directly, so Void needs the packaged runit service active.
     if [[ ! -d /etc/sv/power-profiles-daemon ]]; then

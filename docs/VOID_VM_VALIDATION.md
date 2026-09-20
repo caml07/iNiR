@@ -1064,3 +1064,62 @@ The live root/reboot gate then passed on the same VM:
 This closes the VM graphical-login parity gate. `niri --session` remains the
 documented local-TTY recovery/debug path, not the normal installed startup
 flow. The remaining release gate is the external-disk/hardware test.
+
+## External-disk NetworkManager and runit lifecycle closure (2026-09-20)
+
+The first real external-disk install used prerelease commit `6eec87b2` on a
+Dell laptop with Intel Tiger Lake/Iris Xe graphics and AX201 Wi-Fi. The
+graphical-login path passed on hardware: runit reported both `dbus` and
+`sddm` running, and SDDM launched the packaged `/usr/bin/niri --session`
+entry into the user session.
+
+The hardware pass exposed a provider gap that the prepared VM image had hidden.
+`NetworkManager-1.56.0_1` and `nmcli` were installed, but
+`/var/service/NetworkManager` was absent while `dhcpcd` and standalone
+`wpa_supplicant` were enabled and owned the working Wi-Fi connection.
+`nmcli` therefore returned `NetworkManager is not running`, so the iNiR Wi-Fi
+surface correctly appeared disabled even though the machine had Internet
+access. Doctor still reported 27 passed / 0 failed because its non-systemd
+service step did not verify the Void NetworkManager runtime.
+
+The external-disk fix closes that path with TDD:
+
+1. **RED:** the local distribution contract required an interactive migration
+   from enabled `dhcpcd`/`wpa_supplicant` to NetworkManager, rollback after
+   activation failure, idempotence after a successful handoff, and a Doctor
+   failure when `nmcli` cannot talk to NetworkManager.
+2. **GREEN:** `configure_void_networkmanager_service` now performs that
+   confirmed migration only after the rest of installation has completed.
+   Non-interactive installs leave networking unchanged. Failure to create the
+   NetworkManager service link restores the previous runit links.
+3. `setup doctor` now detects the distro before distro-specific checks, so the
+   Void NetworkManager runtime check actually executes.
+
+The same hardware session also exposed a non-systemd restart leak. Repeated
+Quickshell restarts had left three `swayidle` processes and three
+`keyboard_lock_state_daemon.py` processes reparented to PID 1. The existing
+orphan cleanup only recognized systemd cgroup ownership. The runit path now
+recognizes only iNiR-owned helpers by their installed runtime paths, and the
+supervised session boot cleans those orphans before starting the next shell.
+On the real external install, two consecutive runit restarts killed the old
+helper PIDs and converged to exactly one Quickshell, one `swayidle`, and one
+keyboard-lock daemon; `inir logs --issues` then reported no warnings or
+errors for the new shell instance.
+
+The same runit inspection showed the generated `inir-xembedsniproxy` service
+passing a literal `$TURNSTILE_ENV_DIR` path to `chpst -e`, which produced a
+repeating "unable to switch to directory" failure. The Turnstile service
+renderer now expands the real environment-directory path and waits harmlessly
+when no Xwayland `DISPLAY` is available instead of entering a crash loop. The
+local distribution contract generates and inspects this service explicitly so
+the escaped-variable regression cannot return.
+
+After the operator accepted the NetworkManager migration and reconnected Wi-Fi,
+the Codexify tunnel dropped before a live post-migration capture could be made.
+With the external root mounted read-only from the host afterward, the persistent
+runit configuration contained
+`/etc/runit/runsvdir/default/NetworkManager -> /etc/sv/NetworkManager`, no
+`dhcpcd`/`wpa_supplicant`/`wicd` link, and a root-owned mode-0600
+NetworkManager connection profile for the reconnected Wi-Fi. This is persistent
+configuration evidence; a final booted `nmcli`/service check is still required
+before declaring the entire external-disk release gate closed.

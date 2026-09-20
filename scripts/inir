@@ -2176,21 +2176,37 @@ cleanup_orphans() {
         done <<< "$alive_pids"
     fi
 
-    # Phase 5: Kill orphaned iNiR helper processes still in inir.service cgroup.
-    # KillMode=process only kills the main QS pid; swayidle, the keyboard daemon,
-    # and nmcli monitor can be reparented to the user manager while remaining in
-    # the service cgroup, accumulating across restarts.
-    local _pid _cgroup
+    # Phase 5: Kill orphaned iNiR helper processes from the previous shell.
+    # systemd keeps them in inir.service's cgroup after KillMode=process. Runit
+    # reparents them to PID 1, so use their iNiR runtime path as the ownership
+    # boundary there instead of relying on cgroups that all share the session.
+    local _pid _cgroup _ppid _cmdline _runtime_root _owned
+    local _using_runit=false
+    is_using_runit_supervisor && _using_runit=true
     while IFS= read -r _pid; do
         [[ -n "$_pid" ]] || continue
+        _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
         # Skip processes owned by the live service main pid or its children
         if [[ -n "$service_main_pid" && "$service_main_pid" != "0" ]]; then
-            local _ppid
-            _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
             [[ "$_ppid" == "$service_main_pid" ]] && continue
         fi
-        _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
-        [[ "$_cgroup" == *"inir.service"* ]] || continue
+
+        if [[ "$_using_runit" == true ]]; then
+            [[ "$_ppid" == "1" ]] || continue
+            _cmdline="$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null || true)"
+            _owned=false
+            for _runtime_root in "$user_config_dir" "$system_config_dir" "$fallback_system_config_dir"; do
+                if [[ "$_cmdline" == *"$_runtime_root/scripts/daemon/keyboard_lock_state_daemon.py"* ]] \
+                        || { [[ "$_cmdline" == *"/swayidle -w"* ]] && [[ "$_cmdline" == *"$_runtime_root/scripts/inir"* ]]; }; then
+                    _owned=true
+                    break
+                fi
+            done
+            [[ "$_owned" == true ]] || continue
+        else
+            _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
+            [[ "$_cgroup" == *"inir.service"* ]] || continue
+        fi
         kill "$_pid" 2>/dev/null || true
     done < <(pgrep -f 'keyboard_lock_state_daemon\.py|nmcli monitor|/usr/bin/swayidle -w' 2>/dev/null || true)
 
@@ -3839,6 +3855,8 @@ case "$command_name" in
             # Systemd manages lifecycle (Restart=on-failure) and I/O priority.
             _skip_running_detect=true
             resolve_config_dir
+            # Clean helpers orphaned by the previous supervised shell.
+            cleanup_orphans
             apply_hot_reload_policy_for_dir "$config_dir"
             check_qs_abi
             apply_qt_runtime_env          # import Niri-owned session env if needed

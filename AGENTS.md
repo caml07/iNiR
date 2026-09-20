@@ -51,6 +51,17 @@ external-disk/hardware test.
   SDDM greeter boot plus an SDDM-launched Niri/Quickshell session with Doctor
   27/27. Manual `niri --session` is the recovery path rather than the intended
   normal boot flow.
+- The first real external-disk run found two VM-hidden gaps: Void's stock
+  `dhcpcd`/`wpa_supplicant` services prevented the installed NetworkManager
+  provider from activating, and runit-reparented `swayidle`/keyboard helpers
+  accumulated across shell restarts. The Turnstile xembed service also rendered
+  `$TURNSTILE_ENV_DIR` literally and crash-looped. The external-disk closure
+  branch adds a rollback-safe NetworkManager handoff, Doctor runtime coverage,
+  distro detection for `setup doctor`, runit-aware helper cleanup, and correct
+  xembed environment rendering. Hardware
+  restart testing converged to one shell/idle/keyboard helper; persistent
+  NetworkManager ownership is present on disk, with one final booted live
+  NetworkManager check still pending.
 
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 Repo-local procedures are also available under `.agents/skills/`:

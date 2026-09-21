@@ -1,6 +1,6 @@
 ---
 name: inir-void-debugging
-description: Diagnose runtime regressions in the iNiR Void Linux port. Use when Niri/Quickshell keybinds, IPC, sidebars, user services, session environment, QML modules, audio, ydotool, or runit-backed providers work intermittently or fail after restart/reboot.
+description: Diagnose runtime regressions in the iNiR Void Linux port. Use when Niri/Quickshell keybinds, IPC, sidebars, user services, session environment, QML modules, audio, networking, ydotool, Darkly/Foot theming, or runit-backed providers fail after restart/reboot.
 ---
 
 # iNiR Void runtime debugging
@@ -15,10 +15,10 @@ Read:
 - `AGENTS.md`
 - `docs/VOID_PORT_RUNBOOK.md`
 - `docs/VOID_VM_VALIDATION.md`
-- ADR-0001, ADR-0002, and ADR-0003 when the failure touches startup,
-  supervision, or systemd-sensitive behavior
+- ADR-0001, ADR-0002, and ADR-0003 for startup/supervision issues
 
-Use the generic `diagnosing-bugs` skill for the RED/reproduction loop.
+For a provider failure, also use `inir-void-provider`. For closure/reboot work,
+use `inir-void-validation`.
 
 ## First split: config, transport, or action
 
@@ -31,24 +31,19 @@ For a broken keybind/IPC action, separate these layers:
 5. the QML target executes;
 6. any nested `niri msg`, D-Bus, socket, or service action succeeds.
 
-Do not jump from "the key does nothing" to editing the KDL.
+Do not jump from "the key does nothing" to editing KDL. Compare the normal iNiR
+action, a native Niri action, a generic spawn, and direct QML IPC. Use
+ydotool/uinput when possible so the test crosses the real compositor bind path.
 
-A useful pattern is to compare:
-
-- the normal iNiR action;
-- a temporary native Niri action;
-- a temporary generic `spawn sh -c ...` action;
-- direct QML IPC.
-
-Use ydotool/uinput when possible so the test crosses the real compositor bind
-path instead of calling the final script directly.
+Turnstile is not in the hot path of every keypress. It matters when the session
+or shell is starting/restarting and the Niri environment must be propagated to
+runit.
 
 ## Session environment
 
-On the primary Void profile, the shell is supervised by turnstile/runit and
-must inherit the live Niri session environment.
-
-Inspect the actual Quickshell process:
+The primary Void profile uses Turnstile/runit and must inherit the live Niri
+session environment. Inspect the actual Quickshell process, not the automation
+shell:
 
 ```bash
 qpid=$(pgrep -u "$USER" -af '/usr/bin/qs -n -p .*/quickshell/inir' |
@@ -57,95 +52,98 @@ tr '\0' '\n' < "/proc/$qpid/environ" |
   grep -E '^(PATH|WAYLAND_DISPLAY|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS|NIRI_SOCKET|INIR_VENV)='
 ```
 
-Compare `NIRI_SOCKET` to the current socket under `/run/user/$UID`.
+A stale `NIRI_SOCKET` can make outer IPC look successful while a nested
+`niri msg` fails. The startup handoff must publish the new environment and
+restart only the iNiR service.
 
-A stale Quickshell `NIRI_SOCKET` can make an IPC call return success while a
-nested `niri msg` fails. The startup handoff must publish the new environment
-with `turnstile-update-runit-env` and restart only the iNiR user service so
-the shell inherits it.
+## SSH/automation is usually not the graphical session
 
-## SSH is not the graphical session
+A non-graphical shell can make Doctor report `Niri not detected` or make `qs`
+say no instance exists. That is not enough to diagnose the desktop. Confirm:
 
-An SSH shell commonly lacks `WAYLAND_DISPLAY` and may make `qs` report:
+- SDDM/Niri process ancestry;
+- the live Quickshell process;
+- its environment under `/proc/<pid>/environ`;
+- the active user runtime dir and D-Bus socket.
 
-```text
-No running instances ... on the current display "unk"
-```
+## Supervisor and duplicate-process checks
 
-That does not prove Quickshell is down. Confirm the process and use the active
-display/runtime explicitly when invoking IPC:
+For user services, inspect the active `~/.config/service/*` runit tree. For
+root-owned services, combine persistent links with runtime proof.
 
-```bash
-export WAYLAND_DISPLAY=wayland-1
-export XDG_RUNTIME_DIR=/run/user/$(id -u)
-export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
-qs -p "$HOME/.config/quickshell/inir" ipc call <target> <function>
-```
-
-Use the live process environment instead of hard-coding `wayland-1` when
-testing a machine where the display number is not already known.
-
-## Supervisor checks
-
-For user services:
+When checking duplicate shell/helper regressions, use exact counts:
 
 ```bash
-sv status ~/.config/service/inir
-sv status ~/.config/service/pipewire
-sv status ~/.config/service/wireplumber
-sv status ~/.config/service/pipewire-pulse
-sv status ~/.config/service/ydotool
+pgrep -x qs
+pgrep -x swayidle
+ps -eo pid,comm,args | awk '$2=="python3" && /keyboard_lock_state_daemon.py/'
 ```
 
-For root-owned runit services, verify the `/var/service/<name>` symlink,
-`runsv` process, daemon process, and the provider's operational signal. Do not
-treat inability to run a privileged `sv status` over SSH as proof the daemon
-is down.
+Require one supervised Quickshell shell, one iNiR `swayidle`, and one keyboard
+lock daemon after restart/reboot. Do not count the grep/test shell itself.
+
+## Root runit service trap
+
+On Void an unprivileged:
+
+```bash
+sv status /var/service/NetworkManager
+```
+
+can report `access denied` even while the service is healthy. Cross-check:
+
+- `/var/service/<name>` and persistent default runsvdir links;
+- `runsv <name>` process;
+- daemon child process;
+- D-Bus/socket owner;
+- operational CLI (`nmcli`, `powerprofilesctl`, `bluetoothctl`, etc.).
+
+## Network regressions
+
+For NetworkManager failures, determine who actually owns connectivity. Package
+presence alone is insufficient. Check:
+
+- `nmcli -t -f STATE general`;
+- device connection state;
+- default route;
+- NetworkManager `runsv`/daemon ancestry;
+- `/var/service/NetworkManager` and persistent default link;
+- competing `dhcpcd`, standalone `wpa_supplicant`, or `wicd` service links.
+
+Never disable the working network stack silently. The installer migration is
+confirmation-gated and rollback-safe.
 
 ## QML/runtime failures
 
 When panels or sidebars vanish:
 
 1. inspect the current Quickshell log;
-2. search for missing QML modules, component load failures, TypeError/
-   ReferenceError, and stale socket errors;
-3. verify the required package is in the selected Void dependency profile;
-4. reproduce after a shell restart;
-5. add a local-distribution regression guard if the dependency is mandatory.
+2. search missing QML modules/component-load/TypeError/ReferenceError/stale
+   socket errors;
+3. verify the required package is in the selected Void profile;
+4. reproduce after shell restart;
+5. add a local-distribution regression guard for mandatory dependencies.
 
-The sidebars require `kf6-syntax-highlighting`; binary detection alone is not
-enough when a QML import is load-bearing.
+## Theme/provider regressions
 
-## Keybind regression gate
+Two historical false positives are worth checking explicitly:
 
-For a close-window regression:
-
-1. validate Niri config;
-2. focus a disposable Foot window;
-3. inject Super+Q via ydotool/uinput;
-4. require the window to disappear;
-5. if it fails, compare native `close-window`, generic spawn, and
-   `inir close-window` separately.
-
-Keep `Mod+Q` non-inhibitable unless the product behavior intentionally
-changes.
+- **Darkly:** style loading can pass while `darkly-settings6` fails. Require
+  `darkly6.so` **and** `kcm_darklydecoration.so`, verify `ldd`, then smoke the
+  settings app.
+- **Foot:** the canonical generated include is
+  `~/.config/foot/inir-colors.ini`. If `foot.ini` references legacy
+  `colors.ini`, run the generator/repair path and validate with
+  `foot --check-config` when Foot is installed.
 
 ## Logging regressions
 
-Root-owned daemons must not spray stdout/stderr onto tty1. A managed runit
-service that logs continuously should own a runit log subservice. WARP uses
-`vlogger -t warp-svc -p daemon`.
-
-After changing logging, verify both daemon liveness and logger liveness. A
-quiet tty is not enough if the service died.
+Root-owned daemons must not spray stdout/stderr onto tty1. Managed noisy runit
+services should own a log subservice. Verify both daemon and logger liveness;
+a quiet tty is not enough if the service died.
 
 ## Claims
 
-Distinguish:
-
-- **validated**: behavior was exercised in the live session;
-- **mechanical check**: config/files/process state matched;
-- **not verified**: hardware, credentials, or visual observation were absent.
-
-Do not call an icon visually correct because its asset/mapping exists, and do
-not call Bluetooth hardware operation validated in the current VM.
+Distinguish live validation, mechanical checks, and unverified hardware/visual
+claims. Never call an icon visually correct because its file exists, and never
+infer graphical failure from an SSH shell missing Niri environment variables.

@@ -1,6 +1,6 @@
 ---
 name: inir-void-provider
-description: Add, repair, or review a concrete Void capability provider for iNiR. Use when mapping an iNiR feature to XBPS, Flatpak, or a pinned upstream artifact; editing Void dependency profiles; creating runit/turnstile activation; or writing provider checkers/idempotency tests.
+description: Add, repair, or review a concrete Void capability provider for iNiR. Use when mapping an iNiR feature to XBPS, Flatpak, or a pinned upstream artifact; editing Void dependency profiles; creating runit/Turnstile activation; or writing provider checkers/idempotency tests.
 ---
 
 # iNiR Void provider workflow
@@ -12,6 +12,7 @@ is incomplete.
 
 Read:
 
+- `AGENTS.md`
 - `docs/adr/0004-void-capability-providers.md`
 - `docs/VOID_CAPABILITIES.md`
 - `docs/VOID_PORT_RUNBOOK.md`
@@ -29,68 +30,75 @@ Choose the first viable option:
 2. maintained Flatpak when the app model fits;
 3. pinned upstream binary/source.
 
-For upstream providers require:
-
-- exact version/commit;
-- stable URL/source provenance;
-- SHA-256 verification;
-- explicit install location;
-- repair/update detection;
-- no unreviewed distro maintainer scripts;
-- repeatable VM verification.
+For upstream providers require exact version/commit, provenance, SHA-256,
+explicit install location, deterministic repair/update detection, no unreviewed
+distro maintainer scripts, and repeatable VM verification.
 
 ## Five-part contract
 
-Do not mark the capability supported until all are present:
+A capability is not supported until all five are true:
 
-### Provider
-Concrete package/Flatpak/artifact is named and obtainable.
+1. **Provider** — exact package/Flatpak/artifact is obtainable.
+2. **Provisioning** — install/repair is deterministic and idempotent.
+3. **Activation** — correct ownership model is used.
+4. **Operation** — the real iNiR UI/action works.
+5. **Verification** — repeatable checker + live runtime evidence exist.
 
-### Provisioning
-Install/repair path is deterministic and idempotent.
+Activation choices:
 
-### Activation
-Use the correct model:
-
-- runit system service for root-owned Void daemons;
-- turnstile/runsvdir user service for session daemons;
-- direct process for one-shot tools;
-- systemd user unit only when ADR-0002 predicate holds.
-
-### Operation
-The existing iNiR UI/action works without embedding distro-specific behavior in
-the UI layer.
-
-### Verification
-Create or extend a versioned checker and execute it in the Void VM.
-
-## Dependency profile rules
-
-Profiles mirror the existing installer model: base, audio, toolkit,
-screencapture, fonts/theme.
-
-Selecting a profile must provision every provider required by that profile.
-Do not leave a visible control that depends on a package the selected profile
-does not install.
-
-Important validated Void naming differences are recorded in
-`docs/VOID_PORT_RUNBOOK.md`. Re-query XBPS when adding a new package rather
-than guessing.
+- root-owned Void daemon -> runit system service;
+- user/session daemon -> Turnstile/runsvdir user service;
+- one-shot tool -> direct process;
+- systemd user unit -> only when ADR-0002's usable-user-manager predicate holds.
 
 ## TDD and idempotency
 
-For every provider change:
+For every provider repair:
 
-1. add a regression/provider contract first;
-2. prove RED;
+1. capture the incomplete/broken state;
+2. add a regression/provider contract and prove RED;
 3. implement the minimum GREEN path;
 4. run `bash -n`, `git diff --check`, and `make test-local`;
-5. run the provider checker in a clean VM audit checkout;
-6. run its idempotency mode or an equivalent before/after snapshot.
+5. run the provider checker in `voidlinux-release-clean`;
+6. run its idempotency mode or compare explicit before/after snapshots;
+7. if persistence is part of the provider, reboot and prove ownership again.
 
-A successful second command with changed provider files is not idempotent.
+A second command that exits zero while changing provider files is not
+idempotent.
+
+## Provider completeness lessons from the port
+
+- **NetworkManager:** package presence is not enough. Void may still have
+  `dhcpcd`/standalone `wpa_supplicant` owning the network. Migration must be
+  interactive, rollback-safe, and deferred until the rest of installation is
+  complete. Validate live `nmcli`, persistent runit links, daemon/runsv
+  ancestry, and absence of competing service links.
+- **SDDM:** enable late, confirm explicitly, verify the packaged Niri desktop
+  entry, and refuse to trample another display manager.
+- **Darkly:** `darkly6.so` alone is a partial install. Require the Qt style plus
+  `org.kde.kdecoration3.kcm/kcm_darklydecoration.so`; verify `ldd`,
+  `darkly-settings6`, and second-run convergence. Void needs
+  `kf6-kdecoration-devel` and decorations enabled.
+- **Foot theming:** installer, shipped config, generator, repair, and uninstall
+  must agree on `~/.config/foot/inir-colors.ini`; migrate the old `colors.ini`
+  include instead of accepting two competing contracts.
+- **Root runit services:** unprivileged `sv status` can report access denied even
+  for a healthy service. Verify symlink + `runsv` parent + daemon + D-Bus/socket
+  or feature CLI.
+- **Fonts/large profiles:** keep the dynamic free-space preflight; a successful
+  provider design includes enough disk headroom for the real XBPS transaction.
+
+## Dependency profile rules
+
+Profiles mirror the installer model: base, audio, toolkit, screencapture,
+fonts/theme. Selecting a profile must provision every provider required by that
+profile. Re-query XBPS when adding a package; do not guess from Arch naming.
 
 ## Documentation
 
-Update `docs/VOID_CAPABILITIES.md` only after the five-part contract is
-satisfied. Record actual VM evidence in `docs/VOID_VM_VALIDATION.md`.
+After the five-part contract passes:
+
+- update `docs/VOID_CAPABILITIES.md` with exact current state;
+- append actual VM/hardware evidence to `docs/VOID_VM_VALIDATION.md`;
+- update `docs/VOID.md` / runbook when installer/service semantics changed;
+- never upgrade a mechanical file check into a live/visual/hardware claim.

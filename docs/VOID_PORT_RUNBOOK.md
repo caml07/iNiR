@@ -41,11 +41,14 @@ with the Void port:
 
 - `inir-void-port`: overall roadmap, rules, branching, and implementation flow;
 - `inir-void-provider`: provider/provisioning/activation/operation/verification;
-- `inir-void-validation`: checkers, idempotency, VM and reboot closure gates;
-- `inir-void-debugging`: live Niri/Quickshell/runit/IPC/session regressions.
+- `inir-void-validation`: checkers, idempotency, VM/reboot/hardware closure gates;
+- `inir-void-debugging`: live Niri/Quickshell/runit/IPC/session regressions;
+- `inir-void-release`: upstream Snow parity, release-candidate closure, final docs,
+  PR publication/merge, and the VM -> hardware handoff.
 
 Use the narrowest skill that matches the task. The port skill is the general
-entry point; the other three are specialized procedures.
+entry point; provider/debugging/validation own their focused domains, while the
+release skill owns the repeated end-of-cycle `prerelease` closure workflow.
 
 ## Non-negotiable rules
 

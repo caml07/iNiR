@@ -30,6 +30,8 @@ PROMPTS.md
 !.agents/skills/inir-void-validation/**
 !.agents/skills/inir-void-debugging/
 !.agents/skills/inir-void-debugging/**
+!.agents/skills/inir-void-release/
+!.agents/skills/inir-void-release/**
 CODEX.md
 PI.md
 GEMINI.md*

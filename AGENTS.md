@@ -79,7 +79,99 @@ remains for the 2.31.0 port.
 The detailed commands and observations are in `docs/VOID_VM_VALIDATION.md`.
 Repo-local procedures are also available under `.agents/skills/`:
 `inir-void-port`, `inir-void-provider`, `inir-void-validation`, and
-`inir-void-debugging`.
+`inir-void-debugging`. Release/upstream closure work also has a dedicated
+`inir-void-release` skill.
+
+## Standard maintenance loop
+
+This is the workflow that proved reliable while finishing the Void port. Reuse
+it for future Snow syncs, Void regressions, provider repairs, and release
+candidate updates instead of rebuilding the process ad hoc.
+
+1. **Refresh facts before editing.** Fetch both `origin` and `upstream`, inspect
+   `origin/prerelease`, `upstream/main`, and `upstream/prerelease`, then record
+   the exact delta. Never assume an older feature branch reflects current
+   integration state.
+2. **Protect the user's live checkout.** If the physical Void checkout or any
+   other working tree is dirty, leave it untouched. Create a clean temporary
+   clone/worktree from the fork's `prerelease` for implementation, docs, and
+   publishing. Do not reset/stash/rebase user-owned changes just to make an
+   audit convenient.
+3. **Branch from the current fork integration tip.** Use a small `fix/*`,
+   `feat/*`, or `docs/*` branch based on `origin/prerelease`. `main` remains the
+   upstream baseline; Void work lands through `prerelease`.
+4. **Reproduce first, then TDD.** For a bug, capture the actual failing state
+   (VM or physical Void), add the narrowest regression/checker contract, prove
+   RED, implement the minimum GREEN fix, and keep feature + regression test in
+   the same code commit when practical.
+5. **Validate the provider, not just the binary.** Verify provisioning,
+   activation, runtime ownership, the real iNiR action/UI path, and a second-run
+   idempotency snapshot. A package/plugin existing on disk is not sufficient.
+6. **Use the release VM for Void-specific behavior.** The canonical VM is
+   `voidlinux-release-clean`; discover its current address dynamically rather
+   than hard-coding DHCP state. Pull the latest fork `prerelease` before
+   overlaying/testing a candidate.
+7. **Treat SSH/automation as non-graphical unless proven otherwise.** Missing
+   `NIRI_SOCKET`/`WAYLAND_DISPLAY` in an automation shell does not prove the
+   graphical session is broken. Inspect the real Niri/Quickshell process
+   environment and session ownership before filing a runtime failure.
+8. **Reboot for lifecycle claims.** For service/session fixes, require a real
+   reboot when persistence is part of the contract. Recheck SDDM ->
+   `niri --session`, supervisor ownership, one Quickshell, helper counts,
+   NetworkManager/BlueZ/Power Profiles signals, and relevant IPC/action paths.
+9. **Use physical hardware only for the final gaps.** VM validation comes
+   first. The external-disk Void install is for hardware/network/session facts
+   the VM cannot prove. Record exactly what was exercised; do not convert a
+   mechanical check into a visual/hardware claim.
+10. **Update docs with the code.** At minimum review `AGENTS.md`, `docs/VOID.md`,
+    `docs/VOID_CAPABILITIES.md`, `docs/VOID_PORT_RUNBOOK.md`, and
+    `docs/VOID_VM_VALIDATION.md`. If public install/runtime behavior changed,
+    also review README/INSTALL/SETUP/PACKAGES/RUNTIME/AUTOSTART and localized
+    distro-support notes.
+11. **Compare doc-verifier failures to a clean baseline.** The repository has
+    known non-Void verifier findings. A non-zero `scripts/verify-docs.sh` is not
+    automatically a regression; compare the exact findings with a detached
+    clean `origin/prerelease` worktree before making that claim.
+12. **Run final gates.** `bash -n` for touched shell files, Python compile when
+    relevant, `git diff --check`, `make test-local`, the versioned Void checker,
+    and idempotency mode where supported. Run ShellCheck when installed and say
+    when it is unavailable.
+13. **Review and secret-scan before commit.** Inspect the final diff, verify no
+    unrelated files are staged, and run the staged secret scan when available.
+14. **Keep history readable.** Prefer a code/test commit and a separate docs
+    commit for large closure sweeps. Use concise commit messages such as
+    `fix(void): ...` and `docs(void): ...`.
+15. **Publish through a PR to `prerelease`.** Push the short-lived branch, open
+    a PR against the fork's `prerelease`, summarize exact validation evidence,
+    merge explicitly after the gates pass, and let GitHub delete the merged
+    branch. Do not merge Void work directly into `main`.
+
+### Repeated gotchas worth remembering
+
+- Void root-owned runit services can be healthy even when an unprivileged
+  `sv status /var/service/<name>` reports `access denied`. Cross-check the
+  service link, `runsv` parent, daemon process, D-Bus/socket signal, and the
+  feature's operational CLI.
+- Turnstile/runit is a **session startup/restart lifecycle**, not a per-keybind
+  hot path. Keybind latency debugging should still split Niri -> spawn ->
+  launcher/IPC -> QML/action.
+- NetworkManager migration must not silently destroy a working Void network.
+  Keep the confirmation + rollback contract and defer it until the rest of the
+  install is complete.
+- SDDM enablement is also confirmation-gated and late in setup. A manual
+  `niri --session` launch is a recovery/debug path, not the normal installed
+  login flow.
+- Count the actual supervised shell process (`qs -n -p .../quickshell/inir`),
+  not every short-lived `qs` IPC client. For helper-leak regressions, count
+  `swayidle` and `keyboard_lock_state_daemon.py` separately.
+- Darkly completeness requires both the Qt style and the KDecoration settings
+  KCM. `darkly6.so` alone can make the provider look healthy while
+  `darkly-settings6` still fails.
+- Foot theming uses one canonical managed file:
+  `~/.config/foot/inir-colors.ini`. `colors.ini` is legacy cleanup/migration
+  input only.
+- Large XBPS/font transactions need free-space headroom. Preserve the dynamic
+  preflight instead of assuming a minimal 20 GiB root is enough.
 
 ### Latest VM checkpoint
 
@@ -123,15 +215,16 @@ Repo-local procedures are also available under `.agents/skills/`:
 
 ## Where things are
 
-- Work repo: `~/Projects/inir` (clone of the fork `caml07/iNiR`; `origin` =
-  fork, `upstream` = `snowarch/inir`). PRs for this project target
-  `snowarch/inir` `prerelease` (CONTRIBUTING.md).
-- The original clone stays at `/home/caml/inir` (upstream `main` clone,
-  untouched). Its `inir-fix` worktree holds the now-merged PR #222 branch
-  `fix/window-identity-rules`; it remains outside this port task — do not
-  touch it.
-- Untracked user file that must never be touched or committed:
-  `scripts/colors/modules/05-caelestia-terminal.sh`.
+- Canonical repository: fork `caml07/iNiR`; `origin` is the fork and
+  `upstream` is `snowarch/inir` in normal development checkouts.
+- Do not rely on a hard-coded local checkout path. The physical Void install
+  has had a dirty `~/iNiR` checkout during validation, while clean release work
+  has intentionally used disposable clones/worktrees. Always inspect the path,
+  branch, and status you were actually given before editing.
+- The separate upstream/PR worktrees used for unrelated Snow work remain out of
+  scope unless the user explicitly brings them into the task.
+- If `scripts/colors/modules/05-caelestia-terminal.sh` exists as an untracked
+  user file, never stage, rewrite, or commit it.
 
 ## The port's load-bearing rule
 
@@ -208,7 +301,8 @@ requirement can be identified.
 
 ## Do not
 
-- Touch `/home/caml/inir` or `inir-fix` (PR #222 work).
+- Touch unrelated upstream/PR worktrees or a dirty physical-validation checkout
+  merely to obtain a clean tree. Use a disposable clean clone/worktree instead.
 - Commit without being asked. Never commit the untracked
   `05-caelestia-terminal.sh`.
 - Stage or modify the current user-owned dirty files

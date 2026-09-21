@@ -4,9 +4,14 @@ How iNiR starts, how apps autostart, and how sessions end.
 
 ## Shell startup
 
-iNiR itself runs as a systemd user service. It does not start via niri's `spawn-at-startup`. This gives it crash recovery, proper lifecycle management, and journal logging.
+iNiR is started by the session supervisor selected for the current machine. On
+a normal Arch/systemd-user session that is `inir.service`; on the supported
+Void runit path it is a Turnstile-managed user service or the guarded runsvdir
+fallback. The goal is the same in every tier: exactly one shell, tied to the
+Niri session, with the compositor's authoritative environment and crash
+recovery owned by a supervisor.
 
-The service connects to your compositor via a wants link:
+On the systemd tier, the service connects to the compositor via a wants link:
 
 ```
 ~/.config/systemd/user/niri.service.wants/inir.service
@@ -19,6 +24,13 @@ inir service enable     # create wants link
 inir service disable    # remove it
 inir service status     # check state
 ```
+
+On Void without a usable systemd user manager, setup renders
+`~/.config/service/inir/run`. Turnstile provides the user-session lifecycle and
+environment directory when available; otherwise Niri owns a single runsvdir
+fallback. Do not add a second handwritten `spawn-at-startup` shell entry on top
+of that. `inir restart`, `inir logs`, `inir doctor` and the other normal CLI
+operations select the active supervisor for you.
 
 For the full boot sequence, see [Runtime and Boot Pipeline](RUNTIME.md).
 
@@ -43,7 +55,7 @@ iNiR has its own autostart manager that handles:
 
 - **Desktop entries**: standard `.desktop` files in `~/.config/autostart/`
 - **Custom commands**: user-defined commands configured through Settings
-- **Systemd units**: user-level systemd services
+- **Systemd units**: user-level systemd services when that user manager exists
 
 Manage autostart entries from Settings > System > Autostart (there is no CLI for this, it is managed through the settings UI, backed by `services/Autostart.qml`).
 

@@ -1056,6 +1056,37 @@ if [[ "$python_setup_owners" != "$runtime_root/sdata/subcmd-install/3.files.sh" 
     exit 1
 fi
 
+step "Foot generated color include"
+foot_default="$runtime_root/dots/.config/foot/foot.ini"
+terminal_generator="$runtime_root/scripts/colors/generate_terminal_configs.py"
+package_installers="$runtime_root/sdata/lib/package-installers.sh"
+uninstall_lib="$runtime_root/sdata/lib/uninstall.sh"
+if ! grep -qx 'include=~/.config/foot/inir-colors.ini' "$foot_default"; then
+    printf 'FAIL: shipped Foot config does not reference the managed inir-colors.ini file\n' >&2
+    exit 1
+fi
+if grep -qE '^include=.*[/]colors\.ini$' "$foot_default"; then
+    printf 'FAIL: shipped Foot config still references the stale colors.ini path\n' >&2
+    exit 1
+fi
+for needle in \
+    'include=~/.config/foot/inir-colors.ini' \
+    'f"{home}/.config/foot/inir-colors.ini"'; do
+    if ! grep -Fq "$needle" "$terminal_generator"; then
+        printf 'FAIL: Foot terminal generator missing managed path: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'include=~/.config/foot/inir-colors.ini' "$package_installers"; then
+    printf 'FAIL: Foot installer disagrees with generated color path\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'foot/inir-colors.ini' "$uninstall_lib" \
+        || ! grep -Fq 'foot/colors.ini' "$uninstall_lib"; then
+    printf 'FAIL: Foot uninstall must clean the managed file and its legacy predecessor\n' >&2
+    exit 1
+fi
+
 step "YT Music distribution contract"
 for requirements in "$runtime_root/sdata/uv/requirements.in" "$runtime_root/sdata/uv/requirements.txt"; do
     grep -Fq 'ytmusicapi>=1.12.0' "$requirements" || {
@@ -1998,6 +2029,11 @@ for needle in \
         exit 1
     fi
 done
+if ! grep -Fq 'missing_cmds+=("darkly")' "$runtime_root/sdata/lib/doctor.sh" \
+        || ! grep -Fq 'kcm_darklydecoration.so' "$runtime_root/sdata/lib/doctor.sh"; then
+    printf 'FAIL: Void dependency repair cannot detect the partial Darkly settings install\n' >&2
+    exit 1
+fi
 audio_helper="$runtime_root/sdata/lib/functions.sh"
 if ! grep -Fq 'reconcile_audio_user_services' "$audio_helper" \
         || ! grep -Fq 'pipewire-pulse' "$audio_helper" \
@@ -3410,7 +3446,7 @@ for package in \
     kf6-kcoreaddons-devel kf6-kcmutils-devel kf6-kcolorscheme-devel \
     kf6-kconfig-devel kf6-kguiaddons-devel kf6-ki18n-devel \
     kf6-kiconthemes-devel kf6-kwindowsystem-devel kf6-kirigami-devel \
-    kf6-frameworkintegration-devel; do
+    kf6-frameworkintegration-devel kf6-kdecoration-devel; do
     if ! grep -Eq "^[[:space:]]+${package}$" <<< "$void_fonts_packages"; then
         printf 'FAIL: Void Darkly provider dependency missing: %s\n' "$package" >&2
         exit 1
@@ -3420,9 +3456,10 @@ for needle in \
     'DARKLY_VERSION="0.5.39"' \
     'DARKLY_SOURCE_SHA256="5fed786f78ac3a6153e99920e722c981348c01fc781fb511371f6bfedee0f0c2"' \
     'install_void_darkly' \
+    'void_darkly_kcm_path' \
     '-DBUILD_QT5=OFF' \
     '-DBUILD_QT6=ON' \
-    '-DWITH_DECORATIONS=OFF' \
+    '-DWITH_DECORATIONS=ON' \
     'Widgets DBus OpenGL' \
     '/usr/lib64/qt6/plugins'; do
     if ! grep -Fq -- "$needle" "$void_deps"; then

@@ -219,7 +219,7 @@ inir doctor                     # 自動診断と修復
 inir update                     # pull + マイグレーション + 再起動
 ```
 
-**対応ディストリビューション：** Arch（自動インストーラー）。他のディストリビューションは手動インストール可能 — [PACKAGES.md](../PACKAGES.md) を参照。
+**対応ディストリビューション：** Arch。この fork では XBPS を使う Void Linux glibc + runit の自動・検証済みインストール経路も追加されています。Void は [VOID.md](../VOID.md)、パッケージ詳細は [PACKAGES.md](../PACKAGES.md) を参照してください。
 
 | 方法 | コマンド |
 |--------|---------|

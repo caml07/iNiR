@@ -212,6 +212,7 @@ VOID_FONTS_PACKAGES=(
   kf6-kwindowsystem-devel
   kf6-kirigami-devel
   kf6-frameworkintegration-devel
+  kf6-kdecoration-devel
   dejavu-fonts-ttf
   twemoji
   nerd-fonts-ttf
@@ -633,16 +634,38 @@ void_darkly_plugin_path() {
   done | head -n1
 }
 
+void_darkly_kcm_path() {
+  local plugin_dir
+  plugin_dir=""
+  if command -v qtpaths6 >/dev/null 2>&1; then
+    plugin_dir="$(qtpaths6 --plugin-dir 2>/dev/null || true)"
+  elif command -v qtpaths >/dev/null 2>&1; then
+    plugin_dir="$(qtpaths --plugin-dir 2>/dev/null || true)"
+  fi
+  for plugin_dir in \
+      "$plugin_dir" \
+      /usr/lib64/qt6/plugins \
+      /usr/lib/qt6/plugins \
+      /usr/lib/x86_64-linux-gnu/qt6/plugins; do
+    [[ -n "$plugin_dir" && -d "$plugin_dir/org.kde.kdecoration3.kcm" ]] || continue
+    find "$plugin_dir/org.kde.kdecoration3.kcm" -maxdepth 1 -type f \
+      -name 'kcm_darklydecoration.so' -print -quit 2>/dev/null
+  done | head -n1
+}
+
 install_void_darkly() {
-  local data_home marker_dir marker plugin temp_dir archive source_dir build_dir jobs verify_output
+  local data_home marker_dir marker plugin kcm temp_dir archive source_dir build_dir jobs verify_output
   data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
   marker_dir="$data_home/inir/providers"
   marker="$marker_dir/darkly"
   plugin="$(void_darkly_plugin_path || true)"
+  kcm="$(void_darkly_kcm_path || true)"
 
   if [[ -n "$plugin" ]] \
+      && [[ -n "$kcm" ]] \
       && [[ "$(cat "$marker" 2>/dev/null || true)" == "${DARKLY_VERSION}:${DARKLY_SOURCE_SHA256}" ]] \
-      && ! ldd "$plugin" 2>/dev/null | grep -Fq 'not found'; then
+      && ! ldd "$plugin" 2>/dev/null | grep -Fq 'not found' \
+      && ! ldd "$kcm" 2>/dev/null | grep -Fq 'not found'; then
     return 0
   fi
 
@@ -683,7 +706,7 @@ PY
       -DKDE_INSTALL_USE_QT_SYS_PATHS=ON \
       -DBUILD_QT5=OFF \
       -DBUILD_QT6=ON \
-      -DWITH_DECORATIONS=OFF \
+      -DWITH_DECORATIONS=ON \
       -DBUILD_TESTING=OFF \
       || ! cmake --build "$build_dir" -j"$jobs" \
       || ! pkg_sudo cmake --install "$build_dir"; then
@@ -694,8 +717,13 @@ PY
   rm -rf "$temp_dir"
 
   plugin="$(void_darkly_plugin_path || true)"
+  kcm="$(void_darkly_kcm_path || true)"
   if [[ -z "$plugin" ]] || ldd "$plugin" 2>/dev/null | grep -Fq 'not found'; then
     log_warning "Darkly Qt6 plugin was not installed with usable runtime dependencies"
+    return 1
+  fi
+  if [[ -z "$kcm" ]] || ldd "$kcm" 2>/dev/null | grep -Fq 'not found'; then
+    log_warning "Darkly settings KCM was not installed with usable runtime dependencies"
     return 1
   fi
   verify_output="$(timeout 3 env QT_QPA_PLATFORM=offscreen QT_STYLE_OVERRIDE=Darkly qt6ct 2>&1 || true)"
@@ -706,7 +734,7 @@ PY
 
   mkdir -p "$marker_dir"
   printf '%s\n' "${DARKLY_VERSION}:${DARKLY_SOURCE_SHA256}" > "$marker"
-  log_success "Darkly v${DARKLY_VERSION} Qt6 style installed"
+  log_success "Darkly v${DARKLY_VERSION} Qt6 style and settings KCM installed"
 }
 
 install_void_missioncenter() {
@@ -955,7 +983,7 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
           kf6-kcoreaddons-devel kf6-kcmutils-devel kf6-kcolorscheme-devel \
           kf6-kconfig-devel kf6-kguiaddons-devel kf6-ki18n-devel \
           kf6-kiconthemes-devel kf6-kwindowsystem-devel kf6-kirigami-devel \
-          kf6-frameworkintegration-devel; do
+          kf6-frameworkintegration-devel kf6-kdecoration-devel; do
         [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
       done
       continue

@@ -219,7 +219,7 @@ inir doctor                     # 自动诊断和修复
 inir update                     # 拉取 + 迁移 + 重启
 ```
 
-**支持的发行版：** Arch（自动化安装器）。其他发行版可手动安装——参见 [PACKAGES.md](../PACKAGES.md)。
+**支持的发行版：** Arch；此 fork 还增加了经验证的 Void Linux glibc + runit 自动安装路径，并使用 XBPS。Void 说明见 [VOID.md](../VOID.md)，软件包详情见 [PACKAGES.md](../PACKAGES.md)。
 
 | 方式 | 命令 |
 |--------|---------|

@@ -219,7 +219,7 @@ inir doctor                     # 자동 진단 및 수정
 inir update                     # pull + 마이그레이션 + 재시작
 ```
 
-**지원 배포판:** Arch (자동 설치 프로그램). 다른 배포판은 수동 설치 가능 — [PACKAGES.md](../PACKAGES.md) 참조.
+**지원 배포판:** Arch. 이 fork는 XBPS 기반 Void Linux glibc + runit용 자동화·검증 설치 경로도 제공합니다. Void는 [VOID.md](../VOID.md), 패키지는 [PACKAGES.md](../PACKAGES.md)를 참조하세요.
 
 | 방법 | 명령 |
 |--------|---------|

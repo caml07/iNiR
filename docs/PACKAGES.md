@@ -32,11 +32,23 @@ Important Void package-name and provider differences:
 | OCR | `tesseract-ocr` plus language packages | Vertical models are pinned upstream artifacts |
 | Night light | `wlsunset` | Base profile |
 | Wallpaper | `awww` | Official XBPS package |
+| Darkly Qt style/settings | pinned Darkly v0.5.39 source + `kf6-kdecoration-devel` and other Qt6/KF6 build deps | Built with Qt6 and KDecoration enabled so both the KStyle and `darkly-settings6` KCM are present |
 
 Validated non-XBPS providers are used only where Void does not provide a
 suitable package: pinned upstream ydotool, WARP, adw-gtk3, WhiteSur,
 Capitaine, Darkly, selected UI fonts and vertical OCR models, plus Mission
 Center from Flathub.
+
+The Void Darkly provider is intentionally stricter than a simple
+`darkly6.so` presence check. A complete install also requires
+`org.kde.kdecoration3.kcm/kcm_darklydecoration.so`; otherwise
+`darkly-settings6` opens with a missing-plugin error even though normal Qt apps
+can still use the style. Doctor treats that partial state as repairable.
+
+Terminal theming is distro-independent. Foot's managed color file is
+`~/.config/foot/inir-colors.ini`; `foot.ini` should include that path. The old
+`~/.config/foot/colors.ini` name is treated as a legacy artifact and removed or
+cleaned during repair/uninstall paths.
 
 Void intentionally installs `dunst` for the `dunstify` client. The package
 itself is not an installer conflict; a running `dunst` daemon remains a

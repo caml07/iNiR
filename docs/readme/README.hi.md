@@ -219,7 +219,7 @@ inir doctor                     # ऑटो-डायग्नोस और ठ�
 inir update                     # pull + माइग्रेशन + रीस्टार्ट
 ```
 
-**समर्थित डिस्ट्रो:** Arch (स्वचालित इंस्टॉलर)। अन्य डिस्ट्रो मैन्युअल रूप से इंस्टॉल कर सकते हैं — देखें [PACKAGES.md](../PACKAGES.md)।
+**समर्थित डिस्ट्रो:** Arch; यह fork XBPS के साथ Void Linux glibc + runit के लिए भी validated automated install path देता है। Void के लिए [VOID.md](../VOID.md) और पैकेजों के लिए [PACKAGES.md](../PACKAGES.md) देखें।
 
 | तरीक़ा | कमांड |
 |--------|---------|

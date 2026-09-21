@@ -29,9 +29,11 @@ see `docs/adr/`; glossary: see `CONTEXT.md`.
   Darkly had been built without its KDecoration settings KCM, and the shipped
   Foot config referenced the obsolete `colors.ini` path. Both now have explicit
   regression coverage; Darkly's complete Qt6/KDecoration build was installed
-  and idempotency-tested in the release VM. The only external-disk evidence
-  still not captured is a booted post-migration `nmcli`/NetworkManager service
-  check.
+  and idempotency-tested in the release VM. The final external-disk reboot then
+  closed the hardware gate: NetworkManager owned the live Wi-Fi connection
+  under runit, the old competing network services remained disabled, SDDM
+  launched `niri --session`, and the previously leaking shell helpers remained
+  at one instance each.
 
 ## Installer experience on Void
 
@@ -294,11 +296,11 @@ Current fork policy:
 - `main` and `prerelease` are protected against deletion and force-push.
 
 Documentation and VM observations travel with the canonical integration branch.
-The clean Void external-disk installation has been performed and its findings
-are recorded in `docs/VOID_VM_VALIDATION.md`. The remaining hardware evidence
-is narrow: capture a booted post-migration `nmcli` state and NetworkManager
-runit status. The persistent on-disk runit ownership and connection profile
-have already been verified read-only from the host.
+The clean Void external-disk installation and its post-migration reboot have
+been performed; the final live NetworkManager/runit state, SDDM session path,
+physical Bluetooth adapter, Power Profiles state and helper-process counts are
+recorded in `docs/VOID_VM_VALIDATION.md`. This closes the 2.31.0 Void hardware
+release gate.
 
 ### External hardware prerequisites
 

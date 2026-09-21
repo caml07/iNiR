@@ -19,9 +19,11 @@ As of 2026-09-20:
   clean-VM install, reboot/runtime, privileged Power Profiles activation,
   Web Wallpaper, SDDM graphical-login parity, and the versioned PR3.2-PR7
   checker sweep are VM validated.
-- The external-disk install has been performed. Its remaining evidence is one
-  booted post-migration NetworkManager capture; persistent runit ownership and
-  the reconnected NetworkManager profile were already verified offline.
+- The external-disk install and post-migration reboot have been performed.
+  `nmcli` reported a live connected Wi-Fi device under NetworkManager, runit
+  directly supervised the daemon, persistent service ownership was correct,
+  and the competing base network services remained disabled. The hardware gate
+  is closed.
 - A post-closure Void report exposed a partial Darkly provider and stale Foot
   include. The release VM reproduced both states. Darkly was rebuilt and
   installed with KDecoration enabled, `darkly-settings6` passed, and the second
@@ -470,10 +472,9 @@ These are not evidence of a broken provider unless scope changes:
 - PR6's system-root sudo password prompt was not automated in the VM;
   QML action wiring and a real isolated-root XBPS install/remove transaction
   were validated separately;
-- PR7 engineering and release-VM closure are implemented and validated. The
-  external-disk install has also been exercised; the only outstanding hardware
-  capture is the post-migration live NetworkManager status described in
-  `docs/VOID_VM_VALIDATION.md`.
+- PR7 engineering, release-VM closure, and the external-disk hardware gate are
+  implemented and validated. The final post-migration NetworkManager/runit
+  capture is recorded in `docs/VOID_VM_VALIDATION.md`.
 
 ## Documentation update rules
 

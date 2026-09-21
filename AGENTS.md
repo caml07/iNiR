@@ -8,9 +8,10 @@ The canonical Void integration/release-candidate branch on the fork is
 `prerelease`. At the 2026-09-20 checkpoint the fork contains Snow through
 `9574fa42` (iNiR 2.31.0); a fresh fetch found Snow `main` and `prerelease` at
 that same commit, so there is no upstream delta waiting to be ported. PR1
-through PR7 engineering closure and the clean release-VM gate are complete.
-The external-disk test has also been performed; only one booted post-migration
-NetworkManager capture remains as release evidence.
+through PR7 engineering closure, the clean release-VM gate, and the real
+external-disk hardware gate are complete. The final post-migration boot proved
+NetworkManager live under runit, so no release-blocking Void hardware evidence
+remains for the 2.31.0 port.
 
 ## Current progress (2026-09-20)
 
@@ -60,9 +61,11 @@ NetworkManager capture remains as release evidence.
   branch adds a rollback-safe NetworkManager handoff, Doctor runtime coverage,
   distro detection for `setup doctor`, runit-aware helper cleanup, and correct
   xembed environment rendering. Hardware
-  restart testing converged to one shell/idle/keyboard helper; persistent
-  NetworkManager ownership is present on disk, with one final booted live
-  NetworkManager check still pending.
+  restart testing converged to one shell/idle/keyboard helper. A later real
+  reboot closed the final gate: `nmcli` reported `connected`, the Wi-Fi device
+  was owned by NetworkManager, `runsv NetworkManager` directly parented the
+  daemon, the persistent service links pointed to `/etc/sv/NetworkManager`, and
+  `dhcpcd`/standalone `wpa_supplicant`/`wicd` were disabled.
 - A later real-Void report exposed two post-closure theming/provider gaps. The
   Darkly provider installed the Qt style but had disabled KDecoration, so
   `darkly-settings6` could not load `kcm_darklydecoration.so`. The release VM

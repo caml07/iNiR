@@ -1122,9 +1122,10 @@ With the external root mounted read-only from the host afterward, the persistent
 runit configuration contained
 `/etc/runit/runsvdir/default/NetworkManager -> /etc/sv/NetworkManager`, no
 `dhcpcd`/`wpa_supplicant`/`wicd` link, and a root-owned mode-0600
-NetworkManager connection profile for the reconnected Wi-Fi. This is persistent
-configuration evidence; a final booted `nmcli`/service check is still required
-before declaring the entire external-disk release gate closed.
+NetworkManager connection profile for the reconnected Wi-Fi. At that checkpoint
+this was persistent configuration evidence only; the final booted
+`nmcli`/service check had not yet been captured. The final hardware-gate
+section below records that later live reboot validation.
 
 ## Darkly settings and Foot theming post-closure validation (2026-09-20)
 
@@ -1194,3 +1195,54 @@ scanner mismatch, 498 runtime literals missing from the canonical catalog, 194
 missing keys in most translated catalogs (19 in `es_AR`), and generated CLI
 registry drift. The Void/Foot/Darkly documentation changes introduced no new
 verifier finding.
+
+## Final external-disk hardware gate (2026-09-20)
+
+The external Void installation was booted again after the NetworkManager
+migration, closing the one live capture that the earlier tunnel drop had left
+open. The validation was performed on the real Dell laptop rather than the VM.
+
+NetworkManager owned the live network after reboot:
+
+```text
+nmcli general state: connected
+Wi-Fi device: connected
+default route: through the active Wi-Fi device
+```
+
+The service ownership matched the persistent state observed offline:
+
+```text
+/var/service/NetworkManager -> /etc/sv/NetworkManager
+/etc/runit/runsvdir/default/NetworkManager -> /etc/sv/NetworkManager
+runsv NetworkManager
+└─ NetworkManager -n
+```
+
+The standalone `dhcpcd`, `wpa_supplicant`, and `wicd` service links were absent.
+The NetworkManager D-Bus owner was the same live daemon, and `inir doctor`
+reported `Void NetworkManager provider running`. An unprivileged direct `sv
+status /var/service/NetworkManager` still prints Void's expected `access denied`
+warning for the supervise directory; process ancestry, D-Bus ownership, `nmcli`,
+and the persistent runit links provide the operational proof.
+
+The same boot also rechecked the other hardware-sensitive closure paths:
+
+- SDDM launched `/usr/bin/niri --session` through `sddm-helper`;
+- the supervised desktop had exactly one Quickshell process, one `swayidle`, and
+  one `keyboard_lock_state_daemon.py`, confirming the runit orphan cleanup
+  remains stable across a real reboot;
+- `turnstiled` and the per-user runit services were active;
+- Power Profiles exposed `performance`, `balanced`, and `power-saver` without a
+  degraded driver;
+- the physical Bluetooth controller was detected and powered by BlueZ with the
+  expected audio profiles exposed. Pairing an external Bluetooth device was not
+  required for the port release gate.
+
+A Doctor invocation from the automation transport reported only `Niri not
+detected (run inside Niri session)` because that non-graphical command context
+did not inherit the graphical `NIRI_SOCKET`. The process/session inspection
+above independently showed the real SDDM-launched Niri session running, so this
+is not a desktop failure.
+
+This closes the external-disk hardware gate for the iNiR 2.31.0 Void port.

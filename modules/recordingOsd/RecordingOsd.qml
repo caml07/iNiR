@@ -14,7 +14,6 @@ Scope {
     id: root
     readonly property bool editorial: Appearance.editorialEverywhere
 
-    property bool isVertical: false
     property bool collapsed: false
     readonly property bool autoHide: Config.options?.screenRecord?.recordingOsd?.autoHide ?? false
     readonly property string audioMode: RecorderStatus.effectiveAudioMode
@@ -48,7 +47,6 @@ Scope {
         function onIsRecordingChanged(): void {
             if (RecorderStatus.isRecording) {
                 root.collapsed = false
-                root.isVertical = false
                 root.revealed = true
                 // Start auto-hide timer if enabled
                 if (root.autoHide) {
@@ -68,14 +66,16 @@ Scope {
         }
     }
 
-    Loader {
-        id: osdLoader
-        active: RecorderStatus.isRecording
+    Variants {
+        model: RecorderStatus.isRecording ? Quickshell.screens : []
 
-        sourceComponent: PanelWindow {
+        PanelWindow {
             id: osdWindow
-            visible: osdLoader.active && !GlobalStates.screenLocked
-            screen: GlobalStates.primaryScreen
+            required property ShellScreen modelData
+            property bool isVertical: false
+
+            visible: RecorderStatus.isRecording && !GlobalStates.screenLocked
+            screen: modelData
 
             anchors {
                 top: true
@@ -94,6 +94,20 @@ Scope {
 
             readonly property real edgeMargin: Appearance.sizes.elevationMargin
 
+            function positionPill(): void {
+                const screenWidth = osdWindow.screen?.width ?? 0
+                if (pill._positioned || pill.width <= 0 || osdWindow.width <= 0)
+                    return
+                if (screenWidth > 0 && osdWindow.width < screenWidth)
+                    return
+                pill.x = (osdWindow.width - pill.width) / 2
+                pill.y = Appearance.sizes.elevationMargin
+                pill._positioned = true
+                Qt.callLater(() => { pill.initScale = 1.0 })
+            }
+
+            Component.onCompleted: Qt.callLater(positionPill)
+
             function snapToNearestEdge(): void {
                 const margin = edgeMargin
                 const pw = osdWindow.width
@@ -110,9 +124,9 @@ Scope {
 
                 const minDist = Math.min(distLeft, distRight, distTop, distBottom)
 
-                const wasVertical = root.isVertical
+                const wasVertical = osdWindow.isVertical
                 const snapsToSide = (minDist === distLeft || minDist === distRight)
-                root.isVertical = snapsToSide
+                osdWindow.isVertical = snapsToSide
 
                 let targetX, targetY
 
@@ -124,7 +138,7 @@ Scope {
                     targetX = Math.max(margin, Math.min(pw - pillW - margin, pill.x))
                 }
 
-                if (root.isVertical !== wasVertical) {
+                if (osdWindow.isVertical !== wasVertical) {
                     Qt.callLater(() => {
                         const newPillW = pill.width
                         const newPillH = pill.height
@@ -166,10 +180,10 @@ Scope {
                 opacity: root.autoHide && !root.revealed ? 0 : (initScale < 0.95 ? 0 : 1)
                 scale: root.autoHide && !root.revealed ? 0.5 : initScale
 
-                width: root.isVertical
+                width: osdWindow.isVertical
                     ? verticalContent.implicitWidth + contentPadding * 2
                     : horizontalContent.implicitWidth + contentPadding * 2
-                height: root.isVertical
+                height: osdWindow.isVertical
                     ? verticalContent.implicitHeight + contentPadding * 2
                     : horizontalContent.implicitHeight + contentPadding * 2
 
@@ -191,12 +205,7 @@ Scope {
                 Connections {
                     target: osdWindow
                     function onWidthChanged(): void {
-                        if (!pill._positioned && osdWindow.width > 0) {
-                            pill.x = (osdWindow.width - pill.width) / 2
-                            pill.y = Appearance.sizes.elevationMargin
-                            pill._positioned = true
-                            Qt.callLater(() => { pill.initScale = 1.0 })
-                        }
+                        osdWindow.positionPill()
                     }
                 }
 
@@ -283,7 +292,7 @@ Scope {
                 // Horizontal layout (default, top/bottom edge)
                 RowLayout {
                     id: horizontalContent
-                    visible: !root.isVertical
+                    visible: !osdWindow.isVertical
                     anchors.centerIn: parent
                     spacing: 2
 
@@ -329,7 +338,7 @@ Scope {
                 // Vertical layout (left/right edge)
                 ColumnLayout {
                     id: verticalContent
-                    visible: root.isVertical
+                    visible: osdWindow.isVertical
                     anchors.centerIn: parent
                     spacing: 2
 
@@ -435,12 +444,12 @@ Scope {
             id: dragHandler
             target: pill
             xAxis.minimum: 0
-            xAxis.maximum: osdLoader.item ? osdLoader.item.width - pill.width : 0
+            xAxis.maximum: osdWindow.width - pill.width
             yAxis.minimum: 0
-            yAxis.maximum: osdLoader.item ? osdLoader.item.height - pill.height : 0
+            yAxis.maximum: osdWindow.height - pill.height
             onActiveChanged: {
                 if (active) pill.animatePosition = false
-                else if (osdLoader.item) osdLoader.item.snapToNearestEdge()
+                else osdWindow.snapToNearestEdge()
             }
         }
     }
@@ -484,7 +493,7 @@ Scope {
                 width: 8; height: 8; radius: 4
                 color: Appearance.colors.colError
                 SequentialAnimation on opacity {
-                    running: osdLoader.active
+                    running: RecorderStatus.isRecording
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.2; duration: 800; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }
@@ -525,7 +534,7 @@ Scope {
                 width: 8; height: 8; radius: 4
                 color: Appearance.colors.colError
                 SequentialAnimation on opacity {
-                    running: osdLoader.active
+                    running: RecorderStatus.isRecording
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.2; duration: 800; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }

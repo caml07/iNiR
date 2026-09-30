@@ -189,15 +189,15 @@ resolve_live_version_context() {
     repo_dir="${repo_dir/#\~/$HOME}"
 
     if [[ "$install_mode" == "repo-link" ]]; then
-        if [[ -n "$runtime_path" && -d "$runtime_path/.git" ]]; then
+        if [[ -n "$runtime_path" && -e "$runtime_path/.git" ]]; then
             printf '%s' "$runtime_path"
             return 0
         fi
-        if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+        if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
             printf '%s' "$repo_dir"
             return 0
         fi
-        if [[ -n "$launcher_root" && -d "$launcher_root/.git" ]]; then
+        if [[ -n "$launcher_root" && -e "$launcher_root/.git" ]]; then
             printf '%s' "$launcher_root"
             return 0
         fi
@@ -272,7 +272,7 @@ print_cli_context() {
     printf '  launcher: %s\n' "$launcher_path"
     printf '  service: %s\n' "$service_state"
 
-    if [[ -n "$setup_dir" && -d "$setup_dir/.git" ]]; then
+    if [[ -n "$setup_dir" && -e "$setup_dir/.git" ]]; then
         branch="$(git -C "$setup_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
         if [[ -n "$branch" ]]; then
             printf '  branch: %s\n' "$branch"
@@ -469,6 +469,9 @@ _inir_quickshell_install_kind() {
             fi
             return
         fi
+    elif command -v xbps-query >/dev/null 2>&1 \
+            && xbps-query -p pkgver quickshell >/dev/null 2>&1; then
+        printf 'void-xbps:quickshell'; return
     elif command -v rpm >/dev/null 2>&1; then
         local q
         q="$(rpm -qa 2>/dev/null | grep -E '^quickshell(-git)?-[0-9]' | head -1)"
@@ -500,6 +503,7 @@ _inir_quickshell_rebuild_cmd() {
         arch-repo-binary)   printf '%s -Sa --noconfirm --skipreview %s' "$helper" "$pkg" ;;
         arch-repo-official) printf 'sudo pacman -Rdd --noconfirm quickshell && %s -S --noconfirm quickshell-git' "$helper" ;;
         arch-aur-bin)       printf 'sudo pacman -Rdd --noconfirm quickshell-bin && %s -S --noconfirm quickshell-git' "$helper" ;;
+        void-xbps)          printf 'sudo xbps-install -Sf quickshell' ;;
         fedora-pkg)         printf 'sudo dnf upgrade --refresh -y %s' "$pkg" ;;
         nixos)              printf 'sudo nixos-rebuild switch --upgrade' ;;
         debian|source|unknown|*) ;;  # No automatic path
@@ -749,6 +753,7 @@ _inir_perf_detect_temp_paths() {
 
     [[ -n "$cpu_path" ]] && printf 'cpu:%s:%s:%s\n' "$cpu_path" "$(_inir_perf_sensor_label "$cpu_path")" "$(_inir_perf_temp_celsius "$cpu_path")"
     [[ -n "$gpu_path" ]] && printf 'gpu:%s:%s:%s\n' "$gpu_path" "$(_inir_perf_sensor_label "$gpu_path")" "$(_inir_perf_temp_celsius "$gpu_path")"
+    return 0
 }
 
 _inir_perf_detect_gpu_usage_source() {
@@ -1211,7 +1216,10 @@ _inir_doctor_perf() {
     printf '=== inir.service cgroup ===\n'
     local unit_info unit_cgroup unit_main_pid unit_memory cgroup_rows=""
     local saw_awww=false saw_wlcopy=false saw_possible_app=false
-    unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    unit_info=""
+    if has_usable_systemd_user_manager; then
+        unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    fi
     unit_main_pid="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MainPID"{print $2}')"
     unit_cgroup="$(printf '%s\n' "$unit_info" | awk -F= '$1=="ControlGroup"{print $2}')"
     unit_memory="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MemoryCurrent"{print $2}')"
@@ -1605,6 +1613,7 @@ _cached_systemd_env=""
 _cached_systemd_env_fetched=false
 
 _get_systemd_user_env() {
+    is_using_runit_supervisor && return 0
     if [[ "$_cached_systemd_env_fetched" == true ]]; then
         printf '%s' "$_cached_systemd_env"
         return 0
@@ -1613,6 +1622,20 @@ _get_systemd_user_env() {
     # Keep the lookup bounded for manual invocations outside the supervised path.
     _cached_systemd_env="$(timeout 3s systemctl --user show-environment 2>/dev/null)" || true
     printf '%s' "$_cached_systemd_env"
+}
+
+# Check if the usable systemd user manager predicate holds.
+# Returns 0 if systemd user manager is usable, 1 otherwise.
+# This is the same predicate used in the installer (ADR-0002).
+has_usable_systemd_user_manager() {
+  [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
+    timeout 3s systemctl --user show-environment >/dev/null 2>&1
+}
+
+# Check if we're using runit supervisor (predicate is false)
+# Returns 0 if runit supervisor should be used, 1 if systemd is active.
+is_using_runit_supervisor() {
+  ! has_usable_systemd_user_manager
 }
 
 _niri_app_environment_file() {
@@ -2020,6 +2043,12 @@ wait_for_qml_window_stop() {
 }
 
 is_inir_service_enabled() {
+    if is_using_runit_supervisor; then
+        # For runit, check if the service directory exists and has an executable run script
+        [[ -x "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir/run" ]]
+        return $?
+    fi
+
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2052,6 +2081,10 @@ detect_compositor_service() {
 
 start_inir_service_if_enabled() {
     if is_inir_service_enabled; then
+        if is_using_runit_supervisor; then
+            sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+            return 0
+        fi
         ensure_service_unit_available
         systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
         systemctl --user start inir.service >/dev/null 2>&1 || true
@@ -2064,6 +2097,10 @@ start_inir_service_if_enabled() {
 start_background() {
     local dir="$1"
     if is_inir_service_enabled; then
+        if is_using_runit_supervisor; then
+            sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+            return 0
+        fi
         ensure_service_unit_available
         systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
         systemctl --user start inir.service >/dev/null 2>&1 || true
@@ -2149,7 +2186,11 @@ cleanup_orphans() {
     # inir.service. A foreground `qs -p ...` or another Quickshell config is not
     # owned by this service and must survive its ExecStopPost cleanup.
     local alive_pids service_main_pid=""
-    service_main_pid="$(systemctl --user show -p MainPID inir.service 2>/dev/null | cut -d= -f2 || true)"
+    if has_usable_systemd_user_manager; then
+        service_main_pid="$(systemctl --user show -p MainPID inir.service 2>/dev/null | cut -d= -f2 || true)"
+    elif command -v sv >/dev/null 2>&1; then
+        service_main_pid="$(sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>/dev/null | sed -n 's/.*(pid \([0-9][0-9]*\)).*/\1/p')"
+    fi
     alive_pids="$(pgrep -x 'quickshell|qs' 2>/dev/null || true)"
     if [[ -n "$alive_pids" ]]; then
         while IFS= read -r pid; do
@@ -2162,21 +2203,37 @@ cleanup_orphans() {
         done <<< "$alive_pids"
     fi
 
-    # Phase 5: Kill orphaned iNiR helper processes still in inir.service cgroup.
-    # KillMode=process only kills the main QS pid; swayidle, the keyboard daemon,
-    # and nmcli monitor can be reparented to the user manager while remaining in
-    # the service cgroup, accumulating across restarts.
-    local _pid _cgroup
+    # Phase 5: Kill orphaned iNiR helper processes from the previous shell.
+    # systemd keeps them in inir.service's cgroup after KillMode=process. Runit
+    # reparents them to PID 1, so use their iNiR runtime path as the ownership
+    # boundary there instead of relying on cgroups that all share the session.
+    local _pid _cgroup _ppid _cmdline _runtime_root _owned
+    local _using_runit=false
+    is_using_runit_supervisor && _using_runit=true
     while IFS= read -r _pid; do
         [[ -n "$_pid" ]] || continue
+        _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
         # Skip processes owned by the live service main pid or its children
         if [[ -n "$service_main_pid" && "$service_main_pid" != "0" ]]; then
-            local _ppid
-            _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
             [[ "$_ppid" == "$service_main_pid" ]] && continue
         fi
-        _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
-        [[ "$_cgroup" == *"inir.service"* ]] || continue
+
+        if [[ "$_using_runit" == true ]]; then
+            [[ "$_ppid" == "1" ]] || continue
+            _cmdline="$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null || true)"
+            _owned=false
+            for _runtime_root in "$user_config_dir" "$system_config_dir" "$fallback_system_config_dir"; do
+                if [[ "$_cmdline" == *"$_runtime_root/scripts/daemon/keyboard_lock_state_daemon.py"* ]] \
+                        || { [[ "$_cmdline" == *"/swayidle -w"* ]] && [[ "$_cmdline" == *"$_runtime_root/scripts/inir"* ]]; }; then
+                    _owned=true
+                    break
+                fi
+            done
+            [[ "$_owned" == true ]] || continue
+        else
+            _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
+            [[ "$_cgroup" == *"inir.service"* ]] || continue
+        fi
         kill "$_pid" 2>/dev/null || true
     done < <(pgrep -f 'keyboard_lock_state_daemon\.py|nmcli monitor|/usr/bin/swayidle -w' 2>/dev/null || true)
 
@@ -2229,7 +2286,9 @@ restart_shell() {
     local quiet="${2:-}"
 
     if is_inir_service_enabled; then
-        ensure_service_unit_available
+        if ! is_using_runit_supervisor; then
+            ensure_service_unit_available
+        fi
         [[ -z "$quiet" ]] && printf 'Restarting iNiR service... '
         restart_inir_service_or_fail "$dir" "$quiet"
         return 0
@@ -2353,7 +2412,7 @@ resolve_setup_dir() {
     fi
 
     stored_repo="${stored_repo/#\~/$HOME}"
-    if [[ -n "$stored_repo" && -d "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
+    if [[ -n "$stored_repo" && -e "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
         printf '%s' "$stored_repo"
         return
     fi
@@ -2427,6 +2486,10 @@ show_logs() {
         kill_shell "$config_dir"
         sleep 1
         exec env QS_DEBUG=1 QT_LOGGING_RULES= "$qs_bin" -p "$config_dir"
+    fi
+
+    if [[ $# -eq 0 ]] && is_using_runit_supervisor; then
+        exec sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
     fi
 
     # --full decodes the ENTIRE qslog with no category filtering. Quickshell records
@@ -2710,6 +2773,10 @@ require_command() {
 }
 
 is_inir_service_active() {
+    if is_using_runit_supervisor; then
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>/dev/null | grep -q '^run:'
+        return $?
+    fi
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2718,10 +2785,20 @@ is_inir_service_active() {
 }
 
 is_current_process_inir_service() {
+    if is_using_runit_supervisor; then
+        return 1
+    fi
     grep -q '/inir\.service' "/proc/$$/cgroup" 2>/dev/null
 }
 
 stop_inir_service_if_active() {
+    if is_using_runit_supervisor; then
+        if is_inir_service_active; then
+            sv down "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1 || true
+            return 0
+        fi
+        return 1
+    fi
     if is_inir_service_active; then
         systemctl --user stop inir.service >/dev/null 2>&1 || true
         return 0
@@ -2737,6 +2814,12 @@ restart_inir_service_if_active() {
 
 report_inir_service_failure() {
     local lines="${1:-20}"
+
+    if is_using_runit_supervisor; then
+        printf '\n\033[31m── inir runit service status ──\033[0m\n' >&2
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>&1 | sed -n '1,18p' >&2 || true
+        return 0
+    fi
 
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
@@ -2756,6 +2839,25 @@ report_inir_service_failure() {
 restart_inir_service_or_fail() {
     local dir="$1"
     local quiet="${2:-}"
+
+    if is_using_runit_supervisor; then
+        if ! sv restart "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1; then
+            echo "Unable to restart the runit iNiR service" >&2
+            exit 1
+        fi
+        if ! wait_for_start "$dir"; then
+            echo "Timed out waiting for iNiR to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        if ! is_inir_service_active; then
+            echo "iNiR service failed to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        [[ -z "$quiet" ]] && printf 'done.\n'
+        return 0
+    fi
 
     ensure_service_unit_available
     systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
@@ -2794,7 +2896,7 @@ install_user_service() {
         local launcher_real repo_launcher_real
         launcher_real="$(readlink -f "$launcher_path" 2>/dev/null || true)"
         repo_launcher_real="$(readlink -f "$setup_dir/scripts/inir" 2>/dev/null || true)"
-        if [[ -d "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
+        if [[ -e "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
             install_mode="repo-link"
         fi
     fi
@@ -2963,6 +3065,60 @@ ensure_service_unit_available() {
 run_service_command() {
     local action="${1:-status}"
     shift || true
+
+    local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
+
+    if is_using_runit_supervisor; then
+        require_command sv
+        if [[ ! -x "$runit_service_dir/run" ]]; then
+            echo "runit service not installed at $runit_service_dir" >&2
+            return 1
+        fi
+        case "$action" in
+            install)
+                # Runit service is installed by the installer (3.files.sh)
+                echo "Runit service already installed at $runit_service_dir"
+                ;;
+            uninstall|remove)
+                sv down "$runit_service_dir" >/dev/null 2>&1 || true
+                rm -rf "$runit_service_dir"
+                echo "Removed runit service"
+                ;;
+            enable)
+                sv up "$runit_service_dir" >/dev/null 2>&1
+                echo "Enabled runit service"
+                ;;
+            disable)
+                sv down "$runit_service_dir" >/dev/null 2>&1
+                echo "Disabled runit service"
+                ;;
+            start)
+                exec sv up "$runit_service_dir"
+                ;;
+            stop)
+                exec sv down "$runit_service_dir"
+                ;;
+            restart)
+                exec sv restart "$runit_service_dir"
+                ;;
+            status)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            logs)
+                # For runit, use sv status (journalctl doesn't exist without systemd)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            -h|--help|"")
+                service_usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown service action: $action" >&2
+                exit 1
+                ;;
+        esac
+        return 0
+    fi
 
     case "$action" in
         install)
@@ -3135,7 +3291,7 @@ show_version() {
             local repo_dir=""
             repo_dir="$(jq -r '.repoPath // empty' "$version_file" 2>/dev/null || true)"
             [[ -z "$repo_dir" ]] && repo_dir="$runtime_path"
-            if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+            if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
                 local git_branch
                 git_branch="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
                 if [[ -n "$git_branch" ]]; then
@@ -4072,6 +4228,8 @@ case "$command_name" in
             # Systemd manages lifecycle (Restart=on-failure) and I/O priority.
             _skip_running_detect=true
             resolve_config_dir
+            # Clean helpers orphaned by the previous supervised shell.
+            cleanup_orphans
             apply_hot_reload_policy_for_dir "$config_dir"
             check_qs_abi
             apply_qt_runtime_env          # import Niri-owned session env if needed
@@ -4093,7 +4251,7 @@ case "$command_name" in
         fi
         if [[ "$foreground" == true ]] && is_inir_service_active; then
             if ! is_current_process_inir_service; then
-                echo "iNiR is managed by inir.service. Stop it first before running manually." >&2
+                echo "iNiR is managed by a supervisor. Stop it first before running manually." >&2
                 exit 1
             fi
         fi
@@ -4101,7 +4259,6 @@ case "$command_name" in
             exec "$qs_bin" -n -p "$config_dir"
         fi
         if is_inir_service_enabled; then
-            ensure_service_unit_available
             start_inir_service_if_enabled
             exit 0
         fi

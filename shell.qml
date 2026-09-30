@@ -830,14 +830,15 @@ ShellRoot {
     }
 
     LazyLoader {
-        loading: Config.ready && (Config.options?.panelFamily ?? "ii") === "ii"
-        activeAsync: Config.ready && (Config.options?.panelFamily ?? "ii") === "ii"
+        loading: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "ii"
+        activeAsync: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "ii"
         source: "modules/ii/critical/ShellIiCriticalPanels.qml"
     }
 
     LazyLoader {
         readonly property bool enabled: Config.ready
             && GlobalStates.deferredPanelsReady
+            && !root._familyPanelsSuspended
             && (Config.options?.panelFamily ?? "ii") === "ii"
         loading: enabled
         activeAsync: enabled
@@ -845,14 +846,15 @@ ShellRoot {
     }
 
     LazyLoader {
-        loading: Config.ready && (Config.options?.panelFamily ?? "ii") === "waffle"
-        activeAsync: Config.ready && (Config.options?.panelFamily ?? "ii") === "waffle"
+        loading: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "waffle"
+        activeAsync: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "waffle"
         source: "modules/waffle/critical/ShellWaffleCriticalPanels.qml"
     }
 
     LazyLoader {
         readonly property bool enabled: Config.ready
             && GlobalStates.deferredPanelsReady
+            && !root._familyPanelsSuspended
             && (Config.options?.panelFamily ?? "ii") === "waffle"
         loading: enabled
         activeAsync: enabled
@@ -860,14 +862,15 @@ ShellRoot {
     }
 
     LazyLoader {
-        loading: Config.ready && (Config.options?.panelFamily ?? "ii") === "iris"
-        activeAsync: Config.ready && (Config.options?.panelFamily ?? "ii") === "iris"
+        loading: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "iris"
+        activeAsync: Config.ready && !root._familyPanelsSuspended && (Config.options?.panelFamily ?? "ii") === "iris"
         source: "modules/iris/critical/ShellIrisCriticalPanels.qml"
     }
 
     LazyLoader {
         readonly property bool enabled: Config.ready
             && GlobalStates.deferredPanelsReady
+            && !root._familyPanelsSuspended
             && (Config.options?.panelFamily ?? "ii") === "iris"
         loading: enabled
         activeAsync: enabled
@@ -913,6 +916,13 @@ ShellRoot {
     // === Panel Family Transition ===
     property string _pendingFamily: ""
     property bool _transitionInProgress: false
+    // Qt 6.11 can deliver an output-scale update while layer-shell windows are
+    // being destroyed.  If the old and new family trees swap in one binding
+    // turn, QQuickWindow::physicalDpiChanged() can then walk an item that has
+    // just been freed.  Keep the transition overlay up, unload the old family,
+    // yield to Wayland, change the persisted family, then load the new tree.
+    property bool _familyPanelsSuspended: false
+    property string _familySwapTarget: ""
 
     function _ensureFamilyPanels(family: string): void {
         const basePanels = root.panelFamilies[family] ?? []
@@ -996,14 +1006,55 @@ ShellRoot {
     }
 
     function applyPendingFamily() {
-        if (_pendingFamily && families.includes(_pendingFamily)) {
-            Config.setNestedValue("panelFamily", _pendingFamily)
-            root._ensureFamilyPanels(_pendingFamily)
-        }
+        if (!_pendingFamily || !families.includes(_pendingFamily)) return
+        if (root._familyPanelsSuspended) return
+
+        root._familySwapTarget = _pendingFamily
         _pendingFamily = ""
+        root._familyPanelsSuspended = true
+        familyUnloadSettleTimer.restart()
+    }
+
+    Timer {
+        id: familyUnloadSettleTimer
+        interval: 120
+        repeat: false
+        onTriggered: {
+            if (!root._familySwapTarget || !root.families.includes(root._familySwapTarget)) {
+                root._familyPanelsSuspended = false
+                return
+            }
+            Config.setNestedValue("panelFamily", root._familySwapTarget)
+            root._ensureFamilyPanels(root._familySwapTarget)
+            familyLoadSettleTimer.restart()
+        }
+    }
+
+    Timer {
+        id: familyLoadSettleTimer
+        interval: 120
+        repeat: false
+        onTriggered: {
+            root._familyPanelsSuspended = false
+            root._familySwapTarget = ""
+        }
+    }
+
+    Timer {
+        id: familyFinishSettleTimer
+        interval: 50
+        repeat: false
+        onTriggered: root.finishFamilyTransition()
     }
 
     function finishFamilyTransition() {
+        // The fade can finish before a busy compositor has completed the
+        // serialized family swap.  Do not release the fullscreen transition
+        // cover until the new family is allowed to instantiate.
+        if (root._familyPanelsSuspended) {
+            familyFinishSettleTimer.restart()
+            return
+        }
         _transitionInProgress = false
         GlobalStates.familyTransitionActive = false
         GlobalStates.familyTransitionTarget = ""

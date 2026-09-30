@@ -167,6 +167,26 @@ for needle in \
         exit 1
     fi
 done
+
+family_shell="$runtime_root/shell.qml"
+family_swap_chunk="$(sed -n '/function applyPendingFamily()/,/function finishFamilyTransition()/p' "$family_shell")"
+for needle in \
+        'property bool _familyPanelsSuspended: false' \
+        'id: familyUnloadSettleTimer' \
+        'id: familyLoadSettleTimer' \
+        'root._familyPanelsSuspended = true' \
+        'familyUnloadSettleTimer.restart()' \
+        'familyLoadSettleTimer.restart()'; do
+    if ! grep -Fq "$needle" "$family_shell"; then
+        printf 'FAIL: animated family swap is not serialized around layer-window teardown: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if [[ "$(grep -Fc '!root._familyPanelsSuspended' "$family_shell")" -lt 6 ]] \
+        || ! grep -Fq 'Config.setNestedValue("panelFamily", root._familySwapTarget)' <<<"$family_swap_chunk"; then
+    printf 'FAIL: panel family loaders can still unload/load in the same Wayland dispatch cycle\n' >&2
+    exit 1
+fi
 if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
     printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
     exit 1

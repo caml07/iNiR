@@ -3640,6 +3640,7 @@ for source in \
     "$runtime_root/sdata/lib/versioning.sh" \
     "$runtime_root/sdata/lib/snapshots.sh" \
     "$runtime_root/sdata/lib/doctor.sh" \
+    "$runtime_root/services/ShellUpdates.qml" \
     "$runtime_root/sdata/subcmd-install/3.files.sh"; do
     if grep -Eq -- '-d[[:space:]]+["'\''$\{A-Za-z_].*\.git' "$source"; then
         printf 'FAIL: repo detection still requires .git to be a directory: %s\n' "$source" >&2

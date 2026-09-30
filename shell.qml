@@ -916,6 +916,7 @@ ShellRoot {
     // === Panel Family Transition ===
     property string _pendingFamily: ""
     property bool _transitionInProgress: false
+    property bool _transitionUsesOverlay: false
     // Qt 6.11 can deliver an output-scale update while layer-shell windows are
     // being destroyed.  If the old and new family trees swap in one binding
     // turn, QQuickWindow::physicalDpiChanged() can then walk an item that has
@@ -983,36 +984,62 @@ ShellRoot {
         // the guard stayed true, so this returned silently, and because the
         // overlay was never armed its own watchdog could not run either. If the
         // overlay is not actually up, the flag is stale — clear it and proceed.
-        if (_transitionInProgress && !GlobalStates.familyTransitionActive) {
+        if (_transitionInProgress && _transitionUsesOverlay && !GlobalStates.familyTransitionActive) {
             console.warn("[FamilyTransition] stale in-progress flag cleared")
             _transitionInProgress = false
+            _transitionUsesOverlay = false
         }
         if (_transitionInProgress) return
-        if ((Config.options?.panelFamily ?? "ii") === "iris")
+        const currentFamily = Config.options?.panelFamily ?? "ii"
+        if (currentFamily === "iris")
             GlobalStates.endIrisEditing()
 
-        // If animation is disabled, switch instantly
-        if (!(Config.options?.familyTransitionAnimation ?? true)) {
-            Config.setNestedValue("panelFamily", targetFamily)
-            root._ensureFamilyPanels(targetFamily)
+        // Qt 6.11.x can walk a QQuickWindow's item tree for a Wayland scale
+        // update while Waffle's layer windows are being torn down.  On
+        // Quickshell 0.3.1 this intermittently segfaults in
+        // QQuickWindow::physicalDpiChanged/QQuickItem::flags.  A direct swap is
+        // stable, so keep the animated transition for ii <-> iRiS and bypass it
+        // only when Waffle participates on the affected Qt minor.  Re-enable
+        // automatically on Qt 6.12+ instead of carrying a permanent UX cut.
+        const qt611WaffleLayerRisk = Quickshell.hasQtVersion(6, 11)
+            && !Quickshell.hasQtVersion(6, 12)
+            && (currentFamily === "waffle" || targetFamily === "waffle")
+
+        // If animation is disabled (or unsafe for this Qt/Waffle combination),
+        // keep the visual cut but still serialize the layer-shell teardown/load.
+        // A same-turn config swap can leave Qt 6.11 walking a QQuickItem tree
+        // while the old family's Wayland windows are being destroyed.
+        if (!(Config.options?.familyTransitionAnimation ?? true) || qt611WaffleLayerRisk) {
+            _transitionInProgress = true
+            _transitionUsesOverlay = false
+            root.beginSerializedFamilySwap(targetFamily)
             return
         }
 
         _transitionInProgress = true
+        _transitionUsesOverlay = true
         _pendingFamily = targetFamily
         GlobalStates.familyTransitionTarget = targetFamily
         GlobalStates.familyTransitionDirection = direction
         GlobalStates.familyTransitionActive = true
     }
 
+    function beginSerializedFamilySwap(targetFamily: string): void {
+        if (root._familyPanelsSuspended) return
+        if (!targetFamily || !families.includes(targetFamily)) return
+
+        root._familySwapTarget = targetFamily
+        root._familyPanelsSuspended = true
+        familyUnloadSettleTimer.restart()
+    }
+
     function applyPendingFamily() {
         if (!_pendingFamily || !families.includes(_pendingFamily)) return
         if (root._familyPanelsSuspended) return
 
-        root._familySwapTarget = _pendingFamily
+        const targetFamily = _pendingFamily
         _pendingFamily = ""
-        root._familyPanelsSuspended = true
-        familyUnloadSettleTimer.restart()
+        root.beginSerializedFamilySwap(targetFamily)
     }
 
     Timer {
@@ -1035,8 +1062,13 @@ ShellRoot {
         interval: 120
         repeat: false
         onTriggered: {
+            const directSwap = !root._transitionUsesOverlay
             root._familyPanelsSuspended = false
             root._familySwapTarget = ""
+            if (directSwap) {
+                root._transitionInProgress = false
+                root._transitionUsesOverlay = false
+            }
         }
     }
 
@@ -1056,6 +1088,7 @@ ShellRoot {
             return
         }
         _transitionInProgress = false
+        _transitionUsesOverlay = false
         GlobalStates.familyTransitionActive = false
         GlobalStates.familyTransitionTarget = ""
     }
@@ -1064,6 +1097,7 @@ ShellRoot {
     // the inactive family's visual tree and font/token imports are not retained.
     Loader {
         active: Config.ready
+            && root._transitionUsesOverlay
             && (GlobalStates.familyTransitionActive || root._transitionInProgress)
         source: "FamilyTransitionOverlay.qml"
         onLoaded: {

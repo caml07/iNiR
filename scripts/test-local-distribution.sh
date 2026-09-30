@@ -172,10 +172,13 @@ family_shell="$runtime_root/shell.qml"
 family_swap_chunk="$(sed -n '/function applyPendingFamily()/,/function finishFamilyTransition()/p' "$family_shell")"
 for needle in \
         'property bool _familyPanelsSuspended: false' \
+        'property bool _transitionUsesOverlay: false' \
+        'function beginSerializedFamilySwap(targetFamily: string): void' \
         'id: familyUnloadSettleTimer' \
         'id: familyLoadSettleTimer' \
         'root._familyPanelsSuspended = true' \
         'familyUnloadSettleTimer.restart()' \
+        'root.beginSerializedFamilySwap(targetFamily)' \
         'familyLoadSettleTimer.restart()'; do
     if ! grep -Fq "$needle" "$family_shell"; then
         printf 'FAIL: animated family swap is not serialized around layer-window teardown: %s\n' "$needle" >&2
@@ -187,6 +190,15 @@ if [[ "$(grep -Fc '!root._familyPanelsSuspended' "$family_shell")" -lt 6 ]] \
     printf 'FAIL: panel family loaders can still unload/load in the same Wayland dispatch cycle\n' >&2
     exit 1
 fi
+for needle in \
+        'Quickshell.hasQtVersion(6, 11)' \
+        '!Quickshell.hasQtVersion(6, 12)' \
+        'currentFamily === "waffle" || targetFamily === "waffle"'; do
+    if ! grep -Fq "$needle" "$family_shell"; then
+        printf 'FAIL: Qt 6.11 Waffle family transition crash guard is missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
 if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
     printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
     exit 1

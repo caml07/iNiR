@@ -1005,28 +1005,6 @@ ShellRoot {
         if (qt611LayerShellRisk) {
             _transitionInProgress = true
             _transitionUsesOverlay = false
-            Quickshell.execDetached([
-                "/usr/bin/bash",
-                Quickshell.shellPath("scripts/switch-panel-family-safe.sh"),
-                targetFamily
-            ])
-            return
-        }
-
-        // Qt 6.11.x can walk a QQuickWindow's item tree for a Wayland scale
-        // update while Waffle's layer windows are being torn down. On
-        // Quickshell 0.3.1 even a non-animated in-process Waffle swap can
-        // intermittently segfault in QQuickWindow::physicalDpiChanged /
-        // QQuickItem::flags. Stop the supervised shell before changing the
-        // persisted family so Waffle is only torn down during process exit.
-        // Qt 6.12+ automatically returns to the normal live transition path.
-        const qt611WaffleLayerRisk = Quickshell.hasQtVersion(6, 11)
-            && !Quickshell.hasQtVersion(6, 12)
-            && (currentFamily === "waffle" || targetFamily === "waffle")
-
-        if (qt611WaffleLayerRisk) {
-            _transitionInProgress = true
-            _transitionUsesOverlay = false
             root._restartIntoFamily(targetFamily)
             return
         }

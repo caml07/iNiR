@@ -5,13 +5,46 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The canonical Void integration/release-candidate branch on the fork is
-`prerelease`. At the 2026-09-20 checkpoint the fork contains Snow through
-`9574fa42` (iNiR 2.31.0); a fresh fetch found Snow `main` and `prerelease` at
-that same commit, so there is no upstream delta waiting to be ported. PR1
-through PR7 engineering closure, the clean release-VM gate, and the real
-external-disk hardware gate are complete. The final post-migration boot proved
-NetworkManager live under runit, so no release-blocking Void hardware evidence
-remains for the 2.31.0 port.
+`prerelease`. The last fully closed release checkpoint is iNiR 2.31.0 at Snow
+`9574fa42`; PR1 through PR7, the clean release-VM gate, and the external-disk
+hardware gate are complete for that baseline.
+
+The active 2026-09-29 upstream-sync branch is `feat/void-upstream-2.32`, based
+on `origin/prerelease` and integrating Snow through `5b268a58` with
+`VERSION=2.32.0`. It has not been merged into `prerelease` yet. Local
+distribution tests, PR7, historical provider/runtime checkers, and physical
+Void runtime smoke are green except for one privileged physical repair:
+Darkly's Qt style is installed but the KDecoration KCM is missing on the live
+machine. The provider detects and repairs that state, but the current user is
+not authorized by sudoers, so the physical KCM reinstall remains an explicit
+release-closure item rather than being silently waived.
+
+## Current 2.32 sync progress (2026-09-29)
+
+- Snow 2.32 plus post-tag fixes were merged onto a clean branch created from
+  the current fork `prerelease`; the user's dirty live checkout was left
+  untouched.
+- Generated settings-search and IPC registries were regenerated after conflict
+  resolution. `make test-local` and
+  `INIR_EXPECTED_BRANCH=feat/void-upstream-2.32 ./scripts/check-void-pr7.sh`
+  both pass on the physical Void machine.
+- Historical Void checkers PR3.2/3.3/4.0-4.3/5.0-5.5/6 pass after importing the
+  live Niri session environment where required. PR5.4 correctly reports the
+  live Darkly KDecoration drift described above.
+- Runtime was updated to 2.32 through the real update flow. Eight local runtime
+  modifications were auto-preserved before sync, including the user-owned
+  `scripts/colors/modules/05-caelestia-terminal.sh`.
+- Physical Qt 6.11.2 + Quickshell 0.3.1 exposed a reproducible
+  `QQuickWindow::physicalDpiChanged()/QQuickItem::flags()` segfault while
+  switching panel families in-process. The 2.32 branch now restarts the
+  supervised shell around family changes on Qt 6.11 and returns to normal
+  in-process transitions automatically on Qt 6.12+. Repeated
+  `ii -> waffle -> iris -> ii` hardware tests produced no new crash reports
+  or runtime warnings after the workaround.
+- Documentation verification still has upstream/baseline drift (including the
+  `kl_GL` catalog gap and new 2.32 service-documentation mismatches). The two
+  Void runtime strings introduced by the fork are catalogued; do not claim the
+  repository-wide docs verifier is fully green until upstream drift is closed.
 
 ## Current progress (2026-09-20)
 

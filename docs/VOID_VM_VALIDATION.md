@@ -1246,3 +1246,80 @@ above independently showed the real SDDM-launched Niri session running, so this
 is not a desktop failure.
 
 This closes the external-disk hardware gate for the iNiR 2.31.0 Void port.
+
+## Upstream 2.32 physical-sync validation (2026-09-29)
+
+The next upstream integration was validated on the real Dell Latitude Void
+installation before opening or merging a PR. The clean integration branch was
+`feat/void-upstream-2.32`, created from the current fork `prerelease`, while
+the user's dirty `~/iNiR` checkout remained untouched.
+
+Snow `main` was integrated through `5b268a58` with `VERSION=2.32.0`.
+Conflict resolution preserved the Void installer/service contracts while
+accepting upstream 2.32 behavior, including the new fontconfig layout and Niri
+IPC syntax. Generated settings-search and IPC registries were regenerated from
+source.
+
+The integrated branch passed:
+
+```text
+make test-local
+INIR_EXPECTED_BRANCH=feat/void-upstream-2.32 ./scripts/check-void-pr7.sh
+```
+
+Historical PR3.2/3.3/4.0-4.3/5.0-5.5/6 checkers were also rerun. Checkers that
+inspect live audio, ydotool or Niri state required the actual graphical session
+environment from Quickshell because the automation transport does not inherit
+`XDG_RUNTIME_DIR`, the session D-Bus address or `NIRI_SOCKET`. With those
+values supplied, the runtime-sensitive checkers passed.
+
+The real update path was exercised against the live runtime. Before sync, iNiR
+detected and preserved eight local runtime modifications under
+`~/.local/state/quickshell/user-mods/`, including the user-owned
+`scripts/colors/modules/05-caelestia-terminal.sh`. The runtime then reported
+2.32.0 and the updated repo path without modifying the original dirty checkout.
+
+### Qt 6.11 panel-family crash
+
+Physical testing uncovered a new 2.32-only runtime problem that static/VM
+checks did not catch. On Void's Quickshell 0.3.1 built and run against Qt
+6.11.2, switching panel families in-process could segfault with:
+
+```text
+QQuickItem::flags()
+QQuickWindow::physicalDpiChanged()
+QtWaylandClient::QWaylandWindow::setScale()
+```
+
+The failure was reproduced with the IPC sequence:
+
+```text
+ii -> waffle -> iris -> ii
+```
+
+Serializing layer-tree unload/load reduced the race but did not eliminate it.
+The reliable workaround on Qt 6.11 is therefore a controlled process boundary:
+the helper stops the supervised shell, atomically persists the target family
+and required panel bookkeeping, then starts a fresh shell process. Qt 6.12+
+keeps the normal in-process transition path.
+
+After that change, repeated hardware transitions through all three families
+created no new Quickshell crash directories and `inir logs --issues` reported
+no warnings or errors after each restart.
+
+### Remaining physical closure item
+
+The live machine still has a partial Darkly installation: the Qt style plugin
+exists, but the KDecoration settings KCM does not. PR5.4 correctly detects this
+drift and the Void provider is capable of rebuilding it with
+`kf6-kdecoration-devel` and decorations enabled. The current account is not
+permitted to execute sudo commands by sudoers, so that system-level repair
+could not be completed from this automation session. This is the only known
+privileged physical repair still pending for the 2.32 sync and should remain
+explicit until rerun successfully on the real machine.
+
+The repository-wide docs verifier remains non-zero for pre-existing/upstream
+catalog and service-documentation drift. Detached comparison against the old
+fork baseline and current Snow 2.32 showed that the large new IPC documentation
+set and the `kl_GL` gap are upstream/baseline issues; the two Void-specific
+runtime strings found during this sync were added to the catalogs.

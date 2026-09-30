@@ -352,7 +352,7 @@
         "taskManager": "missioncenter",
         "terminal": "kitty",
         "volumeMixer": "pavucontrol",
-        "update": "kitty -e arch-update"
+        "update": ""
     },
     "audio": {
         "protection": {
@@ -2280,7 +2280,6 @@
         "disableVisualizers": true,
         "disableNiriAnimations": false,
         "disableReloadToasts": true,
-        "disableDiscoverOverlay": true,
         "suppressNotifications": true,
         "minimalMode": false,
         "niriWindowListUpdateIntervalMs": 100,
@@ -2288,7 +2287,7 @@
     },
     "hotspot": {
         "ssid": "iNiR Hotspot",
-        "password": "inirhotspot",
+        "password": "",
         "band": "bg"
     },
     "keyboardIndicators": {

@@ -8832,5 +8832,7 @@
   "Rest the pointer in a corner of the screen and Orbit opens. A game, a locked screen and widget editing turn it off.": "把指针停在屏幕的一个角上，Orbit 就会打开。游戏、锁屏和小组件编辑时会关闭。",
   "Wait before opening": "打开前的等待",
   "At once": "立即",
-  "You are here": "当前位置"
+  "You are here": "当前位置",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

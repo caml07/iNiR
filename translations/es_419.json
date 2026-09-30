@@ -8832,5 +8832,7 @@
   "Rest the pointer in a corner of the screen and Orbit opens. A game, a locked screen and widget editing turn it off.": "Deja el puntero en una esquina de la pantalla y se abre Orbit. Un juego, la pantalla bloqueada y la edición de widgets lo apagan.",
   "Wait before opening": "Espera antes de abrir",
   "At once": "Al instante",
-  "You are here": "Estás aquí"
+  "You are here": "Estás aquí",
+  "Generated during installation": "Generada durante la instalación",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "El demonio de WARP está detenido. Inicia warp-svc con el gestor de servicios de tu sistema y vuelve a intentarlo."
 }

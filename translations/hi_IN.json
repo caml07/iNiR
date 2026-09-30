@@ -8832,5 +8832,7 @@
   "Rest the pointer in a corner of the screen and Orbit opens. A game, a locked screen and widget editing turn it off.": "पॉइंटर को स्क्रीन के किसी कोने में रोकें और Orbit खुल जाता है। गेम, लॉक स्क्रीन और विजेट संपादन इसे बंद कर देते हैं।",
   "Wait before opening": "खुलने से पहले प्रतीक्षा",
   "At once": "तुरंत",
-  "You are here": "आप यहाँ हैं"
+  "You are here": "आप यहाँ हैं",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

@@ -72,6 +72,24 @@ Only after VM closure, use the external-disk install for hardware facts such as
 real Wi-Fi ownership, Bluetooth controller, laptop power profiles, SDDM login,
 and helper convergence. Preserve the physical checkout if dirty.
 
+When checks are launched from automation, SSH, or another non-graphical shell,
+do not treat missing session variables as runtime failures. Read the live
+Quickshell/Niri process environment and export the real `XDG_RUNTIME_DIR`,
+session D-Bus address, `WAYLAND_DISPLAY`, and `NIRI_SOCKET` before running
+session-sensitive IPC, PipeWire, ydotool, or compositor checks.
+
+After a Qt or Quickshell update, include a physical panel-family transition
+smoke. Exercise at least:
+
+```text
+ii -> waffle -> iris -> ii
+```
+
+Snapshot `~/.cache/quickshell/crashes/` before the sequence, verify the shell
+PID/lifecycle after every switch, and run `inir logs --issues` afterward.
+Static QML checks cannot detect Wayland layer-surface teardown or output-scale
+races such as `QQuickWindow::physicalDpiChanged()` crashes.
+
 ## 7. Update closure documentation
 
 Review at least:
@@ -119,6 +137,8 @@ A Void release candidate can be called closed only when:
 - relevant provider/checker/idempotency passes in Void;
 - reboot/session persistence is proven where required;
 - any necessary physical hardware gate is complete;
+- privileged provider repairs required by the real machine are complete rather
+  than merely known to be repairable;
 - docs match the actual current state;
 - remaining exclusions are intentional scope limits, not untested blockers.
 

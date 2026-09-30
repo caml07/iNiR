@@ -170,6 +170,20 @@ for lock_surface in \
     fi
 done
 
+avatar_directories="$runtime_root/modules/common/Directories.qml"
+for needle in \
+        'id: avatarAccountsProbe' \
+        'id: avatarFaceProbe' \
+        'id: avatarFaceIconProbe' \
+        'avatarAccountsProbe.loaded ? userAvatarPathAccountsService : ""' \
+        'avatarFaceProbe.loaded ? userAvatarPathRicersAndWeirdSystems : ""' \
+        'avatarFaceIconProbe.loaded ? userAvatarPathRicersAndWeirdSystems2 : ""'; do
+    if ! grep -Fq "$needle" "$avatar_directories"; then
+        printf 'FAIL: avatar resolver still exposes missing candidate paths: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+
 step "service mask handling"
 service_mask_root="$(mktemp -d)"
 mkdir -p "$service_mask_root/systemd/user" "$service_mask_root/bin" "$service_mask_root/runtime/systemd"

@@ -13,11 +13,11 @@ The active 2026-09-29 upstream-sync branch is `feat/void-upstream-2.32`, based
 on `origin/prerelease` and integrating Snow through `5b268a58` with
 `VERSION=2.32.0`. It has not been merged into `prerelease` yet. Local
 distribution tests, PR7, historical provider/runtime checkers, and physical
-Void runtime smoke are green except for one privileged physical repair:
-Darkly's Qt style is installed but the KDecoration KCM is missing on the live
-machine. The provider detects and repairs that state, but the current user is
-not authorized by sudoers, so the physical KCM reinstall remains an explicit
-release-closure item rather than being silently waived.
+Void runtime smoke are green. The previously partial Darkly installation was
+repaired on the live machine through polkit: `kf6-kdecoration-devel` was
+installed, Darkly 0.5.39 was rebuilt with `WITH_DECORATIONS=ON`, the
+KDecoration KCM loaded with complete linkage, and PR5.4 passed in idempotency
+mode.
 
 ## Current 2.32 sync progress (2026-09-29)
 
@@ -29,8 +29,8 @@ release-closure item rather than being silently waived.
   `INIR_EXPECTED_BRANCH=feat/void-upstream-2.32 ./scripts/check-void-pr7.sh`
   both pass on the physical Void machine.
 - Historical Void checkers PR3.2/3.3/4.0-4.3/5.0-5.5/6 pass after importing the
-  live Niri session environment where required. PR5.4 correctly reports the
-  live Darkly KDecoration drift described above.
+  live Niri session environment where required. PR5.4 also passes on the
+  repaired physical Darkly installation with `INIR_VERIFY_IDEMPOTENCY=true`.
 - Runtime was updated to 2.32 through the real update flow. Eight local runtime
   modifications were auto-preserved before sync, including the user-owned
   `scripts/colors/modules/05-caelestia-terminal.sh`.

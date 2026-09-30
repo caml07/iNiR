@@ -1307,16 +1307,22 @@ After that change, repeated hardware transitions through all three families
 created no new Quickshell crash directories and `inir logs --issues` reported
 no warnings or errors after each restart.
 
-### Remaining physical closure item
+### Darkly physical repair closure
 
-The live machine still has a partial Darkly installation: the Qt style plugin
-exists, but the KDecoration settings KCM does not. PR5.4 correctly detects this
-drift and the Void provider is capable of rebuilding it with
-`kf6-kdecoration-devel` and decorations enabled. The current account is not
-permitted to execute sudo commands by sudoers, so that system-level repair
-could not be completed from this automation session. This is the only known
-privileged physical repair still pending for the 2.32 sync and should remain
-explicit until rerun successfully on the real machine.
+The live machine initially had a partial Darkly installation: the Qt style
+plugin existed but the KDecoration settings KCM did not. The account was added
+to the configured `wheel` administrator group and the provider repair was then
+run through the active graphical polkit agent. It installed
+`kf6-kdecoration-devel`, rebuilt Darkly 0.5.39 with `WITH_DECORATIONS=ON`, and
+installed `kcm_darklydecoration.so` under the Qt 6 KDecoration KCM path.
+
+Post-install evidence on the physical system: the KCM had no missing `ldd`
+dependencies, an offscreen `darkly-settings6` smoke emitted no missing-plugin
+error, the provider marker matched the pinned 0.5.39 source hash, and
+`INIR_EXPECTED_BRANCH=feat/void-upstream-2.32 INIR_VERIFY_IDEMPOTENCY=true
+./scripts/check-void-pr54.sh` completed with `All PR5.4 checks passed`. A final
+`inir doctor` from the real graphical session reported 27 passed, 0 fixed and
+0 failed, including Darkly Qt colors/style and Qt platform integration.
 
 The repository-wide docs verifier remains non-zero for pre-existing/upstream
 catalog and service-documentation drift. Detached comparison against the old

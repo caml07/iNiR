@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 
 VALID_FAMILIES = {"ii", "waffle", "iris"}
@@ -106,6 +107,7 @@ def main() -> int:
 
     inir = _inir_path()
     stopped = False
+    result = 0
     try:
         stop = subprocess.run([inir, "service", "stop"], check=False)
         if stop.returncode != 0:
@@ -125,14 +127,26 @@ def main() -> int:
         _write_atomic(config_path, config)
     except (OSError, RuntimeError) as exc:
         print(f"family switch failed: {exc}", file=sys.stderr)
-        return 5
+        result = 5
     finally:
         if stopped:
-            start = subprocess.run([inir, "service", "start"], check=False)
-            if start.returncode != 0:
+            restarted = False
+            for attempt in range(2):
+                try:
+                    start = subprocess.run([inir, "service", "start"], check=False)
+                    restarted = start.returncode == 0
+                except OSError:
+                    restarted = False
+                if restarted:
+                    break
+                if attempt == 0:
+                    time.sleep(0.25)
+            if not restarted:
                 print("could not restart supervised iNiR service", file=sys.stderr)
+                if result == 0:
+                    result = 6
 
-    return 0
+    return result
 
 
 if __name__ == "__main__":

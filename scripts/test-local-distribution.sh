@@ -234,6 +234,39 @@ if [[ "$(jq -r '.panelFamily' "$family_restart_root/config/illogical-impulse/con
     exit 1
 fi
 rm -rf "$family_restart_root"
+
+family_restart_failure_root="$(mktemp -d)"
+mkdir -p "$family_restart_failure_root/config/illogical-impulse" "$family_restart_failure_root/bin"
+cat > "$family_restart_failure_root/config/illogical-impulse/config.json" <<'JSON'
+{
+    "panelFamily": "ii",
+    "enabledPanels": ["iiBar"],
+    "knownPanels": ["iiBar"]
+}
+JSON
+cat > "$family_restart_failure_root/bin/inir" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$INIR_FAMILY_SWITCH_TEST_LOG"
+if [ "$1 $2" = 'service start' ]; then exit 9; fi
+exit 0
+SH
+chmod +x "$family_restart_failure_root/bin/inir"
+set +e
+INIR_FAMILY_SWITCH_INIR="$family_restart_failure_root/bin/inir" \
+INIR_FAMILY_SWITCH_TEST_LOG="$family_restart_failure_root/service.log" \
+XDG_CONFIG_HOME="$family_restart_failure_root/config" \
+    python3 "$family_restart_helper" iris '["irisBar"]' >/dev/null 2>"$family_restart_failure_root/stderr.log"
+family_restart_failure_rc=$?
+set -e
+if [[ "$family_restart_failure_rc" -ne 6 ]] \
+        || [[ "$(grep -Fc 'service start' "$family_restart_failure_root/service.log")" -ne 2 ]] \
+        || ! grep -Fq 'could not restart supervised iNiR service' "$family_restart_failure_root/stderr.log"; then
+    rm -rf "$family_restart_failure_root"
+    printf 'FAIL: supervised family restart failure is not retried and propagated\n' >&2
+    exit 1
+fi
+rm -rf "$family_restart_failure_root"
+
 if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
     printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
     exit 1

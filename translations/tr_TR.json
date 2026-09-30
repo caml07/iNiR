@@ -8892,5 +8892,7 @@
   "iNiR Settings": "iNiR Ayarları",
   "Over the desktop previews every change on the screen behind it. A window sits with your apps: Niri sizes, maximizes and moves it like any other.": "Masaüstünün üzerinde her değişikliği arkadaki ekranda gösterir. Pencere uygulamalarınla birlikte durur: Niri onu diğerleri gibi boyutlandırır, büyütür ve taşır.",
   "Open over the desktop": "Masaüstünün üzerinde aç",
-  "Open as a window": "Pencere olarak aç"
+  "Open as a window": "Pencere olarak aç",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

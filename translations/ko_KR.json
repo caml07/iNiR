@@ -8892,5 +8892,7 @@
   "iNiR Settings": "iNiR 설정",
   "Over the desktop previews every change on the screen behind it. A window sits with your apps: Niri sizes, maximizes and moves it like any other.": "데스크톱 위에서는 모든 변경이 뒤쪽 화면에 바로 보입니다. 창은 앱과 함께 놓이며, Niri가 다른 창처럼 크기를 바꾸고 최대화하고 옮깁니다.",
   "Open over the desktop": "데스크톱 위에서 열기",
-  "Open as a window": "창으로 열기"
+  "Open as a window": "창으로 열기",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

@@ -7239,5 +7239,7 @@
   "iNiR Settings": "iNiR-ip aaqqissuussinera",
   "Over the desktop previews every change on the screen behind it. A window sits with your apps: Niri sizes, maximizes and moves it like any other.": "Desktop qulaani allannguut tamarmik saqqummersarput. Igalaaq app-it akornanni inissisimavoq: Niri allatut angissusiliivoq, annertusaavoq nuussillugulu.",
   "Open over the desktop": "Desktop qulaani ammaruk",
-  "Open as a window": "Igalaatut ammaruk"
+  "Open as a window": "Igalaatut ammaruk",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

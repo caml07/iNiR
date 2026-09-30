@@ -8892,5 +8892,7 @@
   "iNiR Settings": "Настройки iNiR",
   "Over the desktop previews every change on the screen behind it. A window sits with your apps: Niri sizes, maximizes and moves it like any other.": "Поверх рабочего стола каждое изменение сразу видно на экране позади. Окно живёт рядом с приложениями: Niri меняет его размер, разворачивает и перемещает, как любое другое.",
   "Open over the desktop": "Открыть поверх рабочего стола",
-  "Open as a window": "Открыть в окне"
+  "Open as a window": "Открыть в окне",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

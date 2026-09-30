@@ -2302,8 +2302,10 @@ predicate_dolphin_migration="$runtime_root/sdata/migrations/005-dolphin-xdg-menu
 predicate_orbit_audit="$runtime_root/scripts/orbit-visual-audit.sh"
 perf_temp_helper="$(sed -n '/^_inir_perf_detect_temp_paths() {/,/^}/p' "$predicate_launcher")"
 perf_report_helper="$(sed -n '/^_inir_doctor_perf() {/,/^}/p' "$predicate_launcher")"
+update_finalizing_chunk="$(sed -n '/_step_phase_header 4 "Finalizing"/,/local niri_config=/p' "$predicate_setup")"
 if ! grep -Fq 'has_usable_systemd_user_manager && systemctl --user daemon-reload' "$predicate_setup" \
         || ! grep -Fq 'declare -F has_usable_systemd_user_manager' "$predicate_setup" \
+        || ! grep -Fq 'if has_usable_systemd_user_manager; then' <<< "$update_finalizing_chunk" \
         || ! grep -Fq '|| ! has_usable_systemd_user_manager; then' "$predicate_doctor" \
         || ! grep -Fq 'User service checks skipped (no usable systemd user manager)' "$predicate_doctor" \
         || ! grep -Fq '&& has_usable_systemd_user_manager \' "$predicate_doctor" \

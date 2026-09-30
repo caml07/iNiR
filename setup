@@ -2840,27 +2840,29 @@ run_update() {
     repair_update_owned_state false
 
     _step_phase_header 4 "Finalizing"
-    if inir_user_service_is_masked; then
-        tui_warn "User inir.service is masked; leaving it unchanged (restore with: inir service install && inir service enable)"
-    else
-        _service_refresh_status=1
-        if sync_user_inir_service_from_repo_if_present; then
-            _service_refresh_status=0
+    if has_usable_systemd_user_manager; then
+        if inir_user_service_is_masked; then
+            tui_warn "User inir.service is masked; leaving it unchanged (restore with: inir service install && inir service enable)"
         else
-            _service_refresh_status=$?
-        fi
-        if [[ $_service_refresh_status -eq 0 && "${INIR_SERVICE_SYNC_CHANGED:-0}" -gt 0 ]]; then
-            tui_success "Updated existing user inir.service"
-        fi
-
-        if ensure_user_inir_service_enabled; then
-            if [[ "${INIR_SERVICE_WIRING_CHANGED:-0}" -gt 0 ]]; then
-                tui_success "Repaired user inir.service autostart wiring"
+            _service_refresh_status=1
+            if sync_user_inir_service_from_repo_if_present; then
+                _service_refresh_status=0
             else
-                tui_success "User inir.service autostart verified"
+                _service_refresh_status=$?
             fi
-        else
-            tui_warn "Could not wire inir.service to the compositor — run 'inir service enable'"
+            if [[ $_service_refresh_status -eq 0 && "${INIR_SERVICE_SYNC_CHANGED:-0}" -gt 0 ]]; then
+                tui_success "Updated existing user inir.service"
+            fi
+
+            if ensure_user_inir_service_enabled; then
+                if [[ "${INIR_SERVICE_WIRING_CHANGED:-0}" -gt 0 ]]; then
+                    tui_success "Repaired user inir.service autostart wiring"
+                else
+                    tui_success "User inir.service autostart verified"
+                fi
+            else
+                tui_warn "Could not wire inir.service to the compositor — run 'inir service enable'"
+            fi
         fi
     fi
 

@@ -156,6 +156,17 @@ if ! grep -Fq 'is_using_runit_supervisor' <<<"$cleanup_orphans_chunk" \
     printf 'FAIL: non-systemd orphan cleanup does not own the iNiR idle/keyboard helpers\n' >&2
     exit 1
 fi
+keyboard_daemon="$runtime_root/scripts/daemon/keyboard_lock_state_daemon.py"
+for needle in \
+        'def claim_monitor_process()' \
+        'fcntl.flock' \
+        'signal.SIGTERM' \
+        'inir-keyboard-lock-state'; do
+    if ! grep -Fq "$needle" "$keyboard_daemon"; then
+        printf 'FAIL: keyboard lock daemon does not enforce single-monitor ownership: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
 if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
     printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
     exit 1

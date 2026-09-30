@@ -170,6 +170,7 @@ done
 
 family_shell="$runtime_root/shell.qml"
 family_swap_chunk="$(sed -n '/function applyPendingFamily()/,/function finishFamilyTransition()/p' "$family_shell")"
+family_safe_switch="$runtime_root/scripts/switch-panel-family-safe.sh"
 for needle in \
         'property bool _familyPanelsSuspended: false' \
         'property bool _transitionUsesOverlay: false' \
@@ -185,6 +186,53 @@ for needle in \
         exit 1
     fi
 done
+for needle in \
+        'const qt611LayerShellRisk = Quickshell.hasQtVersion(6, 11)' \
+        'Quickshell.shellPath("scripts/switch-panel-family-safe.sh")'; do
+    if ! grep -Fq "$needle" "$family_shell"; then
+        printf 'FAIL: Qt 6.11 family switching can still tear down layer windows in-process: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if [[ ! -x "$family_safe_switch" ]]; then
+    printf 'FAIL: safe family switch helper is missing or not executable\n' >&2
+    exit 1
+fi
+
+family_switch_root="$(mktemp -d)"
+mkdir -p "$family_switch_root/config/illogical-impulse" "$family_switch_root/bin"
+cat > "$family_switch_root/config/illogical-impulse/config.json" <<'JSON'
+{
+  "panelFamily": "ii"
+}
+JSON
+cat > "$family_switch_root/bin/inir" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+    stop)
+        grep -q '"panelFamily": "ii"' "$INIR_CONFIG_PATH"
+        printf 'stop\n' >> "$INIR_TEST_LOG"
+        ;;
+    start)
+        grep -q '"panelFamily": "iris"' "$INIR_CONFIG_PATH"
+        printf 'start\n' >> "$INIR_TEST_LOG"
+        ;;
+    *) exit 9 ;;
+esac
+SH
+chmod +x "$family_switch_root/bin/inir"
+INIR_CONFIG_PATH="$family_switch_root/config/illogical-impulse/config.json" \
+INIR_LAUNCHER="$family_switch_root/bin/inir" \
+INIR_TEST_LOG="$family_switch_root/order.log" \
+    "$family_safe_switch" iris
+if [[ "$(cat "$family_switch_root/order.log")" != $'stop\nstart' ]] \
+        || ! grep -q '"panelFamily": "iris"' "$family_switch_root/config/illogical-impulse/config.json"; then
+    rm -rf "$family_switch_root"
+    printf 'FAIL: safe family switch does not stop, persist, then start in order\n' >&2
+    exit 1
+fi
+rm -rf "$family_switch_root"
 if [[ "$(grep -Fc '!root._familyPanelsSuspended' "$family_shell")" -lt 6 ]] \
         || ! grep -Fq 'Config.setNestedValue("panelFamily", root._familySwapTarget)' <<<"$family_swap_chunk"; then
     printf 'FAIL: panel family loaders can still unload/load in the same Wayland dispatch cycle\n' >&2
@@ -193,12 +241,48 @@ fi
 for needle in \
         'Quickshell.hasQtVersion(6, 11)' \
         '!Quickshell.hasQtVersion(6, 12)' \
-        'currentFamily === "waffle" || targetFamily === "waffle"'; do
+        'currentFamily === "waffle" || targetFamily === "waffle"' \
+        'switch-family-restart.py' \
+        'root._restartIntoFamily(targetFamily)'; do
     if ! grep -Fq "$needle" "$family_shell"; then
         printf 'FAIL: Qt 6.11 Waffle family transition crash guard is missing: %s\n' "$needle" >&2
         exit 1
     fi
 done
+family_restart_helper="$runtime_root/scripts/switch-family-restart.py"
+if [[ ! -x "$family_restart_helper" ]]; then
+    printf 'FAIL: supervised family restart helper is missing or not executable\n' >&2
+    exit 1
+fi
+family_restart_root="$(mktemp -d)"
+mkdir -p "$family_restart_root/config/illogical-impulse" "$family_restart_root/bin"
+cat > "$family_restart_root/config/illogical-impulse/config.json" <<'JSON'
+{
+    "panelFamily": "ii",
+    "enabledPanels": ["iiBar"],
+    "knownPanels": ["iiBar"]
+}
+JSON
+cat > "$family_restart_root/bin/inir" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$INIR_FAMILY_SWITCH_TEST_LOG"
+exit 0
+SH
+chmod +x "$family_restart_root/bin/inir"
+INIR_FAMILY_SWITCH_INIR="$family_restart_root/bin/inir" \
+INIR_FAMILY_SWITCH_TEST_LOG="$family_restart_root/service.log" \
+XDG_CONFIG_HOME="$family_restart_root/config" \
+    python3 "$family_restart_helper" waffle '["wBar","wBackground"]'
+if [[ "$(jq -r '.panelFamily' "$family_restart_root/config/illogical-impulse/config.json")" != waffle ]] \
+        || ! jq -e '.enabledPanels == ["iiBar","wBar","wBackground"]' "$family_restart_root/config/illogical-impulse/config.json" >/dev/null \
+        || ! jq -e '.knownPanels == ["iiBar","wBar","wBackground"]' "$family_restart_root/config/illogical-impulse/config.json" >/dev/null \
+        || [[ "$(sed -n '1p' "$family_restart_root/service.log")" != 'service stop' ]] \
+        || [[ "$(sed -n '2p' "$family_restart_root/service.log")" != 'service start' ]]; then
+    rm -rf "$family_restart_root"
+    printf 'FAIL: supervised Waffle family restart did not stop-write-start atomically\n' >&2
+    exit 1
+fi
+rm -rf "$family_restart_root"
 if ! grep -Fq '# Clean helpers orphaned by the previous supervised shell.' "$runtime_root/scripts/inir"; then
     printf 'FAIL: supervised session boot does not clean orphaned iNiR helpers before starting Quickshell\n' >&2
     exit 1

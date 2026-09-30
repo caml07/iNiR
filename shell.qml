@@ -924,6 +924,7 @@ ShellRoot {
     // yield to Wayland, change the persisted family, then load the new tree.
     property bool _familyPanelsSuspended: false
     property string _familySwapTarget: ""
+    property bool _familyRestartPending: false
 
     function _ensureFamilyPanels(family: string): void {
         const basePanels = root.panelFamilies[family] ?? []
@@ -994,22 +995,45 @@ ShellRoot {
         if (currentFamily === "iris")
             GlobalStates.endIrisEditing()
 
+        // Qt 6.11's Wayland backend can segfault in physicalDpiChanged() while
+        // live layer-shell windows are destroyed during a family switch.  A
+        // controlled process boundary is the only reliable guard we found on
+        // Quickshell 0.3.1: stop the shell, persist the requested family, then
+        // start a fresh process.  Qt 6.12+ keeps the normal in-process UX.
+        const qt611LayerShellRisk = Quickshell.hasQtVersion(6, 11)
+            && !Quickshell.hasQtVersion(6, 12)
+        if (qt611LayerShellRisk) {
+            _transitionInProgress = true
+            _transitionUsesOverlay = false
+            Quickshell.execDetached([
+                "/usr/bin/bash",
+                Quickshell.shellPath("scripts/switch-panel-family-safe.sh"),
+                targetFamily
+            ])
+            return
+        }
+
         // Qt 6.11.x can walk a QQuickWindow's item tree for a Wayland scale
-        // update while Waffle's layer windows are being torn down.  On
-        // Quickshell 0.3.1 this intermittently segfaults in
-        // QQuickWindow::physicalDpiChanged/QQuickItem::flags.  A direct swap is
-        // stable, so keep the animated transition for ii <-> iRiS and bypass it
-        // only when Waffle participates on the affected Qt minor.  Re-enable
-        // automatically on Qt 6.12+ instead of carrying a permanent UX cut.
+        // update while Waffle's layer windows are being torn down. On
+        // Quickshell 0.3.1 even a non-animated in-process Waffle swap can
+        // intermittently segfault in QQuickWindow::physicalDpiChanged /
+        // QQuickItem::flags. Stop the supervised shell before changing the
+        // persisted family so Waffle is only torn down during process exit.
+        // Qt 6.12+ automatically returns to the normal live transition path.
         const qt611WaffleLayerRisk = Quickshell.hasQtVersion(6, 11)
             && !Quickshell.hasQtVersion(6, 12)
             && (currentFamily === "waffle" || targetFamily === "waffle")
 
-        // If animation is disabled (or unsafe for this Qt/Waffle combination),
-        // keep the visual cut but still serialize the layer-shell teardown/load.
-        // A same-turn config swap can leave Qt 6.11 walking a QQuickItem tree
-        // while the old family's Wayland windows are being destroyed.
-        if (!(Config.options?.familyTransitionAnimation ?? true) || qt611WaffleLayerRisk) {
+        if (qt611WaffleLayerRisk) {
+            _transitionInProgress = true
+            _transitionUsesOverlay = false
+            root._restartIntoFamily(targetFamily)
+            return
+        }
+
+        // With animation disabled, still serialize the layer-shell teardown/load
+        // so the old and new trees never change in the same Wayland dispatch.
+        if (!(Config.options?.familyTransitionAnimation ?? true)) {
             _transitionInProgress = true
             _transitionUsesOverlay = false
             root.beginSerializedFamilySwap(targetFamily)
@@ -1022,6 +1046,36 @@ ShellRoot {
         GlobalStates.familyTransitionTarget = targetFamily
         GlobalStates.familyTransitionDirection = direction
         GlobalStates.familyTransitionActive = true
+    }
+
+    function _restartIntoFamily(targetFamily: string): void {
+        if (root._familyRestartPending) return
+        const basePanels = Array.from(root.panelFamilies[targetFamily] ?? [])
+        if (basePanels.length === 0) {
+            root._transitionInProgress = false
+            return
+        }
+
+        root._familyRestartPending = true
+        Quickshell.execDetached([
+            Quickshell.shellPath("scripts/switch-family-restart.py"),
+            targetFamily,
+            JSON.stringify(basePanels)
+        ])
+        familyRestartFallbackTimer.restart()
+    }
+
+    Timer {
+        id: familyRestartFallbackTimer
+        interval: 8000
+        repeat: false
+        onTriggered: {
+            // Normally this object is gone because the service restarted. If
+            // the helper could not stop the supervisor, let the user retry.
+            root._familyRestartPending = false
+            root._transitionInProgress = false
+            root._transitionUsesOverlay = false
+        }
     }
 
     function beginSerializedFamilySwap(targetFamily: string): void {

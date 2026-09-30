@@ -2983,6 +2983,16 @@ if ! grep -q 'ONLY_MISSING_DEPS' "$void_deps"; then
     printf 'FAIL: Void installer missing ONLY_MISSING_DEPS handling\n' >&2
     exit 1
 fi
+if ! grep -Fq 'local dependency_repair_only=false' "$runtime_root/setup" \
+        || ! grep -Fq '[[ -n "${ONLY_MISSING_DEPS:-}" ]] && dependency_repair_only=true' "$runtime_root/setup" \
+        || ! grep -Fq 'if $dependency_repair_only; then' "$runtime_root/setup"; then
+    printf 'FAIL: targeted dependency/provider repairs can overwrite install source tracking\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'reboot_cmd="loginctl reboot"' "$runtime_root/setup"; then
+    printf 'FAIL: Void install completion still assumes systemctl for reboot\n' >&2
+    exit 1
+fi
 
 step "Void Quickshell ABI repair"
 inir_cli="$runtime_root/scripts/inir"

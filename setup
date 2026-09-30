@@ -1745,6 +1745,12 @@ run_logs() {
 show_reboot_notice() {
     local reasons=("${INIR_REBOOT_REASONS[@]}") reason
     local bar="══════════════════════════════════════════════════════════════"
+    local reboot_cmd="systemctl reboot"
+    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+        reboot_cmd="loginctl reboot"
+    elif ! command -v systemctl >/dev/null 2>&1 && command -v loginctl >/dev/null 2>&1; then
+        reboot_cmd="loginctl reboot"
+    fi
     echo ""
     echo -e "  ${STY_YELLOW}${STY_BOLD}╔${bar}╗${STY_RST}"
     printf "  ${STY_YELLOW}${STY_BOLD}║%-62s║${STY_RST}\n" ""
@@ -1761,7 +1767,7 @@ show_reboot_notice() {
     fi
     echo ""
     echo -e "    Then pick ${STY_BOLD}Niri${STY_RST} at the login screen and you're in."
-    echo -e "    ${STY_FAINT}Reboot now:${STY_RST} ${STY_BOLD}systemctl reboot${STY_RST}"
+    echo -e "    ${STY_FAINT}Reboot now:${STY_RST} ${STY_BOLD}${reboot_cmd}${STY_RST}"
     echo ""
 }
 
@@ -1812,6 +1818,8 @@ show_update_completion() {
 ###############################################################################
 run_install() {
     detect_distro
+    local dependency_repair_only=false
+    [[ -n "${ONLY_MISSING_DEPS:-}" ]] && dependency_repair_only=true
     # Filled by the install steps with what only a fresh login or a reboot applies.
     INIR_REBOOT_REASONS=()
 
@@ -1953,7 +1961,18 @@ run_install() {
     #     fi
     # fi
 
-    # Set version tracking
+    # A targeted dependency/provider repair must not claim the current checkout
+    # became the installed source. This path is also used by Doctor and the
+    # provider idempotency checks from temporary worktrees.
+    if $dependency_repair_only; then
+        tui_task_skip 3 "unchanged"
+        tui_task_finalize
+        echo ""
+        tui_success "Dependency/provider repair complete"
+        return 0
+    fi
+
+    # Set version tracking for a real install.
     tui_task_run 3 "recording version"
     set_installed_version "$(get_repo_version)" "$(get_repo_commit)" "setup"
     tui_task_done 3 "$(get_repo_version)"

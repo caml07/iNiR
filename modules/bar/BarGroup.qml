@@ -58,6 +58,13 @@ Item {
     // visible:false items, so an all-hidden zone reports ~0 inner width). Lets
     // callers collapse the pill entirely instead of showing a ghost background.
     readonly property bool empty: gridLayout.implicitWidth < 1
+    readonly property real elasticSlack: {
+        let slack = 0
+        for (const child of gridLayout.children)
+            if (child.visible && child.Layout.fillWidth && isFinite(child.Layout.maximumWidth))
+                slack += Math.max(0, child.implicitWidth - child.Layout.minimumWidth)
+        return slack
+    }
     default property alias items: gridLayout.children
 
     readonly property real _spectrumX: {
@@ -170,6 +177,10 @@ Item {
         GridLayout {
             id: gridLayout
             columns: root.vertical ? 1 : -1
+            // A group held narrower than its content lays it out in that width, so elastic modules
+            // (media) give way before anything is clipped; only past that does it overflow, centred.
+            width: root.vertical ? implicitWidth
+                : Math.min(implicitWidth, Math.max(implicitWidth - root.elasticSlack, parent.width - root.padding * 2))
             anchors {
                 verticalCenter: root.vertical ? undefined : parent.verticalCenter
                 horizontalCenter: parent.horizontalCenter

@@ -1666,6 +1666,45 @@ ContentPage {
         title: Translation.tr("Widget Colors")
 
         SettingsGroup {
+            WidgetSettingRow {
+                label: Translation.tr("Global widget design")
+                icon: "widgets"
+                trailing: false
+                ConfigSelectionArray {
+                    currentValue: DesktopWidgetDesign.shared
+                    options: DesktopWidgetDesign.choices.map(choice => ({
+                        displayName: Translation.tr(choice.label), icon: choice.icon, value: choice.value
+                    }))
+                    onSelected: newValue => DesktopWidgetDesign.apply(newValue)
+                }
+            }
+            StyledText {
+                Layout.fillWidth: true
+                text: Translation.tr("One look on every widget. Individual keeps each widget's own style.")
+                color: Appearance.colors.colSubtext
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                wrapMode: Text.WordWrap
+            }
+            RowLayout {
+                visible: DesktopWidgetDesign.exceptionCount > 0 || DesktopWidgetDesign.canUndo
+                spacing: 6
+                SelectionGroupButton {
+                    visible: DesktopWidgetDesign.exceptionCount > 0
+                    Layout.fillWidth: false
+                    leftmost: true; rightmost: true
+                    buttonIcon: "select_all"
+                    buttonText: Translation.tr("Match every widget")
+                    onClicked: DesktopWidgetDesign.apply(DesktopWidgetDesign.shared)
+                }
+                SelectionGroupButton {
+                    visible: DesktopWidgetDesign.canUndo
+                    Layout.fillWidth: false
+                    leftmost: true; rightmost: true
+                    buttonIcon: "undo"
+                    buttonText: Translation.tr("Undo design change")
+                    onClicked: DesktopWidgetDesign.undo()
+                }
+            }
             StyledText {
                 Layout.fillWidth: true
                 text: Translation.tr("Apply one wallpaper-generated color preset to every built-in desktop widget. You can still tune any widget individually below.")
@@ -1677,14 +1716,14 @@ ContentPage {
             SettingsSwitch {
                 Layout.fillWidth: true
                 buttonIcon: "wallpaper"
-                text: Translation.tr("Adapt colors to widget position")
+                text: Translation.tr("Ink follows the wallpaper")
                 autoToggle: false
                 checked: Config.getNestedValue(
-                    "background.widgets.adaptColorsToWallpaperPosition", false)
+                    "background.widgets.adaptColorsToWallpaperPosition", true)
                 onToggledByUser: checked => Config.setNestedValue(
                     "background.widgets.adaptColorsToWallpaperPosition", checked)
                 StyledToolTip {
-                    text: Translation.tr("Sample the wallpaper behind each widget to adjust readable ink and semantic foreground choices. Off keeps colors stable when widgets move.")
+                    text: Translation.tr("Each widget reads the wallpaper under it: dark ink and deeper accents where it is light, light ink where it is dark. Off keeps the theme's ink everywhere.")
                 }
             }
 
@@ -1982,14 +2021,14 @@ ContentPage {
                         text: Translation.tr("Adapt digital clock locally")
                         autoToggle: false
                         enabled: Config.getNestedValue(
-                            "background.widgets.adaptColorsToWallpaperPosition", false)
+                            "background.widgets.adaptColorsToWallpaperPosition", true)
                         opacity: enabled ? 1 : 0.45
                         checked: Config.getNestedValue("background.widgets.clock.digital.adaptToWallpaper", true)
                         onToggledByUser: checked => Config.setNestedValue("background.widgets.clock.digital.adaptToWallpaper", checked)
                         StyledToolTip {
                             text: enabled
                                 ? Translation.tr("Let the digital clock use the wallpaper sample behind it.")
-                                : Translation.tr("Enable Adapt colors to widget position in Widget Colors first.")
+                                : Translation.tr("Turn on Ink follows the wallpaper in Widget Colors first.")
                         }
                     }
                 }

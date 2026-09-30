@@ -1155,7 +1155,7 @@ ContentPage {
             }
 
             Repeater {
-                model: root.desktopWidgetDescriptors
+                model: ScriptModel { objectProp: "key"; values: root.desktopWidgetDescriptors }
 
                 RowLayout {
                     id: widgetOutputRow

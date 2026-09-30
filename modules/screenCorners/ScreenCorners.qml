@@ -21,7 +21,6 @@ Scope {
 
     component CornerPanelWindow: PanelWindow {
         id: cornerPanelWindow
-        property var screen: QsWindow.window?.screen
         property var brightnessMonitor: Brightness.getMonitorForScreen(screen)
         property bool fullscreen
         property var corner

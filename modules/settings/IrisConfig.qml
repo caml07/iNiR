@@ -214,8 +214,15 @@ ContentPage {
                         }
                     }
                     SettingsSwitch {
+                        buttonIcon: "visibility_off"
+                        text: Translation.tr("Automatically hide")
+                        checked: Config.options?.iris?.bar?.autoHide ?? false
+                        onCheckedChanged: Config.setNestedValue("iris.bar.autoHide", checked)
+                    }
+                    SettingsSwitch {
                         buttonIcon: "view_compact"
                         text: Translation.tr("Reserve workspace space")
+                        visible: !(Config.options?.iris?.bar?.autoHide ?? false)
                         checked: Config.options?.iris?.bar?.reserveSpace ?? true
                         onCheckedChanged: Config.setNestedValue("iris.bar.reserveSpace", checked)
                     }

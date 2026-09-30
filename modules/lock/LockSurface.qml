@@ -398,7 +398,7 @@ MouseArea {
 
                 // WiFi
                 Revealer {
-                    reveal: Network.wifiEnabled
+                    reveal: Network.ethernet || Network.wifiEnabled
                 Row {
                     spacing: 4
 
@@ -417,7 +417,7 @@ MouseArea {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: Network.networkName ?? ""
+                        text: Network.ethernet ? Translation.tr("Ethernet") : (Network.networkName ?? "")
                         visible: text.length > 0 && text.length < 16
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         font.family: Appearance.font.family.main
@@ -680,7 +680,7 @@ MouseArea {
             active: root.showMedia &&
                     MprisController.activePlayer !== null && 
                     MprisController.activePlayer.playbackState !== MprisPlaybackState.Stopped &&
-                    (MprisController.activePlayer.trackTitle?.length > 0 ?? false)
+                    (MprisController.titleOf(MprisController.activePlayer)?.length > 0 ?? false)
             anchors {
                 horizontalCenter: parent.horizontalCenter
                 top: parent.verticalCenter

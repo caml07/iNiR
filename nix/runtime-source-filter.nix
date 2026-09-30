@@ -7,7 +7,7 @@ let
   readList = name: lib.filter (s: s != "" && !(lib.hasPrefix "#" s))
     (lib.splitString "\n" (builtins.readFile (root + ("/sdata/" + name))));
   runtimeDirs = readList "runtime-payload-dirs.txt";
-  runtimeFiles = readList "runtime-root-files.txt" ++ [ "LICENSE" ];
+  runtimeFiles = readList "runtime-root-files.txt" ++ [ "LICENSE" "NOTICE" ];
   excludedName = name:
     builtins.elem name policy.excludedNames
     || lib.any (p: lib.hasPrefix p name) policy.excludedNamePrefixes

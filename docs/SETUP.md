@@ -448,7 +448,7 @@ These may be used by other applications. The script asks before removing:
 | `~/.config/dolphinrc`                                          | Optional     | Ask (remove if not using Dolphin)                                                                       |
 | `~/.config/gtk-3.0/gtk.css`                                    | Optional     | Ask                                                                                                     |
 | `~/.config/gtk-4.0/gtk.css`                                    | Optional     | Ask                                                                                                     |
-| `~/.config/fontconfig/`                                        | Essential    | Keep                                                                                                    |
+| `~/.config/fontconfig/conf.d/90-inir-shell.conf`               | iNiR default | Remove                                                                                                  |
 | `${XDG_DATA_HOME:-~/.local/share}/color-schemes/Darkly.colors` | iNiR default | Remove                                                                                                  |
 
 ### Installed Packages

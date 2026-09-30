@@ -246,9 +246,9 @@ Item {
                 anchors.fill: parent
                 z: 2
                 shown: root.responses.length === 0
-                icon: "bookmark_heart"
+                icon: Network.online ? "bookmark_heart" : "cloud_off"
                 text: Translation.tr("Anime boorus")
-                explanation: ""
+                explanation: Network.online ? "" : Network.offlineReason
                 shape: MaterialShape.Shape.Bun
             }
 

@@ -7,6 +7,7 @@ import qs.modules.common.functions
 import qs.modules.lock
 import qs.modules.waffle.lock
 import qs.modules.iris.lock
+import qs.modules.iris.style
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -162,23 +163,47 @@ Scope {
             // Unlock the keyring if configured to do so
             if (Config.options?.lock?.security?.unlockKeyring ?? true) root.unlockKeyring(); // Async
 
-            // Unlock the screen before exiting, or the compositor will display a
-            // fallback lock you can't interact with.
-            GlobalStates.screenLocked = false;
-            
-            // Refocus last focused window on unlock (hack)
-            if (CompositorService.isHyprland) {
-                Quickshell.execDetached(["/usr/bin/bash", "-lc", "/usr/bin/sleep 0.2; /usr/bin/hyprctl --batch 'dispatch togglespecialworkspace; dispatch togglespecialworkspace'"])
+            if (root._cachedUseIrisLock && IrisStyle.recedeDuration > 0) {
+                root.irisUnlocking = true
+                irisRelease.restart()
+                return
             }
+            root.finishUnlock()
+        }
+    }
 
-            // Reset
-            lockContext.reset();
+    property bool irisUnlocking: false
+    Timer {
+        id: irisRelease
+        interval: IrisStyle.recedeDuration + 40
+        onTriggered: root.finishUnlock()
+    }
+    Connections {
+        target: GlobalStates
+        function onScreenLockedChanged(): void {
+            if (GlobalStates.screenLocked) return
+            irisRelease.stop()
+            root.irisUnlocking = false
+        }
+    }
 
-            // Post-unlock actions: activate idle inhibitor if requested
-            if (lockContext.alsoInhibitIdle) {
-                lockContext.alsoInhibitIdle = false;
-                Idle.toggleInhibit(true);
-            }
+    function finishUnlock(): void {
+        // Unlock the screen before exiting, or the compositor will display a
+        // fallback lock you can't interact with.
+        GlobalStates.screenLocked = false;
+        
+        // Refocus last focused window on unlock (hack)
+        if (CompositorService.isHyprland) {
+            Quickshell.execDetached(["/usr/bin/bash", "-lc", "/usr/bin/sleep 0.2; /usr/bin/hyprctl --batch 'dispatch togglespecialworkspace; dispatch togglespecialworkspace'"])
+        }
+
+        // Reset
+        lockContext.reset();
+
+        // Post-unlock actions: activate idle inhibitor if requested
+        if (lockContext.alsoInhibitIdle) {
+            lockContext.alsoInhibitIdle = false;
+            Idle.toggleInhibit(true);
         }
     }
 
@@ -258,7 +283,8 @@ Scope {
             Loader {
                 id: lockSurfaceLoader
                 active: GlobalStates.screenLocked && Config.ready
-                asynchronous: true
+                // The iRiS lock arrives from the wallpaper; an async first frame is a bare colour flash.
+                asynchronous: !root._cachedUseIrisLock
                 anchors.fill: parent
                 // Don't animate opacity - causes issues during hot-reload
                 opacity: active ? 1 : 0
@@ -278,6 +304,19 @@ Scope {
                     }
                 }
                 
+                Binding {
+                    target: lockSurfaceLoader.item
+                    when: root._cachedUseIrisLock && lockSurfaceLoader.item !== null
+                    property: "screenName"
+                    value: lockSurface.screen?.name ?? ""
+                }
+                Binding {
+                    target: lockSurfaceLoader.item
+                    when: root._cachedUseIrisLock && lockSurfaceLoader.item !== null
+                    property: "leaving"
+                    value: root.irisUnlocking
+                }
+
                 // Force focus to loaded item
                 onLoaded: {
                     if (item) {

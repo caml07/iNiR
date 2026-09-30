@@ -138,6 +138,12 @@ parser.add_argument(
     help="file path to write material_colors.scss",
 )
 parser.add_argument(
+    "--surface-seed",
+    type=str,
+    default=None,
+    help="hex colour the neutral surfaces are anchored to (the shell's own material); accents stay from the source",
+)
+parser.add_argument(
     "--render-templates",
     type=str,
     default=None,
@@ -370,7 +376,11 @@ def find_tone_for_contrast(
 
 
 def ensure_contrast(
-    fg_argb: int, bg_argb: int, min_ratio: float = 4.5, is_dark: bool = True
+    fg_argb: int,
+    bg_argb: int,
+    min_ratio: float = 4.5,
+    is_dark: bool = True,
+    tone_limit: float | None = None,
 ) -> int:
     """Adjust foreground tone to ensure minimum contrast ratio against background.
 
@@ -387,7 +397,8 @@ def ensure_contrast(
 
     # Tone limits to prevent colors from washing out to pure white/black.
     # If min ratio is unreachable inside limits, return highest-contrast option.
-    tone_limit = 88.0 if is_dark else 20.0
+    if tone_limit is None:
+        tone_limit = 88.0 if is_dark else 20.0
 
     best, best_tone, met_min, best_ratio = find_tone_for_contrast(
         hct.hue,
@@ -474,10 +485,14 @@ def build_app_palette(base_palette: dict[str, str]) -> dict[str, str]:
     on_layer2 = readable_hex(on_surface, layer2, 4.5)
     on_layer3 = readable_hex(on_surface, layer3, 4.5)
     on_layer4 = readable_hex(on_surface, layer4, 4.5)
-    subtext = readable_hex(mix_hex(on_layer1, layer1, 0.75), layer1, 3.0)
-
     layer1_hover = mix_hex(layer1, on_layer1, 0.92)
     layer1_active = mix_hex(layer1, on_layer1, 0.85)
+    # Muted text on a light theme drops under 3:1 on hover and press fills, so
+    # it is solved against the pressed fill; dark themes keep the 3:1 floor.
+    if Hct.from_int(hex_to_argb(layer0)).tone >= 50:
+        subtext = readable_hex(mix_hex(on_layer1, layer1, 0.75), layer1_active, 4.5)
+    else:
+        subtext = readable_hex(mix_hex(on_layer1, layer1, 0.75), layer1, 3.0)
     layer2_hover = mix_hex(layer2, on_layer2, 0.90)
     layer2_active = mix_hex(layer2, on_layer2, 0.80)
     layer3_hover = mix_hex(layer3, on_layer3, 0.90)
@@ -642,6 +657,44 @@ else:
     material_colors["successContainer"] = "#D1E8D5"
     material_colors["onSuccessContainer"] = "#0C1F13"
 
+# The shell's own material as the surface base: the ramp between surfaces keeps
+# its steps, the hue and chroma come from the seed, so apps read as the shell.
+SURFACE_RAMP = [
+    "background", "surface", "surfaceDim", "surfaceBright", "surfaceVariant",
+    "surfaceContainerLowest", "surfaceContainerLow", "surfaceContainer",
+    "surfaceContainerHigh", "surfaceContainerHighest",
+]
+if args.surface_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.surface_seed.strip()):
+    seed_hct = Hct.from_int(hex_to_argb("#" + args.surface_seed.strip().lstrip("#")))
+    # A seed of the other polarity is a scheme change still on its way: ignore it.
+    if (seed_hct.tone < 50) == bool(darkmode) and "background" in material_colors:
+        base_tone = Hct.from_int(hex_to_argb(material_colors["background"])).tone
+        # A paper stays a paper and a night a night: past these tones no role can be solved against the ramp.
+        seed_tone = max(64.0, seed_hct.tone) if not darkmode else min(30.0, seed_hct.tone)
+        for key in SURFACE_RAMP:
+            if key not in material_colors:
+                continue
+            tone = Hct.from_int(hex_to_argb(material_colors[key])).tone
+            shifted = max(0.0, min(100.0, seed_tone + (tone - base_tone)))
+            material_colors[key] = argb_to_hex(
+                Hct.from_hct(seed_hct.hue, seed_hct.chroma, shifted).to_int()
+            )
+        # The ramp moved, and the text and accent roles were solved for the stock paper (or night). Solve them again against
+        # the surface they now sit farthest from (the darkest in light, the lightest in dark), keeping hue and chroma, so a
+        # seed that follows the shell's frost never costs legibility.
+        ramp = [hex_to_argb(material_colors[key]) for key in SURFACE_RAMP if key in material_colors]
+        worst = (min if not darkmode else max)(ramp, key=lambda argb: Hct.from_int(argb).tone)
+        for key, ratio in (
+            ("onSurface", 7.0), ("onBackground", 7.0), ("onSurfaceVariant", 4.5),
+            ("primary", 4.5), ("secondary", 4.5), ("tertiary", 4.5), ("error", 4.5), ("outline", 3.0),
+        ):
+            if key in material_colors:
+                material_colors[key] = argb_to_hex(
+                    ensure_contrast(
+                        hex_to_argb(material_colors[key]), worst, ratio, bool(darkmode), 94.0 if darkmode else 8.0
+                    )
+                )
+
 # Terminal Colors
 if args.termscheme is not None:
     with open(args.termscheme, "r") as f:
@@ -724,11 +777,8 @@ if args.termscheme is not None:
                 )
             else:
                 term_colors[color] = material_colors.get(
-                    "outline_variant",
-                    material_colors.get(
-                        "outlineVariant",
-                        get_interpolated_surface(max(0.0, user_bg_brightness - 0.45)),
-                    ),
+                    "outline",
+                    get_interpolated_surface(max(0.0, user_bg_brightness - 0.45)),
                 )
             continue
 

@@ -436,7 +436,7 @@ Item {
                     text: root.searchText
                     color: IrisStyle.text
                     selectionColor: IrisStyle.accentContainer
-                    selectedTextColor: IrisStyle.onAccentContainer
+                    selectedTextColor: IrisStyle.inkOnAccentContainer
                     font.family: IrisStyle.fontMain
                     font.pixelSize: 13 * IrisStyle.typeScale
                     clip: true
@@ -744,7 +744,7 @@ Item {
             }
 
             Repeater {
-                model: root._mascotInstanceIds
+                model: ScriptModel { values: root._mascotInstanceIds }
                 WidgetCard {
                     required property string modelData
                     required property int index

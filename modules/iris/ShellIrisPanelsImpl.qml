@@ -5,7 +5,6 @@ import Quickshell
 import qs
 import qs.services
 import qs.modules.common
-import qs.modules.iris.palette
 import qs.modules.iris.notificationPopup
 import qs.modules.iris.onScreenDisplay
 import qs.modules.iris.session
@@ -13,9 +12,11 @@ import qs.modules.iris.polkit
 import qs.modules.iris.style
 import qs.modules.iris.pieces
 import qs.modules.iris.settings
-import qs.modules.iris.sidebar
 import qs.modules.iris.studio
-import qs.modules.iris.wallpaper
+import qs.modules.iris.lock
+import qs.modules.iris.sidebar
+import qs.modules.iris.orbit
+import qs.modules.iris.osk
 import qs.modules.background
 import qs.modules.lock
 
@@ -25,7 +26,7 @@ Item {
     component PanelLoader: LazyLoader {
         required property string identifier
         property bool extraCondition: true
-        readonly property bool enabledPanel: Config.ready
+        readonly property bool enabledPanel: Config.ready && IrisGate.official
             && (Config.options?.enabledPanels ?? []).includes(identifier)
             && extraCondition
         loading: enabledPanel
@@ -35,7 +36,7 @@ Item {
     component DeferredPanelLoader: LazyLoader {
         required property string identifier
         property bool extraCondition: true
-        readonly property bool enabledPanel: Config.ready
+        readonly property bool enabledPanel: Config.ready && IrisGate.official
             && (Config.options?.enabledPanels ?? []).includes(identifier)
             && extraCondition
         loading: enabledPanel && GlobalStates.shellEntryReady
@@ -54,7 +55,7 @@ Item {
             interval: loader.closeGraceMs
             onTriggered: loader.resident = loader.open
         }
-        readonly property bool enabledPanel: Config.ready
+        readonly property bool enabledPanel: Config.ready && IrisGate.official
             && (!requireEnabledPanel || (Config.options?.enabledPanels ?? []).includes(identifier))
             && extraCondition
 
@@ -71,8 +72,22 @@ Item {
         activeAsync: enabledPanel && GlobalStates.deferredPanelsReady && resident
     }
 
-    IrisSidebarEdge { side: "left" }
-    IrisSidebarEdge { side: "right" }
+    IrisAppsSync {}
+
+    // Orbit's hot corner: a few pixels in one screen corner, on Top, only while it is on and something can use it.
+    LazyLoader {
+        active: IrisGate.official && (Config.options?.iris?.orbit?.enable ?? false) && (Config.options?.iris?.orbit?.hotCorner ?? true)
+        component: IrisOrbitCorner {}
+    }
+
+    LazyLoader {
+        active: IrisGate.official
+        component: IrisSidebarEdge { side: "left" }
+    }
+    LazyLoader {
+        active: IrisGate.official
+        component: IrisSidebarEdge { side: "right" }
+    }
 
     OnDemandPanelLoader {
         identifier: "irisSidebarLeft"
@@ -98,7 +113,8 @@ Item {
         closeGraceMs: IrisStyle.settleDuration * 2 + 160
         extraCondition: (Config.options?.iris?.modules?.notificationPopup ?? true)
             && (!(Config.options?.enabledPanels ?? []).includes("irisBar")
-                || (CompositorService.isNiri && GameMode.hasFullscreenOnOutput(GlobalStates.focusedScreen?.name ?? "") && !NiriService.inOverview))
+                || (CompositorService.isNiri && GameMode.hasFullscreenOnOutput(GlobalStates.focusedScreen?.name ?? "") && !NiriService.inOverview
+                    && (Config.options?.iris?.notifications?.fullscreen ?? true)))
         component: IrisNotificationPopup {}
     }
 
@@ -119,14 +135,14 @@ Item {
     }
 
     LazyLoader {
-        activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+        activeAsync: Config.ready && IrisGate.official && GlobalStates.deferredPanelsReady
             && CompositorService.isNiri
             && (Config.options?.background?.backdrop?.enable ?? false)
         source: "../background/Backdrop.qml"
     }
 
     LazyLoader {
-        activeAsync: Config.ready && GlobalStates.deferredPanelsReady
+        activeAsync: Config.ready && IrisGate.official && GlobalStates.deferredPanelsReady
             && (Config.options?.enabledPanels ?? []).includes("irisBackground")
             && (Config.options?.iris?.modules?.desktopWidgets ?? true)
         component: Background {}
@@ -141,14 +157,6 @@ Item {
                 || ((Config.options?.iris?.bar?.screenList ?? []).length > 0
                     && !(Config.options.iris.bar.screenList).includes(GlobalStates.focusedScreen?.name ?? "")))
         component: IrisOSD {}
-    }
-
-    OnDemandPanelLoader {
-        identifier: "irisPalette"
-        open: GlobalStates.searchOpen
-        closeGraceMs: IrisStyle.settleDuration + 120
-        extraCondition: Config.options?.iris?.modules?.palette ?? true
-        component: IrisPalette {}
     }
 
     OnDemandPanelLoader {
@@ -189,7 +197,8 @@ Item {
         identifier: "irisOnScreenKeyboard"
         open: GlobalStates.oskOpen
         requireEnabledPanel: false
-        source: "../onScreenKeyboard/OnScreenKeyboard.qml"
+        closeGraceMs: IrisStyle.settleDuration + 80
+        component: IrisOnScreenKeyboard {}
     }
 
     OnDemandPanelLoader {
@@ -199,12 +208,12 @@ Item {
         source: "../regionSelector/RegionSelector.qml"
     }
 
+
     OnDemandPanelLoader {
-        identifier: "irisWallpaperSelector"
-        open: GlobalStates.wallpaperSelectorOpen
+        identifier: "irisLockRehearsal"
+        open: GlobalStates.irisLockEdit
         requireEnabledPanel: false
-        closeGraceMs: IrisStyle.settleDuration + 120
-        component: IrisWallpaperPicker {}
+        component: IrisLockRehearsal {}
     }
 
     OnDemandPanelLoader {

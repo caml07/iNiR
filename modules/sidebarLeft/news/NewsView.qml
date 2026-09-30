@@ -157,7 +157,7 @@ Item {
             MaterialPlaceholderMessage {
                 anchors.centerIn: parent
                 maximumWidth: 340
-                shown: NewsService.lastError.length > 0 && NewsService.articles.length === 0
+                shown: Network.online && NewsService.lastError.length > 0 && NewsService.articles.length === 0
                 icon: "error"
                 actionIcon: "refresh"
                 text: Translation.tr("Error")
@@ -169,11 +169,20 @@ Item {
                 }
             }
 
+            MaterialPlaceholderMessage {
+                anchors.centerIn: parent
+                maximumWidth: 340
+                shown: !Network.online && NewsService.articles.length === 0
+                icon: "cloud_off"
+                text: Network.offlineReason
+                explanation: Translation.tr("News loads when you're back online")
+            }
+
             // Empty
             MaterialPlaceholderMessage {
                 anchors.centerIn: parent
                 maximumWidth: 340
-                shown: !NewsService.loading && NewsService.lastError.length === 0 && NewsService.articles.length === 0
+                shown: Network.online && !NewsService.loading && NewsService.lastError.length === 0 && NewsService.articles.length === 0
                 icon: "newspaper"
                 text: Translation.tr("No news")
                 explanation: Translation.tr("Try a different board")
@@ -262,11 +271,19 @@ Item {
             Layout.fillWidth: true
             spacing: 8
 
+            MaterialSymbol {
+                visible: !Network.online
+                text: "cloud_off"
+                iconSize: Appearance.font.pixelSize.normal
+                color: Appearance.colMetadataText
+            }
+
             StyledText {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 wrapMode: Text.NoWrap
-                text: root.configMode === "local" && NewsService.localCity.length > 0
+                text: !Network.online ? Network.offlineReason
+                    : root.configMode === "local" && NewsService.localCity.length > 0
                     ? NewsService.localCity
                     : root.boards[root.currentBoardIndex].label
                 font.pixelSize: Appearance.font.pixelSize.smaller
@@ -277,7 +294,7 @@ Item {
                 implicitWidth: 32
                 implicitHeight: 32
                 buttonRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : Appearance.rounding.full
-                enabled: !NewsService.loading
+                enabled: !NewsService.loading && Network.online
 
                 colBackgroundHover: Appearance.inirEverywhere ? Appearance.inir.colLayer2Hover
                     : Appearance.auroraEverywhere ? Appearance.aurora.colSubSurface

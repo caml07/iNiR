@@ -425,7 +425,7 @@ Scope {
         const day = now.getDay()
         const hour = now.getHours()
         if (_eventEnabled("music") && _looksLikeMusic()) {
-            const t = MprisController.activePlayer?.trackTitle ?? ""
+            const t = MprisController.titleOf(MprisController.activePlayer) ?? ""
             // An untitled track would render the line as an empty quote.
             if (t.length > 0)
                 out.push({ key: "media-playing", pose: "headphone-groove-full-loop", edge: "right", arg: t.length > 40 ? t.substring(0, 37) + "..." : t })
@@ -663,7 +663,7 @@ Scope {
     readonly property bool _musicRequireArtist: Config.options?.mascot?.companion?.musicRequireArtist ?? true
     function _looksLikeMusic() {
         if (!MprisController.isPlaying) return false
-        const artist = MprisController.activePlayer?.trackArtist ?? ""
+        const artist = MprisController.artistOf(MprisController.activePlayer) ?? ""
         return !_musicRequireArtist || artist.length > 0
     }
 
@@ -672,9 +672,9 @@ Scope {
         interval: 7000
         onTriggered: {
             if (!root._eventEnabled("music") || !root._looksLikeMusic()) return
-            const title = MprisController.activePlayer?.trackTitle ?? ""
+            const title = MprisController.titleOf(MprisController.activePlayer) ?? ""
             if (title.length === 0) return
-            const artist = MprisController.activePlayer?.trackArtist ?? ""
+            const artist = MprisController.artistOf(MprisController.activePlayer) ?? ""
             const mpose = root._eventPose("music", root._reactionMap.music?.poses ?? ["music-vibe"])
             const pool = root._manifest.smartLines?.["music-track"] ?? []
             if (pool.length === 0) { root._showReaction(mpose, "right", "media"); return }

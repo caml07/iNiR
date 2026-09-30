@@ -351,7 +351,7 @@ Item {
             // Error message
             MaterialPlaceholderMessage {
                 anchors.centerIn: parent
-                shown: AnimeService.lastError.length > 0 && root.getCurrentData().length === 0
+                shown: Network.online && AnimeService.lastError.length > 0 && root.getCurrentData().length === 0
                 maximumWidth: 360
                 icon: "error"
                 actionIcon: "refresh"
@@ -365,10 +365,19 @@ Item {
                 }
             }
             
+            MaterialPlaceholderMessage {
+                anchors.centerIn: parent
+                shown: !Network.online && root.getCurrentData().length === 0
+                maximumWidth: 360
+                icon: "cloud_off"
+                text: Network.offlineReason
+                explanation: Translation.tr("The schedule loads when you're back online")
+            }
+
             // Empty state
             MaterialPlaceholderMessage {
                 anchors.centerIn: parent
-                shown: !AnimeService.loading && AnimeService.lastError.length === 0 && root.getCurrentData().length === 0
+                shown: Network.online && !AnimeService.loading && AnimeService.lastError.length === 0 && root.getCurrentData().length === 0
                 maximumWidth: 360
                 icon: "calendar_month"
                 actionIcon: "refresh"
@@ -435,9 +444,18 @@ Item {
             Layout.fillWidth: true
             spacing: 8
             
+            MaterialSymbol {
+                visible: !Network.online
+                text: "cloud_off"
+                iconSize: Appearance.font.pixelSize.normal
+                color: Appearance.colMetadataText
+            }
+
             StyledText {
                 Layout.fillWidth: true
-                text: root.currentTab === 0 
+                elide: Text.ElideRight
+                text: !Network.online ? Network.offlineReason
+                    : root.currentTab === 0 
                     ? Translation.tr("Airing on %1").arg(AnimeService.getDayName(root.selectedDay === "today" ? root.todayName : root.selectedDay))
                     : root.currentTab === 1 
                         ? Translation.tr("%1 %2").arg(AnimeService.getSeasonDisplayName(AnimeService.selectedSeason)).arg(AnimeService.selectedYear)
@@ -450,7 +468,7 @@ Item {
                 implicitWidth: 32
                 implicitHeight: 32
                 buttonRadius: Appearance.editorialEverywhere ? Appearance.rounding.small : Appearance.rounding.full
-                enabled: !AnimeService.loading
+                enabled: !AnimeService.loading && Network.online
                 
                 colBackgroundHover: Appearance.inirEverywhere ? Appearance.inir.colLayer2Hover
                     : Appearance.auroraEverywhere ? Appearance.aurora.colSubSurface

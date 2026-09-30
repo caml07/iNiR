@@ -788,14 +788,11 @@ Item { // Bar content region
                             color: rightSidebarButton.colText
                         }
                     }
-                    Loader {
-                        active: CompositorService.isHyprland
+                    Bar.HyprlandXkbIndicator {
+                        vertical: true
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.bottomMargin: indicatorsColumnLayout.realSpacing
-                        sourceComponent: Bar.HyprlandXkbIndicator {
-                            vertical: true
-                            color: rightSidebarButton.colText
-                        }
+                        Layout.bottomMargin: KeyboardIndicators.hasPanelIndicators ? indicatorsColumnLayout.realSpacing : 0
+                        color: rightSidebarButton.colText
                     }
                     Revealer {
                         vertical: true
@@ -812,12 +809,14 @@ Item { // Bar content region
                         }
                     }
                     MaterialSymbol {
+                        Layout.alignment: Qt.AlignHCenter
                         Layout.bottomMargin: indicatorsColumnLayout.realSpacing
                         text: Network.materialSymbol
                         iconSize: Appearance.font.pixelSize.larger
                         color: rightSidebarButton.colText
                     }
                     MaterialSymbol {
+                        Layout.alignment: Qt.AlignHCenter
                         visible: BluetoothStatus.available
                         text: BluetoothStatus.activeIcon
                         iconSize: Appearance.font.pixelSize.larger

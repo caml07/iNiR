@@ -430,6 +430,8 @@ Item { // Bar content region
         property string zone: "left"
         Layout.alignment: Qt.AlignVCenter
         Layout.fillWidth: root._fillWidth(modelData, zone)
+        Layout.maximumWidth: root._maxWidth(modelData, item)
+        Layout.minimumWidth: root._minWidth(modelData, item)
         Layout.fillHeight: root._fillHeight(modelData)
         active: root._moduleShown(modelData, zone)
         visible: active
@@ -540,8 +542,8 @@ Item { // Bar content region
 
     // Which ids stretch along the bar axis. `spacer` is a pure gap;
     // activeWindow/taskbar fill the edge section; resources fills only on the
-    // tightest screens. Centre pills size tightly to content, so clock/media do
-    // NOT fill — they sit at natural width with no leftover space.
+    // tightest screens. Centre pills size tightly to content, so clock does NOT
+    // fill; media fills only up to its natural width, which lets it shrink first.
     readonly property string _spacerMode: Config.options?.bar?.layout?.spacerMode ?? "auto"
     function _fillWidth(id, zone) {
         if (id === "spacer") {
@@ -564,7 +566,15 @@ Item { // Bar content region
         // activeWindow adopts its clamped intrinsic width instead of filling.
         if (id === "activeWindow") return root._fillSlot(zone) && !root.isIslands
         if (id === "resources") return root.useShortenedForm === 2
+        // Media fills up to its own width only (see _maxWidth), so it can yield in a crowded group.
+        if (id === "media") return true
         return false
+    }
+    function _maxWidth(id, item) {
+        return id === "media" && item ? item.implicitWidth : Number.POSITIVE_INFINITY
+    }
+    function _minWidth(id, item) {
+        return id === "media" && item ? item.minimumWidth : 0
     }
     function _fillHeight(id) {
         // Islands: filling the row's height means filling the BAR's height, which is
@@ -1142,7 +1152,7 @@ Item { // Bar content region
         onMovedAway: root.closeOSD(root.leftAction)
         onPressed: event => {
             if (event.button === Qt.LeftButton)
-                ShellLayoutController.toggleSidebarAtSlot("left");
+                ShellLayoutController.toggleSidebarAtSlot("left", root.screen?.name ?? "");
             else if (event.button === Qt.RightButton)
                 root.openBarContextMenu(event.x, event.y, barLeftSideMouseArea)
         }
@@ -1261,6 +1271,8 @@ Item { // Bar content region
                     required property string modelData
                     Layout.alignment: Qt.AlignVCenter
                     Layout.fillWidth: root._fillWidth(modelData, "center")
+                    Layout.maximumWidth: root._maxWidth(modelData, item)
+                    Layout.minimumWidth: root._minWidth(modelData, item)
                     Layout.fillHeight: root._fillHeight(modelData)
                     // Hidden modules must leave the layout entirely, or their
                     // implicit width lingers as a ghost gap inside the pill.
@@ -1328,6 +1340,8 @@ Item { // Bar content region
                     required property string modelData
                     Layout.alignment: Qt.AlignVCenter
                     Layout.fillWidth: root._fillWidth(modelData, "centerLeft")
+                    Layout.maximumWidth: root._maxWidth(modelData, item)
+                    Layout.minimumWidth: root._minWidth(modelData, item)
                     Layout.fillHeight: root._fillHeight(modelData)
                     active: root._moduleShown(modelData, "centerLeft")
                     visible: active
@@ -1406,6 +1420,8 @@ Item { // Bar content region
                         required property string modelData
                         Layout.alignment: Qt.AlignVCenter
                         Layout.fillWidth: root._fillWidth(modelData, "centerRight")
+                        Layout.maximumWidth: root._maxWidth(modelData, item)
+                        Layout.minimumWidth: root._minWidth(modelData, item)
                         Layout.fillHeight: root._fillHeight(modelData)
                         active: root._moduleShown(modelData, "centerRight")
                         visible: active
@@ -1424,7 +1440,7 @@ Item { // Bar content region
                     if (event.button === Qt.RightButton) {
                         GlobalStates.controlPanelOpen = !GlobalStates.controlPanelOpen;
                     } else {
-                        ShellLayoutController.toggleSidebarAtSlot("right");
+                        ShellLayoutController.toggleSidebarAtSlot("right", root.screen?.name ?? "");
                         rightCenterGroup._tapSeq++; _tapSeqTimer.restart()
                         if (rightCenterGroup._tapSeq >= 3) { rightCenterGroup._confirmFx = true; rightCenterGroup._tapSeq = 0; _fxResetTimer.restart() }
                     }
@@ -1487,7 +1503,7 @@ Item { // Bar content region
         onMovedAway: root.closeOSD(root.rightAction)
         onPressed: event => {
             if (event.button === Qt.LeftButton) {
-                ShellLayoutController.toggleSidebarAtSlot("right");
+                ShellLayoutController.toggleSidebarAtSlot("right", root.screen?.name ?? "");
             } else if (event.button === Qt.RightButton) {
                 root.openBarContextMenu(event.x, event.y, barRightSideMouseArea)
             }
@@ -1659,7 +1675,7 @@ Item { // Bar content region
             }
 
             onPressed: {
-                ShellLayoutController.toggleSidebarAtSlot("right");
+                ShellLayoutController.toggleSidebarAtSlot("right", root.screen?.name ?? "");
             }
 
             RowLayout {

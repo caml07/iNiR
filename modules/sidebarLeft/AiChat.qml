@@ -719,7 +719,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     Layout.maximumHeight: root.compactLayout ? 104 : 156
                     padding: 10
                     color: activeFocus ? Appearance.colors.colOnSurface : Appearance.colMetadataText
-                    placeholderText: Ai.currentModelReady
+                    placeholderText: !Network.online && !(Ai.getModel()?.local ?? false)
+                        ? Translation.tr("%1. Local models still work").arg(Network.offlineReason)
+                        : Ai.currentModelReady
                         ? Translation.tr("Ask %1 anything...").arg(Ai.getModel()?.name ?? Translation.tr("the assistant"))
                         : Translation.tr("Connect the selected provider to start chatting")
 

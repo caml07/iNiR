@@ -1249,9 +1249,10 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 maximumWidth: 420
-                icon: "image"
+                icon: Network.online ? "image" : "cloud_off"
                 text: Translation.tr("%1 wallpapers").arg(root.providerLabel())
-                explanation: root.wallhavenControlsVisible
+                explanation: !Network.online ? Network.offlineReason
+                    : root.wallhavenControlsVisible
                     ? Translation.tr("Search Wallhaven by tags, or pick a collection above\nResults automatically match this monitor")
                     : root.providerSearchable
                         ? Translation.tr("Search %1 by tags\nDisplay fit follows this monitor automatically").arg(root.providerLabel())

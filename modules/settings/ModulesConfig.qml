@@ -279,6 +279,46 @@ ContentPage {
                     onClicked: Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "panelFamily", "set", "iris"])
                 }
             }
+
+            ConfigSwitch {
+                Layout.fillWidth: true
+                buttonIcon: "animation"
+                text: Translation.tr("Animated switch")
+                checked: Config.options?.familyTransitionAnimation ?? true
+                onCheckedChanged: Config.setNestedValue("familyTransitionAnimation", checked)
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                text: Translation.tr("The switch shortcut goes through, in this order:")
+                color: Appearance.colors.colSubtext
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                wrapMode: Text.WordWrap
+            }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 6
+                Repeater {
+                    model: [
+                        { value: "ii", label: "Material", icon: "dashboard" },
+                        { value: "waffle", label: "Windows 11", icon: "window" },
+                        { value: "iris", label: "iRiS", icon: "visibility" }
+                    ]
+                    FilterChip {
+                        required property var modelData
+                        readonly property var cycle: Array.from(Config.options?.familyCycle ?? ["ii", "waffle", "iris"])
+                        chipIcon: modelData.icon
+                        text: cycle.includes(modelData.value)
+                            ? `${cycle.indexOf(modelData.value) + 1}  ${modelData.label}` : modelData.label
+                        selected: cycle.includes(modelData.value)
+                        onClicked: {
+                            const next = cycle.filter(family => family !== modelData.value)
+                            if (!selected) next.push(modelData.value)
+                            Config.setNestedValue("familyCycle", next)
+                        }
+                    }
+                }
+            }
         }
     }
         }

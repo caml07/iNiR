@@ -589,6 +589,7 @@ ContentPage {
                                     if (ShellUpdates.isUpdating) return "hourglass_top"
                                     if (ShellUpdates.isChecking) return "sync"
                                     if (ShellUpdates.hasUpdate) return "upgrade"
+                                    if (ShellUpdates.waitingForNetwork) return "cloud_off"
                                     if (ShellUpdates.lastError.length > 0) return "error"
                                     if (ShellUpdates.available) return "check_circle"
                                     return "cloud_off"
@@ -619,6 +620,7 @@ ContentPage {
                                     if (ShellUpdates.repoDiverged) return Translation.tr("Repository history changed")
                                     if (ShellUpdates.hasUpdate) return Translation.tr("Update available")
                                     if (ShellUpdates.managedExternally) return "Managed externally"
+                                    if (ShellUpdates.waitingForNetwork) return Translation.tr("Waiting for internet")
                                     if (ShellUpdates.lastError.length > 0) return Translation.tr("Error")
                                     if (ShellUpdates.available) return Translation.tr("Up to date")
                                     return Translation.tr("Not available")

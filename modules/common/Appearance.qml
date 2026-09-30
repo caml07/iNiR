@@ -1883,12 +1883,11 @@ Singleton {
     // Toggle dark mode - switches between light and dark variants of current theme
     function toggleDarkMode(): void {
         const newMode = !root.m3colors.darkmode
-        // Update the custom theme darkmode setting
-        Config.setNestedValue("appearance.customTheme.darkmode", newMode)
-        // If using auto theme, regenerate from wallpaper with new mode
         if (ThemeService.isAutoTheme) {
-            ThemeService.regenerateAutoTheme()
+            // The same path as every other switch: mode passed explicitly, iRiS scheme kept in step.
+            MaterialThemeLoader.setDarkMode(newMode)
         } else {
+            Config.setNestedValue("appearance.customTheme.darkmode", newMode)
             // For preset themes, just toggle the darkmode flag directly
             root.m3colors.darkmode = newMode
         }

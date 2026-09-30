@@ -65,7 +65,7 @@ Scope {
         onTriggered: root.recomputeOverlaySearchResults()
     }
 
-    function getFamilySettingsPageIndex(family: string) {
+    function getFamilySettingsPageIndex(family: string): int {
         const componentName = family === "waffle" ? "WaffleConfig.qml"
             : family === "iris" ? "IrisConfig.qml" : ""
         if (!componentName.length) return -1

@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Services.SystemTray
 import Quickshell.Widgets
@@ -11,10 +12,14 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.modules.background.widgets
+import qs.modules.background.widgets.instrument
+import qs.modules.iris.lock
 import qs.modules.iris.style
 import qs.modules.iris.frame
 import qs.modules.iris.components
 import qs.modules.iris.pieces
+import qs.modules.iris.control
 import qs.modules.iris.field as Field
 import qs.modules.iris.bar.island as IslandParts
 
@@ -24,6 +29,8 @@ ClippingRectangle {
     property string section: ""
     property string group: ""
     property bool playing: true
+    property bool compact: false
+    property string caption: ""
     readonly property real d: IrisStyle.density
     readonly property int rev: Config.revision
     readonly property string scene: root.sceneFor(root.section, root.group)
@@ -33,20 +40,31 @@ ClippingRectangle {
 
     function sceneFor(section: string, group: string): string {
         if (group.length === 0)
-            return ({ dock: "dock", player: "player", desktop: "widgets", sidebars: "panels", surfaces: "controlCenter", bubbles: "bubbles" })[section] ?? ""
+            return ({ dock: "dock", player: "player", desktop: "widgets", sidebars: "panels", controlCenter: "controlCenter", spotlight: "spotlight", bubbles: "bubbles",
+                bar: "islandEdge", appearance: "light", motion: "motion", lock: "lock", frameMusic: "frame", notifications: "feedback", sound: "feedback" })[section] ?? ""
         const key = section + "/" + group
         return ({
             "bar/Size": "islandReserve", "bar/Interaction": "islandInteraction",
-            "bar/Shape": "islandEdge", "bar/Layout": "islandEdge", "bar/Bar": "barZones",
-            "appearance/Light": "light", "appearance/Shape": "fusion", "appearance/Glass": "glass",
+            "bar/Shape": "shapes", "bar/Layout": "islandEdge", "bar/Bar": "barZones",
+            "appearance/Light": "light", "appearance/Shape": "shapes", "appearance/Colour theme": "glass", "appearance/Scheme": "glass", "appearance/Dark look": "glass", "appearance/Ink look": "glass", "appearance/Light look": "glass", "appearance/Corners per surface": "fusion", "appearance/Glass": "glass",
+            "appearance/Menus": "menus", "appearance/Settings": "settings",
+            "appearance/Material": "glass", "appearance/Material per surface": "glass", "appearance/Look": "fusion",
+            "appearance/Adaptive": "fusion", "appearance/Accent": "controlCenter", "appearance/Highlight": "controlCenter",
+            "appearance/Faces": "typography", "appearance/Text": "typography", "appearance/Frame": "frame",
+            "desktop/Desktop menu": "menus",
+            "motion/Motion": "motion", "motion/Curve": "motion", "motion/Timing": "motion",
+            "motion/Per surface": "motion", "motion/Style per surface": "motion", "motion/Touch": "motion",
+            "frameMusic/On the edges": "frame", "frameMusic/Frame response": "frame", "frameMusic/Finish": "frame",
+            "lock/Scene": "lock", "lock/Type": "lock", "lock/Clock": "lock", "lock/At a glance": "lock",
+            "lock/Now playing": "lock", "lock/Activity": "lock", "lock/Sign in": "lock", "lock/Status": "lock",
             "bar/Desktop page": "islandPage", "bar/Pages": "islandPage", "bar/Player page": "islandPage",
             "bubbles/Behaviour": "bubbles", "bubbles/Floating": "bubbles", "bubbles/On the contour": "bubbles", "bubbles/Size": "bubbles",
+            "bubbles/Cards": "cards", "bubbles/Card contents": "cards", "bubbles/Joining": "joining", "bubbles/Tray": "tray",
             "dock/Visibility": "dock", "dock/Icons": "dock", "dock/Look": "dock",
             "desktop/Widgets": "widgets", "desktop/Overview backdrop": "backdrop", "desktop/Wallpaper gallery": "gallery",
-            "surfaces/Spotlight": "spotlight", "surfaces/Control Center": "controlCenter",
-            "surfaces/Cards": "cards", "surfaces/Card contents": "cards", "surfaces/Menus": "menus",
-            "surfaces/Settings": "settings", "surfaces/Side panels": "panels", "surfaces/Joining": "joining",
-            "surfaces/Notifications": "feedback", "surfaces/Feedback": "feedback", "surfaces/Tray": "tray",
+            "spotlight/Spotlight": "spotlight", "controlCenter/Control Center": "controlCenter",
+            "sidebars/Panel look": "panels",
+            "notifications/Banners": "feedback", "notifications/Notifications": "feedback", "sound/Feedback": "feedback",
             "player/Player": "player", "player/Bubble": "player"
         })[key] ?? ""
     }
@@ -58,15 +76,15 @@ ClippingRectangle {
     radius: IrisStyle.radiusTile
     color: IrisStyle.surfaceHigh
 
-    Image {
+    IrisWallpaperView {
+        live: false
         id: wallpaperImage
         anchors.fill: parent
-        source: root.available ? root.wallpaper : ""
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: true
-        sourceSize.width: Math.round(Math.max(1, root.width) * 1.5)
-        visible: root.scene !== "backdrop"
+        active: root.available && root.visible
+        screen: GlobalStates.focusedScreen
+        provideTexture: true
+        decodeSize: Qt.size(Math.round(root.width * 2), 0)
+        opacity: root.scene !== "backdrop" ? 1 : 0
     }
 
     Item {
@@ -86,13 +104,14 @@ ClippingRectangle {
         Loader {
             id: sceneLoader
             anchors.fill: parent
-            active: root.available
+            active: root.available && root.visible
             sourceComponent: ({
+                typography: typographyScene, frame: frameScene, lock: lockScene, motion: motionScene,
                 dock: dockScene, widgets: widgetsScene, backdrop: backdropScene, gallery: galleryScene,
                 spotlight: spotlightScene, controlCenter: controlScene, cards: cardsScene, menus: menusScene,
                 settings: settingsScene, panels: panelsScene, joining: joiningScene, feedback: feedbackScene,
                 tray: trayScene, player: playerScene, islandReserve: reserveScene, islandEdge: edgeScene, barZones: zonesScene,
-                light: lightScene, fusion: fusionScene, glass: glassScene, islandInteraction: interactionScene, islandPage: islandPageScene, bubbles: bubblesScene
+                light: lightScene, fusion: fusionScene, shapes: shapesScene, glass: glassScene, islandInteraction: interactionScene, islandPage: islandPageScene, bubbles: bubblesScene
             })[root.scene] ?? null
         }
     }
@@ -133,13 +152,14 @@ ClippingRectangle {
         implicitHeight: Math.round(28 * root.d)
         radius: height / 2
         color: IrisStyle.veilHeavy
-        visible: caption.text.length > 0
+        visible: caption.text.length > 0 && !root.compact
+        Binding { target: root; property: "caption"; value: caption.text }
         RowLayout {
             id: captionRow
             anchors.centerIn: parent
             spacing: Math.round(6 * root.d)
             MaterialSymbol { text: caption.glyph; iconSize: Math.round(14 * root.d); color: IrisStyle.subtext }
-            IrisText { text: caption.text; font.pixelSize: 11.5 * IrisStyle.typeScale; color: IrisStyle.text }
+            IrisText { text: caption.text; font.pixelSize: IrisStyle.typeMeta; color: IrisStyle.text }
         }
     }
 
@@ -158,7 +178,7 @@ ClippingRectangle {
             anchors.centerIn: parent
             spacing: Math.round(8 * root.d)
             MaterialSymbol { text: "visibility_off"; iconSize: Math.round(16 * root.d); color: IrisStyle.subtext }
-            IrisText { text: off.text; font.weight: Font.DemiBold }
+            IrisText { text: off.text; font.weight: IrisStyle.weight(Font.DemiBold) }
         }
     }
 
@@ -174,13 +194,13 @@ ClippingRectangle {
         IrisClock {
             visible: !pill.vertical
             anchors.centerIn: parent
-            pixelSize: 15 * IrisStyle.typeScale
+            pixelSize: IrisStyle.typeHeadline
             separatorColor: IrisStyle.secondaryAccent
         }
         IslandParts.IslandStackedClock {
             visible: pill.vertical
             anchors.centerIn: parent
-            pixelSize: 15 * IrisStyle.typeScale
+            pixelSize: IrisStyle.typeHeadline
             accent: IrisStyle.secondaryAccent
         }
     }
@@ -198,10 +218,10 @@ ClippingRectangle {
             implicitHeight: implicitWidth
             radius: IrisStyle.iconRadius(width)
             color: row2.lit ? IrisStyle.accent : IrisStyle.fill
-            MaterialSymbol { anchors.centerIn: parent; text: row2.glyph; iconSize: Math.round(16 * root.d); color: row2.lit ? IrisStyle.onAccent : IrisStyle.text }
+            MaterialSymbol { anchors.centerIn: parent; text: row2.glyph; iconSize: Math.round(16 * root.d); color: row2.lit ? IrisStyle.inkOnAccent : IrisStyle.text }
         }
         IrisText { Layout.fillWidth: true; text: row2.title; font.weight: row2.lit ? Font.DemiBold : Font.Normal; elide: Text.ElideRight }
-        IrisText { text: row2.detail; color: IrisStyle.muted; font.pixelSize: 11.5 * IrisStyle.typeScale }
+        IrisText { text: row2.detail; color: IrisStyle.muted; font.pixelSize: IrisStyle.typeMeta }
     }
 
     component Level: Rectangle {
@@ -265,8 +285,8 @@ ClippingRectangle {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Math.round(1 * root.d)
-            IrisText { Layout.fillWidth: true; text: blockRow.title; font.weight: Font.DemiBold; elide: Text.ElideRight }
-            IrisText { Layout.fillWidth: true; text: blockRow.detail; color: IrisStyle.muted; font.pixelSize: 11.5 * IrisStyle.typeScale; elide: Text.ElideRight }
+            IrisText { Layout.fillWidth: true; text: blockRow.title; font.weight: IrisStyle.weight(Font.DemiBold); elide: Text.ElideRight }
+            IrisText { Layout.fillWidth: true; text: blockRow.detail; color: IrisStyle.muted; font.pixelSize: IrisStyle.typeMeta; elide: Text.ElideRight }
         }
     }
 
@@ -347,8 +367,9 @@ ClippingRectangle {
             Rectangle {
                 x: dockRoot.inset("left")
                 y: dockRoot.inset("top")
-                width: parent.width - x - dockRoot.inset("right")
-                height: parent.height - y - dockRoot.inset("bottom")
+                // From the targets, not the animating x/y, or the size overshoots while they move.
+                width: parent.width - dockRoot.inset("left") - dockRoot.inset("right")
+                height: parent.height - dockRoot.inset("top") - dockRoot.inset("bottom")
                 radius: IrisStyle.radiusTile
                 color: IrisStyle.surfaceHigh
                 border.width: 1
@@ -380,14 +401,13 @@ ClippingRectangle {
                 width: dockRoot.plateW; height: dockRoot.plateH
                 radius: dockRoot.notch ? Math.round(16 * root.d) : dockRoot.thick / 2
                 color: "transparent"
-                Image {
+                ShaderEffectSource {
                     id: dockBlurSource
                     x: -dockRoot.plateX; y: -dockRoot.plateY
                     width: dockRoot.width; height: dockRoot.height
-                    source: root.wallpaper
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 400
                     visible: false
+                    sourceItem: wallpaperImage.textureItem
+                    live: true
                 }
                 MultiEffect { anchors.fill: dockBlurSource; source: dockBlurSource; blurEnabled: true; blur: 1; blurMax: 48 }
             }
@@ -408,7 +428,8 @@ ClippingRectangle {
                         : { x: -2 * f, y: H - band, width: W + 4 * f, height: band + deep })
                     Object.assign(out[0], { radius: 0, fuse: f, id: "edge", paints: true })
                     out.push({ x: dockRoot.plateX, y: dockRoot.plateY, width: dockRoot.plateW, height: dockRoot.plateH,
-                        radius: dockRoot.notch ? Math.round(16 * root.d) : dockRoot.thick / 2,
+                        radius: IrisStyle.dockShape !== "auto" ? IrisStyle.profileRadius(IrisStyle.bodyProfile(IrisStyle.dockShape, dockRoot.notch), dockRoot.thick)
+                            : dockRoot.notch ? Math.round(16 * root.d) : dockRoot.thick / 2,
                         fuse: dockRoot.notch ? IrisStyle.fuseEdge : IrisStyle.fuse, id: "dock", joins: dockRoot.notch ? "edge" : "", paints: true })
                     return out
                 }
@@ -454,7 +475,7 @@ ClippingRectangle {
                             anchors.margins: -Math.round(3 * root.d)
                             width: Math.round(17 * root.d); height: width; radius: width / 2
                             color: IrisStyle.badge
-                            IrisText { anchors.centerIn: parent; text: dockIcon.index; color: IrisStyle.onBadge; font.pixelSize: 10 * IrisStyle.typeScale; font.weight: Font.Bold }
+                            IrisText { anchors.centerIn: parent; text: dockIcon.index; color: IrisStyle.inkOnBadge; font.pixelSize: IrisStyle.typeCaption; font.weight: IrisStyle.weight(Font.Bold) }
                         }
                     }
                 }
@@ -539,11 +560,13 @@ ClippingRectangle {
             readonly property bool vertical: edgeRoot.edge === "left" || edgeRoot.edge === "right"
             readonly property bool notch: root.opt("iris.bar.notch", false)
             readonly property string layout: String(root.opt("iris.bar.layout", "island"))
+            readonly property bool spans: edgeRoot.layout === "full" || (edgeRoot.layout === "menubar" && !edgeRoot.vertical)
             readonly property real thick: IrisFrame.islandBand
             readonly property real span: edgeRoot.vertical ? height : width
-            readonly property real length: edgeRoot.layout === "full" ? edgeRoot.span - 2 * IrisFrame.band
+            // A spanning bar that floats keeps its gap on every side (IrisFrame.islandMargin is 0 with the notch).
+            readonly property real length: edgeRoot.spans ? edgeRoot.span - 2 * (IrisFrame.band + IrisFrame.islandMargin)
                 : Math.round(edgeRoot.thick * (edgeRoot.vertical ? 3.2 : 3.6))
-            readonly property real along: edgeRoot.layout === "full" ? IrisFrame.band
+            readonly property real along: edgeRoot.spans ? IrisFrame.band + IrisFrame.islandMargin
                 : edgeRoot.layout === "left" ? IrisFrame.band + Math.round(20 * root.d)
                 : edgeRoot.layout === "right" ? edgeRoot.span - edgeRoot.length - IrisFrame.band - Math.round(20 * root.d)
                 : Math.round((edgeRoot.span - edgeRoot.length) / 2)
@@ -557,7 +580,7 @@ ClippingRectangle {
             }
             readonly property var island: edgeRoot.place(edgeRoot.along, edgeRoot.length, edgeRoot.depth, edgeRoot.thick)
             readonly property real bubble: Math.round(edgeRoot.thick * 0.86)
-            readonly property var satellites: edgeRoot.layout === "full" ? [] : [
+            readonly property var satellites: edgeRoot.spans ? [] : [
                 edgeRoot.place(edgeRoot.along - Math.round(6 * root.d) - edgeRoot.bubble, edgeRoot.bubble, edgeRoot.depth + (edgeRoot.thick - edgeRoot.bubble) / 2, edgeRoot.bubble),
                 edgeRoot.place(edgeRoot.along + edgeRoot.length + Math.round(6 * root.d), edgeRoot.bubble, edgeRoot.depth + (edgeRoot.thick - edgeRoot.bubble) / 2, edgeRoot.bubble)
             ]
@@ -575,9 +598,19 @@ ClippingRectangle {
                 framed: false
                 shapes: {
                     const out = []
-                    if (edgeRoot.notch) out.push(Object.assign({ radius: 0, fuse: IrisStyle.fuseDeep, id: "edge", paints: true }, edgeRoot.edgeBody()))
-                    out.push(Object.assign({ radius: edgeRoot.layout === "full" ? 0 : edgeRoot.thick / 2, fuse: edgeRoot.notch ? IrisStyle.fuseEdge : IrisStyle.fuse,
+                    const clear = edgeRoot.layout === "menubar" && !edgeRoot.vertical && String(root.opt("iris.bar.strip", "clear")) === "clear"
+                    if (edgeRoot.notch || clear) out.push(Object.assign({ radius: 0, fuse: IrisStyle.fuseDeep, id: "edge", paints: true }, edgeRoot.edgeBody()))
+                    if (!clear) out.push(Object.assign({ radius: edgeRoot.spans ? (edgeRoot.notch ? 0 : IrisStyle.pieceRadius(edgeRoot.thick))
+                        : IrisStyle.profileRadius(IrisStyle.bodyProfile(IrisStyle.barShape, edgeRoot.notch), edgeRoot.thick),
+                        fuse: edgeRoot.spans && !edgeRoot.vertical ? Math.round(16 * root.d) : edgeRoot.notch ? IrisStyle.fuseEdge : IrisStyle.fuse,
                         id: "island", joins: edgeRoot.notch ? "edge" : "", paints: true }, edgeRoot.island))
+                    if (edgeRoot.layout === "menubar" && !edgeRoot.vertical) {
+                        const height = IrisFrame.islandFullBand
+                        const width = Math.round(height * 4.2)
+                        out.push(Object.assign({ radius: IrisStyle.profileRadius(IrisStyle.bodyProfile(IrisStyle.barShape, true), height), fuse: clear ? IrisStyle.fuseEdge : Math.round(32 * root.d),
+                            id: "islandnotch", joins: clear ? "edge" : "island", paints: true },
+                            edgeRoot.place((edgeRoot.span - width) / 2, width, edgeRoot.depth, height)))
+                    }
                     edgeRoot.satellites.forEach((sat, i) => out.push(Object.assign({ radius: IrisStyle.pieceRadius(edgeRoot.bubble), fuse: IrisStyle.fuse,
                         id: "satellite" + i, joins: "island", paints: true }, sat)))
                     return out
@@ -588,7 +621,7 @@ ClippingRectangle {
                 opacity: edgeRoot.t
                 x: edgeRoot.island.x + (edgeRoot.island.width - width) / 2
                 y: edgeRoot.island.y + (edgeRoot.island.height - height) / 2
-                pixelSize: 15 * IrisStyle.typeScale
+                pixelSize: IrisStyle.typeHeadline
                 separatorColor: IrisStyle.secondaryAccent
             }
             IslandParts.IslandStackedClock {
@@ -596,14 +629,14 @@ ClippingRectangle {
                 opacity: edgeRoot.t
                 x: edgeRoot.island.x + (edgeRoot.island.width - width) / 2
                 y: edgeRoot.island.y + (edgeRoot.island.height - height) / 2
-                pixelSize: 15 * IrisStyle.typeScale
+                pixelSize: IrisStyle.typeHeadline
                 accent: IrisStyle.secondaryAccent
             }
             Caption {
                 anchors.leftMargin: edgeRoot.edge === "left" ? edgeRoot.inset + edgeRoot.thick + Math.round(14 * root.d) : Math.round(14 * root.d)
                 glyph: ({ top: "vertical_align_top", bottom: "vertical_align_bottom", left: "align_horizontal_left", right: "align_horizontal_right" })[edgeRoot.edge] ?? "pill"
                 text: Translation.tr(({ top: "Top edge", bottom: "Bottom edge", left: "Left edge", right: "Right edge" })[edgeRoot.edge] ?? "")
-                    + " · " + (edgeRoot.layout === "full" ? Translation.tr("a bar across it") : edgeRoot.notch ? Translation.tr("melts into it") : Translation.tr("floats off it"))
+                    + " · " + (edgeRoot.layout === "menubar" ? Translation.tr("a menu bar with a notch") : edgeRoot.spans ? Translation.tr("a bar across it") : edgeRoot.notch ? Translation.tr("melts into it") : Translation.tr("floats off it"))
             }
         }
     }
@@ -654,12 +687,12 @@ ClippingRectangle {
                                 implicitHeight: zonesRoot.thick - Math.round(10 * root.d)
                                 radius: height / 2
                                 color: current ? IrisStyle.tintFill(IrisStyle.accent) : IrisStyle.fill
-                                Behavior on color { ColorAnimation { duration: IrisStyle.duration(160) } }
+                                Behavior on color { ColorAnimation { duration: IrisStyle.duration(160); easing.type: IrisStyle.feedbackEasing } }
                                 IrisText {
                                     id: chipLabel
                                     anchors.centerIn: parent
                                     text: modelData === "time" ? Qt.formatTime(new Date(), "hh:mm") : Translation.tr(zonesRoot.names[modelData] ?? modelData)
-                                    font.pixelSize: 11.5 * IrisStyle.typeScale
+                                    font.pixelSize: IrisStyle.typeMeta
                                     color: parent.current ? IrisStyle.text : IrisStyle.subtext
                                 }
                             }
@@ -707,7 +740,7 @@ ClippingRectangle {
                     RowLayout {
                         spacing: Math.round(6 * root.d)
                         MaterialSymbol { text: "partly_cloudy_day"; fill: 1; iconSize: Math.round(18 * root.d); color: IrisStyle.identity.sky }
-                        IrisText { text: Translation.tr("Weather"); font.weight: Font.DemiBold }
+                        IrisText { text: Translation.tr("Weather"); font.weight: IrisStyle.weight(Font.DemiBold) }
                     }
                     IrisText {
                         text: "18°"
@@ -715,7 +748,7 @@ ClippingRectangle {
                         font.weight: IrisStyle.figureWeight
                         font.pixelSize: 40 * IrisStyle.typeScale
                     }
-                    IrisText { text: Translation.tr("Partly cloudy"); color: IrisStyle.muted; font.pixelSize: 12 * IrisStyle.typeScale }
+                    IrisText { text: Translation.tr("Partly cloudy"); color: IrisStyle.muted; font.pixelSize: IrisStyle.typeMeta }
                     Item { Layout.fillHeight: true }
                 }
             }
@@ -734,7 +767,7 @@ ClippingRectangle {
                     RowLayout {
                         spacing: Math.round(6 * root.d)
                         MaterialSymbol { text: "tune"; iconSize: Math.round(18 * root.d); color: IrisStyle.text }
-                        IrisText { text: Translation.tr("Control Center"); font.weight: Font.DemiBold }
+                        IrisText { text: Translation.tr("Control Center"); font.weight: IrisStyle.weight(Font.DemiBold) }
                     }
                     RowLayout {
                         spacing: Math.round(8 * root.d)
@@ -747,7 +780,7 @@ ClippingRectangle {
                                 implicitHeight: implicitWidth
                                 radius: IrisStyle.pieceRadius(implicitWidth)
                                 color: index === 0 ? IrisStyle.accent : IrisStyle.fill
-                                MaterialSymbol { anchors.centerIn: parent; text: parent.modelData; fill: 1; iconSize: Math.round(18 * root.d); color: parent.index === 0 ? IrisStyle.onAccent : IrisStyle.text }
+                                MaterialSymbol { anchors.centerIn: parent; text: parent.modelData; fill: 1; iconSize: Math.round(18 * root.d); color: parent.index === 0 ? IrisStyle.inkOnAccent : IrisStyle.text }
                             }
                         }
                     }
@@ -797,7 +830,7 @@ ClippingRectangle {
             IrisClock {
                 x: fuseRoot.island.x + (fuseRoot.island.width - width) / 2
                 y: fuseRoot.island.y + (fuseRoot.island.height - height) / 2
-                pixelSize: 15 * IrisStyle.typeScale
+                pixelSize: IrisStyle.typeHeadline
                 separatorColor: IrisStyle.secondaryAccent
             }
             Column {
@@ -820,6 +853,87 @@ ClippingRectangle {
     }
 
     Component {
+        id: shapesScene
+        Item {
+            id: shapeRoot
+            readonly property real naturalWidth: Math.round(440 * root.d)
+            readonly property real naturalHeight: Math.round(260 * root.d)
+            readonly property bool notch: root.opt("iris.bar.notch", false)
+            readonly property bool dockNotch: root.opt("iris.dock.notch", false)
+            readonly property real rest: IrisFrame.islandBand
+            readonly property real gap: shapeRoot.notch ? 0 : Math.round(14 * root.d)
+            readonly property real dockThick: IrisFrame.dockBand
+            readonly property real dockGap: shapeRoot.dockNotch ? 0 : Math.round(14 * root.d)
+            readonly property real bubble: Math.round(shapeRoot.rest * 0.86)
+            readonly property var resting: ({ x: Math.round(34 * root.d), y: shapeRoot.gap, width: Math.round(150 * root.d), height: shapeRoot.rest })
+            readonly property var bubbleAt: ({ x: shapeRoot.resting.x + shapeRoot.resting.width + Math.round(6 * root.d),
+                y: shapeRoot.gap + (shapeRoot.rest - shapeRoot.bubble) / 2, width: shapeRoot.bubble, height: shapeRoot.bubble })
+            readonly property var opened: ({ x: Math.round(width - 34 * root.d - 190 * root.d), y: shapeRoot.gap, width: Math.round(190 * root.d), height: Math.round(104 * root.d) })
+            readonly property var docked: ({ x: Math.round(width / 2 - 120 * root.d), y: height - shapeRoot.dockThick - shapeRoot.dockGap,
+                width: Math.round(240 * root.d), height: shapeRoot.dockThick })
+            readonly property real openCorner: Math.min(shapeRoot.opened.height / 2,
+                IrisStyle.openedRadius(IrisStyle.barShape, Math.max(IrisStyle.radius, 30 * root.d)))
+            function shapeName(shape: string): string {
+                return Translation.tr(({ round: "Round", squircle: "Squircle", square: "Square" })[shape] ?? "Auto")
+            }
+            Field.IrisField {
+                anchors.fill: parent
+                framed: false
+                shapes: {
+                    const deep = Math.max(8, IrisStyle.fuseDeep * 2), f = IrisStyle.fuseDeep
+                    const out = []
+                    if (shapeRoot.notch) out.push({ x: -2 * f, y: -deep, width: width + 4 * f, height: deep, radius: 0, fuse: f, id: "edge", paints: true })
+                    const join = shapeRoot.notch ? "edge" : ""
+                    const fuse = shapeRoot.notch ? IrisStyle.fuseEdge : IrisStyle.fuse
+                    out.push(Object.assign({ radius: IrisStyle.profileRadius(IrisStyle.bodyProfile(IrisStyle.barShape, shapeRoot.notch), shapeRoot.rest),
+                        fuse: fuse, id: "island", joins: join, paints: true }, shapeRoot.resting))
+                    out.push(Object.assign({ radius: IrisStyle.pieceRadius(shapeRoot.bubble), fuse: IrisStyle.fuse, id: "satellite", joins: "island", paints: true }, shapeRoot.bubbleAt))
+                    out.push(Object.assign({ radius: shapeRoot.openCorner, fuse: fuse, id: "open", joins: join, paints: true }, shapeRoot.opened))
+                    if (shapeRoot.dockNotch) out.push({ x: -2 * f, y: height, width: width + 4 * f, height: deep, radius: 0, fuse: f, id: "dockEdge", paints: true })
+                    out.push(Object.assign({ radius: IrisStyle.profileRadius(IrisStyle.bodyProfile(IrisStyle.dockShape, shapeRoot.dockNotch), shapeRoot.dockThick),
+                        fuse: shapeRoot.dockNotch ? IrisStyle.fuseEdge : IrisStyle.fuse, id: "dock", joins: shapeRoot.dockNotch ? "dockEdge" : "", paints: true }, shapeRoot.docked))
+                    return out
+                }
+            }
+            IrisClock {
+                x: shapeRoot.resting.x + (shapeRoot.resting.width - width) / 2
+                y: shapeRoot.resting.y + (shapeRoot.resting.height - height) / 2
+                pixelSize: IrisStyle.typeHeadline
+                separatorColor: IrisStyle.secondaryAccent
+            }
+            Column {
+                x: shapeRoot.opened.x + IrisStyle.concentricPad(shapeRoot.openCorner, 16 * root.d)
+                y: shapeRoot.opened.y + IrisStyle.concentricPad(shapeRoot.openCorner, 16 * root.d)
+                spacing: Math.round(8 * root.d)
+                Rectangle { width: Math.round(96 * root.d); height: Math.round(10 * root.d); radius: IrisStyle.radiusMicro; color: IrisStyle.fillHover }
+                Rectangle { width: Math.round(140 * root.d); height: Math.round(10 * root.d); radius: IrisStyle.radiusMicro; color: IrisStyle.fill }
+                Row {
+                    spacing: Math.round(8 * root.d)
+                    Repeater { model: 3; Rectangle { required property int index; width: Math.round(40 * root.d); height: Math.round(30 * root.d); radius: IrisStyle.radiusTile; color: IrisStyle.fillQuiet } }
+                }
+            }
+            Row {
+                x: shapeRoot.docked.x + Math.round((shapeRoot.docked.width - width) / 2)
+                y: shapeRoot.docked.y + Math.round((shapeRoot.docked.height - height) / 2)
+                spacing: Math.round(10 * root.d)
+                Repeater {
+                    model: 5
+                    Rectangle {
+                        required property int index
+                        width: IrisFrame.dockIcon * 0.8; height: width
+                        radius: IrisStyle.iconRadius(width)
+                        color: index === 2 ? IrisStyle.fillActive : IrisStyle.fillHover
+                    }
+                }
+            }
+            Caption {
+                glyph: "rounded_corner"
+                text: Translation.tr("Island shape") + " · " + shapeRoot.shapeName(IrisStyle.barShape) + "   " + Translation.tr("Dock shape") + " · " + shapeRoot.shapeName(IrisStyle.dockShape)
+            }
+        }
+    }
+
+    Component {
         id: glassScene
         Item {
             id: glassRoot
@@ -836,14 +950,13 @@ ClippingRectangle {
                 y: Math.round(28 * root.d)
                 radius: IrisStyle.radiusSheet
                 color: IrisStyle.glassy ? "transparent" : IrisStyle.bodySurface
-                Image {
+                ShaderEffectSource {
                     id: paneSource
                     x: -pane.x; y: -pane.y
                     width: glassRoot.width; height: glassRoot.height
-                    source: IrisStyle.glassy ? root.wallpaper : ""
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 400
                     visible: false
+                    sourceItem: IrisStyle.glassy ? wallpaperImage.textureItem : null
+                    live: true
                 }
                 MultiEffect {
                     anchors.fill: paneSource
@@ -860,15 +973,16 @@ ClippingRectangle {
                     y: x
                     width: pane.width - 2 * x
                     spacing: Math.round(4 * root.d)
-                    IrisText { text: Translation.tr("Now playing"); font.weight: Font.DemiBold; font.pixelSize: 14 * IrisStyle.typeScale }
-                    IrisText { width: parent.width; text: Translation.tr("Secondary text stays readable over the wallpaper"); color: IrisStyle.muted; wrapMode: Text.WordWrap; font.pixelSize: 12 * IrisStyle.typeScale }
-                    IrisText { text: Translation.tr("Tertiary detail"); color: IrisStyle.textTertiary; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                    IrisText { text: Translation.tr("Now playing"); font.weight: IrisStyle.weight(Font.DemiBold); font.pixelSize: IrisStyle.typeBody }
+                    IrisText { width: parent.width; text: Translation.tr("Secondary text stays readable over the wallpaper"); color: IrisStyle.muted; wrapMode: Text.WordWrap; font.pixelSize: IrisStyle.typeMeta }
+                    IrisText { text: Translation.tr("Tertiary detail"); color: IrisStyle.textTertiary; font.pixelSize: IrisStyle.typeMeta }
                 }
             }
             Caption {
-                glyph: glassRoot.mode === "off" ? "crop_square" : "blur_on"
-                text: glassRoot.mode === "off" ? Translation.tr("Off: solid material")
-                    : Translation.tr("Tint %1% · frost %2%").arg(Math.round(IrisStyle.glassTint * 100)).arg(Math.round(IrisStyle.glassBlurAmount * 100))
+                glyph: IrisStyle.glassy ? "blur_on" : "crop_square"
+                text: !IrisStyle.glassy ? Translation.tr("Off: solid material")
+                    : (glassRoot.mode === "off" ? Translation.tr("Lume frost") + " · " : "")
+                        + Translation.tr("Tint %1% · frost %2%").arg(Math.round(IrisStyle.glassTint * 100)).arg(Math.round(IrisStyle.glassBlurAmount * 100))
                         + (glassRoot.mode === "compositor" ? " · " + Translation.tr("Blur previews as Glass") : "")
             }
         }
@@ -881,9 +995,13 @@ ClippingRectangle {
             readonly property real naturalWidth: Math.round(620 * root.d)
             readonly property real naturalHeight: Math.round(260 * root.d)
             readonly property bool on: root.opt("iris.modules.desktopWidgets", true)
+            readonly property string design: DesktopWidgetDesign.current
+            readonly property bool iris: widgetsRoot.design === "iris"
+            readonly property bool instrument: widgetsRoot.design === "instrument"
+            readonly property bool bare: widgetsRoot.instrument || widgetsRoot.design === "readout"
             readonly property string material: String(root.opt("iris.widgets.material", "glass"))
-            readonly property bool glass: widgetsRoot.material === "glass"
-            readonly property bool clear: widgetsRoot.material === "clear"
+            readonly property bool glass: widgetsRoot.iris && widgetsRoot.material === "glass"
+            readonly property bool clear: widgetsRoot.bare || (widgetsRoot.iris && widgetsRoot.material === "clear")
             readonly property color ink: String(root.opt("iris.widgets.tint", "wallpaper")) === "wallpaper" ? IrisStyle.wallpaperLight : IrisStyle.accent
             readonly property int weight: ({ light: Font.Light, regular: Font.Medium, bold: Font.Bold })[String(root.opt("iris.widgets.weight", "regular"))] ?? Font.Medium
             readonly property real strength: Math.max(0.2, Math.min(1, Number(root.opt("iris.widgets.opacity", 100)) / 100))
@@ -893,19 +1011,18 @@ ClippingRectangle {
             readonly property real gap: Math.round(16 * root.d)
             readonly property real plateX: Math.round((widgetsRoot.width - widgetsRoot.wide - widgetsRoot.gap - widgetsRoot.unit) / 2)
             readonly property real plateY: Math.round((widgetsRoot.height - widgetsRoot.unit) / 2)
-            readonly property color plateColor: widgetsRoot.glass || widgetsRoot.clear
-                ? ColorUtils.applyAlpha(IrisStyle.surface, IrisStyle.legibleVeil(widgetsRoot.material, 0, 0, widgetsRoot.strength))
+            readonly property color plateColor: widgetsRoot.bare ? "transparent" : !widgetsRoot.iris ? Appearance.colors.colLayer2 : widgetsRoot.glass || widgetsRoot.clear
+                ? ColorUtils.applyAlpha(IrisStyle.surface, widgetsRoot.clear && !Boolean(root.opt("iris.widgets.legibleAlways", false)) ? 0
+                    : IrisStyle.legibleVeil(widgetsRoot.material, 0, 0, widgetsRoot.strength))
                 : ColorUtils.applyAlpha(widgetsRoot.material === "tinted"
                     ? ColorUtils.mix(IrisStyle.surface, Appearance.colors.colPrimary, 0.82) : IrisStyle.surface, widgetsRoot.strength)
 
-            Image {
+            ShaderEffectSource {
                 id: widgetsWall
                 anchors.fill: parent
                 visible: false
-                source: widgetsRoot.glass ? root.wallpaper : ""
-                fillMode: Image.PreserveAspectCrop
-                sourceSize.width: 700
-                asynchronous: true
+                sourceItem: widgetsRoot.glass ? wallpaperImage.textureItem : null
+                live: true
             }
             Repeater {
                 model: widgetsRoot.on && widgetsRoot.glass ? [
@@ -946,16 +1063,30 @@ ClippingRectangle {
                 color: widgetsRoot.plateColor
                 border.width: widgetsRoot.clear ? 0 : 1
                 border.color: IrisStyle.rim
+                InstrumentRing {
+                    anchors.fill: parent
+                    anchors.margins: Math.round(4 * root.d)
+                    visible: widgetsRoot.instrument
+                    fraction: DateTime.clock.date.getMinutes() / 60
+                    ink: IrisStyle.onMedia
+                    accent: widgetsRoot.ink
+                    accentSoft: IrisStyle.secondaryAccent
+                    showArc: false
+                    showComet: false
+                    animated: false
+                }
                 ColumnLayout {
                     anchors.left: parent.left; anchors.bottom: parent.bottom
                     anchors.margins: Math.round(18 * root.d)
+                    anchors.bottomMargin: widgetsRoot.instrument ? Math.round(44 * root.d) : Math.round(18 * root.d)
+                    anchors.leftMargin: widgetsRoot.instrument ? Math.round(60 * root.d) : Math.round(18 * root.d)
                     spacing: 0
-                    IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd"); color: widgetsRoot.ink; font.weight: widgetsRoot.weight; font.pixelSize: 15 * IrisStyle.typeScale }
+                    IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd"); color: widgetsRoot.ink; font.weight: widgetsRoot.weight; font.pixelSize: IrisStyle.typeHeadline }
                     IrisText {
                         text: Qt.locale().toString(DateTime.clock.date, "hh:mm")
                         font.family: IrisStyle.fontNumbers
                         font.weight: widgetsRoot.weight
-                        font.pixelSize: 52 * IrisStyle.typeScale
+                        font.pixelSize: (widgetsRoot.instrument ? 36 : 52) * IrisStyle.typeScale
                         style: widgetsRoot.clear ? Text.Raised : Text.Normal
                         styleColor: IrisStyle.plateShadow
                     }
@@ -983,8 +1114,11 @@ ClippingRectangle {
             }
             OffState { visible: !widgetsRoot.on; text: Translation.tr("Desktop widgets off") }
             Caption {
-                glyph: widgetsRoot.glass ? "blur_on" : widgetsRoot.clear ? "select" : "square"
+                glyph: widgetsRoot.bare ? "avg_pace" : widgetsRoot.glass ? "blur_on" : widgetsRoot.clear ? "select" : "square"
                 text: !widgetsRoot.on ? ""
+                    : widgetsRoot.instrument ? Translation.tr("Dials, scales and ruled lists")
+                    : widgetsRoot.design === "readout" ? Translation.tr("Quiet figures and open lists")
+                    : !widgetsRoot.iris ? Translation.tr("Each widget keeps its Material design")
                     : widgetsRoot.glass ? Translation.tr("Frosted wallpaper · darker only where the wallpaper is bright")
                     : widgetsRoot.clear ? Translation.tr("Bare wallpaper · a veil only where text needs it")
                     : widgetsRoot.material === "tinted" ? Translation.tr("Black material with a trace of the wallpaper hue")
@@ -1008,14 +1142,13 @@ ClippingRectangle {
                 anchors.fill: parent
                 visible: backdropRoot.on
                 clip: true
-                Image {
+                ShaderEffectSource {
                     id: backdropImage
                     anchors.fill: parent
                     anchors.margins: -48
-                    source: root.wallpaper
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 700
                     visible: false
+                    sourceItem: wallpaperImage.textureItem
+                    live: true
                 }
                 MultiEffect {
                     anchors.fill: backdropImage
@@ -1071,7 +1204,7 @@ ClippingRectangle {
             readonly property bool live: root.opt("iris.wallpaper.livePreview", true)
             readonly property int perRow: Math.max(1, Math.floor((galleryRoot.galleryWidth - 30 * root.d) / (galleryRoot.thumb + 10 * root.d)))
             readonly property var sources: {
-                const list = Array.from(Wallpapers.wallpapers ?? []).map(path => "file://" + path)
+                const list = Array.from(Wallpapers.wallpapers ?? []).map(path => Wallpapers.stillUrlFor(path)).filter(url => url.length > 0)
                 const pool = list.length > 0 ? list : [root.wallpaper]
                 return Array.from({ length: galleryRoot.perRow * 2 }, (_, i) => pool[i % pool.length])
             }
@@ -1084,13 +1217,10 @@ ClippingRectangle {
                 repeat: true
                 onTriggered: galleryRoot.focusIndex = (galleryRoot.focusIndex + 1) % Math.max(1, galleryRoot.sources.length)
             }
-            Image {
+            IrisImage {
                 anchors.fill: parent
                 visible: galleryRoot.live
                 source: galleryRoot.sources[galleryRoot.focusIndex] ?? ""
-                fillMode: Image.PreserveAspectCrop
-                sourceSize.width: 700
-                asynchronous: true
             }
             Plate {
                 id: galleryPlate
@@ -1104,7 +1234,7 @@ ClippingRectangle {
                 IrisText {
                     x: Math.round(20 * root.d); y: Math.round(16 * root.d)
                     text: Translation.tr("Wallpapers")
-                    font.family: IrisStyle.fontTitle; font.weight: Font.Bold; font.pixelSize: 16 * IrisStyle.typeScale
+                    font.family: IrisStyle.fontTitle; font.weight: IrisStyle.weight(Font.Bold); font.pixelSize: IrisStyle.typeTitle
                 }
                 Flow {
                     id: galleryFlow
@@ -1122,7 +1252,7 @@ ClippingRectangle {
                             radius: IrisStyle.radiusTile
                             border.width: shot.index === galleryRoot.focusIndex ? 2 : 0
                             border.color: IrisStyle.accent
-                            Image { anchors.fill: parent; source: shot.modelData; fillMode: Image.PreserveAspectCrop; sourceSize.width: 320; asynchronous: true }
+                            IrisImage { anchors.fill: parent; source: shot.modelData }
                         }
                     }
                 }
@@ -1178,7 +1308,7 @@ ClippingRectangle {
                             anchors.leftMargin: Math.round(14 * root.d)
                             spacing: Math.round(8 * root.d)
                             MaterialSymbol { text: "search"; iconSize: Math.round(18 * root.d); color: IrisStyle.muted }
-                            IrisText { text: Translation.tr("Search apps, files and actions"); color: IrisStyle.muted; font.pixelSize: 13.5 * IrisStyle.typeScale }
+                            IrisText { text: Translation.tr("Search apps, files and actions"); color: IrisStyle.muted; font.pixelSize: IrisStyle.typeLabel }
                         }
                     }
                     Row {
@@ -1192,7 +1322,7 @@ ClippingRectangle {
                                 height: Math.round(24 * root.d)
                                 radius: height / 2
                                 color: IrisStyle.fillQuiet
-                                IrisText { id: hintLabel; anchors.centerIn: parent; text: parent.modelData; color: IrisStyle.subtext; font.pixelSize: 11 * IrisStyle.typeScale }
+                                IrisText { id: hintLabel; anchors.centerIn: parent; text: parent.modelData; color: IrisStyle.subtext; font.pixelSize: IrisStyle.typeFootnote }
                             }
                         }
                     }
@@ -1221,7 +1351,7 @@ ClippingRectangle {
                                         text: DesktopEntries.heuristicLookup(hit.app?.appId ?? "")?.name ?? String(hit.app?.appId ?? Translation.tr("Result"))
                                         elide: Text.ElideRight
                                     }
-                                    IrisText { text: hit.index === 0 ? Translation.tr("Open") : Translation.tr("App"); color: IrisStyle.muted; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                                    IrisText { text: hit.index === 0 ? Translation.tr("Open") : Translation.tr("App"); color: IrisStyle.muted; font.pixelSize: IrisStyle.typeMeta }
                                 }
                             }
                         }
@@ -1244,19 +1374,14 @@ ClippingRectangle {
             readonly property bool fromIsland: String(root.opt("iris.controlCenter.opens", "island")) === "island"
             readonly property bool round: String(root.opt("iris.controlCenter.controls", "tiles")) === "round"
             readonly property real plateWidth: Math.max(320, Math.min(540, Number(root.opt("iris.controlCenter.width", 360)))) * root.d
-            readonly property var sections: {
-                const list = root.opt("iris.controlCenter.sections", ["connectivity", "media", "shortcuts", "levels", "notifications"])
-                return Array.from(list ?? [])
-            }
-            readonly property var rows: {
-                const out = []
-                const pairs = [["connectivity", "media"], ["shortcuts", "levels"]]
-                for (let i = 0; i < ccRoot.sections.length; i++) {
-                    const a = ccRoot.sections[i], b = ccRoot.sections[i + 1]
-                    if (b && pairs.some(p => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))) { out.push([a, b]); i++ }
-                    else out.push([a])
-                }
-                return out
+            readonly property int columns: { root.rev; return IrisControlOptions.columns }
+            readonly property var ids: { root.rev; return IrisControlOptions.gridModules }
+            readonly property bool listed: { root.rev; return IrisControlOptions.modules.includes("notifications") }
+            readonly property var packed: {
+                root.rev
+                const shapes = ({})
+                for (const id of ccRoot.ids) shapes[id] = IrisControlOptions.shapeOf(id)
+                return IrisControlOptions.pack(ccRoot.ids, shapes, ccRoot.columns)
             }
             readonly property real naturalWidth: ccRoot.plateWidth + Math.round(120 * root.d)
             readonly property real naturalHeight: ccPlate.y + ccPlate.height + Math.round(24 * root.d)
@@ -1281,78 +1406,127 @@ ClippingRectangle {
                     x: Math.round(14 * root.d); y: Math.round(14 * root.d)
                     width: parent.width - 2 * x
                     spacing: Math.round(10 * root.d)
-                    IrisText { text: Translation.tr("Control Center"); font.weight: Font.DemiBold; font.pixelSize: 15 * IrisStyle.typeScale }
-                    Repeater {
-                        model: ccRoot.rows
-                        RowLayout {
-                            id: ccRow
-                            required property var modelData
-                            Layout.fillWidth: true
-                            spacing: Math.round(10 * root.d)
-                            Repeater {
-                                model: ccRow.modelData
+                    IrisText { text: Translation.tr("Control Center"); font.weight: IrisStyle.weight(Font.DemiBold); font.pixelSize: IrisStyle.typeHeadline }
+                    Item {
+                        id: ccGrid
+                        readonly property real gap: Math.round(8 * root.d)
+                        readonly property real cell: (width - (ccRoot.columns - 1) * gap) / ccRoot.columns
+                        readonly property real unit: Math.round((root.opt("iris.controlCenter.labels", false) ? 70 : 64) * root.d)
+                        Layout.fillWidth: true
+                        implicitHeight: ccRoot.packed.rows * unit + Math.max(0, ccRoot.packed.rows - 1) * gap
+                        Repeater {
+                            model: ccRoot.ids
+                            Rectangle {
+                                id: block
+                                required property string modelData
+                                required property int index
+                                readonly property var spot: ccRoot.packed.placed[block.modelData]
+                                readonly property string kind: IrisControlOptions.kindOf(block.modelData)
+                                readonly property bool wide: !["media", "level", "levels", "platter"].includes(block.kind) && block.spot.w > 1
+                                readonly property bool grouped: block.kind === "levels" || block.kind === "platter"
+                                readonly property bool upright: block.spot.h > block.spot.w
+                                x: Math.round(block.spot.col * (ccGrid.cell + ccGrid.gap))
+                                y: Math.round(block.spot.row * (ccGrid.unit + ccGrid.gap))
+                                width: Math.round(block.spot.w * ccGrid.cell + (block.spot.w - 1) * ccGrid.gap)
+                                height: Math.round(block.spot.h * ccGrid.unit + (block.spot.h - 1) * ccGrid.gap)
+                                radius: block.kind === "platter" || block.kind === "media" ? IrisStyle.radiusPlate
+                                    : !ccRoot.round ? IrisStyle.radiusTile : Math.min(width, height) / 2
+                                color: block.kind === "levels" ? "transparent"
+                                    : block.index === 0 && block.kind === "toggle" && !block.wide ? IrisStyle.accent : IrisStyle.fillQuiet
+                                clip: true
+                                Grid {
+                                    visible: block.kind === "platter"
+                                    anchors.centerIn: parent
+                                    columns: block.spot.w > 2 ? 4 : 2
+                                    spacing: Math.round(10 * root.d)
+                                    Repeater {
+                                        model: IrisControlOptions.platterIds
+                                        Rectangle {
+                                            required property string modelData
+                                            required property int index
+                                            width: Math.round(38 * root.d)
+                                            height: width
+                                            radius: width / 2
+                                            color: index === 0 ? IrisStyle.accent : IrisStyle.fill
+                                            MaterialSymbol { anchors.centerIn: parent; text: IrisControlOptions.glyphOf(parent.modelData); iconSize: Math.round(17 * root.d); color: parent.index === 0 ? IrisStyle.inkOnAccent : IrisStyle.text }
+                                        }
+                                    }
+                                }
+                                Row {
+                                    visible: block.kind === "levels"
+                                    anchors.centerIn: parent
+                                    spacing: Math.round(10 * root.d)
+                                    Repeater {
+                                        model: IrisControlOptions.levelIds
+                                        Rectangle {
+                                            required property string modelData
+                                            width: Math.round(Math.min(46 * root.d, (block.width - 20 * root.d) / 3))
+                                            height: block.height
+                                            radius: width / 2
+                                            color: IrisStyle.fill
+                                            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: parent.height * 0.6; radius: parent.radius; color: IrisStyle.fillStrong }
+                                            MaterialSymbol { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: Math.round(10 * root.d); text: IrisControlOptions.glyphOf(parent.modelData); iconSize: Math.round(15 * root.d); color: IrisStyle.surface }
+                                        }
+                                    }
+                                }
                                 Rectangle {
-                                    id: block
-                                    required property string modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredWidth: block.modelData === "levels" ? Math.round(150 * root.d) : 1
-                                    Layout.maximumWidth: block.modelData === "levels" ? Math.round(150 * root.d) : Number.POSITIVE_INFINITY
-                                    implicitHeight: block.modelData === "notifications" ? Math.round(52 * root.d) : Math.round(112 * root.d)
-                                    radius: IrisStyle.radiusCard
-                                    color: block.modelData === "levels" ? "transparent" : IrisStyle.surfaceHigh
-                                    Grid {
-                                        anchors.centerIn: parent
-                                        visible: block.modelData === "connectivity" || block.modelData === "shortcuts"
-                                        columns: block.modelData === "connectivity" ? 2 : 3
-                                        spacing: Math.round(8 * root.d)
-                                        Repeater {
-                                            model: block.modelData === "connectivity" ? ["lan", "bluetooth", "do_not_disturb_off", "sports_esports"] : ["contrast", "nightlight", "coffee", "screenshot_region", "radio_button_checked", "speaker"]
-                                            Rectangle {
-                                                required property string modelData
-                                                required property int index
-                                                readonly property bool isRound: block.modelData === "connectivity" || ccRoot.round
-                                                width: isRound ? Math.round(36 * root.d) : Math.round(44 * root.d)
-                                                height: isRound ? width : Math.round(38 * root.d)
-                                                radius: isRound ? width / 2 : IrisStyle.radiusTile
-                                                color: index === 0 ? IrisStyle.accent : IrisStyle.fill
-                                                MaterialSymbol { anchors.centerIn: parent; text: parent.modelData; iconSize: Math.round(17 * root.d); color: parent.index === 0 ? IrisStyle.onAccent : IrisStyle.text }
-                                            }
+                                    visible: block.kind === "level"
+                                    y: block.upright ? parent.height * 0.4 : 0
+                                    width: block.upright ? parent.width : parent.width * 0.6
+                                    height: block.upright ? parent.height * 0.6 : parent.height
+                                    radius: parent.radius
+                                    color: IrisStyle.fillStrong
+                                }
+                                MaterialSymbol {
+                                    visible: !block.wide && !block.grouped && block.kind !== "media"
+                                    x: block.kind === "level" && !block.upright ? Math.round(14 * root.d) : Math.round((parent.width - width) / 2)
+                                    y: block.kind === "level" && block.upright ? parent.height - height - Math.round(14 * root.d) : Math.round((parent.height - height) / 2)
+                                    text: IrisControlOptions.glyphOf(block.modelData)
+                                    iconSize: Math.round(18 * root.d)
+                                    color: block.kind === "level" ? IrisStyle.surface : block.index === 0 ? IrisStyle.inkOnAccent : IrisStyle.text
+                                }
+                                RowLayout {
+                                    visible: block.wide || block.kind === "media"
+                                    anchors.fill: parent
+                                    anchors.margins: Math.round(10 * root.d)
+                                    spacing: Math.round(8 * root.d)
+                                    Rectangle {
+                                        Layout.alignment: block.kind === "media" && block.spot.h > 1 && !(block.spot.w > 2) ? Qt.AlignTop : Qt.AlignVCenter
+                                        implicitWidth: Math.round(30 * root.d)
+                                        implicitHeight: implicitWidth
+                                        radius: width / 2
+                                        color: block.kind === "media" ? IrisStyle.fillActive : IrisStyle.accent
+                                        MaterialSymbol {
+                                            anchors.centerIn: parent
+                                            text: block.kind === "media" ? "music_note" : IrisControlOptions.glyphOf(block.modelData)
+                                            iconSize: Math.round(16 * root.d)
+                                            color: block.kind === "media" ? IrisStyle.subtext : IrisStyle.inkOnAccent
                                         }
                                     }
-                                    ColumnLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: Math.round(12 * root.d)
-                                        visible: block.modelData === "media"
-                                        MaterialSymbol { text: "music_note"; iconSize: Math.round(20 * root.d); color: IrisStyle.subtext }
-                                        Item { Layout.fillHeight: true }
-                                        IrisText { Layout.fillWidth: true; text: MprisController.activePlayer?.trackTitle || Translation.tr("Not playing"); font.weight: Font.DemiBold; elide: Text.ElideRight }
-                                        IrisText { Layout.fillWidth: true; text: MprisController.activePlayer?.trackArtist || Translation.tr("Music will show here"); color: IrisStyle.subtext; font.pixelSize: 11 * IrisStyle.typeScale; elide: Text.ElideRight }
-                                    }
-                                    Row {
-                                        anchors.fill: parent
-                                        visible: block.modelData === "levels"
-                                        spacing: Math.round(8 * root.d)
-                                        Repeater {
-                                            model: [["light_mode", 0.45], ["volume_up", 0.7], ["mic", 1]]
-                                            Rectangle {
-                                                required property var modelData
-                                                width: Math.round(44 * root.d); height: parent.height
-                                                radius: width / 2
-                                                color: IrisStyle.fill
-                                                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: parent.height * parent.modelData[1]; radius: width / 2; color: IrisStyle.fillStrong }
-                                                MaterialSymbol { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: parent.modelData[0]; iconSize: Math.round(15 * root.d); color: IrisStyle.surface }
-                                            }
-                                        }
-                                    }
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: Math.round(12 * root.d)
-                                        visible: block.modelData === "notifications"
-                                        MaterialSymbol { text: "notifications"; iconSize: Math.round(17 * root.d); color: IrisStyle.subtext }
-                                        IrisText { Layout.fillWidth: true; text: Translation.tr("You're all caught up"); color: IrisStyle.subtext }
+                                    IrisText {
+                                        Layout.fillWidth: true
+                                        Layout.alignment: Qt.AlignVCenter
+                                        text: block.kind === "media" ? (MprisController.titleOf(MprisController.activePlayer) || Translation.tr("Not playing"))
+                                            : Translation.tr(IrisControlOptions.labelOf(block.modelData))
+                                        font.weight: IrisStyle.weight(Font.DemiBold)
+                                        font.pixelSize: IrisStyle.typeMeta
+                                        elide: Text.ElideRight
                                     }
                                 }
                             }
+                        }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        visible: ccRoot.listed
+                        implicitHeight: Math.round(52 * root.d)
+                        radius: IrisStyle.radiusPlate
+                        color: IrisStyle.fillQuiet
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: Math.round(12 * root.d)
+                            MaterialSymbol { text: "notifications"; iconSize: Math.round(17 * root.d); color: IrisStyle.subtext }
+                            IrisText { Layout.fillWidth: true; text: Translation.tr("You're all caught up"); color: IrisStyle.subtext }
                         }
                     }
                 }
@@ -1408,8 +1582,8 @@ ClippingRectangle {
                         }
                         ColumnLayout {
                             spacing: 0
-                            IrisText { text: Translation.tr("Sound"); font.weight: Font.DemiBold }
-                            IrisText { text: Audio.sink?.description ?? Translation.tr("Speakers"); color: IrisStyle.subtext; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                            IrisText { text: Translation.tr("Sound"); font.weight: IrisStyle.weight(Font.DemiBold) }
+                            IrisText { text: Audio.sink?.description ?? Translation.tr("Speakers"); color: IrisStyle.subtext; font.pixelSize: IrisStyle.typeMeta }
                         }
                     }
                     RowLayout {
@@ -1417,7 +1591,7 @@ ClippingRectangle {
                         spacing: Math.round(10 * root.d)
                         MaterialSymbol { text: "volume_up"; iconSize: Math.round(18 * root.d); color: IrisStyle.text }
                         Level { value: Math.min(1, Audio.value ?? 0.6); tint: IrisStyle.text }
-                        IrisText { text: Math.round(Math.min(1, Audio.value ?? 0.6) * 100); font.family: IrisStyle.fontNumbers; font.weight: Font.DemiBold }
+                        IrisText { text: Math.round(Math.min(1, Audio.value ?? 0.6) * 100); font.family: IrisStyle.fontNumbers; font.weight: IrisStyle.weight(Font.DemiBold) }
                     }
                     Row {
                         visible: cardRoot.devices
@@ -1430,7 +1604,7 @@ ClippingRectangle {
                                 width: devLabel.implicitWidth + Math.round(20 * root.d); height: Math.round(26 * root.d)
                                 radius: height / 2
                                 color: index === 0 ? IrisStyle.tintFill(IrisStyle.accent) : IrisStyle.fillQuiet
-                                IrisText { id: devLabel; anchors.centerIn: parent; text: parent.modelData; color: parent.index === 0 ? IrisStyle.accent : IrisStyle.subtext; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                                IrisText { id: devLabel; anchors.centerIn: parent; text: parent.modelData; color: parent.index === 0 ? IrisStyle.accent : IrisStyle.subtext; font.pixelSize: IrisStyle.typeMeta }
                             }
                         }
                     }
@@ -1456,53 +1630,93 @@ ClippingRectangle {
             id: menuRoot
             readonly property real naturalWidth: Math.round(480 * root.d)
             readonly property real naturalHeight: Math.round(300 * root.d)
+            readonly property int pad: Math.round(6 * root.d)
             Plate {
+                id: menuPlate
                 surface: "menus"
-                fallbackRadius: IrisStyle.radiusCard
+                fallbackRadius: IrisStyle.radiusTile
                 anchors.centerIn: parent
-                width: Math.round(260 * root.d)
-                height: menuColumn.implicitHeight + Math.round(12 * root.d)
+                width: Math.round(236 * root.d)
+                height: menuColumn.implicitHeight + 2 * menuRoot.pad
                 ColumnLayout {
                     id: menuColumn
-                    x: Math.round(6 * root.d); y: Math.round(6 * root.d)
+                    x: menuRoot.pad; y: menuRoot.pad
                     width: parent.width - 2 * x
-                    spacing: Math.round(2 * root.d)
-                    RowLayout {
+                    spacing: 0
+                    ClippingRectangle {
                         Layout.fillWidth: true
-                        spacing: Math.round(6 * root.d)
-                        Repeater {
-                            model: [["wallpaper", Translation.tr("Wallpaper")], ["widgets", Translation.tr("Widgets")], ["palette", Translation.tr("Studio")]]
-                            Rectangle {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                implicitHeight: Math.round(58 * root.d)
-                                radius: IrisStyle.radiusTile
-                                color: IrisStyle.fillQuiet
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    spacing: Math.round(3 * root.d)
-                                    MaterialSymbol { Layout.alignment: Qt.AlignHCenter; text: parent.parent.modelData[0]; fill: 1; iconSize: Math.round(19 * root.d); color: IrisStyle.text }
-                                    IrisText { Layout.alignment: Qt.AlignHCenter; text: parent.parent.modelData[1]; font.pixelSize: 11 * IrisStyle.typeScale; font.weight: Font.DemiBold }
-                                }
+                        Layout.preferredHeight: Math.round(width * 9 / 16)
+                        radius: Math.max(IrisStyle.radiusMicro, menuPlate.radius - menuRoot.pad)
+                        color: IrisStyle.fillQuiet
+                        ShaderEffectSource {
+                            anchors.fill: parent
+                            sourceItem: wallpaperImage
+                            sourceRect: {
+                                const w = wallpaperImage.width, h = Math.min(wallpaperImage.height, w * 9 / 16)
+                                return Qt.rect(0, (wallpaperImage.height - h) / 2, w, h)
                             }
                         }
-                    }
-                    Rectangle { Layout.fillWidth: true; Layout.margins: Math.round(6 * root.d); implicitHeight: 1; color: IrisStyle.hairlineStrong }
-                    Repeater {
-                        model: [["edit", Translation.tr("Edit iRiS")], ["tune", Translation.tr("Quick controls")], ["settings", Translation.tr("Settings")]]
                         Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: Math.round(parent.height * 0.55)
+                            gradient: Gradient {
+                                GradientStop { position: 0; color: ColorUtils.applyAlpha(IrisStyle.mediaScrim, 0) }
+                                GradientStop { position: 1; color: IrisStyle.veilStrong }
+                            }
+                        }
+                        RowLayout {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: Math.round(10 * root.d)
+                            IrisText { Layout.fillWidth: true; text: Translation.tr("Wallpaper"); color: IrisStyle.onMedia; font.pixelSize: IrisStyle.typeLabel; font.weight: IrisStyle.weight(Font.DemiBold) }
+                            MaterialSymbol { text: "chevron_right"; iconSize: Math.round(16 * root.d); color: IrisStyle.onMedia }
+                        }
+                    }
+                    Repeater {
+                        model: [
+                            { sep: true },
+                            { glyph: "widgets", text: Translation.tr("Edit widgets"), tint: "teal", lit: true },
+                            { glyph: "palette", text: Translation.tr("Customize iRiS"), tint: "purple" },
+                            { sep: true },
+                            { glyph: "settings", text: Translation.tr("Settings"), tint: "gray" },
+                            { glyph: "restart_alt", text: Translation.tr("Restart shell"), tint: "gray" }
+                        ]
+                        Item {
+                            id: menuRow
                             required property var modelData
-                            required property int index
+                            readonly property color tint: IrisStyle.identityColor(String(menuRow.modelData.tint ?? "gray"))
                             Layout.fillWidth: true
-                            implicitHeight: Math.round(34 * root.d)
-                            radius: IrisStyle.radiusRow
-                            color: index === 0 ? IrisStyle.tintFill(IrisStyle.accent) : "transparent"
-                            RowLayout {
+                            implicitHeight: menuRow.modelData.sep ? Math.round(9 * root.d) : Math.round(28 * root.d)
+                            Rectangle {
+                                visible: menuRow.modelData.sep === true
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: Math.round(8 * root.d); width: parent.width - 2 * x; height: 1
+                                color: IrisStyle.hairline
+                            }
+                            Rectangle {
+                                visible: menuRow.modelData.sep !== true
                                 anchors.fill: parent
-                                anchors.leftMargin: Math.round(10 * root.d)
-                                spacing: Math.round(10 * root.d)
-                                MaterialSymbol { Layout.preferredWidth: Math.round(20 * root.d); text: parent.parent.modelData[0]; iconSize: Math.round(17 * root.d); color: IrisStyle.subtext }
-                                IrisText { text: parent.parent.modelData[1]; font.weight: Font.Medium }
+                                radius: Math.max(IrisStyle.radiusMicro, menuPlate.radius - menuRoot.pad)
+                                color: menuRow.modelData.lit ? IrisStyle.fillHover : "transparent"
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Math.round(8 * root.d)
+                                    spacing: Math.round(8 * root.d)
+                                    Rectangle {
+                                        Layout.preferredWidth: Math.round(18 * root.d)
+                                        Layout.preferredHeight: Layout.preferredWidth
+                                        radius: IrisStyle.iconRadius(width)
+                                        gradient: Gradient {
+                                            GradientStop { position: 0; color: Qt.lighter(menuRow.tint, 1.2) }
+                                            GradientStop { position: 1; color: menuRow.tint }
+                                        }
+                                        MaterialSymbol { anchors.centerIn: parent; text: String(menuRow.modelData.glyph ?? ""); fill: 1; iconSize: Math.round(13 * root.d); color: IrisStyle.onTint }
+                                    }
+                                    IrisText { Layout.fillWidth: true; text: String(menuRow.modelData.text ?? ""); font.pixelSize: IrisStyle.typeLabel }
+                                }
                             }
                         }
                     }
@@ -1514,9 +1728,11 @@ ClippingRectangle {
     Component {
         id: settingsScene
         Item {
+            id: settingsRoot
             readonly property real naturalWidth: Math.round(620 * root.d)
             readonly property real naturalHeight: Math.round(300 * root.d)
             Plate {
+                id: settingsPlate
                 surface: "settings"
                 fallbackRadius: IrisStyle.radiusPanel
                 anchors.centerIn: parent
@@ -1524,40 +1740,62 @@ ClippingRectangle {
                 height: Math.round(250 * root.d)
                 clip: true
                 Rectangle {
+                    id: settingsSide
                     x: 1; y: 1
-                    width: Math.round(140 * root.d); height: parent.height - 2
+                    width: Math.round(150 * root.d); height: parent.height - 2
                     radius: parent.radius
                     color: IrisStyle.surfaceHigh
+                    Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: IrisStyle.hairline }
                     Column {
-                        x: Math.round(12 * root.d); y: Math.round(16 * root.d)
-                        spacing: Math.round(8 * root.d)
+                        x: Math.round(10 * root.d); y: Math.round(18 * root.d)
+                        width: parent.width - 2 * x
+                        spacing: Math.round(4 * root.d)
+                        Rectangle { width: parent.width; height: Math.round(18 * root.d); radius: height / 2; color: IrisStyle.fillQuiet }
+                        Item { width: 1; height: Math.round(4 * root.d) }
                         Repeater {
-                            model: [IrisStyle.identity.blue, IrisStyle.identity.pink, IrisStyle.identity.sky, IrisStyle.identity.indigo, IrisStyle.identity.purple]
-                            Row {
+                            model: [IrisStyle.identity.gray, IrisStyle.identity.purple, IrisStyle.identity.indigo, IrisStyle.identity.blue, IrisStyle.identity.sky, IrisStyle.identity.pink]
+                            Rectangle {
                                 required property color modelData
-                                spacing: Math.round(8 * root.d)
-                                Rectangle { width: Math.round(18 * root.d); height: width; radius: IrisStyle.iconRadius(width); color: parent.modelData }
-                                Rectangle { anchors.verticalCenter: parent.verticalCenter; width: Math.round(70 * root.d); height: Math.round(7 * root.d); radius: height / 2; color: IrisStyle.fill }
+                                required property int index
+                                width: parent.width; height: Math.round(20 * root.d)
+                                radius: IrisStyle.radiusRow
+                                color: index === 4 ? IrisStyle.fillActive : "transparent"
+                                Row {
+                                    x: Math.round(4 * root.d); anchors.verticalCenter: parent.verticalCenter
+                                    spacing: Math.round(6 * root.d)
+                                    Rectangle { width: Math.round(13 * root.d); height: width; radius: IrisStyle.iconRadius(width); color: parent.parent.modelData }
+                                    Rectangle { anchors.verticalCenter: parent.verticalCenter; width: Math.round(56 * root.d); height: Math.round(6 * root.d); radius: height / 2; color: IrisStyle.fillStrong }
+                                }
                             }
                         }
                     }
                 }
-                Grid {
-                    x: Math.round(160 * root.d); y: Math.round(20 * root.d)
-                    columns: 3
-                    spacing: Math.round(10 * root.d)
-                    Repeater {
-                        model: 6
-                        Rectangle {
-                            required property int index
-                            width: Math.round(110 * root.d); height: Math.round(92 * root.d)
-                            radius: IrisStyle.radiusCard
-                            color: IrisStyle.surfaceHigh
-                            border.width: 1
-                            border.color: IrisStyle.rim
-                            Rectangle { x: 10; y: 10; width: Math.round(20 * root.d); height: width; radius: IrisStyle.iconRadius(width); color: IrisStyle.identity.blue }
-                            Rectangle { x: 10; y: parent.height - 30; width: parent.width * 0.55; height: 7; radius: 3.5; color: IrisStyle.fillStrong }
-                            Rectangle { x: 10; y: parent.height - 17; width: parent.width * 0.75; height: 6; radius: 3; color: IrisStyle.fill }
+                Column {
+                    x: settingsSide.width + Math.round(22 * root.d); y: Math.round(20 * root.d)
+                    width: parent.width - x - Math.round(22 * root.d)
+                    spacing: Math.round(12 * root.d)
+                    Rectangle { width: Math.round(120 * root.d); height: Math.round(10 * root.d); radius: height / 2; color: IrisStyle.text }
+                    Rectangle {
+                        width: parent.width
+                        height: groupRows.implicitHeight
+                        radius: IrisStyle.radiusTile
+                        color: IrisStyle.fillQuiet
+                        Column {
+                            id: groupRows
+                            width: parent.width
+                            Repeater {
+                                model: [IrisStyle.identity.yellow, IrisStyle.identity.red, IrisStyle.identity.green, IrisStyle.identity.blue, IrisStyle.identity.teal]
+                                Item {
+                                    required property color modelData
+                                    required property int index
+                                    width: parent.width; height: Math.round(32 * root.d)
+                                    Rectangle { id: rowMark; x: Math.round(10 * root.d); anchors.verticalCenter: parent.verticalCenter; width: Math.round(16 * root.d); height: width; radius: IrisStyle.iconRadius(width); color: parent.modelData }
+                                    Rectangle { x: rowMark.x + rowMark.width + Math.round(10 * root.d); anchors.verticalCenter: parent.verticalCenter; width: Math.round((80 + 24 * (parent.index % 3)) * root.d); height: Math.round(7 * root.d); radius: height / 2; color: IrisStyle.fillStrong }
+                                    Rectangle { anchors.right: parent.right; anchors.rightMargin: Math.round(26 * root.d); anchors.verticalCenter: parent.verticalCenter; width: Math.round(46 * root.d); height: Math.round(6 * root.d); radius: height / 2; color: IrisStyle.fill }
+                                    MaterialSymbol { anchors.right: parent.right; anchors.rightMargin: Math.round(8 * root.d); anchors.verticalCenter: parent.verticalCenter; text: "chevron_right"; iconSize: Math.round(14 * root.d); color: IrisStyle.muted }
+                                    Rectangle { visible: parent.index > 0; x: rowMark.x + rowMark.width + Math.round(10 * root.d); width: parent.width - x; height: 1; color: IrisStyle.hairline }
+                                }
+                            }
                         }
                     }
                 }
@@ -1586,11 +1824,11 @@ ClippingRectangle {
                     spacing: Math.round(10 * root.d)
                     RowLayout {
                         spacing: Math.round(10 * root.d)
-                        IrisText { text: Qt.locale().toString(DateTime.clock.date, "d"); color: IrisStyle.identity.red; font.family: IrisStyle.fontNumbers; font.weight: Font.Bold; font.pixelSize: 30 * IrisStyle.typeScale }
+                        IrisText { text: Qt.locale().toString(DateTime.clock.date, "d"); color: IrisStyle.identity.red; font.family: IrisStyle.fontNumbers; font.weight: IrisStyle.weight(Font.Bold); font.pixelSize: 30 * IrisStyle.typeScale }
                         ColumnLayout {
                             spacing: 0
-                            IrisText { text: Translation.tr("Today"); font.family: IrisStyle.fontTitle; font.weight: Font.Bold; font.pixelSize: 17 * IrisStyle.typeScale }
-                            IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd, MMMM"); color: IrisStyle.subtext; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                            IrisText { text: Translation.tr("Today"); font.family: IrisStyle.fontTitle; font.weight: IrisStyle.weight(Font.Bold); font.pixelSize: IrisStyle.typeTitle }
+                            IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd, MMMM"); color: IrisStyle.subtext; font.pixelSize: IrisStyle.typeMeta }
                         }
                     }
                     Repeater {
@@ -1609,7 +1847,7 @@ ClippingRectangle {
                                     radius: IrisStyle.iconRadius(width); color: parent.parent.modelData[2]
                                     MaterialSymbol { anchors.centerIn: parent; text: parent.parent.parent.modelData[0]; fill: 1; iconSize: Math.round(14 * root.d); color: IrisStyle.onTint }
                                 }
-                                IrisText { text: parent.parent.modelData[1]; font.weight: Font.DemiBold }
+                                IrisText { text: parent.parent.modelData[1]; font.weight: IrisStyle.weight(Font.DemiBold) }
                             }
                         }
                     }
@@ -1649,7 +1887,7 @@ ClippingRectangle {
                 }
             }
             MaterialSymbol { x: joinRoot.origin.x + (joinRoot.origin.width - width) / 2; y: joinRoot.origin.y + (joinRoot.origin.height - height) / 2; text: "partly_cloudy_day"; fill: 1; iconSize: Math.round(18 * root.d); color: IrisStyle.identity.sky }
-            IrisClock { x: joinRoot.island.x + (joinRoot.island.width - width) / 2; y: joinRoot.island.y + (joinRoot.island.height - height) / 2; pixelSize: 15 * IrisStyle.typeScale; separatorColor: IrisStyle.secondaryAccent }
+            IrisClock { x: joinRoot.island.x + (joinRoot.island.width - width) / 2; y: joinRoot.island.y + (joinRoot.island.height - height) / 2; pixelSize: IrisStyle.typeHeadline; separatorColor: IrisStyle.secondaryAccent }
             Rectangle {
                 visible: joinRoot.air > 0
                 x: joinRoot.card.x + joinRoot.card.width
@@ -1695,7 +1933,7 @@ ClippingRectangle {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: Math.round(2 * root.d)
-                        IrisText { text: Translation.tr("A notification"); font.weight: Font.DemiBold }
+                        IrisText { text: Translation.tr("A notification"); font.weight: IrisStyle.weight(Font.DemiBold) }
                         IrisText { Layout.fillWidth: true; text: Translation.tr("Stays %1 s, then folds back into the Island.").arg((feedRoot.duration / 1000).toFixed(1)); color: IrisStyle.textSecondary; elide: Text.ElideRight }
                     }
                 }
@@ -1734,7 +1972,7 @@ ClippingRectangle {
                     spacing: Math.round(10 * root.d)
                     MaterialSymbol { text: "volume_up"; fill: 1; iconSize: Math.round(18 * root.d); color: IrisStyle.text }
                     Level { value: Math.min(1, Audio.value ?? 0.7); tint: IrisStyle.text }
-                    IrisText { text: Math.round(Math.min(1, Audio.value ?? 0.7) * 100); font.family: IrisStyle.fontNumbers; font.weight: Font.DemiBold }
+                    IrisText { text: Math.round(Math.min(1, Audio.value ?? 0.7) * 100); font.family: IrisStyle.fontNumbers; font.weight: IrisStyle.weight(Font.DemiBold) }
                 }
             }
             Caption {
@@ -1763,7 +2001,7 @@ ClippingRectangle {
                 IrisText {
                     x: Math.round(16 * root.d); y: Math.round(14 * root.d)
                     text: Translation.tr("Tray") + "  " + trayRoot.items.length
-                    font.weight: Font.DemiBold
+                    font.weight: IrisStyle.weight(Font.DemiBold)
                 }
                 Grid {
                     id: trayGrid
@@ -1790,7 +2028,7 @@ ClippingRectangle {
                                 horizontalAlignment: Text.AlignHCenter
                                 text: trayEntry.modelData?.tooltipTitle || trayEntry.modelData?.title || trayEntry.modelData?.id || Translation.tr("App")
                                 elide: Text.ElideRight
-                                font.pixelSize: 11 * IrisStyle.typeScale
+                                font.pixelSize: IrisStyle.typeFootnote
                                 color: IrisStyle.subtext
                             }
                         }
@@ -1809,9 +2047,9 @@ ClippingRectangle {
         Item {
             id: playerRoot
             readonly property var player: MprisController.activePlayer
-            readonly property string art: String(playerRoot.player?.trackArtUrl ?? "")
+            readonly property string art: String(MprisController.artUrlOf(playerRoot.player) ?? "")
             readonly property string cover: playerRoot.art.length > 0 ? playerRoot.art : root.wallpaper
-            readonly property bool roundCover: root.opt("iris.player.roundCover", true)
+            readonly property bool roundCover: root.opt("iris.player.roundCover", false)
             readonly property bool artBackground: root.opt("iris.player.artworkBackground", true)
             readonly property bool opensIsland: String(root.opt("iris.player.bubbleOpens", "card")) === "island"
             readonly property bool pinned: root.opt("iris.player.cardPinned", false)
@@ -1853,13 +2091,13 @@ ClippingRectangle {
                             implicitWidth: Math.round(84 * root.d); implicitHeight: implicitWidth
                             radius: playerRoot.roundCover ? width / 2 : IrisStyle.radiusTile
                             Behavior on radius { NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
-                            Image { anchors.fill: parent; source: playerRoot.cover; fillMode: Image.PreserveAspectCrop; sourceSize.width: 200 }
+                            IrisImage { anchors.fill: parent; source: playerRoot.cover }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: Math.round(2 * root.d)
-                            IrisText { Layout.fillWidth: true; text: playerRoot.player?.trackTitle || Translation.tr("Song title"); color: playerRoot.artBackground ? IrisStyle.onMedia : IrisStyle.text; font.weight: Font.DemiBold; font.pixelSize: 15 * IrisStyle.typeScale; elide: Text.ElideRight }
-                            IrisText { Layout.fillWidth: true; text: playerRoot.player?.trackArtist || Translation.tr("Artist"); color: playerRoot.artBackground ? IrisStyle.onMediaSecondary : IrisStyle.subtext; elide: Text.ElideRight }
+                            IrisText { Layout.fillWidth: true; text: MprisController.titleOf(playerRoot.player) || Translation.tr("Song title"); color: playerRoot.artBackground ? IrisStyle.onMedia : IrisStyle.text; font.weight: IrisStyle.weight(Font.DemiBold); font.pixelSize: IrisStyle.typeHeadline; elide: Text.ElideRight }
+                            IrisText { Layout.fillWidth: true; text: MprisController.artistOf(playerRoot.player) || Translation.tr("Artist"); color: playerRoot.artBackground ? IrisStyle.onMediaSecondary : IrisStyle.subtext; elide: Text.ElideRight }
                         }
                         MaterialSymbol { visible: playerRoot.pinned; Layout.alignment: Qt.AlignTop; text: "keep"; fill: 1; iconSize: Math.round(18 * root.d); color: playerRoot.artBackground ? IrisStyle.onMedia : IrisStyle.accent }
                     }
@@ -1936,14 +2174,12 @@ ClippingRectangle {
                 clip: true
                 Behavior on width { NumberAnimation { duration: IrisStyle.moveDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve } }
 
-                Image {
+                IrisImage {
                     visible: pageRoot.mode !== "media" && pageRoot.banner
                     x: 0; y: islandBody.radius
                     width: parent.width
                     height: Math.min(Math.round(150 * root.d), islandBody.height - 2 * islandBody.radius)
                     source: root.wallpaper
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize.width: 600
                     Rectangle {
                         anchors.fill: parent
                         gradient: Gradient {
@@ -2003,7 +2239,7 @@ ClippingRectangle {
                         IrisText {
                             text: "<font color='" + IrisStyle.secondaryAccent + "'><b>" + Qt.locale().toString(DateTime.clock.date, "dddd") + "</b></font> " + Qt.locale().toString(DateTime.clock.date, "d MMMM")
                             textFormat: Text.StyledText
-                            font.pixelSize: 13 * IrisStyle.typeScale
+                            font.pixelSize: IrisStyle.typeLabel
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -2062,7 +2298,7 @@ ClippingRectangle {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: stripCell.index === 0 ? Translation.tr("Now") : String(stripCell.modelData.label ?? "").slice(0, 2)
                                                     color: IrisStyle.muted
-                                                    font.pixelSize: 11.5 * IrisStyle.typeScale
+                                                    font.pixelSize: IrisStyle.typeMeta
                                                 }
                                                 MaterialSymbol {
                                                     Layout.alignment: Qt.AlignHCenter
@@ -2075,7 +2311,7 @@ ClippingRectangle {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: desktopBlock.modelData === "forecast" ? String(stripCell.modelData.temp ?? "—") : stripCell.modelData.value
                                                     font.family: IrisStyle.fontNumbers
-                                                    font.pixelSize: 12.5 * IrisStyle.typeScale
+                                                    font.pixelSize: IrisStyle.typeLabel
                                                 }
                                             }
                                         }
@@ -2100,14 +2336,14 @@ ClippingRectangle {
                                         implicitWidth: Math.round(56 * root.d); implicitHeight: implicitWidth
                                         radius: IrisStyle.radiusTile
                                         color: IrisStyle.fill
-                                        Image { anchors.fill: parent; source: String(pageRoot.player?.trackArtUrl ?? ""); fillMode: Image.PreserveAspectCrop; sourceSize.width: 120 }
-                                        MaterialSymbol { anchors.centerIn: parent; visible: String(pageRoot.player?.trackArtUrl ?? "").length === 0; text: "music_note"; fill: 1; iconSize: Math.round(26 * root.d); color: IrisStyle.subtext }
+                                        IrisImage { anchors.fill: parent; source: String(MprisController.artUrlOf(pageRoot.player) ?? "") }
+                                        MaterialSymbol { anchors.centerIn: parent; visible: String(MprisController.artUrlOf(pageRoot.player) ?? "").length === 0; text: "music_note"; fill: 1; iconSize: Math.round(26 * root.d); color: IrisStyle.subtext }
                                     }
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: Math.round(2 * root.d)
-                                        IrisText { Layout.fillWidth: true; text: pageRoot.player?.trackTitle || Translation.tr("Song title"); font.weight: Font.DemiBold; font.pixelSize: 15 * IrisStyle.typeScale; elide: Text.ElideRight }
-                                        IrisText { Layout.fillWidth: true; text: pageRoot.player?.trackArtist || Translation.tr("Artist"); color: IrisStyle.subtext; elide: Text.ElideRight }
+                                        IrisText { Layout.fillWidth: true; text: MprisController.titleOf(pageRoot.player) || Translation.tr("Song title"); font.weight: IrisStyle.weight(Font.DemiBold); font.pixelSize: IrisStyle.typeHeadline; elide: Text.ElideRight }
+                                        IrisText { Layout.fillWidth: true; text: MprisController.artistOf(pageRoot.player) || Translation.tr("Artist"); color: IrisStyle.subtext; elide: Text.ElideRight }
                                     }
                                 }
                             }
@@ -2176,7 +2412,7 @@ ClippingRectangle {
             readonly property bool attach: root.opt("iris.bubbles.attach", true)
             readonly property bool cluster: root.opt("iris.bubbles.cluster", true)
             readonly property bool opensIsland: String(root.opt("iris.bubbles.opens", "card")) === "island"
-            readonly property bool joined: root.opt("iris.appearance.surfaces.cards.joinOrigin", true)
+            readonly property bool joined: root.opt("iris.appearance.surfaces.cards.joinOrigin", false)
             readonly property real size: IrisFrame.pieceBand
             readonly property real gap: bubRoot.attach ? 0 : Math.round(Math.max(0, Math.min(64, Number(root.opt("iris.bubbles.edgeGap", 20)))) * root.d)
             readonly property real split: bubRoot.cluster ? 0 : Math.round(6 * root.d)
@@ -2250,7 +2486,7 @@ ClippingRectangle {
                 x: (bubRoot.width - width) / 2
                 y: IrisFrame.band + (IrisFrame.islandBand - height) / 2
                 opacity: 1 - (bubRoot.opensIsland ? bubRoot.openness : 0)
-                pixelSize: 15 * IrisStyle.typeScale
+                pixelSize: IrisStyle.typeHeadline
                 separatorColor: IrisStyle.secondaryAccent
             }
             MaterialSymbol {
@@ -2280,10 +2516,10 @@ ClippingRectangle {
                 RowLayout {
                     spacing: Math.round(8 * root.d)
                     MaterialSymbol { text: "volume_up"; fill: 1; iconSize: Math.round(18 * root.d); color: IrisStyle.identity.indigo }
-                    IrisText { text: Translation.tr("Sound"); font.weight: Font.DemiBold }
+                    IrisText { text: Translation.tr("Sound"); font.weight: IrisStyle.weight(Font.DemiBold) }
                 }
                 Level { value: 0.62; tint: IrisStyle.identity.indigo }
-                IrisText { text: Translation.tr("Speakers"); color: IrisStyle.muted; font.pixelSize: 11.5 * IrisStyle.typeScale }
+                IrisText { text: Translation.tr("Speakers"); color: IrisStyle.muted; font.pixelSize: IrisStyle.typeMeta }
             }
 
             Pointer {
@@ -2334,9 +2570,10 @@ ClippingRectangle {
             }
             Rectangle {
                 x: reserveRoot.inset("left")
-                width: parent.width - x - reserveRoot.inset("right")
+                // From the targets, not the animating x/y, or the size overshoots while they move.
+                width: parent.width - reserveRoot.inset("left") - reserveRoot.inset("right")
                 y: reserveRoot.inset("top")
-                height: parent.height - y - reserveRoot.inset("bottom")
+                height: parent.height - reserveRoot.inset("top") - reserveRoot.inset("bottom")
                 Behavior on x { NumberAnimation { duration: IrisStyle.moveDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve } }
                 Behavior on width { NumberAnimation { duration: IrisStyle.moveDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve } }
                 radius: IrisStyle.radiusTile
@@ -2430,7 +2667,7 @@ ClippingRectangle {
                 IrisClock {
                     anchors.centerIn: parent
                     visible: !actRoot.expanded && !(actRoot.step === 2 && actRoot.scroll !== "none") && !(actRoot.step === 3 && actRoot.events)
-                    pixelSize: 15 * IrisStyle.typeScale
+                    pixelSize: IrisStyle.typeHeadline
                     separatorColor: IrisStyle.secondaryAccent
                 }
                 RowLayout {
@@ -2447,15 +2684,15 @@ ClippingRectangle {
                     visible: actRoot.step === 3 && actRoot.events && !actRoot.expanded
                     spacing: Math.round(8 * root.d)
                     MaterialSymbol { text: "battery_charging_full"; fill: 1; iconSize: Math.round(17 * root.d); color: IrisStyle.identity.green }
-                    IrisText { text: Translation.tr("Charger connected"); font.weight: Font.DemiBold }
+                    IrisText { text: Translation.tr("Charger connected"); font.weight: IrisStyle.weight(Font.DemiBold) }
                 }
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: Math.round(18 * root.d)
                     visible: actRoot.expanded
                     opacity: actRoot.expanded ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(200) } }
-                    IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd d MMMM"); color: IrisStyle.secondaryAccent; font.weight: Font.DemiBold }
+                    Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(200); easing.type: IrisStyle.feedbackEasing } }
+                    IrisText { text: Qt.locale().toString(DateTime.clock.date, "dddd d MMMM"); color: IrisStyle.secondaryAccent; font.weight: IrisStyle.weight(Font.DemiBold) }
                     IrisText { text: Qt.locale().toString(DateTime.clock.date, "hh:mm"); font.family: IrisStyle.fontNumbers; font.weight: IrisStyle.figureWeight; font.pixelSize: 40 * IrisStyle.typeScale }
                     Item { Layout.fillHeight: true }
                     Level { value: 0.6 }
@@ -2470,7 +2707,7 @@ ClippingRectangle {
                 height: Math.round(26 * root.d)
                 radius: height / 2
                 color: IrisStyle.bodySurface
-                IrisText { id: capsLabel; anchors.centerIn: parent; text: Translation.tr("Caps Lock on"); font.pixelSize: 11.5 * IrisStyle.typeScale; font.weight: Font.DemiBold }
+                IrisText { id: capsLabel; anchors.centerIn: parent; text: Translation.tr("Caps Lock on"); font.pixelSize: IrisStyle.typeMeta; font.weight: IrisStyle.weight(Font.DemiBold) }
             }
             MaterialSymbol {
                 id: pointer
@@ -2492,8 +2729,8 @@ ClippingRectangle {
                     border.width: 2
                     border.color: IrisStyle.accent
                     opacity: actRoot.clicked ? 0 : 1
-                    Behavior on width { NumberAnimation { duration: 320 } }
-                    Behavior on opacity { NumberAnimation { duration: 420 } }
+                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.moveCurve } }
+                    Behavior on opacity { NumberAnimation { duration: 420; easing.type: IrisStyle.feedbackEasing } }
                 }
             }
             Caption {
@@ -2503,6 +2740,191 @@ ClippingRectangle {
                     actRoot.scroll === "none" ? Translation.tr("Scroll does nothing") : actRoot.scroll === "brightness" ? Translation.tr("Scroll sets brightness") : Translation.tr("Scroll sets volume"),
                     actRoot.events ? (actRoot.caps ? Translation.tr("System events and the Caps Lock badge") : Translation.tr("System events")) : Translation.tr("System events off")][actRoot.step]
             }
+        }
+    }
+
+    Component {
+        id: typographyScene
+        Item {
+            readonly property real naturalWidth: Math.round(560 * root.d)
+            readonly property real naturalHeight: Math.round(280 * root.d)
+            Plate {
+                anchors.centerIn: parent
+                width: Math.round(480 * root.d)
+                height: Math.round(216 * root.d)
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Math.round(24 * root.d)
+                    spacing: Math.round(6 * root.d)
+                    IrisText { text: Translation.tr("A little room to breathe"); font.family: IrisStyle.fontTitle; font.pixelSize: IrisStyle.typeTitleLarge; font.weight: IrisStyle.weight(Font.Medium) }
+                    IrisClock { pixelSize: 56 * IrisStyle.typeScale; separatorColor: IrisStyle.secondaryAccent }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: IrisStyle.hairline }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        IrisText { text: Translation.tr("Words, figures, one family"); color: IrisStyle.subtext }
+                        Item { Layout.fillWidth: true }
+                        IrisText { text: "Aa 0123"; color: IrisStyle.accent; font.pixelSize: IrisStyle.typeTitle }
+                    }
+                }
+            }
+            Caption { glyph: "text_fields"; text: Translation.tr("Your typefaces, weight and text size") }
+        }
+    }
+
+    Component {
+        id: motionScene
+        Item {
+            readonly property real naturalWidth: Math.round(540 * root.d)
+            readonly property real naturalHeight: Math.round(280 * root.d)
+            IrisMotionLab {
+                anchors.fill: parent
+                anchors.margins: Math.round(12 * root.d)
+                playing: root.playing && root.visible && IrisStyle.motionEnabled
+            }
+            Caption { glyph: "animation"; text: IrisStyle.motionEnabled ? Translation.tr("The same motion when opening and closing") : Translation.tr("Motion is off") }
+        }
+    }
+
+    Component {
+        id: frameScene
+        Item {
+            id: framePreview
+            readonly property real naturalWidth: Math.round(540 * root.d)
+            readonly property real naturalHeight: Math.round(280 * root.d)
+            readonly property bool wave: root.section === "frameMusic" && root.opt("background.edgeWidgets.organic.enable", false) && String(root.opt("iris.surround.music", "widget")) === "widget"
+            readonly property bool music: root.section === "frameMusic"
+                && root.opt("background.edgeWidgets.organic.enable", false)
+                && String(root.opt("iris.surround.music", "widget")) === "frame"
+            property real phase: 0
+            readonly property real strength: Number(root.opt("iris.surround.musicStrength", 160)) / 100
+            readonly property real sensitivity: Number(root.opt("iris.surround.musicSensitivity", 140)) / 100
+            readonly property string edges: String(root.opt("iris.surround.musicEdges", "sides"))
+            Timer {
+                interval: 50
+                repeat: true
+                running: root.playing && root.visible && (framePreview.wave || (framePreview.music && IrisFrame.framed)) && IrisStyle.motionEnabled
+                onTriggered: framePreview.phase += 0.05 * Number(root.opt("iris.surround.musicSpeed", 100)) / 100
+            }
+            Field.IrisField {
+                anchors.fill: parent
+                anchors.margins: Math.round(16 * root.d)
+                framed: IrisFrame.framed
+                band: IrisFrame.band
+                cornerRadius: IrisFrame.cornerRadius
+                // Miniatures always sample wallpaper; they never blur Settings itself.
+                compositorAllowed: false
+                edgeWave: {
+                    const level = framePreview.music ? Math.min(20, (5 + 3 * Math.sin(framePreview.phase * 3)) * framePreview.strength * framePreview.sensitivity) : 0
+                    const sides = framePreview.edges !== "horizontal", horizontal = framePreview.edges !== "sides"
+                    return Qt.vector4d(horizontal ? level : 0, sides ? level : 0, horizontal ? level : 0, sides ? level : 0)
+                }
+                waveClock: framePreview.phase
+                frameMusicLevel: framePreview.music ? 0.5 : 0
+                shapes: [{ x: width / 2 - 66 * root.d, y: 0, width: 132 * root.d, height: 30 * root.d,
+                    radius: IrisStyle.radiusTile, id: "island", joins: "frame", fuse: IrisStyle.fuse }]
+            }
+            IrisClock { anchors.centerIn: parent; pixelSize: 48 * IrisStyle.typeScale; separatorColor: IrisStyle.secondaryAccent }
+            Shape {
+                anchors.fill: parent
+                visible: framePreview.wave
+                preferredRendererType: Shape.CurveRenderer
+                ShapePath {
+                    strokeColor: IrisStyle.accent
+                    strokeWidth: Math.round(3 * root.d)
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    PathMultiline {
+                        paths: [Array.from({length: 49}, (_, i) => Qt.point(i / 48 * framePreview.width,
+                            framePreview.height - 24 * root.d - (10 + 7 * Math.sin(i * 0.2 + framePreview.phase * 3)) * root.d))]
+                    }
+                }
+            }
+            OffState { visible: !IrisFrame.framed && !framePreview.wave; text: Translation.tr("Frame off") }
+            Caption { glyph: "crop_free"; text: framePreview.wave ? Translation.tr("Music follows the screen edges") : framePreview.music ? Translation.tr("A sample of your frame's music response") : Translation.tr("The frame's width, corners and material") }
+        }
+    }
+
+    Component {
+        id: lockScene
+        Item {
+            id: lockPreview
+            readonly property real naturalWidth: Math.round(540 * root.d)
+            readonly property real naturalHeight: Math.round(300 * root.d)
+            readonly property string source: String(root.opt("iris.lock.scene.source", "desktop"))
+            readonly property real blur: Number(root.opt("iris.lock.scene.blur", 100)) / 100
+            readonly property real dim: Number(root.opt("iris.lock.scene.dim", 0)) / 100
+            readonly property string clockFormat: String(root.opt("iris.lock.type.clockFormat", "auto"))
+            readonly property string format: lockPreview.clockFormat === "24h" ? "HH:mm" : lockPreview.clockFormat === "12h" ? "h:mm AP" : String(Config.options?.time?.format ?? "hh:mm")
+            Rectangle { anchors.fill: parent; color: IrisStyle.surface }
+            IrisWallpaperView {
+                id: lockWall
+                anchors.fill: parent
+                active: root.visible && lockPreview.source !== "colour"
+                live: false
+                screen: GlobalStates.focusedScreen
+                path: lockPreview.source === "custom" ? String(root.opt("iris.lock.scene.path", "")) : configuredPath
+                provideTexture: true
+                decodeSize: Qt.size(Math.round(lockPreview.width), 0)
+                opacity: 0
+            }
+            MultiEffect {
+                anchors.fill: parent
+                visible: lockPreview.source !== "colour"
+                source: lockWall.textureItem
+                blurEnabled: lockPreview.blur > 0
+                blur: lockPreview.blur
+                blurMax: IrisStyle.glassBlurMax
+                saturation: Number(root.opt("iris.lock.scene.saturation", 100)) / 100 - 1
+                autoPaddingEnabled: false
+            }
+            Rectangle { anchors.fill: parent; color: IrisStyle.surface; opacity: lockPreview.dim }
+            ColumnLayout {
+                anchors.centerIn: parent
+                width: parent.width - Math.round(64 * root.d)
+                spacing: Math.round(10 * root.d)
+                IrisText {
+                    visible: root.opt("iris.lock.blocks.clock.enable", true)
+                    Layout.alignment: Qt.AlignHCenter
+                    text: Qt.locale().toString(DateTime.clock.date, lockPreview.format + (root.opt("iris.lock.type.seconds", false) ? ":ss" : ""))
+                    font.family: IrisLockOptions.clockFamily
+                    font.pixelSize: Number(root.opt("iris.lock.type.clockSize", 112)) * 0.6 * IrisLockOptions.typeScale
+                    font.weight: Number(root.opt("iris.lock.type.clockWeight", 700))
+                    font.letterSpacing: Number(root.opt("iris.lock.type.clockTracking", -4))
+                    color: IrisLockOptions.accentColour
+                }
+                IrisText {
+                    visible: root.opt("iris.lock.blocks.clock.enable", true) && String(root.opt("iris.lock.type.dateFormat", "long")) !== "none"
+                    Layout.alignment: Qt.AlignHCenter
+                    text: Qt.locale().toString(DateTime.clock.date, String(root.opt("iris.lock.type.dateFormat", "long")) === "short" ? "ddd d MMM" : "dddd d MMMM")
+                    color: IrisStyle.onMediaSecondary
+                }
+                RowLayout {
+                    visible: root.opt("iris.lock.blocks.glance.enable", true)
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Math.round(16 * root.d)
+                    MaterialSymbol { visible: root.opt("iris.lock.blocks.glance.weather", true); text: "partly_cloudy_day"; color: IrisStyle.onMedia; iconSize: Math.round(22 * root.d) }
+                    MaterialSymbol { visible: root.opt("iris.lock.blocks.glance.events", true); text: "event"; color: IrisStyle.onMedia; iconSize: Math.round(22 * root.d) }
+                    MaterialSymbol { visible: root.opt("iris.lock.blocks.glance.battery", true); text: "battery_full"; color: IrisStyle.onMedia; iconSize: Math.round(22 * root.d) }
+                }
+                Rectangle {
+                    visible: root.opt("iris.lock.blocks.session.enable", true)
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: Number(root.opt("iris.lock.blocks.session.width", 248)) * 0.65
+                    Layout.preferredHeight: Math.round(32 * root.d)
+                    radius: height / 2
+                    color: IrisStyle.onMediaFill
+                    MaterialSymbol { anchors.centerIn: parent; text: "lock"; color: IrisStyle.onMedia; iconSize: Math.round(18 * root.d) }
+                }
+                IrisText {
+                    visible: root.opt("iris.lock.blocks.media.enable", true)
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.maximumWidth: parent.width
+                    text: MprisController.titleOf(MprisController.activePlayer) || Translation.tr("Now playing")
+                    color: IrisStyle.onMediaSecondary
+                    elide: Text.ElideRight
+                }
+            }
+            Caption { glyph: "lock"; text: Translation.tr("Your lock screen, without locking") }
         }
     }
 }

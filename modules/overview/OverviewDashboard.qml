@@ -57,13 +57,13 @@ Item {
     // ── Media player state (MediaSection pattern) ──
     readonly property MprisPlayer player: MprisController.activePlayer
     readonly property bool isYtMusic: MprisController.isYtMusicActive
-    readonly property bool hasPlayer: (player && player.trackTitle) || (isYtMusic && YtMusic.currentVideoId)
-    readonly property string effectiveTitle: isYtMusic ? YtMusic.currentTitle : (player?.trackTitle ?? "")
-    readonly property string effectiveArtist: isYtMusic ? YtMusic.currentArtist : (player?.trackArtist ?? "")
-    readonly property string effectiveArtUrl: isYtMusic && YtMusic.currentThumbnail ? YtMusic.currentThumbnail : (player?.trackArtUrl ?? "")
+    readonly property bool hasPlayer: (player && MprisController.titleOf(player)) || (isYtMusic && YtMusic.currentVideoId)
+    readonly property string effectiveTitle: isYtMusic ? YtMusic.currentTitle : (MprisController.titleOf(player) ?? "")
+    readonly property string effectiveArtist: isYtMusic ? YtMusic.currentArtist : (MprisController.artistOf(player) ?? "")
+    readonly property string effectiveArtUrl: isYtMusic && YtMusic.currentThumbnail ? YtMusic.currentThumbnail : (MprisController.artUrlOf(player) ?? "")
     readonly property bool effectiveIsPlaying: isYtMusic ? YtMusic.isPlaying : (player?.isPlaying ?? false)
-    readonly property real effectivePosition: isYtMusic ? YtMusic.currentPosition : (player?.position ?? 0)
-    readonly property real effectiveLength: isYtMusic ? YtMusic.currentDuration : (player?.length ?? 0)
+    readonly property real effectivePosition: isYtMusic ? YtMusic.currentPosition : MprisController.positionOf(player)
+    readonly property real effectiveLength: isYtMusic ? YtMusic.currentDuration : MprisController.lengthOf(player)
     readonly property bool effectiveCanSeek: isYtMusic ? YtMusic.canSeek : (player?.canSeek ?? false)
 
     // ── Cover art download ──
@@ -779,7 +779,7 @@ Item {
                                 value: root.effectiveLength > 0 ? root.effectivePosition / root.effectiveLength : 0
                                 onMoved: {
                                     if (root.isYtMusic) YtMusic.seek(value * root.effectiveLength)
-                                    else if (root.player) root.player.position = value * root.player.length
+                                    else if (root.player) MprisController.seek(root.player, value * MprisController.lengthOf(root.player))
                                 }
 
                                 Binding {

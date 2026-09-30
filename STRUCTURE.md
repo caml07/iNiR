@@ -133,7 +133,7 @@ inir/
 
 **translations/:**
 - Purpose: i18n string files for all supported languages
-- Contains: 17 JSON locale catalogs (ar_SA, de_DE, en_US, es_AR, fr_FR, he_HE, hi_IN, it_IT, ja_JP, kl_GL, ko_KR, pt_BR, ru_RU, tr_TR, uk_UA, vi_VN, zh_CN)
+- Contains: 18 JSON locale catalogs (ar_SA, de_DE, en_US, es_419, fr_FR, he_HE, hi_IN, id_ID, it_IT, ja_JP, kl_GL, ko_KR, pt_BR, ru_RU, tr_TR, uk_UA, vi_VN, zh_CN)
 - Key files: `translations/en_US.json`
 
 **distro/arch/:**

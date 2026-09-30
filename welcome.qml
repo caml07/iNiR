@@ -68,7 +68,7 @@ Scope {
     readonly property color welcomeScrim: Appearance.m3colors.m3scrim
     readonly property color welcomePrimary: root.irisFamily ? IrisStyle.accent
         : root.waffleFamily ? Looks.colors.accent : Appearance.m3colors.m3primary
-    readonly property color welcomeOnPrimary: root.irisFamily ? IrisStyle.onAccent
+    readonly property color welcomeOnPrimary: root.irisFamily ? IrisStyle.inkOnAccent
         : root.waffleFamily ? Looks.colors.accentFg : Appearance.m3colors.m3onPrimary
     readonly property color welcomePrimaryContainer: root.irisFamily ? IrisStyle.tintFill(IrisStyle.accent)
         : root.waffleFamily ? ColorUtils.mix(Looks.colors.bg1Base, Looks.colors.accent, 0.84)
@@ -133,6 +133,7 @@ Scope {
     property bool profileCustomized: false
     property bool initialProfileApplied: false
     property bool initialPerformanceApplied: false
+    property bool initialIrisDesktopApplied: false
     readonly property bool firstRunSetup: !(Config.options?.welcomeWizard?.completed ?? false)
         && !(Config.options?.welcomeWizard?.skipped ?? false)
 
@@ -670,6 +671,12 @@ Scope {
     readonly property string irisMaterial: Config.options?.iris?.appearance?.theme?.surface ?? "black"
     readonly property string irisAccent: Config.options?.iris?.appearance?.accent ?? "blue"
 
+    readonly property var irisDesktopDefaults: ({
+        "background.effects.enableBlur": false,
+        "background.effects.dim": 0,
+        "background.effects.dynamicDim": 0
+    })
+
     function applyIrisArrangement(id: string): void {
         Config.setNestedValues(root.presetById(root.irisArrangements, id).values)
     }
@@ -686,6 +693,10 @@ Scope {
             if (!root.irisFamily && !root.initialProfileApplied) {
                 root.initialProfileApplied = true
                 root.applyProfile(root.selectedProfile)
+            }
+            if (root.irisFamily && !root.initialIrisDesktopApplied) {
+                root.initialIrisDesktopApplied = true
+                Config.setNestedValues(root.irisDesktopDefaults)
             }
             if (!root.initialPerformanceApplied) {
                 root.initialPerformanceApplied = true

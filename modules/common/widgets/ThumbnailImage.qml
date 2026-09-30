@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
@@ -22,7 +21,10 @@ StyledImage {
     readonly property bool _ownsStill: root.cleanVideoStill && root.isVideo
     property bool thumbnailAvailable: false
     property string resolvedThumbnailSource: ""
-    property string _queuedThumbnailCheck: ""
+    // The thumbnail path this tile asked Wallpapers about and is waiting to hear back on.
+    property string _pendingCheck: ""
+    // A thumbnail that exists but will not decode is made again once, then left alone.
+    property bool _repairTried: false
     property string thumbnailPath: {
         if (sourcePath.length === 0) return ""
         if (root._ownsStill) return Wallpapers.videoStillPath(sourcePath)
@@ -68,50 +70,55 @@ StyledImage {
         Wallpapers.ensureThumbnailForPath(root.sourcePath, root.thumbnailSizeName)
     }
 
+    function _repairThumbnail() {
+        root._repairTried = true
+        Wallpapers.forgetThumbnail(root.thumbnailPath)
+        root._clearResolvedThumbnail()
+        if (!root.generateThumbnail) return
+        if (root._ownsStill) Wallpapers.ensureVideoStill(root.sourcePath, true)
+        else Wallpapers.ensureThumbnailForPath(root.sourcePath, root.thumbnailSizeName, true)
+    }
+
     function _clearResolvedThumbnail() {
         root.thumbnailAvailable = false
         root.resolvedThumbnailSource = ""
     }
 
-    function _startThumbnailCheck() {
-        if (root._queuedThumbnailCheck.length === 0 || _thumbnailCheckProc.running) return
-        const targetPath = root._queuedThumbnailCheck
-        root._queuedThumbnailCheck = ""
-        _thumbnailCheckProc._targetPath = targetPath
-        _thumbnailCheckProc.command = ["test", "-f", targetPath]
-        _thumbnailCheckProc.running = true
-    }
-
     function reloadThumbnail() {
         if (!root.sourcePath || root.sourcePath.length === 0 || !root.thumbnailPath || root.thumbnailPath.length === 0) {
-            root._queuedThumbnailCheck = ""
+            root._pendingCheck = ""
             root._clearResolvedThumbnail()
             return
         }
 
         const normalizedThumbnailPath = FileUtils.trimFileProtocol(root.thumbnailPath)
         if (Wallpapers.hasKnownThumbnail(normalizedThumbnailPath)) {
-            root._queuedThumbnailCheck = ""
+            root._pendingCheck = ""
             root.thumbnailAvailable = true
             root.resolvedThumbnailSource = root.thumbnailPath
             return
         }
 
         root._clearResolvedThumbnail()
-        root._queuedThumbnailCheck = normalizedThumbnailPath
-        root._startThumbnailCheck()
+        root._pendingCheck = normalizedThumbnailPath
+        Wallpapers.requestThumbnailCheck(normalizedThumbnailPath)
     }
 
     onStatusChanged: {
         if (status === Image.Ready) {
             Wallpapers.rememberThumbnail(root.thumbnailPath)
         } else if (status === Image.Error && root.resolvedThumbnailSource.length > 0) {
-            Wallpapers.forgetThumbnail(root.thumbnailPath)
-            root.reloadThumbnail()
+            if (root._repairTried) {
+                Wallpapers.forgetThumbnail(root.thumbnailPath)
+                root._clearResolvedThumbnail()
+            } else {
+                root._repairThumbnail()
+            }
         }
     }
 
     onSourcePathChanged: {
+        root._repairTried = false
         root.reloadThumbnail()
     }
 
@@ -136,33 +143,20 @@ StyledImage {
             if (Qt.resolvedUrl(root.sourcePath) !== Qt.resolvedUrl(filePath)) return
             root.reloadThumbnail()
         }
-    }
-
-    Process {
-        id: _thumbnailCheckProc
-        property string _targetPath: ""
-        onExited: (exitCode) => {
-            const currentThumbnailPath = FileUtils.trimFileProtocol(root.thumbnailPath)
-            const checkedPath = _thumbnailCheckProc._targetPath
-
-            if (checkedPath === currentThumbnailPath && exitCode === 0) {
-                Wallpapers.rememberThumbnail(currentThumbnailPath)
+        function onThumbnailsChecked(found) {
+            const checked = root._pendingCheck
+            if (checked.length === 0 || found[checked] === undefined) return
+            root._pendingCheck = ""
+            if (checked !== FileUtils.trimFileProtocol(root.thumbnailPath)) {
+                root.reloadThumbnail()
+                return
+            }
+            if (found[checked]) {
                 root.thumbnailAvailable = true
                 root.resolvedThumbnailSource = root.thumbnailPath
-            } else if (checkedPath === currentThumbnailPath) {
-                Wallpapers.forgetThumbnail(currentThumbnailPath)
-                root._clearResolvedThumbnail()
+            } else {
                 root._ensureThumbnail()
             }
-
-            if (root._queuedThumbnailCheck.length === 0
-                    && currentThumbnailPath.length > 0
-                    && checkedPath !== currentThumbnailPath
-                    && !Wallpapers.hasKnownThumbnail(currentThumbnailPath)) {
-                root._queuedThumbnailCheck = currentThumbnailPath
-            }
-
-            root._startThumbnailCheck()
         }
     }
 }

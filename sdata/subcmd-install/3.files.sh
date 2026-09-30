@@ -617,9 +617,13 @@ if [[ -d "dots/.config/vesktop/themes" ]]; then
   fi
 fi
 
-# Fontconfig
-if [[ -f "dots/.config/fontconfig/fonts.conf" ]]; then
-  install_file "dots/.config/fontconfig/fonts.conf" "${XDG_CONFIG_HOME}/fontconfig/fonts.conf"
+# Fontconfig: grayscale for the shell only; the rest of the desktop keeps the user's choice
+if [[ -f "dots/.config/fontconfig/conf.d/90-inir-shell.conf" ]]; then
+  LEGACY_FONTCONFIG="${XDG_CONFIG_HOME}/fontconfig/fonts.conf"
+  if [[ -f "$LEGACY_FONTCONFIG" ]] && [[ "$(tr -d '[:space:]' < "$LEGACY_FONTCONFIG")" == '<?xmlversion="1.0"?><!DOCTYPEfontconfigSYSTEM"urn:fontconfig:fonts.dtd"><fontconfig><matchtarget="font"><editname="rgba"mode="assign"><const>none</const></edit></match></fontconfig>' ]]; then
+    v rm -f "$LEGACY_FONTCONFIG"
+  fi
+  install_file "dots/.config/fontconfig/conf.d/90-inir-shell.conf" "${XDG_CONFIG_HOME}/fontconfig/conf.d/90-inir-shell.conf"
 fi
 
 # Config (use defaults for distribution)
@@ -682,6 +686,7 @@ v dedup_and_sort_listfile "${INSTALLED_LISTFILE}" "${INSTALLED_LISTFILE}"
 # Environment variables are configured in Niri
 #####################################################################################
 tui_info "Configuring environment variables..."
+[[ "${IS_UPDATE}" != "true" ]] && INIR_REBOOT_REASONS+=("Niri's environment and the shell profile variables only load on a new login")
 
 # Primary: environment {} block in Niri config.kdl (already installed)
 # Secondary: shell profile files for terminals outside Niri session (SSH, TTY, etc.)
@@ -1251,33 +1256,26 @@ if ! ${quiet:-false}; then
     echo ""
   fi
 
-  # REBOOT WARNING (first install only)
-  if [[ "${IS_UPDATE}" != "true" ]]; then
-    echo ""
-    echo -e "${STY_CYAN}${STY_BOLD}┌─ Session Note${STY_RST}"
-    echo -e "${STY_CYAN}│${STY_RST}"
-    echo -e "${STY_CYAN}│${STY_RST}  ${STY_YELLOW}Log out or reboot${STY_RST} if new groups, env vars, or user services"
-    echo -e "${STY_CYAN}│${STY_RST}  do not apply immediately in your current session."
-    echo ""
-  else
+  # First installs end on the reboot notice from ./setup (show_install_completion)
+  if [[ "${IS_UPDATE}" == "true" ]]; then
     echo -e "${STY_CYAN}${STY_BOLD}┌─ Session Note${STY_RST}"
     echo -e "${STY_CYAN}│${STY_RST}"
     echo -e "${STY_CYAN}│${STY_RST}  Reload Niri or restart the session if the updated launcher bindings"
     echo -e "${STY_CYAN}│${STY_RST}  are not visible immediately."
+    echo -e "${STY_CYAN}└──────────────────────────────${STY_RST}"
+    echo ""
   fi
-  echo -e "${STY_CYAN}└──────────────────────────────${STY_RST}"
-  echo ""
 
   # Key shortcuts (only show on install, not update)
   if [[ "${IS_UPDATE}" != "true" ]]; then
     echo -e "${STY_PURPLE}${STY_BOLD}┌─ Key Shortcuts${STY_RST}"
     echo -e "${STY_PURPLE}│${STY_RST}"
-    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+Space ${STY_RST}     Search / Overview"
-    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+G ${STY_RST}         Overlay (widgets, tools)"
-    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Alt+Tab ${STY_RST}         Window switcher"
+    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+Space ${STY_RST}     Search and overview"
+    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+, ${STY_RST}         Settings"
+    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+Shift+W ${STY_RST}   Switch between Material, Waffle and iRiS"
     echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+V ${STY_RST}         Clipboard history"
-    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Ctrl+Alt+T ${STY_RST}      Wallpaper picker"
-    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+/ ${STY_RST}         Show all shortcuts"
+    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Ctrl+Alt+T ${STY_RST}      Wallpapers"
+    echo -e "${STY_PURPLE}│${STY_RST}  ${STY_INVERT} Super+/ ${STY_RST}         Every other shortcut"
     echo -e "${STY_PURPLE}│${STY_RST}"
     echo -e "${STY_PURPLE}└──────────────────────────────${STY_RST}"
     echo ""
@@ -1289,9 +1287,7 @@ if ! ${quiet:-false}; then
 
   if [[ "${IS_UPDATE}" == "true" ]]; then
     echo -e "${STY_GREEN}Done. Hot reload should kick in any second now.${STY_RST}"
-  else
-    echo -e "${STY_GREEN}Install complete. iNiR is ready through the inir launcher.${STY_RST}"
+    echo ""
   fi
-  echo ""
 
 fi  # end quiet check

@@ -55,6 +55,7 @@ InputChip 1.0 InputChip.qml
 FilterChip 1.0 FilterChip.qml
 KeyboardKey 1.0 KeyboardKey.qml
 LightDarkPreferenceButton 1.0 LightDarkPreferenceButton.qml
+LiveLayer 1.0 LiveLayer.qml
 MascotAnimation 1.0 MascotAnimation.qml
 ArrangeChip 1.0 ArrangeChip.qml
 ArrangeDropSlot 1.0 ArrangeDropSlot.qml
@@ -193,3 +194,4 @@ ZzzTechFrame 1.0 ZzzTechFrame.qml
 
 OrganicAudioMotion 1.0 OrganicAudioMotion.qml
 OrganicScreenEdge 1.0 OrganicScreenEdge.qml
+singleton OrganicIdleClock 1.0 OrganicIdleClock.qml

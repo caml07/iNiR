@@ -72,11 +72,15 @@ def main():
             failures.append(f"iris.{path}: schema {value!r} but defaults/config.json {fresh!r}")
 
     rows = re.finditer(
-        r'path: "iris\.([\w.]+)"(?: \+ side \+ "([\w.]+)")?[^\n]*?fallback: ?(\[[^\]]*\]|"[^"]*"|[\w.\-]+)',
+        r'path: "iris\.([\w.]+)"(?: \+ side \+ "([\w.]+)")?([^\n]*?)fallback: ?(\[[^\]]*\]|"[^"]*"|[\w.\-]+)',
         OPTIONS.read_text(encoding="utf-8"),
     )
     for row in rows:
-        fallback = literal(row.group(3))
+        # An icon row is keyed by its piece inside one shared list, so its fallback is
+        # the empty per-piece choice, not the list the path holds.
+        if 'kind: "icon"' in row.group(3):
+            continue
+        fallback = literal(row.group(4))
         paths = [row.group(1) + side + row.group(2) for side in ("left", "right")] if row.group(2) else [row.group(1)]
         for path in paths:
             if path not in schema:

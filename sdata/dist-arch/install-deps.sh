@@ -450,10 +450,14 @@ install_font_fallback() {
 
 # Add other AUR packages based on flags
 if $INSTALL_FONTS; then
-  AUR_PACKAGES+=(
-    whitesur-icon-theme
-    darkly-bin
-  )
+  AUR_PACKAGES+=(whitesur-icon-theme)
+  # Darkly already on the system (another package, or files left by an earlier install) makes
+  # darkly-bin fail with "exists in filesystem" and stops the whole AUR batch.
+  if [[ -e /usr/lib/qt6/plugins/styles/darkly6.so ]]; then
+    log_info "Darkly is already installed, skipping darkly-bin"
+  else
+    AUR_PACKAGES+=(darkly-bin)
+  fi
 fi
 
 if $INSTALL_AUDIO; then
@@ -528,7 +532,7 @@ tui_info "Registering dependencies with pacman..."
 _meta_dir="./sdata/dist-arch/inir-deps"
 if [[ -f "$_meta_dir/PKGBUILD" ]]; then
   # Update pkgver from VERSION file
-  _inir_ver="$(cat ./VERSION 2>/dev/null || echo '2.31.0')"
+  _inir_ver="$(cat ./VERSION 2>/dev/null || echo '2.32.0')"
   sed -i "s/^pkgver=.*/pkgver=${_inir_ver}/" "$_meta_dir/PKGBUILD"
 
   (

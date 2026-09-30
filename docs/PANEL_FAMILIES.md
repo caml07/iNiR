@@ -158,6 +158,10 @@ iRiS composition is split between `modules/iris/critical/ShellIrisCriticalPanels
 
 The transition is handled by `FamilyTransitionOverlay.qml`. Config persists the choice, so the next startup uses whichever family you last selected.
 
+The shortcut only walks the families you want, in your order (`familyCycle`, all three by default). Pick them, and turn the animation off if you'd rather have a cut (`familyTransitionAnimation`), from any family: iRiS Settings > General > Shell family, Material's Modules page, or Waffle's Modules page.
+
+Every family also arrives on its own when the shell starts, reloads or takes over from another one, instead of popping in: iRiS grows inward from just past the screen edges, Material's bar and dock slide in from their edge, Waffle's taskbar rises out of its edge, and desktop widgets settle in with them. With animations off, everything is simply there.
+
 ## Panel loading
 
 All families use the same staged loading idea, but not every surface uses the same loader. Critical first-frame surfaces use `CriticalPanelLoader`; the implementation roots use `PanelLoader`, `DeferredPanelLoader`, and `OnDemandPanelLoader` according to lifecycle needs.

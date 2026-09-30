@@ -36,9 +36,9 @@ Item {
     readonly property string popupMode: Config.options?.media?.popupMode ?? "dock"
     property bool barMediaPopupVisible: false
 
-    readonly property string artUrl: activePlayer?.trackArtUrl ?? ""
-    readonly property string trackTitle: activePlayer?.trackTitle ?? ""
-    readonly property string trackArtist: activePlayer?.trackArtist ?? ""
+    readonly property string artUrl: MprisController.artUrlOf(activePlayer) ?? ""
+    readonly property string trackTitle: MprisController.titleOf(activePlayer) ?? ""
+    readonly property string trackArtist: MprisController.artistOf(activePlayer) ?? ""
     readonly property string artworkTransitionKey: `${activePlayer?.dbusName ?? ""}\u001f${activePlayer?.uniqueId ?? 0}\u001f${root.artUrl}`
     property bool   isPlaying:   activePlayer?.isPlaying   ?? false
     property bool   hasTrack:    trackTitle.length > 0
@@ -204,7 +204,7 @@ Item {
         sourceComponent: ClippedFilledCircularProgress {
             implicitSize: 20
             lineWidth: Appearance.rounding.unsharpen
-            value: root.activePlayer?.position / root.activePlayer?.length
+            value: MprisController.lengthOf(root.activePlayer) > 0 ? MprisController.positionOf(root.activePlayer) / MprisController.lengthOf(root.activePlayer) : 0
             colPrimary: Appearance.colors.colOnLayer1
             enableAnimation: false
             Item {
@@ -253,7 +253,7 @@ Item {
                 Layout.leftMargin: 3
                 implicitSize: 20
                 lineWidth: Appearance.rounding.unsharpen
-                value: root.activePlayer?.position / root.activePlayer?.length
+                value: MprisController.lengthOf(root.activePlayer) > 0 ? MprisController.positionOf(root.activePlayer) / MprisController.lengthOf(root.activePlayer) : 0
                 colPrimary: Appearance.colors.colOnLayer1
                 enableAnimation: false
                 Item {
@@ -277,7 +277,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 color: Appearance.colors.colOnLayer1
-                text: Config.options.bar.m3.media.onlyTitle ? root.cleanedTitle : `${root.cleanedTitle}${root.activePlayer?.trackArtist ? ' • ' + root.activePlayer.trackArtist : ''}`
+                text: Config.options.bar.m3.media.onlyTitle ? root.cleanedTitle : `${root.cleanedTitle}${MprisController.artistOf(root.activePlayer) ? ' • ' + MprisController.artistOf(root.activePlayer) : ''}`
             }
         }
     }

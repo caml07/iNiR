@@ -217,8 +217,8 @@ Singleton {
         if (id !== "mpv" && !id.includes("mpv") && entry !== "mpv" && !entry.includes("mpv")) return false
         const trackUrl = player.metadata?.["xesam:url"] ?? ""
         if (trackUrl.includes("youtube.com") || trackUrl.includes("youtu.be")) return true
-        if (root.currentVideoId && player.trackTitle) {
-            const playerTitle = player.trackTitle.toLowerCase()
+        if (root.currentVideoId && MprisController.titleOf(player)) {
+            const playerTitle = MprisController.titleOf(player).toLowerCase()
             const currentTitleLower = root.currentTitle.toLowerCase()
             if (playerTitle.includes(currentTitleLower) || currentTitleLower.includes(playerTitle)) return true
         }
@@ -332,7 +332,7 @@ Singleton {
         if (!player) return
 
         const url = player.metadata?.["xesam:url"] ?? ""
-        const art = player.trackArtUrl ?? ""
+        const art = MprisController.artUrlOf(player) ?? ""
         const pos = player.position ?? 0
         const len = player.length ?? 0
 
@@ -341,11 +341,11 @@ Singleton {
         // which overwrites currentTitle, causing exponential title growth.
         // Only sync title/artist if we have nothing (e.g. picking up an orphaned player).
         if (!root.currentTitle) {
-            const title = player.trackTitle ?? ""
+            const title = MprisController.titleOf(player) ?? ""
             if (title) root.currentTitle = title
         }
         if (!root.currentArtist) {
-            const artist = player.trackArtist ?? ""
+            const artist = MprisController.artistOf(player) ?? ""
             if (artist) root.currentArtist = artist
         }
         if (url) root.currentUrl = url
@@ -2243,7 +2243,7 @@ print("")
             if (!root.canGoNext)
                 return
             root.playNext()
-            if (Config.options?.osd?.mediaEnabled ?? true)
+            if (GlobalStates.userMediaFeedback)
                 GlobalStates.showMediaAction("next")
         }
         
@@ -2251,7 +2251,7 @@ print("")
             if (!root.currentVideoId)
                 return
             root.playPrevious()
-            if (Config.options?.osd?.mediaEnabled ?? true)
+            if (GlobalStates.userMediaFeedback)
                 GlobalStates.showMediaAction("previous")
         }
         

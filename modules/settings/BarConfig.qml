@@ -2391,7 +2391,7 @@ ContentPage {
 
                         StyledText {
                             Layout.fillWidth: true
-                            text: Translation.tr("‘distro’ auto-detects your distribution. Otherwise enter any icon name (looked up as <name>-symbolic).")
+                            text: Translation.tr("‘distro’ auto-detects your distribution, ‘avatar’ shows your profile picture. Otherwise enter any icon name (looked up as <name>-symbolic).")
                             color: Appearance.colors.colSubtext
                             font.pixelSize: Appearance.font.pixelSize.smaller
                             wrapMode: Text.WordWrap

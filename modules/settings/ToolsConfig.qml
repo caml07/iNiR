@@ -1477,6 +1477,90 @@ ContentPage {
                 }
             }
             }
+
+        SettingsGroup {
+            ConfigSwitch {
+                buttonIcon: "cable"
+                text: Translation.tr("Connection notices")
+                checked: Config.options?.osd?.connections?.enable ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.enable", checked)
+                StyledToolTip {
+                    text: Translation.tr("A short notice when something is plugged in, connected, unplugged or lost")
+                }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "lan"
+                text: Translation.tr("Network")
+                checked: Config.options?.osd?.connections?.network ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.network", checked)
+                StyledToolTip { text: Translation.tr("Wi-Fi or cable connected and dropped") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "cloud_off"
+                text: Translation.tr("Internet")
+                checked: Config.options?.osd?.connections?.internet ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.internet", checked)
+                StyledToolTip { text: Translation.tr("Lost and back online") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "bluetooth_connected"
+                text: Translation.tr("Bluetooth devices")
+                checked: Config.options?.osd?.connections?.bluetooth ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.bluetooth", checked)
+                StyledToolTip { text: Translation.tr("Headphones, keyboards, controllers") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "mouse"
+                text: Translation.tr("USB devices")
+                checked: Config.options?.osd?.connections?.usb ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.usb", checked)
+                StyledToolTip { text: Translation.tr("Mice, keyboards, controllers, cameras, phones, by name") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "battery_charging_full"
+                text: Translation.tr("Charger")
+                checked: Config.options?.osd?.connections?.power ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.power", checked)
+                StyledToolTip { text: Translation.tr("Plugged in and on battery") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "headphones"
+                text: Translation.tr("Sound output")
+                checked: Config.options?.osd?.connections?.audio ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.audio", checked)
+                StyledToolTip { text: Translation.tr("Headphones or speakers take over") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "desktop_windows"
+                text: Translation.tr("Displays")
+                checked: Config.options?.osd?.connections?.displays ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.displays", checked)
+                StyledToolTip { text: Translation.tr("A monitor plugged in or removed") }
+            }
+
+            ConfigSwitch {
+                visible: Config.options?.osd?.connections?.enable ?? true
+                buttonIcon: "usb"
+                text: Translation.tr("Drives and memory cards")
+                checked: Config.options?.osd?.connections?.drives ?? true
+                onCheckedChanged: Config.setNestedValue("osd.connections.drives", checked)
+                StyledToolTip { text: Translation.tr("Pendrives, external disks and SD cards, with their name and size") }
+            }
+            }
         }
     }
     }

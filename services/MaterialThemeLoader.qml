@@ -46,6 +46,14 @@ Singleton {
     // Toggle dark/light mode by running switchwall.sh with --mode and scheduling a reload.
     function setDarkMode(dark: bool): void {
         Config.setNestedValue("appearance.customTheme.darkmode", dark)
+        // A switch by hand is the last word: the wallpaper's brightness would decide again on the very next regeneration
+        // (the seed of the new mode starts one) and undo it. The Settings switch shows it off; the person turns it back on.
+        if (Config.options?.appearance?.wallpaperTheming?.autoDarkLightMode ?? false)
+            Config.setNestedValue("appearance.wallpaperTheming.autoDarkLightMode", false)
+        // A scheme iRiS was told to keep is the mode: leaving it behind would put the shell and the apps in different ones on the next regeneration.
+        const scheme = String(Config.options?.iris?.appearance?.scheme ?? "auto")
+        if ((Config.options?.panelFamily ?? "ii") === "iris" && scheme !== "auto")
+            Config.setNestedValue("iris.appearance.scheme", dark ? "dark" : scheme === "ink" ? "ink" : "light")
         darkModeProc.command = [
             "/usr/bin/bash",
             Directories.wallpaperSwitchScriptPath,

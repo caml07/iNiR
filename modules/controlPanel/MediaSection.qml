@@ -28,13 +28,13 @@ Item {
     
     readonly property MprisPlayer player: MprisController.activePlayer
     readonly property bool isYtMusicActive: MprisController.isYtMusicActive
-    readonly property bool hasPlayer: (player && player.trackTitle) || (isYtMusicActive && YtMusic.currentVideoId)
+    readonly property bool hasPlayer: (player && MprisController.titleOf(player)) || (isYtMusicActive && YtMusic.currentVideoId)
     readonly property bool inirEverywhere: Appearance.inirEverywhere
     readonly property bool auroraEverywhere: Appearance.auroraEverywhere
 
-    readonly property string effectiveArtUrl: isYtMusicActive && YtMusic.currentThumbnail ? YtMusic.currentThumbnail : (player?.trackArtUrl ?? "")
-    readonly property string effectiveTitle: isYtMusicActive && YtMusic.currentTitle ? YtMusic.currentTitle : (player?.trackTitle ?? "")
-    readonly property string effectiveArtist: isYtMusicActive && YtMusic.currentArtist ? YtMusic.currentArtist : (player?.trackArtist ?? "")
+    readonly property string effectiveArtUrl: isYtMusicActive && YtMusic.currentThumbnail ? YtMusic.currentThumbnail : (MprisController.artUrlOf(player) ?? "")
+    readonly property string effectiveTitle: isYtMusicActive && YtMusic.currentTitle ? YtMusic.currentTitle : (MprisController.titleOf(player) ?? "")
+    readonly property string effectiveArtist: isYtMusicActive && YtMusic.currentArtist ? YtMusic.currentArtist : (MprisController.artistOf(player) ?? "")
     readonly property bool effectiveIsPlaying: isYtMusicActive ? YtMusic.isPlaying : (player?.isPlaying ?? false)
 
     property string artDownloadLocation: Directories.coverArt
@@ -263,8 +263,8 @@ Item {
                 PlayerProgress {
                     Layout.fillWidth: true
                     implicitHeight: root.compactMode ? 12 : 16
-                    position: root.player?.position ?? 0
-                    length: root.player?.length ?? 0
+                    position: MprisController.positionOf(root.player)
+                    length: MprisController.lengthOf(root.player)
                     canSeek: root.player?.canSeek ?? false
                     isPlaying: root.player?.isPlaying ?? false
                     highlightColor: Appearance.angelEverywhere ? Appearance.angel.colPrimary
@@ -275,7 +275,7 @@ Item {
                         : root.inirEverywhere ? Appearance.inir.colLayer2
                         : Appearance.zzzEverywhere ? Appearance.zzz.metricTrack
                         : (root.blendedColors?.colSecondaryContainer ?? Appearance.colors.colSecondaryContainer)
-                    onSeekRequested: seconds => { if (root.player) root.player.position = seconds }
+                    onSeekRequested: seconds => MprisController.seek(root.player, seconds)
                 }
 
                 // Time + controls
@@ -284,7 +284,7 @@ Item {
                     spacing: 4
 
                     StyledText {
-                        text: StringUtils.friendlyTimeForSeconds(root.player?.position ?? 0)
+                        text: StringUtils.friendlyTimeForSeconds(MprisController.positionOf(root.player))
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         font.family: Appearance.font.family.numbers
                         color: Appearance.angelEverywhere ? Appearance.angel.colText
@@ -393,7 +393,7 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     StyledText {
-                        text: StringUtils.friendlyTimeForSeconds(root.player?.length ?? 0)
+                        text: StringUtils.friendlyTimeForSeconds(MprisController.lengthOf(root.player))
                         font.pixelSize: Appearance.font.pixelSize.smallest
                         font.family: Appearance.font.family.numbers
                         color: Appearance.angelEverywhere ? Appearance.angel.colText

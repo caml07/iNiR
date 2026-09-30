@@ -10,9 +10,9 @@ Use `l10n.py` for current runtime localization work. It audits English fallbacks
 python3 translations/tools/l10n.py audit-guides
 python3 translations/tools/l10n.py audit-source
 python3 translations/tools/l10n.py audit-all
-python3 translations/tools/l10n.py audit es_AR
-python3 translations/tools/l10n.py extract es_AR /tmp/es_AR-001.json --limit 200
-python3 translations/tools/l10n.py apply /tmp/es_AR-001.json
+python3 translations/tools/l10n.py audit es_419
+python3 translations/tools/l10n.py extract es_419 /tmp/es_419-001.json --limit 200
+python3 translations/tools/l10n.py apply /tmp/es_419-001.json
 ```
 
 See `translations/l10n/README.md` for the full workflow. The older automatic translators below are useful only for rough drafts and are not an approval step.
@@ -37,7 +37,7 @@ See `translations/l10n/README.md` for the full workflow. The older automatic tra
 ### 4. `auto-translate.js` - Bulk Auto-Translation Tool
 - Uses Google Translate to automatically fill empty or missing translations.
 - Processes keys in batches to avoid API limits.
-- **Usage**: `node auto-translate.js <lang_code>` (e.g. `node auto-translate.js es_AR`)
+- **Usage**: `node auto-translate.js <lang_code>` (e.g. `node auto-translate.js es_419`)
 
 ## Quick Start
 
@@ -57,8 +57,8 @@ cd translations/tools
 ./manage-translations.sh extract
 
 # Prepare and apply reviewed locale work with the canonical helper
-python3 l10n.py extract es_AR /tmp/es_AR-review.json --limit 200
-python3 l10n.py apply /tmp/es_AR-review.json
+python3 l10n.py extract es_419 /tmp/es_419-review.json --limit 200
+python3 l10n.py apply /tmp/es_419-review.json
 
 # Structural sync/legacy maintenance remains explicit
 ./manage-translations.sh sync

@@ -309,6 +309,11 @@ ContentPage {
     function loadValidation() { validationProcess.running = true }
     function loadCustomizations() { customizationsProcess.running = true }
 
+    Connections {
+        target: NiriAnimationPresets
+        function onApplied(id: string): void { root.loadAnimations() }
+    }
+
     function setProcessError(key, message) {
         processErrors = Object.assign({}, processErrors, { [key]: message })
     }
@@ -2958,6 +2963,16 @@ ContentPage {
                 onCheckedChanged: {
                     if (!root.animationsReady) return
                     root.setBooleanConfig("animations", "enabled", checked)
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Style")
+                tooltip: Translation.tr("How windows open, close and slide between columns.")
+                visible: root.animationsData?.enabled ?? true
+
+                NiriAnimationPresetGrid {
+                    Layout.fillWidth: true
                 }
             }
 

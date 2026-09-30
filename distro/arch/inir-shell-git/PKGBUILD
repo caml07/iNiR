@@ -131,6 +131,7 @@ package() {
   install -Dm644 "$srcroot/assets/applications/inir-settings.desktop" "$pkgdir/usr/share/applications/inir-settings.desktop"
   install -Dm644 "$srcroot/assets/icons/desktop-symbolic.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/inir.svg"
   install -Dm644 "$srcroot/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$srcroot/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
   install -Dm644 "$srcroot/README.md" "$docroot/README.md"
   install -Dm644 "$srcroot/docs/SETUP.md" "$docroot/SETUP.md"
   install -Dm644 "$srcroot/docs/IPC.md" "$docroot/IPC.md"

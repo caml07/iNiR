@@ -80,6 +80,7 @@ Singleton {
     property string conflictCachePath: `${Directories.cachePath}/conflict-killer`
     property string notificationsPath: `${Directories.stateUserPath}/notifications.json`
     property string calendarSyncCachePath: `${Directories.stateUserPath}/calendar-sync-cache.json`
+    property string weatherCachePath: `${Directories.stateUserPath}/weather-cache.json`
     property string generatedMaterialThemePath: `${Directories.stateUserPath}/generated/colors.json`
     property string generatedPalettePath: `${Directories.stateUserPath}/generated/palette.json`
     property string generatedAppPalettePath: `${Directories.stateUserPath}/generated/app-palette.json`

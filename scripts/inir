@@ -133,7 +133,8 @@ Maintenance (delegates to setup):
 Other:
   version [--json]
   theme <list-targets|inspect|doctor|apply|scaffold> [args...]
-  completions <bash|zsh|fish>
+  completions <bash|zsh|fish|install>
+  bind [--add|--remove|--list|--examples] <keys> <call…>   Niri keybinds for any inir call
   service <install|uninstall|enable|disable|start|stop|restart|status|logs>
   repair, path, test-local, settings-window, waffle-settings-window
 EOF
@@ -1776,6 +1777,32 @@ apply_qt_runtime_env() {
     [[ -z "${QSG_ATLAS_WIDTH:-}" ]] && export QSG_ATLAS_WIDTH=1024
     [[ -z "${QSG_ATLAS_HEIGHT:-}" ]] && export QSG_ATLAS_HEIGHT=1024
 
+    # Quickshell links jemalloc, whose defaults (4 arenas per core, 10 s dirty
+    # decay) keep what the QML engine and the video decoders free: ~290 MB on a
+    # 16-thread machine with a live wallpaper. Two arenas and a 1 s decay give
+    # it back with no measurable CPU cost.
+    [[ -z "${MALLOC_CONF:-}" ]] && export MALLOC_CONF="background_thread:true,narenas:2,dirty_decay_ms:1000,muzzy_decay_ms:0,tcache_max:4096"
+    # Mesa's GL worker thread buys nothing behind Qt's own render threads and
+    # costs ~50 MB across the shell's windows. The mesa_glthread variable prints
+    # a notice for every GL context (~2000 journal lines a day), so it is turned
+    # off through a driconf app profile: the system drirc.d plus one file.
+    if [[ -z "${mesa_glthread:-}" && -z "${DRIRC_CONFIGDIR:-}" ]]; then
+        local _drirc_sys _drirc_dir="${XDG_RUNTIME_DIR:-/tmp}/inir/drirc.d"
+        for _drirc_sys in /usr/share/drirc.d /usr/local/share/drirc.d /run/opengl-driver/share/drirc.d ""; do
+            [[ -n "$_drirc_sys" && -d "$_drirc_sys" ]] && break
+        done
+        if [[ -n "$_drirc_sys" ]] && rm -rf "$_drirc_dir" && mkdir -p "$_drirc_dir" \
+                && ln -s "$_drirc_sys"/*.conf "$_drirc_dir"/ 2>/dev/null \
+                && printf '%s\n' '<?xml version="1.0" standalone="yes"?>' '<driconf><device>' \
+                    '<application name="Quickshell" executable="qs"><option name="mesa_glthread_app_profile" value="0"/></application>' \
+                    '<application name="Quickshell" executable="quickshell"><option name="mesa_glthread_app_profile" value="0"/></application>' \
+                    '</device></driconf>' > "$_drirc_dir/99-inir.conf"; then
+            export DRIRC_CONFIGDIR="$_drirc_dir"
+        else
+            export mesa_glthread=false
+        fi
+    fi
+
     # Qt platform theme drives icon resolution (QIcon::fromTheme) and widget styling.
     # Override via INIR_QT_QPA_PLATFORMTHEME / INIR_QT_STYLE_OVERRIDE if needed.
     if [[ -n "${INIR_QT_QPA_PLATFORMTHEME+x}" ]]; then
@@ -2404,6 +2431,7 @@ run_setup_command() {
         exit 1
     fi
 
+    export INIR_INVOKED_FROM="$PWD"
     cd "$dir"
     exec ./setup "$@"
 }
@@ -3286,6 +3314,351 @@ show_version() {
 
     printf 'iNiR %s\n' "$(tr -d '[:space:]' < "$setup_dir/VERSION")"
     printf 'runtime: %s\n' "${runtime_path:-$setup_dir}"
+}
+
+# ── inir bind: Niri keybinds for any inir call ────────────────────────────────
+# The binds a person adds live in one marked block of their own Niri file
+# (90-user-extra.kdl, the file updates never touch). Niri lets a later `binds`
+# block replace a key bound earlier (niri-config/src/lib.rs, "binds"), so a bind
+# here overrides iNiR's default for the same keys; inside one block a key must
+# appear once, which is why the block is rewritten rather than appended to.
+_BIND_BEGIN='// >>> inir bind: added with `inir bind --add`, removed with `inir bind --remove <keys>` >>>'
+_BIND_END='// <<< inir bind <<<'
+_BIND_RUNTIME_COMMANDS="close-window terminal browser settings settings-window colorpicker restart"
+
+_bind_niri_dir() { printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/niri"; }
+
+# Where the block goes: the personal file when the main config includes it, else the main config.
+_bind_file() {
+    local dir; dir="$(_bind_niri_dir)"
+    if [[ -f "$dir/config.kdl" ]] && grep -qE '^[[:space:]]*include[[:space:]]+"config\.d/90-user-extra\.kdl"' "$dir/config.kdl"; then
+        printf '%s\n' "$dir/config.d/90-user-extra.kdl"
+    else
+        printf '%s\n' "$dir/config.kdl"
+    fi
+}
+
+# Keys compared the way Niri reads them: modifiers in any order, case-insensitive.
+_bind_norm() {
+    local IFS='+' part key mods=()
+    read -ra parts <<< "$1"
+    key="${parts[-1],,}"
+    for part in "${parts[@]:0:${#parts[@]}-1}"; do
+        part="${part,,}"
+        [[ "$part" == control ]] && part=ctrl
+        mods+=("$part")
+    done
+    printf '%s\n' "$(printf '%s\n' "${mods[@]}" | sort | tr '\n' '+')${key}"
+}
+
+# Lines that already bind these keys, as "file:line: text", comments and our own block's copy aside.
+_bind_existing() {
+    local want="$1" dir file n line first
+    dir="$(_bind_niri_dir)"
+    for file in "$dir/config.kdl" "$dir"/config.d/*.kdl; do
+        [[ -f "$file" ]] || continue
+        n=0
+        while IFS= read -r line; do
+            ((n++))
+            [[ "$line" =~ ^[[:space:]]*// ]] && continue
+            [[ "$line" =~ ^[[:space:]]*([A-Za-z0-9_+-]+)[[:space:]]*([a-z-]+=[^{]*)?\{ ]] || continue
+            first="${BASH_REMATCH[1]}"
+            [[ "$first" == *+* || "$first" =~ ^(XF86|F[0-9]|Print|Escape) ]] || continue
+            [[ "$(_bind_norm "$first")" == "$want" ]] && printf '%s:%s: %s\n' "$file" "$n" "$(sed 's/^[[:space:]]*//' <<< "$line")"
+        done < "$file"
+    done
+}
+
+_bind_kdl_string() { local s="${1//\\/\\\\}"; printf '"%s"' "${s//\"/\\\"}"; }
+
+# Checks the call against the registry. Prints warnings; fails only on what cannot work.
+_bind_check_call() {
+    local asked="${1:-}" target="${1:-}" fn="${2:-}"; shift 2 2>/dev/null || shift $#
+    local -a args=("$@")
+    if [[ " $_BIND_RUNTIME_COMMANDS " == *" $target "* ]]; then
+        return 0
+    fi
+    if ! source_ipc_registry 2>/dev/null; then
+        printf 'note: the IPC registry was not found, so the call is not checked.\n' >&2
+        return 0
+    fi
+    [[ -n "${IPC_KEBAB_ALIASES[$target]+_}" ]] && target="${IPC_KEBAB_ALIASES[$target]}"
+    if [[ -z "${IPC_TARGET_FUNCTIONS[$target]+_}" ]]; then
+        printf "'%s' is not something inir knows. 'inir help' lists them.\n" "$asked" >&2
+        return 1
+    fi
+    if [[ -z "$fn" || " ${IPC_TARGET_FUNCTIONS[$target]} " != *" $fn "* ]]; then
+        printf "%s has no '%s'. It takes: %s\n" "$target" "$fn" "${IPC_TARGET_FUNCTIONS[$target]}" >&2
+        return 1
+    fi
+    local key="$target:$fn"
+    local -a hint=( ${IPC_FUNCTION_ARGS[$key]:-} )
+    # Quickshell refuses a call with a value missing, so a bind without one would do nothing.
+    if (( ${#args[@]} != ${#hint[@]} )); then
+        if (( ${#hint[@]} == 0 )); then
+            printf "%s %s takes no values.\n" "$target" "$fn" >&2
+        else
+            printf "%s %s takes %s: %s%s. Pass \"\" for one you leave empty.\n" "$target" "$fn" \
+                "${#hint[@]} value(s)" "${IPC_FUNCTION_ARGS[$key]}" "${IPC_FUNCTION_VALUES[$key]:+ (e.g. ${IPC_FUNCTION_VALUES[$key]})}" >&2
+        fi
+        return 1
+    fi
+    local values="${IPC_FUNCTION_VALUES[$key]:-}" arg v ok
+    if [[ -n "$values" ]]; then
+        for arg in "${args[@]}"; do
+            ok=false
+            for v in $values; do
+                if [[ "$arg" == "$v" || ( "$v" == *: && "$arg" == "$v"* ) ]]; then ok=true; break; fi
+            done
+            [[ "$ok" == true ]] || printf "note: '%s' is not one of the values %s %s names (%s); it is kept as typed.\n" "$arg" "$target" "$fn" "$values" >&2
+        done
+    fi
+    return 0
+}
+
+# The KDL line for a call: toggles and opens do not repeat while held; steps (volume, next…) do.
+# No title: Niri's hotkey overlay already shows the command a bind spawns.
+_bind_line() {
+    local keys="$1"; shift
+    local fn="${2:-}" word spawn=""
+    for word in "$@"; do spawn+=" $(_bind_kdl_string "$word")"; done
+    local repeat=' repeat=false'
+    [[ "$fn" =~ ^(volumeUp|volumeDown|increment|decrement|next|previous|prev|zoomIn|zoomOut|up|down)$ ]] && repeat=''
+    printf '%s%s { spawn "inir"%s; }\n' "$keys" "$repeat" "$spawn"
+}
+
+# The block's bind lines, one per line.
+_bind_block_lines() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+    awk -v b="$_BIND_BEGIN" -v e="$_BIND_END" '
+        $0 == b { inb = 1; next } $0 == e { inb = 0; next }
+        inb && $0 !~ /^[[:space:]]*(binds[[:space:]]*\{|\})[[:space:]]*$/ && $0 ~ /[^[:space:]]/ { sub(/^[[:space:]]+/, ""); print }
+    ' "$file"
+}
+
+# Rewrites the block from the given lines (none: the block goes away), keeping the rest of the file.
+_bind_write_block() {
+    local file="$1"; shift
+    local tmp; tmp="$(mktemp "${file}.XXXXXX")" || return 1
+    if [[ -f "$file" ]]; then
+        awk -v b="$_BIND_BEGIN" -v e="$_BIND_END" '$0 == b { skip = 1; next } $0 == e { skip = 0; next } !skip' "$file" > "$tmp"
+    fi
+    # No trailing blank lines before the block.
+    sed -i -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$tmp"
+    if (( $# > 0 )); then
+        {
+            [[ -s "$tmp" ]] && printf '\n'
+            printf '%s\n' "$_BIND_BEGIN" 'binds {'
+            printf '    %s\n' "$@"
+            printf '}\n%s\n' "$_BIND_END"
+        } >> "$tmp"
+    fi
+    cat "$tmp" > "$file" && rm -f "$tmp"
+}
+
+# Validates Niri's whole config after a change and puts the file back if Niri rejects it.
+_bind_commit() {
+    local file="$1" backup="$2"
+    if command -v niri >/dev/null 2>&1; then
+        local out
+        if ! out="$(niri validate 2>&1)"; then
+            cp -f "$backup" "$file"; rm -f "$backup"
+            printf 'Niri rejected the change, so the file is as it was:\n%s\n' "$out" >&2
+            return 1
+        fi
+    fi
+    rm -f "$backup"
+}
+
+_bind_examples() {
+    local family="${1:-}"
+    if [[ -z "$family" ]]; then
+        family="$(jq -r '.panelFamily // "ii"' "$(inir_config_file 2>/dev/null)" 2>/dev/null || echo ii)"
+    fi
+    # keys | call | what it does | families
+    local rows='Mod+O|orbit toggle|Orbit: every workspace and window, and a search|iris ii
+Mod+Space|iris spotlight|Spotlight: apps, files, actions and settings|iris
+Mod+A|iris focus toggle|The Focus panel on the left|iris
+Mod+N|iris today toggle|The Today panel on the right|iris
+Mod+S|iris controlCenter toggle|The Control Center|iris
+Mod+M|iris page media|The Island on the player|iris
+Mod+D|iris dock toggle|Show or hide the Dock|iris
+Mod+Comma|iris settings general|iRiS Settings|iris
+Mod+E|iris edit toggle|Customize iRiS where it is|iris
+Mod+Tab|overview toggle|The overview|ii
+Mod+A|sidebarLeft toggle|Left sidebar: AI chat and apps|ii
+Mod+N|sidebarRight toggle|Right sidebar: toggles, notes and settings|ii
+Mod+Slash|cheatsheet toggle|Keyboard shortcuts|ii
+Mod+Space|search toggle|Start menu and search|waffle
+Mod+A|wactionCenter toggle|Action center|waffle
+Mod+N|wnotificationCenter toggle|Notification center|waffle
+Mod+W|wwidgets toggle|Widgets|waffle
+Mod+V|clipboard toggle|Clipboard history|all
+Mod+Shift+S|region screenshot|Screenshot a region|all
+Mod+Shift+T|region ocr|Copy the text in a region|all
+Mod+Shift+R|region record|Record a region|all
+Mod+Alt+L|colorMode set toggle|Light or dark|all
+Mod+F12|gamemode toggle|Game mode|all
+Mod+Shift+Escape|session toggle|Power menu|all
+Mod+Alt+Space|mpris playPause|Play or pause|all
+XF86AudioRaiseVolume|audio volumeUp|Louder|all
+XF86AudioLowerVolume|audio volumeDown|Quieter|all'
+    # The key a call is already on, if any.
+    _bind_key_of_call() {
+        local spawn="spawn \"inir\"" word dir file
+        for word in $1; do spawn+=" \"$word\""; done
+        spawn+=";"
+        dir="$(_bind_niri_dir)"
+        for file in "$dir/config.kdl" "$dir"/config.d/*.kdl; do
+            [[ -f "$file" ]] || continue
+            { grep -hF -- "$spawn" "$file" || true; } | { grep -vE '^[[:space:]]*//' || true; } | head -1 | sed -E 's/^[[:space:]]*([^[:space:]{]+).*/\1/'
+        done | head -1
+    }
+    local keys call what fams bound taken free="" have=""
+    while IFS='|' read -r keys call what fams; do
+        [[ "$fams" == all || " $fams " == *" $family "* || "$family" == all ]] || continue
+        bound="$(_bind_key_of_call "$call")"
+        if [[ -n "$bound" ]]; then
+            have+="$(printf '  %-22s %-30s %s' "$bound" "$call" "$what")"$'\n'
+            continue
+        fi
+        taken="$(_bind_existing "$(_bind_norm "$keys")" | head -1 || true)"
+        if [[ -z "$taken" ]]; then
+            free+="$(printf '  %-50s %s' "inir bind --add $keys $call" "$what")"$'\n'
+        else
+            free+="$(printf '  %-50s %s (%s is taken)' "inir bind --add <keys> $call" "$what" "$keys")"$'\n'
+        fi
+    done <<< "$rows"
+    printf 'Binds for %s.\n' "$family"
+    if [[ -n "$free" ]]; then printf '\nNot on a key yet:\n%s' "$free"; fi
+    if [[ -n "$have" ]]; then printf '\nAlready on a key:\n%s' "$have"; fi
+    printf '\nAny other call works the same way; tab completion lists them all.\n'
+}
+
+# Links the completion file for a shell where that shell loads completions by itself. A link, so an
+# update of iNiR updates the completions too. zsh has no per-user directory on its path by default:
+# the one used is reported with the line to add when it is not there.
+install_completions() {
+    local shell="${1:-$(basename "${SHELL:-bash}")}" source="" candidate dest
+    for candidate in \
+        "$script_dir/completions/inir.${shell}" \
+        "$launcher_root/share/quickshell/inir/scripts/completions/inir.${shell}" \
+        "$user_config_dir/scripts/completions/inir.${shell}"; do
+        [[ -f "$candidate" ]] && { source="$(readlink -f "$candidate")"; break; }
+    done
+    case "$shell" in
+        bash) dest="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions/inir" ;;
+        zsh) dest="${XDG_DATA_HOME:-$HOME/.local/share}/zsh/site-functions/_inir" ;;
+        fish) dest="${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/inir.fish" ;;
+        *) printf 'Completions exist for bash, zsh and fish, not %s.\n' "$shell" >&2; return 1 ;;
+    esac
+    if [[ -z "$source" ]]; then
+        printf 'The %s completion file was not found next to inir.\n' "$shell" >&2
+        return 1
+    fi
+    if [[ -e "$dest" && ! -L "$dest" ]]; then
+        printf 'Left %s as it is: it is a file of your own, not a link inir made.\n' "$dest"
+        return 0
+    fi
+    mkdir -p "$(dirname "$dest")"
+    ln -sfn "$source" "$dest"
+    printf 'Installed %s completions: %s\n' "$shell" "$dest"
+    case "$shell" in
+        bash)
+            if ! [[ -f /usr/share/bash-completion/bash_completion || -f /etc/bash_completion ]]; then
+                printf 'bash-completion is not installed; install it (package bash-completion) so bash loads them.\n'
+            fi
+            printf 'Open a new terminal to use them.\n' ;;
+        zsh)
+            if command -v zsh >/dev/null 2>&1 && ! zsh -ic 'print -l -- $fpath' 2>/dev/null | grep -qxF "$(dirname "$dest")"; then
+                printf 'Add this line to ~/.zshrc before compinit, then open a new terminal:\n  fpath=(%s $fpath)\n' "$(dirname "$dest")"
+            else
+                printf 'Open a new terminal to use them.\n'
+            fi ;;
+        fish) printf 'fish loads them in new terminals.\n' ;;
+    esac
+}
+
+run_bind_command() {
+    local mode=preview
+    case "${1:-}" in
+        --add) mode=add; shift ;;
+        --remove) mode=remove; shift ;;
+        --list) mode=list; shift ;;
+        --examples) shift; _bind_examples "${1:-}"; return ;;
+        -h|--help|"")
+            cat <<'USAGE'
+Usage: inir bind [--add] <keys> <call…>
+       inir bind --remove <keys> | --list | --examples [iris|ii|waffle|all]
+
+Makes a Niri keybind for any inir call and tells you what those keys do now.
+  inir bind Mod+O orbit toggle            the line, checked, and any bind it would replace
+  inir bind --add Mod+O orbit toggle      saves it in your own block of 90-user-extra.kdl
+  inir bind --remove Mod+O                takes it back out
+Niri reloads its config by itself; a bind you add replaces iNiR's default for the same keys.
+USAGE
+            return 0 ;;
+    esac
+    local file; file="$(_bind_file)"
+    case "$mode" in
+        list)
+            local lines; lines="$(_bind_block_lines "$file")"
+            if [[ -z "$lines" ]]; then printf 'No binds added with inir bind yet (%s).\n' "$file"; else printf '%s\n' "$lines"; fi
+            return 0 ;;
+        remove)
+            local keys="${1:-}" want kept=() line removed=false
+            [[ -n "$keys" ]] || { printf 'Usage: inir bind --remove <keys>\n' >&2; return 1; }
+            want="$(_bind_norm "$keys")"
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                if [[ "$(_bind_norm "${line%%[[:space:]{]*}")" == "$want" ]]; then removed=true; else kept+=("$line"); fi
+            done < <(_bind_block_lines "$file")
+            [[ "$removed" == true ]] || { printf 'No bind for %s in your block.\n' "$keys" >&2; return 1; }
+            local backup="$file.inir-bind.bak"; cp -f "$file" "$backup"
+            _bind_write_block "$file" "${kept[@]}" && _bind_commit "$file" "$backup" || return 1
+            printf 'Removed %s. Whatever iNiR binds there by default is back.\n' "$keys"
+            return 0 ;;
+    esac
+    local keys="${1:-}"; shift || true
+    if [[ -z "$keys" || $# -eq 0 ]]; then
+        printf 'Usage: inir bind [--add] <keys> <call…>  (e.g. inir bind Mod+O orbit toggle)\n' >&2
+        return 1
+    fi
+    if [[ ! "$keys" =~ ^[A-Za-z0-9_+-]+$ ]]; then
+        printf "'%s' does not look like Niri keys (e.g. Mod+O, Mod+Shift+S, XF86AudioMute).\n" "$keys" >&2
+        return 1
+    fi
+    _bind_check_call "$@" || return 1
+    local line want existing
+    line="$(_bind_line "$keys" "$@")"
+    want="$(_bind_norm "$keys")"
+    existing="$(_bind_existing "$want" | grep -vF "$line" || true)"
+    if [[ "$mode" == preview ]]; then
+        printf '%s\n' "$line"
+        if [[ -n "$existing" ]]; then
+            printf '\n%s already does something:\n' "$keys"
+            sed 's|^|  |' <<< "$existing"
+            printf 'Adding it replaces that (a bind in your block wins).\n'
+        fi
+        printf '\nSave it with: inir bind --add %s %s\n' "$keys" "$*"
+        return 0
+    fi
+    # add
+    local -a lines=() kept=()
+    local l
+    while IFS= read -r l; do
+        [[ -z "$l" ]] && continue
+        [[ "$(_bind_norm "${l%%[[:space:]{]*}")" == "$want" ]] || kept+=("$l")
+    done < <(_bind_block_lines "$file")
+    kept+=("$line")
+    mkdir -p "$(dirname "$file")"
+    local backup="$file.inir-bind.bak"
+    if [[ -f "$file" ]]; then cp -f "$file" "$backup"; else : > "$backup"; fi
+    _bind_write_block "$file" "${kept[@]}" && _bind_commit "$file" "$backup" || return 1
+    printf 'Added: %s\n' "$line"
+    [[ -n "$existing" ]] && printf 'It replaces: %s\n' "$(head -1 <<< "$existing" | sed -E 's/^[^:]+:[0-9]+: //')"
+    printf 'Saved in %s. Niri picks it up now.\n' "$file"
 }
 
 run_theme_command() {
@@ -4348,8 +4721,15 @@ case "$command_name" in
     theme)
         run_theme_command "$@"
         ;;
+    bind)
+        run_bind_command "$@"
+        ;;
     completions)
         _comp_shell="${1:-}"
+        if [[ "$_comp_shell" == install ]]; then
+            install_completions "${2:-}"
+            exit $?
+        fi
         case "$_comp_shell" in
             bash|zsh|fish)
                 _comp_candidates=(
@@ -4382,7 +4762,9 @@ case "$command_name" in
                 printf "Examples:\n"
                 printf "  eval \"\$(inir completions bash)\"     # Add to .bashrc\n"
                 printf "  inir completions zsh > ~/.zsh/completions/_inir\n"
-                printf "  inir completions fish | source        # Add to config.fish\n"
+                printf "  inir completions fish | source        # Add to config.fish\n\n"
+                printf "Or let inir put them where your shell looks:\n"
+                printf "  inir completions install [bash|zsh|fish]\n"
                 ;;
             *)
                 printf "Unknown shell: '%s'. Supported: bash, zsh, fish\n" "$_comp_shell" >&2

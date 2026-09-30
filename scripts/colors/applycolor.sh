@@ -11,7 +11,7 @@ main() {
   # install accumulates tens of MB under XDG_STATE_HOME. Trim here, before the
   # modules that write them are spawned.
   local log_name
-  for log_name in theming_modules terminal_colors code_editor_themes; do
+  for log_name in theming_modules terminal_colors code_editor_themes spicetify_theme; do
     rotate_log "$STATE_DIR/user/generated/$log_name.log"
   done
 

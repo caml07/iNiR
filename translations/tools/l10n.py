@@ -21,7 +21,7 @@ TRANSLATIONS = ROOT / "translations"
 L10N = TRANSLATIONS / "l10n"
 SOURCE = TRANSLATIONS / "en_US.json"
 
-LOCALE_RE = re.compile(r"^[A-Za-z]{2,3}_[A-Za-z]{2,3}$")
+LOCALE_RE = re.compile(r"^[A-Za-z]{2,3}_(?:[A-Za-z]{2,3}|\d{3})$")
 MARKDOWN_URL_RE = re.compile(r"\]\([^\n)]*https?://[^\n)]*\)")
 URL_RE = re.compile(r"https?://[^\s)]+")
 TOKEN_RE = re.compile(r"%[1-9]\d?(?!\d)|%n|\{\d+\}|<[^<>]+>")
@@ -213,7 +213,7 @@ def semantic_term_errors(locale: str, source: str, target: str) -> list[str]:
     target_lower = target.casefold()
     errors: list[str] = []
     checks_by_locale = {
-        "es_AR": (
+        "es_419": (
             (r"\bshell\b", ("concha", "carcasa", "caparazón"), "shell"),
             (r"\bdock\b", ("muelle",), "Dock"),
             (r"\bcommits?\b", ("confirmación", "confirmaciones"), "commit"),

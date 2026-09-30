@@ -56,6 +56,7 @@ if [[ ! -d "$REPO_ROOT" || ! -f "$REPO_ROOT/shell.qml" ]]; then
     exit 1
 fi
 
+INVOKED_FROM="$PWD"
 cd "$REPO_ROOT"
 
 # Handle Ctrl+C gracefully
@@ -228,6 +229,8 @@ sync_launcher_from_repo() {
     chmod +x "$launcher_source"
     [[ "$install_mode" == "repo-link" ]] || chmod +x "$launcher_target"
     ensure_launcher_path_in_shells "$XDG_BIN_HOME"
+    # Tab completion in the person's own shell: a link to the runtime's file, never over one of theirs.
+    "$launcher_target" completions install "$(basename "${SHELL:-bash}")" >/dev/null 2>&1 || true
     printf '%s\n' "$launcher_target"
 }
 
@@ -1737,8 +1740,31 @@ run_logs() {
 }
 
 ###############################################################################
-# Install completion — useful next steps without making first-run feel like a log dump
+# Install completion: short, and it ends on the one thing nobody may skip
 ###############################################################################
+show_reboot_notice() {
+    local reasons=("${INIR_REBOOT_REASONS[@]}") reason
+    local bar="══════════════════════════════════════════════════════════════"
+    echo ""
+    echo -e "  ${STY_YELLOW}${STY_BOLD}╔${bar}╗${STY_RST}"
+    printf "  ${STY_YELLOW}${STY_BOLD}║%-62s║${STY_RST}\n" ""
+    printf "  ${STY_YELLOW}${STY_BOLD}║%-62s║${STY_RST}\n" "    RESTART YOUR COMPUTER BEFORE USING iNiR"
+    printf "  ${STY_YELLOW}${STY_BOLD}║%-62s║${STY_RST}\n" "    Not a suggestion. Half of it isn't live until you do."
+    printf "  ${STY_YELLOW}${STY_BOLD}║%-62s║${STY_RST}\n" ""
+    echo -e "  ${STY_YELLOW}${STY_BOLD}╚${bar}╝${STY_RST}"
+    if [[ ${#reasons[@]} -gt 0 ]]; then
+        echo ""
+        echo -e "    ${STY_BOLD}Why:${STY_RST}"
+        for reason in "${reasons[@]}"; do
+            echo "$reason" | fold -s -w 64 | sed '1s/^/    • /; 2,$s/^/      /'
+        done
+    fi
+    echo ""
+    echo -e "    Then pick ${STY_BOLD}Niri${STY_RST} at the login screen and you're in."
+    echo -e "    ${STY_FAINT}Reboot now:${STY_RST} ${STY_BOLD}systemctl reboot${STY_RST}"
+    echo ""
+}
+
 show_install_completion() {
     local version distro package_manager host gpu ram compositor
     version="$(get_repo_version)"
@@ -1750,10 +1776,7 @@ show_install_completion() {
     ram="${DETECTED_RAM_GIB:-?} GiB"
     compositor="${DETECTED_DE:-${XDG_CURRENT_DESKTOP:-not detected}}"
 
-    tui_alert "success" "iNiR is ready" \
-        "Version ${version} is installed. You can start the shell now or begin with a clean Niri login."
-
-    tui_summary_card "This install" \
+    tui_summary_card "iNiR ${version}" \
         "Distro:${distro}" \
         "Packages:${package_manager}" \
         "Host:${host}" \
@@ -1761,18 +1784,15 @@ show_install_completion() {
         "RAM:${ram}" \
         "Session:${compositor}"
 
-    tui_section_start "Good next moves"
-    if [[ -n "${NIRI_SOCKET:-}" ]]; then
-        tui_list_item "Start/reload now: inir restart"
-    else
-        tui_list_item "Log out, choose Niri in your login screen, then sign back in"
-    fi
-    tui_list_item "Open Settings: inir settings"
-    tui_list_item "Check health: inir doctor"
-    tui_list_item "See exactly what is installed: inir status"
+    tui_section_start "After that"
+    tui_list_item "Super+/ lists every shortcut, Super+, opens Settings"
+    tui_list_item "Something off? inir doctor, then inir logs"
+    tui_list_item "Regret it? ./setup rollback"
     tui_section_end
 
-    tui_dim "If an experiment goes sideways later: ./setup rollback"
+    if [[ "${IS_UPDATE}" != "true" || ${#INIR_REBOOT_REASONS[@]} -gt 0 ]]; then
+        show_reboot_notice
+    fi
 }
 
 show_update_completion() {
@@ -1792,6 +1812,8 @@ show_update_completion() {
 ###############################################################################
 run_install() {
     detect_distro
+    # Filled by the install steps with what only a fresh login or a reboot applies.
+    INIR_REBOOT_REASONS=()
 
     # Greeting & system info
     source ./sdata/subcmd-install/0.greeting.sh
@@ -2378,6 +2400,14 @@ run_update() {
         tui_info "Branch: $tracked_branch"
     fi
 
+    tui_info "Repo: $REPO_ROOT"
+    local invoked_from="${INIR_INVOKED_FROM:-${INVOKED_FROM:-$PWD}}"
+    if [[ "$invoked_from" != "$REPO_ROOT" && -e "${invoked_from}/.git" && -f "${invoked_from}/shell.qml" ]]; then
+        tui_warn "Updating that repo, not the one you are standing in:"
+        tui_dim "    you are in: $invoked_from"
+        tui_dim "    repo path comes from ~/.config/inir/version.json"
+    fi
+
     local installed_mode=$(get_installed_install_mode)
     local installed_strategy=$(get_installed_update_strategy)
     local package_name=$(get_installed_package_name)
@@ -2478,12 +2508,29 @@ run_update() {
 
             # Pull changes
             _step_phase_start 1 "Pulling changes"
-            if ! git -C "$REPO_ROOT" pull --ff-only origin "$tracked_branch" 2>/dev/null; then
+            local pull_log
+            pull_log="$(mktemp)"
+            if ! LC_ALL=C git -C "$REPO_ROOT" pull --ff-only origin "$tracked_branch" 2>"$pull_log"; then
                 _step_phase_fail "Git pull failed"
-                tui_error "Git pull from origin/${tracked_branch} failed. You may have local changes."
-                tui_info "Try: git stash && ./setup update"
+                tui_error "Git pull from origin/${tracked_branch} failed in ${REPO_ROOT}"
+                if [[ -s "$pull_log" ]]; then
+                    echo ""
+                    while IFS= read -r line; do
+                        tui_dim "    $line"
+                    done < "$pull_log"
+                    echo ""
+                fi
+                if grep -qi "untracked working tree files" "$pull_log"; then
+                    tui_info "Untracked files are in the way. Move or remove the files listed above,"
+                    tui_info "or stash them too: git -C \"$REPO_ROOT\" stash -u"
+                    tui_dim "    (plain 'git stash' never touches untracked files)"
+                else
+                    tui_info "Try: git -C \"$REPO_ROOT\" stash && ./setup update"
+                fi
+                rm -f "$pull_log"
                 return 1
             fi
+            rm -f "$pull_log"
             _step_phase_done "Pulled changes from origin/${tracked_branch}"
 
             # Re-exec to pick up updated library code from the pull.

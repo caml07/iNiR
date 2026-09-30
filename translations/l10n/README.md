@@ -10,7 +10,7 @@ The localization helper does not call a translation service. It prepares context
 python3 translations/tools/l10n.py audit-guides
 python3 translations/tools/l10n.py audit-source
 python3 translations/tools/l10n.py audit-all
-python3 translations/tools/l10n.py audit es_AR
+python3 translations/tools/l10n.py audit es_419
 ```
 
 The repository gate requires one writing guide for every supported locale, source coverage in canonical `en_US.json`, locale key parity, placeholders/markup, protected product names and locale-specific semantic terminology guards. Suspected untranslated values are reported for review but are not automatically errors because product names and established technical terms can legitimately remain unchanged. Commands, paths, codecs and common acronyms are excluded through `glossary.json`.
@@ -18,7 +18,7 @@ The repository gate requires one writing guide for every supported locale, sourc
 ## Prepare a review batch
 
 ```bash
-python3 translations/tools/l10n.py extract es_AR /tmp/es_AR-001.json --limit 200
+python3 translations/tools/l10n.py extract es_419 /tmp/es_419-001.json --limit 200
 ```
 
 Each entry contains:
@@ -35,7 +35,7 @@ Translate only `translated`. Keep the other fields unchanged.
 ## Apply a reviewed batch
 
 ```bash
-python3 translations/tools/l10n.py apply /tmp/es_AR-001.json
+python3 translations/tools/l10n.py apply /tmp/es_419-001.json
 bash scripts/verify-docs.sh
 ```
 

@@ -68,6 +68,8 @@ Singleton {
     property bool osdMediaOpen: false
     property string osdMediaAction: "play" // "play", "pause", "next", "previous"
     signal osdMediaActionTriggered(string action)
+    readonly property bool userMediaFeedback: Config.options?.panelFamily === "iris"
+        || (Config.options?.osd?.mediaEnabled ?? true)
 
     function showMediaAction(action: string): void {
         const normalized = String(action ?? "")
@@ -79,6 +81,7 @@ Singleton {
     }
 
     property bool osdKeyboardLayoutOpen: false
+    property bool osdConnectionOpen: false
     property bool oskOpen: false
     property bool overlayOpen: false
     property bool overviewOpen: false
@@ -217,21 +220,35 @@ Singleton {
     property bool wallpaperSelectorOpen: false
     property string wallpaperSelectorSource: ""
     property string wallpaperSelectorQuery: ""
+    property string wallpaperSelectorKind: ""
+    property var wallpaperSelectorSeries: null
+    property string wallpaperSelectorKindActive: "all"
     property bool wallpaperLauncherOpen: false
     property string wallpaperLauncherMode: "static"
     property bool widgetEditMode: false
+    // Finding a widget while arranging (the iRiS widget bar); `inir background widgetSearch` drives the same state.
+    property bool widgetSearchOpen: false
+    property string widgetSearchText: ""
+    signal widgetSearchCommand(string verb)
+    // Arrow keys while arranging under iRiS: the chassis owns the keyboard and hands the step to the selected widget.
+    signal desktopWidgetNudge(int dx, int dy)
     property string selectedDesktopWidget: ""
     property string selectedDesktopItem: ""
     property string desktopWidgetQuickControls: ""
+    property string desktopWidgetManagerOutput: ""
     property bool shellLayoutEditMode: false
 
     function setWidgetEditMode(enabled: bool): void {
-        if (enabled)
+        if (enabled) {
             shellLayoutEditMode = false
+            irisEdit = false
+        }
         else {
             selectedDesktopWidget = ""
             selectedDesktopItem = ""
             desktopWidgetQuickControls = ""
+            widgetSearchOpen = false
+            widgetSearchText = ""
         }
         widgetEditMode = enabled
     }
@@ -285,6 +302,7 @@ Singleton {
     // Target monitor for wallpaper selector (set before opening, avoids config timing issues)
     property string wallpaperSelectorTargetMonitor: ""
     onWallpaperSelectorOpenChanged: {
+        if (wallpaperSelectorOpen) irisOrbitOpen = false
         // Reset selection target when selector closes without selection
         if (!wallpaperSelectorOpen) {
             wallpaperSelectionTarget = "main";
@@ -300,6 +318,7 @@ Singleton {
         }
     }
     onWallpaperLauncherOpenChanged: {
+        if (wallpaperLauncherOpen) irisOrbitOpen = false
         if (!wallpaperLauncherOpen) {
             // Restore the configured wallpaper if the user browsed away without applying.
             Wallpapers.cancelWallpaperPreview()
@@ -356,20 +375,52 @@ Singleton {
     property var irisDockBody: ({})
     // iRiS is being edited in place: every piece is grabbable, the edit bar
     // holds the pieces, the look and the sizes, and Done ends it.
+    // Arranging the Control Center in place; closing the panel ends it.
+    property bool irisControlEdit: false
+    property string irisControlTab: "controls"
+    // The lock screen rehearsal: the same surface, editable, with no PAM behind it.
+    property bool irisLockEdit: false
+    property string irisLockSelection: ""
+    // The quick-controls tab `inir iris lock select:<key>/<tab>` asks the selected lock widget to show.
+    property string irisLockWidgetTab: ""
+    property string irisLockPage: "scene"
     property bool irisEdit: false
     // What the edit bar is inspecting: a piece slot ("extra:vitals", "left",
     // "app:kitty"), a surface ("island", "dock", "cards"…) or "" for the family.
     property string irisEditSelection: ""
     // A Studio target the edit bar should inspect ("" = keep what it shows).
     property string irisEditTarget: ""
-    property string irisEditTab: "pieces"
     property int irisChassisEpoch: 0
-    onIrisEditChanged: if (!irisEdit) { irisEditSelection = ""; irisEditTarget = "" }
-    // iRiS Studio, the live appearance editor, is open.
+    onIrisEditChanged: {
+        if (!irisEdit) { irisEditSelection = ""; irisEditTarget = "" }
+        else if (widgetEditMode) setWidgetEditMode(false)
+        if (irisEdit && irisStudioOpen) irisStudioOpen = false
+    }
+    onIrisEditSelectionChanged: if (irisEditSelection.length > 0) irisEditTarget = ""
+    onIrisEditTargetChanged: if (irisEditTarget.length > 0) irisEditSelection = ""
+    // The in-place editors belong to iRiS: leaving the family ends them, or they are destroyed open and
+    // come back open when the family does.
+    function endIrisEditing(): void {
+        irisLockEdit = false
+        irisEdit = false
+        irisControlEdit = false
+    }
+    onControlPanelOpenChanged: if (!controlPanelOpen) irisControlEdit = false
+    onIrisControlEditChanged: if (!irisControlEdit) irisControlTab = "controls"
+    // iRiS Studio, the panel form of Customize, is open. It and Customize on the shell never show together.
     property bool irisStudioOpen: false
-    // Where Studio is on screen while it is presented ({ screen, x, y, width,
-    // height }), so surfaces it edits can leave its area out of their input.
-    property var irisStudioRect: null
+    onIrisStudioOpenChanged: if (irisStudioOpen && irisEdit) irisEdit = false
+    // Customize, in the form the person chose (iris.appearance.customize), on a target ("" = where it was).
+    function openIrisCustomize(target): void {
+        const wanted = String(target ?? "")
+        if (String(Config.options?.iris?.appearance?.customize ?? "shell") === "studio") {
+            irisStudioTarget = wanted
+            irisStudioOpen = true
+        } else {
+            irisEditTarget = wanted
+            irisEdit = true
+        }
+    }
     // A target Studio should show when it opens or is already open ("" = keep).
     property string irisStudioTarget: ""
     // The `source` of the card on screen (kept while it collapses), "" when none.
@@ -398,10 +449,36 @@ Singleton {
     property var irisDockMenuRequest: null
     // A query for Spotlight to type as it opens (IPC); taken and cleared by the palette.
     property string irisSpotlightQuery: ""
+    // Orbit (iRiS): Niri's workspaces and windows as a place to find and go. `irisOrbitQuery` is what it types as it opens.
+    property bool irisOrbitOpen: false
+    property string irisOrbitQuery: ""
+    // The output Orbit opened on when a hot corner asked for one; empty means the focused output. It stays put until the
+    // next open, so a leaving Orbit is not pulled to another output.
+    property string irisOrbitOutput: ""
+    property bool _irisOrbitOutputAsked: false
+    // The corner each output's Orbit hot corner is on right now ("" = none), published by the corner itself.
+    property var irisOrbitCorners: ({})
+    function openIrisOrbit(outputName: string): void {
+        irisOrbitOutput = outputName
+        _irisOrbitOutputAsked = true
+        irisOrbitOpen = true
+    }
+    onIrisOrbitOpenChanged: {
+        if (!irisOrbitOpen) return
+        if (!_irisOrbitOutputAsked) irisOrbitOutput = ""
+        _irisOrbitOutputAsked = false
+        searchOpen = false
+        wallpaperSelectorOpen = false
+        wallpaperLauncherOpen = false
+    }
     // Desktop widget manager toggle routed to the output that should show it.
     signal desktopWidgetManagerToggleRequested(string outputName)
+    // The iRiS desktop menu opened at a point of an output (`inir iris desktopMenu`).
+    signal irisDesktopMenuRequested(string outputName, real x, real y)
     // Whether any output's Island is expanded, published for `inir iris status`.
     property bool irisIslandExpanded: false
+    property string irisIslandShape: ""
+    property string irisControlPickerRequest: ""
     property string irisIslandPage: ""
     property bool dashboardOpen: false
     property bool workspaceShowNumbers: false
@@ -620,6 +697,7 @@ Singleton {
     // Close other waffle popups when one opens (unless allowMultiplePanels is enabled)
     property bool _allowMultiple: Config.options?.waffles?.behavior?.allowMultiplePanels ?? false
     onSearchOpenChanged: {
+        if (searchOpen) irisOrbitOpen = false
         if (searchOpen && !_allowMultiple) {
             waffleActionCenterOpen = false
             waffleNotificationCenterOpen = false

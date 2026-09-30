@@ -78,9 +78,16 @@ check_conflicts() {
     # Check for installed conflicts
     for pkg in "${!conflict_map[@]}"; do
         local installed=false
+        # pacman -Qi also answers for a package that only provides the name (awww provides swww):
+        # show and remove the package that is really installed.
+        local real="$pkg"
         case $package_manager in
             pacman)
-                if pacman -Qi "$pkg" &>/dev/null; then installed=true; fi
+                if pacman -Qi "$pkg" &>/dev/null; then
+                    installed=true
+                    real=$(LC_ALL=C pacman -Qi "$pkg" 2>/dev/null | awk -F': *' '/^Name/ { print $2; exit }')
+                    [[ -n "$real" ]] || real="$pkg"
+                fi
                 ;;
             xbps)
                 if xbps-query -p pkgver "$pkg" &>/dev/null; then installed=true; fi
@@ -98,7 +105,11 @@ check_conflicts() {
         esac
         
         if $installed; then
-            conflicts+=("$pkg (${conflict_map[$pkg]})")
+            if [[ "$real" != "$pkg" ]]; then
+                conflicts+=("$real (provides $pkg, ${conflict_map[$pkg]})")
+            else
+                conflicts+=("$pkg (${conflict_map[$pkg]})")
+            fi
             if [[ -n "${critical_map[$pkg]:-}" ]]; then
                 critical_conflicts+=("$pkg")
             fi

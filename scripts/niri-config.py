@@ -15,6 +15,8 @@ Commands:
   get-hot-corners      Read effective Niri overview hot corners
   get-layout           Read current layout config from KDL
   get-animations       Read current animation config from KDL (with per-type springs)
+  get-animation-presets  List animation presets and which one the KDL matches
+  apply-animation-preset ID  Write a preset's animations, keeping `off` and `slowdown`
   get-window-rules     Read window-rule globals from KDL
   list-cursor-themes   List available cursor themes from icon dirs
   validate             Validate current Niri config via niri validate
@@ -161,7 +163,7 @@ def cmd_outputs():
 
     for name, out in data.items():
         modes = out.get("modes", [])
-        current_idx = out.get("current_mode", 0)
+        current_idx = out.get("current_mode")
         logical = out.get("logical") or {}
 
         res_map = {}
@@ -188,7 +190,7 @@ def cmd_outputs():
             elif m.get("is_preferred", False):
                 res_map[key]["preferred"] = True
 
-        current_mode = modes[current_idx] if current_idx < len(modes) else None
+        current_mode = modes[current_idx] if current_idx is not None and current_idx < len(modes) else None
         current_res = ""
         current_rate = 0.0
         current_rate_string = ""
@@ -1058,9 +1060,7 @@ def cmd_get_layout():
             block = _extract_block(layout_block, section)
             if block is not None:
                 py_key = section.replace("-", "_")
-                # "off" on its own line means disabled
-                has_off = bool(re.search(r"^\s*off\s*$", block, re.MULTILINE))
-                result[py_key]["enabled"] = not has_off
+                result[py_key]["enabled"] = _flag_state(block, NIRI_FLAG_DEFAULTS[section])
                 m = re.search(r"width\s+(\d+)", block)
                 if m and "width" in result[py_key]:
                     result[py_key]["width"] = int(m.group(1))
@@ -1257,7 +1257,233 @@ def cmd_get_animations():
     return 0
 
 
+ANIMATION_PRESETS_FILE = Path(__file__).resolve().parent.parent / "defaults" / "niri-animation-presets.json"
+
+
+def _user_animation_presets_file():
+    xdg = Path(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")))
+    legacy = xdg / "illogical-impulse"
+    return (legacy if legacy.exists() else xdg / "inir") / "niri-animation-presets.json"
+
+
+def _load_animation_presets():
+    """Shipped presets come from the running iNiR; the user's own file adds or overrides by id."""
+    try:
+        registry = json.loads(ANIMATION_PRESETS_FILE.read_text())
+    except (OSError, ValueError):
+        registry = {"default": "", "presets": []}
+    try:
+        user = json.loads(_user_animation_presets_file().read_text())
+    except (OSError, ValueError):
+        user = {}
+    presets = list(registry.get("presets", []))
+    for preset in user.get("presets", []) if isinstance(user, dict) else []:
+        if not isinstance(preset, dict) or not preset.get("id") or not isinstance(preset.get("types"), dict):
+            continue
+        preset = dict(preset, user=True)
+        index = next((i for i, p in enumerate(presets) if p.get("id") == preset["id"]), None)
+        if index is None:
+            presets.append(preset)
+        else:
+            presets[index] = preset
+    registry["presets"] = presets
+    return registry
+
+
+def _kdl_number(value):
+    return f"{float(value):.4f}".rstrip("0").rstrip(".") if float(value) != int(float(value)) else f"{float(value):.1f}"
+
+
+def _animation_type_lines(spec):
+    if "spring" in spec:
+        damping, stiffness, epsilon = spec["spring"]
+        return [f"spring damping-ratio={_kdl_number(damping)} stiffness={int(stiffness)} epsilon={_kdl_number(epsilon)}"]
+    lines = [f"duration-ms {int(spec['duration-ms'])}"]
+    curve = f'curve "{spec["curve"]}"'
+    if spec.get("curve-args"):
+        curve += " " + " ".join(_kdl_number(a) for a in spec["curve-args"])
+    lines.append(curve)
+    if spec.get("custom-shader"):
+        shader = "\n".join(("            " + l) if l else "" for l in spec["custom-shader"].splitlines())
+        lines.append('custom-shader r"\n' + shader + '\n        "')
+    return lines
+
+
+def _normalize_animation_block(text):
+    text = re.sub(r"-?\d+(?:\.\d+)?", lambda m: repr(float(m.group(0))), text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _active_animation_preset(anim_block, presets):
+    for preset in presets:
+        matches = True
+        for anim_type, spec in preset.get("types", {}).items():
+            current = _extract_block(anim_block, anim_type)
+            expected = "\n".join(_animation_type_lines(spec))
+            if current is None or _normalize_animation_block(current) != _normalize_animation_block(expected):
+                matches = False
+                break
+        if matches:
+            return preset["id"]
+    return ""
+
+
+def cmd_get_animation_presets():
+    registry = _load_animation_presets()
+    presets = registry.get("presets", [])
+    anim_file = resolve_niri_section_file("config.d/60-animations.kdl")
+    active = ""
+    if anim_file.exists():
+        anim_block = _extract_block(anim_file.read_text(), "animations", top_level=True)
+        if anim_block is not None:
+            active = _active_animation_preset(anim_block, presets)
+    print(json.dumps({"default": registry.get("default", ""), "active": active, "presets": presets}))
+    return 0
+
+
+def cmd_apply_animation_preset(args):
+    if not args:
+        print(json.dumps({"success": False, "error": "Usage: apply-animation-preset ID"}))
+        return 1
+    preset = next((p for p in _load_animation_presets().get("presets", []) if p.get("id") == args[0]), None)
+    if preset is None:
+        print(json.dumps({"success": False, "error": f"Unknown animation preset: {args[0]}"}))
+        return 1
+
+    anim_file = resolve_niri_section_file("config.d/60-animations.kdl")
+    content = anim_file.read_text() if anim_file.exists() else ""
+    bounds = _find_block_bounds(content, "animations", top_level=True)
+
+    kept = []
+    if bounds:
+        depth = 0
+        for raw_line in content[bounds[1]:bounds[2]].splitlines():
+            stripped = raw_line.strip()
+            if depth == 0 and (stripped == "off" or stripped.startswith("slowdown")):
+                kept.append("    " + stripped)
+            depth += raw_line.count("{") - raw_line.count("}")
+    # GameMode toggles animations by commenting and uncommenting this line.
+    if not any(line.strip() == "off" for line in kept):
+        kept.insert(0, "    // off")
+
+    body = ["animations {", *kept]
+    for anim_type, spec in preset["types"].items():
+        if len(body) > 1:
+            body.append("")
+        body.append(f"    {anim_type} {{")
+        body.extend("        " + line for line in _animation_type_lines(spec))
+        body.append("    }")
+    body.append("}")
+    block = "\n".join(body)
+
+    if bounds:
+        start = bounds[0] + (1 if content[bounds[0]] == "\n" else 0)
+        content = content[:start] + block + content[bounds[3]:]
+    else:
+        content = content.rstrip() + ("\n\n" if content.strip() else "") + block + "\n"
+    return _write_validated(anim_file, content)
+
+
 # ─── Window Rules ─────────────────────────────────────────────────────
+
+
+def _mask_kdl_comments(text):
+    """Same text with every // comment blanked, so offsets still line up with the original."""
+    return re.sub(r"//[^\n]*", lambda m: " " * len(m.group(0)), text)
+
+
+def _window_rule_blocks(text):
+    """(body_start, body_end, masked_body) for every real window-rule block, in file order."""
+    masked = _mask_kdl_comments(text)
+    for head in re.finditer(r"window-rule\s*\{", masked):
+        start = head.end()
+        depth, i = 1, start
+        while i < len(masked) and depth > 0:
+            if masked[i] == "{":
+                depth += 1
+            elif masked[i] == "}":
+                depth -= 1
+            i += 1
+        if depth == 0:
+            yield start, i - 1, masked[start : i - 1]
+
+
+def _is_global_rule(body):
+    return not re.search(r"^\s*(match|exclude)\b", body, re.M)
+
+
+def _set_global_rule_property(content, prop, value):
+    """Set `prop` in the first window-rule that matches every window, creating that rule if needed.
+    Rules scoped by `match` (games, one app) are never the global value, whatever their order."""
+    for start, end, body in _window_rule_blocks(content):
+        if not _is_global_rule(body):
+            continue
+        found = re.search(rf"^([ \t]*){re.escape(prop)}[ \t]+[^\s]+", body, re.M)
+        if found:
+            a, b = start + found.start(), start + found.end()
+            return content[:a] + f"{found.group(1)}{prop} {value}" + content[b:]
+        return content[:start] + f"\n    {prop} {value}" + content[start:]
+    return content.rstrip() + f"\n\nwindow-rule {{\n    {prop} {value}\n}}\n"
+
+
+def _global_rules(content):
+    return [(start, end, body) for start, end, body in _window_rule_blocks(content) if _is_global_rule(body)]
+
+
+def _set_global_opacity(content, value):
+    """One opacity for every window: set in the first global rule, dropped from any later global rule
+    (later rules win, so a second `opacity` in another global rule silently overrode the setting)."""
+    content = _set_global_rule_property(content, "opacity", value)
+    rules = _global_rules(content)
+    for start, end, body in reversed(rules[1:]):
+        cleaned = re.sub(r"(?m)^[ \t]*opacity[ \t]+[^\s]+[ \t]*\n?", "", content[start:end])
+        content = content[:start] + cleaned + content[end:]
+    return content
+
+
+def _set_global_effect(content, prop, value):
+    """Set (or with value None, remove) `prop` inside the first global rule's background-effect block."""
+    rules = _global_rules(content)
+    if not rules:
+        content = content.rstrip() + "\n\nwindow-rule {\n}\n"
+        rules = _global_rules(content)
+    start, end, body = rules[0]
+    block = re.search(r"background-effect\s*\{([^}]*)\}", body)
+    if block is None:
+        if value is None:
+            return content
+        insert = f"\n    background-effect {{\n        {prop} {value}\n    }}"
+        return content[:end].rstrip() + insert + "\n" + content[end:]
+    inner = block.group(1)
+    line = re.search(rf"(?m)^([ \t]*){re.escape(prop)}[ \t]+[^\s]+[ \t]*$", inner)
+    if value is None:
+        inner = re.sub(rf"(?m)^[ \t]*{re.escape(prop)}[ \t]+[^\s]+[ \t]*\n?", "", inner)
+    elif line:
+        inner = inner[:line.start()] + f"{line.group(1)}{prop} {value}" + inner[line.end():]
+    else:
+        inner = inner.rstrip() + f"\n        {prop} {value}\n    "
+    if not re.search(r"\S", inner):
+        a, b = start + block.start(), start + block.end()
+        return content[:a].rstrip() + content[b:]
+    a, b = start + block.start(1), start + block.end(1)
+    return content[:a] + inner + content[b:]
+
+
+def _protect_games_rule(content):
+    """Fullscreen games keep direct scanout: iNiR's games rule stays opaque and unblurred."""
+    for _ in range(3):
+        rule = next(((start, end, body) for start, end, body in _window_rule_blocks(content)
+                     if "steam_app_" in body and re.search(r"^\s*match\b", body, re.M)), None)
+        if rule is None:
+            return content
+        start, end, body = rule
+        if not re.search(r"(?m)^\s*opacity\b", body):
+            content = content[:end].rstrip() + "\n    opacity 1.0\n" + content[end:]
+        elif "background-effect" not in body:
+            content = content[:end].rstrip() + "\n    background-effect {\n        blur false\n    }\n" + content[end:]
+        else:
+            return content
+    return content
 
 
 def cmd_get_window_rules():
@@ -1267,45 +1493,50 @@ def cmd_get_window_rules():
         "corner_radius": 16,
         "clip_to_geometry": True,
         "inactive_opacity": 0.9,
+        "active_opacity": 1.0,
+        "blur": False,
+        "xray": True,
+        "border_behind": False,
     }
 
     if not rules_file.exists():
         print(json.dumps(result))
         return 0
 
-    content = _strip_kdl_line_comments(rules_file.read_text())
-
-    # Find all window-rule blocks
-    pos = 0
-    while True:
-        match = re.search(r"window-rule\s*\{", content[pos:])
-        if not match:
-            break
-        block_start = pos + match.end()
-        depth = 1
-        i = block_start
-        while i < len(content) and depth > 0:
-            if content[i] == "{":
-                depth += 1
-            elif content[i] == "}":
-                depth -= 1
-            i += 1
-        block = content[block_start : i - 1] if depth == 0 else ""
-        pos = i
-
-        # Check if this is the inactive-opacity rule (has match is-active=false)
+    content = rules_file.read_text()
+    global_seen = False
+    for _start, _end, block in _window_rule_blocks(content):
         if re.search(r"match\s+is-active\s*=\s*false", block):
             m = re.search(r"opacity\s+([\d.]+)", block)
             if m:
                 result["inactive_opacity"] = float(m.group(1))
-        else:
-            # General rule — corner radius / clip
+        elif _is_global_rule(block) and not global_seen:
+            # Only the rule every window matches is the global value; app- and game-scoped rules
+            # (radius 0 for scanout) must not read back as the setting.
             m = re.search(r"geometry-corner-radius\s+(\d+)", block)
             if m:
                 result["corner_radius"] = int(m.group(1))
+                global_seen = True
             m = re.search(r"clip-to-geometry\s+(true|false)", block)
             if m:
                 result["clip_to_geometry"] = m.group(1) == "true"
+                global_seen = True
+        if _is_global_rule(block):
+            # Later global rules win in niri, so the last value read is the effective one.
+            m = re.search(r"(?m)^\s*opacity\s+([\d.]+)", block)
+            if m:
+                result["active_opacity"] = float(m.group(1))
+            effect = re.search(r"background-effect\s*\{([^}]*)\}", block)
+            if effect:
+                m = re.search(r"blur\s+(true|false)", effect.group(1))
+                if m:
+                    result["blur"] = m.group(1) == "true"
+                m = re.search(r"xray\s+(true|false)", effect.group(1))
+                if m:
+                    result["xray"] = m.group(1) == "true"
+            m = re.search(r"draw-border-with-background\s+(true|false)", block)
+            if m:
+                result["border_behind"] = m.group(1) == "false"
 
     print(json.dumps(result))
     return 0
@@ -1539,6 +1770,89 @@ def _validate_config():
 # ─── Surgical Set ─────────────────────────────────────────────────────
 
 
+
+BLUR_FILE = "config.d/80-layer-rules.kdl"
+BLUR_STRENGTH = {"light": ("2", "2.0"), "balanced": ("3", "3.0"), "strong": ("4", "4.5")}
+
+
+def _niri_version():
+    try:
+        out = subprocess.run(["niri", "--version"], capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return None
+    m = re.search(r"(\d+)\.(\d+)", out or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _blur_value(block, key, fallback):
+    m = re.search(rf"(?m)^\s*{re.escape(key)}\s+([-0-9.]+)", block or "")
+    return float(m.group(1)) if m else fallback
+
+
+def cmd_get_blur():
+    """Niri's global blur: whether this niri has it, and the values iNiR manages."""
+    version = _niri_version()
+    blur_file = resolve_niri_section_file(BLUR_FILE)
+    content = _strip_kdl_line_comments(blur_file.read_text()) if blur_file.exists() else ""
+    block = _extract_block(content, "blur", top_level=True)
+    elsewhere = []
+    config_dir = get_niri_config_dir()
+    for candidate in [get_niri_config_path(), *sorted((config_dir / "config.d").glob("*.kdl"))]:
+        if not candidate.exists() or candidate.resolve() == blur_file.resolve():
+            continue
+        if _extract_block(_strip_kdl_line_comments(candidate.read_text()), "blur", top_level=True) is not None:
+            elsewhere.append(candidate.name)
+    passes = _blur_value(block, "passes", 3)
+    offset = _blur_value(block, "offset", 3.0)
+    strength = next((name for name, pair in BLUR_STRENGTH.items() if float(pair[0]) == passes and float(pair[1]) == offset), "custom")
+    print(json.dumps({
+        "available": bool(version and version >= (26, 4)),
+        "version": ".".join(str(part) for part in version) if version else "",
+        "enabled": not (block is not None and _has_top_level_flag(block, "off")),
+        "strength": strength,
+        "noise": _blur_value(block, "noise", 0.02),
+        "saturation": _blur_value(block, "saturation", 1.5),
+        "elsewhere": elsewhere,
+    }))
+    return 0
+
+
+def _set_blur(key, value):
+    blur_file = resolve_niri_section_file(BLUR_FILE)
+    if not blur_file.exists():
+        print(json.dumps({"error": "layer rules config file not found"}))
+        return 1
+    content = blur_file.read_text()
+    if _find_block_bounds(content, "blur", top_level=True) is None:
+        content = content.rstrip("\n") + "\n\n// Niri's blur behind surfaces that ask for it (iRiS glass set to Blur).\nblur {\n}\n"
+    if key == "enabled":
+        block = _extract_block(content, "blur", top_level=True) or ""
+        has_off = _has_top_level_flag(_strip_kdl_line_comments(block), "off")
+        if value == "on" and has_off:
+            content = _remove_key_from_section(content, "blur", "off", top_level=True)
+        elif value == "off" and not has_off:
+            content = _set_value_in_block(content, "blur", "off", "", top_level=True)
+    elif key == "strength":
+        pair = BLUR_STRENGTH.get(value)
+        if not pair:
+            print(json.dumps({"error": f"unknown blur strength: {value}"}))
+            return 1
+        content = _set_value_in_block(content, "blur", "passes", pair[0], top_level=True)
+        content = _set_value_in_block(content, "blur", "offset", pair[1], top_level=True)
+    elif key in ("noise", "saturation"):
+        try:
+            float(value)
+        except ValueError:
+            print(json.dumps({"error": f"invalid {key}: {value}"}))
+            return 1
+        content = _set_value_in_block(content, "blur", key, value, top_level=True)
+    else:
+        print(json.dumps({"error": f"unknown blur key: {key}"}))
+        return 1
+    blur_file.write_text(content)
+    print(json.dumps({"ok": True}))
+    return 0
+
 def cmd_set(args):
     """Surgical edit of a single config value.
 
@@ -1590,6 +1904,8 @@ def cmd_set(args):
         return _set_animations(config_dir, key, value)
     elif section == "window-rules":
         return _set_window_rules(config_dir, key, value)
+    elif section == "blur":
+        return _set_blur(key, value)
     elif section == "output":
         # output HDMI-A-2.mode 1920x1080@74.973
         parts = key.split(".", 1)
@@ -2115,21 +2431,7 @@ def _set_window_rules(config_dir, key, value):
     content = rules_file.read_text()
 
     if key == "corner-radius":
-        if re.search(r"geometry-corner-radius\s+\d+", content):
-            content = re.sub(
-                r"(geometry-corner-radius\s+)\d+",
-                rf"\g<1>{value}",
-                content,
-                count=1,
-            )
-        else:
-            # Insert in first window-rule block
-            content = re.sub(
-                r"(window-rule\s*\{)\s*\n",
-                rf"\g<1>\n    geometry-corner-radius {value}\n",
-                content,
-                count=1,
-            )
+        content = _set_global_rule_property(content, "geometry-corner-radius", int(float(value)))
 
     elif key == "inactive-opacity":
         # Find the inactive rule block (has match is-active=false)
@@ -2149,20 +2451,29 @@ def _set_window_rules(config_dir, key, value):
             )
 
     elif key == "clip-to-geometry":
-        if re.search(r"clip-to-geometry\s+(true|false)", content):
-            content = re.sub(
-                r"(clip-to-geometry\s+)(true|false)",
-                rf"\g<1>{value}",
-                content,
-                count=1,
-            )
+        content = _set_global_rule_property(content, "clip-to-geometry", "true" if str(value) == "true" else "false")
+
+    elif key == "active-opacity":
+        content = _protect_games_rule(_set_global_opacity(content, float(value)))
+
+    elif key == "blur":
+        on = str(value) in ("on", "true", "1")
+        content = _set_global_effect(content, "blur", "true" if on else None)
+        if on:
+            content = _protect_games_rule(content)
+
+    elif key == "xray":
+        # Niri turns xray on by itself once blur is on; only "off" needs writing.
+        content = _set_global_effect(content, "xray", None if str(value) in ("on", "true", "1") else "false")
+
+    elif key == "border-behind":
+        on = str(value) in ("on", "true", "1")
+        if on:
+            content = _set_global_rule_property(content, "draw-border-with-background", "false")
         else:
-            content = re.sub(
-                r"(window-rule\s*\{)\s*\n",
-                rf"\g<1>\n    clip-to-geometry {value}\n",
-                content,
-                count=1,
-            )
+            for start, end, body in reversed(_global_rules(content)):
+                cleaned = re.sub(r"(?m)^[ \t]*draw-border-with-background[ \t]+[^\s]+[ \t]*\n?", "", content[start:end])
+                content = content[:start] + cleaned + content[end:]
 
     else:
         print(json.dumps({"error": f"Unknown window-rules key: {key}"}))
@@ -2283,25 +2594,34 @@ def _set_value_in_block(content, section, prop, value, top_level=False):
     return content[:inner_start] + new_block + content[inner_end:]
 
 
+# What niri does when a block carries neither flag: the focus ring is on, border and shadow are off.
+NIRI_FLAG_DEFAULTS = {"focus-ring": True, "border": False, "shadow": False}
+
+
+def _flag_state(block, default):
+    """The last bare `on`/`off` line wins, as in niri; without one the block keeps niri's default."""
+    flags = re.findall(r"^[ \t]*(on|off)[ \t]*$", _mask_kdl_comments(block), re.MULTILINE)
+    return flags[-1] == "on" if flags else default
+
+
 def _toggle_subsection_enabled(content, section, enable):
-    """Toggle the `off` flag inside a subsection block (border, focus-ring, shadow)."""
+    """Leave exactly one explicit flag in a subsection block (border, focus-ring, shadow).
+    Removing `off` alone cannot turn on a block that is off by default, and a stale flag left
+    beside the new one made the file say both."""
     bounds = _find_block_bounds(content, section)
     if not bounds:
         return content
 
     _, inner_start, inner_end, _ = bounds
     block_content = content[inner_start:inner_end]
-    has_off = bool(re.search(r"^\s*off\s*$", block_content, re.MULTILINE))
-
-    if enable and has_off:
-        new_block = re.sub(
-            r"^[ \t]*off\s*\n", "", block_content, flags=re.MULTILINE, count=1
-        )
-    elif not enable and not has_off:
-        new_block = "\n        off\n" + block_content.lstrip("\n")
-    else:
-        return content  # Already in desired state
-
+    masked = _mask_kdl_comments(block_content)
+    kept = []
+    for raw, bare in zip(block_content.splitlines(keepends=True), masked.splitlines(keepends=True)):
+        if not re.fullmatch(r"[ \t]*(on|off)[ \t]*\n?", bare):
+            kept.append(raw)
+    indent = re.search(r"^([ \t]+)\S", block_content, re.MULTILINE)
+    flag = f"{indent.group(1) if indent else '        '}{'on' if enable else 'off'}\n"
+    new_block = "\n" + flag + "".join(kept).lstrip("\n")
     return content[:inner_start] + new_block + content[inner_end:]
 
 
@@ -3054,7 +3374,10 @@ def main():
         "get-hot-corners": lambda: cmd_get_hot_corners(),
         "get-layout": lambda: cmd_get_layout(),
         "get-animations": lambda: cmd_get_animations(),
+        "get-animation-presets": lambda: cmd_get_animation_presets(),
+        "apply-animation-preset": lambda: cmd_apply_animation_preset(args),
         "get-window-rules": lambda: cmd_get_window_rules(),
+        "get-blur": lambda: cmd_get_blur(),
         "list-cursor-themes": lambda: cmd_list_cursor_themes(),
         "sync-cursor": lambda: cmd_sync_cursor(),
         "validate": lambda: cmd_validate(),

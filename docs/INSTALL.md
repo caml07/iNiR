@@ -27,13 +27,12 @@ Add `-y` if you don't want to answer questions:
 ./setup install -y
 ```
 
-When it's done:
+When it's done, **restart the computer**. Not log out, restart: the new groups, the login screen and
+Niri's environment only apply after a reboot. Then pick Niri at the login screen.
 
 ```bash
-niri msg action load-config-file
+systemctl reboot
 ```
-
-Log out and back in, or just restart Niri. Done.
 
 ## The Easy Way (Void Linux)
 

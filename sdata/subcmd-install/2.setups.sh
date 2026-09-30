@@ -17,19 +17,36 @@ function setup_user_groups(){
   fi
   
   # Add user to required groups
+  local groups_before=" $(id -nG) "
+  local required_groups="video,i2c,input"
+
   # Void requires network and bluetooth group membership for their providers.
-  # Keep the existing group set unchanged on other distributions.
   if [[ "${OS_GROUP_ID:-}" == void ]]; then
-    local required_groups="video,i2c,input,network"
+    required_groups="video,i2c,input,network"
     if ${INSTALL_TOOLKIT:-true} && getent group bluetooth >/dev/null; then
       required_groups+=",bluetooth"
     fi
-    x pkg_sudo usermod -aG "$required_groups" "$(whoami)"
-    log_success "User added to ${required_groups//,/, } groups"
-  else
-    x pkg_sudo usermod -aG video,i2c,input "$(whoami)"
-    log_success "User added to video, i2c, input groups"
   fi
+
+  x pkg_sudo usermod -aG "$required_groups" "$(whoami)"
+
+  local group group_changed=false
+  for group in ${required_groups//,/ }; do
+    if [[ "$groups_before" != *" $group "* ]]; then
+      group_changed=true
+      break
+    fi
+  done
+
+  if [[ "$group_changed" == true ]]; then
+    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+      INIR_REBOOT_REASONS+=("Your user joined ${required_groups//,/, }: Void session, network, Bluetooth and input access need the new group membership")
+    else
+      INIR_REBOOT_REASONS+=("Your user joined video, i2c and input: brightness, keyboard lights and the on-screen keyboard need it")
+    fi
+  fi
+
+  log_success "User added to ${required_groups//,/, } groups"
   log_warning "Group changes require logout/login to take effect"
 }
 
@@ -180,7 +197,8 @@ function setup_systemd_services(){
         fi
       done
 
-      elevate systemctl enable sddm.service 2>/dev/null && log_success "SDDM service enabled"
+      elevate systemctl enable sddm.service 2>/dev/null && log_success "SDDM service enabled" \
+        && INIR_REBOOT_REASONS+=("SDDM is your login screen now${current_dm:+, instead of ${current_dm%.service}}")
     fi
   fi
   

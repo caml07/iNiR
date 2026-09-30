@@ -495,14 +495,7 @@ Item {
     Timer {
         id: _saveFavouritesDebounce
         interval: 300
-        onTriggered: _saveFavouritesProc.running = true
-    }
-
-    Process {
-        id: _saveFavouritesProc
-        command: ["bash", "-c",
-            "printf '%s' " + JSON.stringify(JSON.stringify(root._favouritesDb)) +
-            " > " + JSON.stringify(root._favouritesCachePath)]
+        onTriggered: favouritesFileView.setText(JSON.stringify(root._favouritesDb))
     }
 
     // ─── Color cache persistence ───
@@ -531,14 +524,7 @@ Item {
     Timer {
         id: _saveColorsDebounce
         interval: 500
-        onTriggered: _saveColorsProc.running = true
-    }
-
-    Process {
-        id: _saveColorsProc
-        command: ["bash", "-c",
-            "printf '%s' " + JSON.stringify(JSON.stringify(root._colorsDb)) +
-            " > " + JSON.stringify(root._colorsCachePath)]
+        onTriggered: colorsFileView.setText(JSON.stringify(root._colorsDb))
     }
 
     // ─── File deletion ───
@@ -585,16 +571,11 @@ Item {
         const batch = _colorAnalysisQueue.splice(0, _colorBatchSize)
         _colorAnalysisProc._batchNames = batch.map(b => b.name)
         _colorAnalysisProc._resultLines = []
-        // Single bash process for the whole batch
-        let script = ""
-        for (const item of batch) {
-            // Output: name<TAB>hue sat lightness (or name<TAB>ERR)
-            script += "printf '%s\\t' " + JSON.stringify(item.name) + "; "
-            script += "convert " + JSON.stringify(item.path) +
-                " -resize 1x1\\! -colorspace HSL -format '%[fx:hue*360] %[fx:saturation] %[fx:lightness]' info: 2>/dev/null || printf 'ERR'; "
-            script += "printf '\\n'; "
-        }
-        _colorAnalysisProc.command = ["bash", "-c", script]
+        // One process for the whole batch, paths as arguments: name<TAB>hue sat lightness, or name<TAB>ERR
+        _colorAnalysisProc.command = ["sh", "-c",
+            'for p do printf "%s\\t" "${p##*/}"; '
+            + 'convert "$p" -resize "1x1!" -colorspace HSL -format "%[fx:hue*360] %[fx:saturation] %[fx:lightness]" info: 2>/dev/null || printf ERR; '
+            + 'printf "\\n"; done', "sh"].concat(batch.map(item => item.path))
         _colorAnalysisProc.running = true
     }
 

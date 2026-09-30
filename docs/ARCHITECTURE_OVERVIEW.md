@@ -112,7 +112,7 @@ A simplified map of what lives where:
 | `modules/sidebar/` | Physical sidebar hosts and live layout behavior | High |
 | `modules/sidebarLeft/` | Semantic feature content: AI chat, YT Music, widgets | Normal |
 | `modules/sidebarRight/` | Semantic system content: toggles, calendar, tools | Normal |
-| `translations/` | i18n strings (17 locales) | Low |
+| `translations/` | i18n strings (18 locales) | Low |
 
 Full breakdown: [Project Map](PROJECT_MAP.md)
 

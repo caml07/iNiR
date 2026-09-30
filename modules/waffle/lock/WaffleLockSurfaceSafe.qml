@@ -253,7 +253,7 @@ MouseArea {
                 active: root.showMedia &&
                         root.activePlayer !== null &&
                         root.activePlayer.playbackState !== MprisPlaybackState.Stopped &&
-                        (root.activePlayer.trackTitle?.length > 0 ?? false)
+                        (MprisController.titleOf(root.activePlayer)?.length > 0 ?? false)
                 visible: active
 
                 sourceComponent: Rectangle {
@@ -266,9 +266,9 @@ MouseArea {
                     border.width: 1
 
                     readonly property MprisPlayer player: root.activePlayer
-                    readonly property string effectiveArtUrl: MprisController.isYtMusicActive ? YtMusic.currentThumbnail : (player?.trackArtUrl ?? "")
-                    readonly property string effectiveTitle: MprisController.isYtMusicActive ? YtMusic.currentTitle : (player?.trackTitle ?? "")
-                    readonly property string effectiveArtist: MprisController.isYtMusicActive ? YtMusic.currentArtist : (player?.trackArtist ?? "")
+                    readonly property string effectiveArtUrl: MprisController.isYtMusicActive ? YtMusic.currentThumbnail : (MprisController.artUrlOf(player) ?? "")
+                    readonly property string effectiveTitle: MprisController.isYtMusicActive ? YtMusic.currentTitle : (MprisController.titleOf(player) ?? "")
+                    readonly property string effectiveArtist: MprisController.isYtMusicActive ? YtMusic.currentArtist : (MprisController.artistOf(player) ?? "")
 
                     RowLayout {
                         id: mediaRow
@@ -310,7 +310,7 @@ MouseArea {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: StringUtils.cleanMusicTitle(mediaWidget.player?.trackTitle ?? "")
+                                text: StringUtils.cleanMusicTitle(MprisController.titleOf(mediaWidget.player) ?? "")
                                 font.pixelSize: Looks.font.pixelSize.large
                                 font.weight: Looks.font.weight.regular
                                 font.family: Looks.font.family.ui
@@ -320,7 +320,7 @@ MouseArea {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: mediaWidget.player?.trackArtist ?? ""
+                                text: MprisController.artistOf(mediaWidget.player) ?? ""
                                 font.pixelSize: Looks.font.pixelSize.normal
                                 font.family: Looks.font.family.ui
                                 color: Looks.colors.subfg
@@ -375,7 +375,7 @@ MouseArea {
 
                 Row {
                     spacing: 4
-                    visible: Network.wifiEnabled
+                    visible: Network.ethernet || Network.wifiEnabled
 
                     MaterialSymbol {
                         anchors.verticalCenter: parent.verticalCenter
@@ -386,7 +386,7 @@ MouseArea {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: Network.networkName ?? ""
+                        text: Network.ethernet ? Translation.tr("Ethernet") : (Network.networkName ?? "")
                         visible: text.length > 0 && text.length < 16
                         font.pixelSize: Looks.font.pixelSize.small
                         font.family: Looks.font.family.ui

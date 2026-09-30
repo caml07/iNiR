@@ -167,19 +167,25 @@ fi
 #####################################################################################
 # Version warnings
 #####################################################################################
+# iNiR needs Qt 6.9 or newer (QtQuick.Effects shadows, typed nested functions); Quickshell itself
+# needs 6.6. Stop early instead of failing after a long source build.
 if $IS_UBUNTU; then
   case "$UBUNTU_VERSION" in
-    22.04|22.10)
-      log_warning "Ubuntu ${UBUNTU_VERSION} has older Qt6 packages — Ubuntu 24.04+ recommended"
+    2[0-4].*|25.04)
+      log_error "Ubuntu ${UBUNTU_VERSION} ships Qt older than 6.9, which iNiR needs. Use Ubuntu 25.10 or newer."
+      exit 1
       ;;
   esac
 fi
 
 if $IS_DEBIAN; then
   case "$DEBIAN_VERSION" in
-    11*|10*|9*)
-      log_error "Debian ${DEBIAN_VERSION} is too old — Qt6 requires Debian 12 (bookworm) or newer"
+    12*|11*|10*|9*)
+      log_error "Debian ${DEBIAN_VERSION} ships Qt older than 6.9, which iNiR needs. Use Debian 14 (forky) or testing."
       exit 1
+      ;;
+    13*)
+      log_warning "Debian 13 ships Qt 6.8; iNiR needs 6.9. Some surfaces may not load until Qt 6.9 is available (testing or backports)."
       ;;
   esac
 fi

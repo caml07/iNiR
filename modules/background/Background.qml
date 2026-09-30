@@ -42,12 +42,14 @@ import qs.modules.background.desktopItems
 import qs.modules.iris.components
 import qs.modules.iris.style
 import qs.modules.iris.frame
+import qs.modules.iris.background
 import "root:modules/common/functions/parallax.js" as ParallaxMath
 import "widgets/OrganicEdgeConfig.js" as OrganicEdgeConfig
 
 Scope {
     id: backgroundScope
     property var organicEdgeHosts: ({})
+    property var widgetCanvases: ({})
 
     // Bounded diagnostics for the desktop clock. They are inert unless the
     // supervised shell is loaded with INIR_REGION_DEBUG=1.
@@ -94,6 +96,33 @@ Scope {
 
     IpcHandler {
         target: "background"
+        function widgetDesign(name: string): string {
+            if (name === "status")
+                return DesktopWidgetDesign.current + " · " + DesktopWidgetDesign.exceptionCount + " own looks"
+                    + (DesktopWidgetDesign.canUndo ? " · undo available" : "")
+            if (name === "undo") return DesktopWidgetDesign.undo()
+            return DesktopWidgetDesign.apply(name)
+        }
+
+        function widgetSearch(query: string): string {
+            if ((Config.options?.panelFamily ?? "ii") !== "iris")
+                return "the widget search is part of the iRiS widget bar"
+            if (query === "close") {
+                GlobalStates.widgetSearchOpen = false
+                GlobalStates.widgetSearchText = ""
+                return "search closed"
+            }
+            if (["next", "previous", "take"].includes(query)) {
+                GlobalStates.widgetSearchCommand(query)
+                return query
+            }
+            if (!GlobalStates.widgetEditMode)
+                GlobalStates.setWidgetEditMode(true)
+            GlobalStates.widgetSearchText = query === "open" ? "" : query
+            GlobalStates.widgetSearchOpen = true
+            return "searching: " + GlobalStates.widgetSearchText
+        }
+
         function toggleEditMode(): string {
             GlobalStates.setWidgetEditMode(!GlobalStates.widgetEditMode)
             return GlobalStates.widgetEditMode ? "edit mode on" : "edit mode off"
@@ -157,6 +186,59 @@ Scope {
         function setOrganicEdgeEnabled(enabled: bool): string {
             Config.setNestedValue("background.edgeWidgets.organic.enable", enabled)
             return enabled ? "Organic edge enabled" : "Organic edge disabled"
+        }
+
+        function quickControlsPage(page: string): string {
+            const key = GlobalStates.selectedDesktopWidget
+            const [output, name] = key.split("::")
+            const widget = (backgroundScope.widgetCanvases[output]?._loadedDesktopWidgets() ?? [])
+                .find(item => item.configEntryName === name) ?? null
+            if (!widget)
+                return "select a widget first: focusWidget <name> true"
+            const pages = widget.irisFaced ? ["widget", "look", "arrange"].concat(widget.stacked ? ["stack"] : []) : ["widget", "colors", "layout"]
+            const aliases = ({ look: widget.irisFaced ? "look" : "colors", colors: widget.irisFaced ? "look" : "colors",
+                arrange: widget._arrangeTab, layout: widget._arrangeTab, widget: "widget", stack: "stack" })
+            const target = aliases[String(page ?? "").trim()] ?? ""
+            if (!pages.includes(target))
+                return "pages: widget, look, arrange" + (widget.stacked ? ", stack" : "")
+            widget.openQuickControls(target)
+            return JSON.stringify({ widget: key, page: target })
+        }
+
+        function quickControlsGeometry(): string {
+            const [output, name] = GlobalStates.selectedDesktopWidget.split("::")
+            const widget = (backgroundScope.widgetCanvases[output]?._loadedDesktopWidgets() ?? [])
+                .find(item => item.configEntryName === name) ?? null
+            return widget ? widget.editControlsGeometryReport : "{}"
+        }
+
+        function legibilityState(): string {
+            const out = []
+            for (const output of Object.keys(backgroundScope.widgetCanvases)) {
+                const canvas = backgroundScope.widgetCanvases[output]
+                if (!canvas || typeof canvas._loadedDesktopWidgets !== "function")
+                    continue
+                for (const widget of canvas._loadedDesktopWidgets())
+                    out.push({
+                        output: output,
+                        widget: widget.configEntryName,
+                        adaptive: widget.positionColorAdaptationEnabled,
+                        sampled: widget._hasBrightness,
+                        level: Math.round(widget.regionBrightness * 1000) / 1000,
+                        spread: Math.round(widget.regionBrightnessSpread * 1000) / 1000,
+                        luminance: Math.round(widget.regionLuminance * 1000) / 1000,
+                        lightBackdrop: widget.backdropIsLight,
+                        darkInk: widget.inkOnLight,
+                        plate: widget.widgetHasSurface,
+                        shadow: widget._legibleShadow ? Math.round(widget._legibleShadowOpacity * 100) / 100 : 0,
+                        face: widget.irisFaced ? { lightBackdrop: widget.irisFaceView?.lightBackdrop ?? null,
+                            veil: Math.round((widget.irisFaceView?.veil ?? -1) * 100) / 100,
+                            material: widget.irisFaceView?.material ?? "" } : false,
+                        ink: String(widget.widgetInk),
+                        accent: String(widget.widgetAccent)
+                    })
+            }
+            return JSON.stringify(out)
         }
 
         function desktopItemsState(): string {
@@ -387,6 +469,7 @@ Scope {
         id: bgRoot
 
         required property var modelData
+        readonly property Item wallpaperLayer: wallpaperContainer
 
         // Hide when fullscreen
         property list<HyprlandWorkspace> workspacesForMonitor: CompositorService.isHyprland ? Hyprland.workspaces.values.filter(workspace => workspace.monitor && workspace.monitor.name == monitor.name) : []
@@ -417,7 +500,7 @@ Scope {
         readonly property var workSafetyOptions: Config.options?.workSafety ?? {}
         readonly property var workSafetyEnableOptions: workSafetyOptions.enable ?? {}
         readonly property var workSafetyTriggerOptions: workSafetyOptions.triggerCondition ?? {}
-        readonly property var lockBlurOptions: Config.options?.lock?.blur ?? {}
+        readonly property var lockBlurOptions: Config.options?.panelFamily === "iris" ? ({}) : (Config.options?.lock?.blur ?? {})
         readonly property var desktopFreeWorkArea: ShellLayoutController.desktopWorkArea(
             screen?.name ?? "", screen?.width ?? 0, screen?.height ?? 0)
         readonly property var desktopItemsWorkArea: ShellLayoutController.desktopZoneWorkArea(
@@ -997,6 +1080,12 @@ Scope {
         // Keep background behind the lock surface. Moving this to Overlay can capture input.
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:background"
+        // Host for LiveLayer (continuous motion in a widget moves to a small surface of its own instead of
+        // repainting this whole output every frame): nothing here covers or moves a still widget outside edit.
+        readonly property bool liveCalm: !GlobalStates.widgetEditMode && !GlobalStates.shellLayoutEditMode
+            && !GlobalStates.screenLocked
+        readonly property int liveLayer: WlrLayer.Bottom
+        readonly property int liveEpoch: 0
         // Map the desktop keyboard-inert during startup, then arm OnDemand after
         // the first-frame/deferred lifecycle has settled. Niri can temporarily
         // focus a newly mapped OnDemand layer surface during shell restart, which
@@ -1441,6 +1530,13 @@ Scope {
                             : bgRoot.fillMode === "tile" ? Image.Tile
                             : bgRoot.fillMode === "center" ? Image.Pad
                             : Image.PreserveAspectCrop
+                    // Decoded at the size it is drawn, not the file's: a 6000 px wallpaper was held twice at full size
+                    // (~70 MB each) for a 1080p output. Crop and fit are then decoded at their optimal size (Qt's
+                    // Image.sourceSize); tile and center draw the image at its own size, so they keep it. The target
+                    // size, not the animated one, so a parallax resize does not decode again per frame.
+                    sourceSize: bgRoot.fillMode === "tile" || bgRoot.fillMode === "center" ? Qt.size(0, 0)
+                        : Qt.size(Math.ceil(wallpaperContainer.targetWidth * bgRoot.devicePixelRatio),
+                            Math.ceil(wallpaperContainer.targetHeight * bgRoot.devicePixelRatio))
 
                     onTransitionStarted: {
                         if (!bgRoot.dynamicParallaxRequested || !bgRoot.pauseParallaxDuringTransitions)
@@ -1771,6 +1867,16 @@ Scope {
             // iRiS desktop menu: the Island's material, quick-action tiles and
             // keyboard, growing out of the pointer. Only the actions that drive
             // something under iRiS (shell layout editing is ii/Waffle-only).
+            Connections {
+                target: GlobalStates
+                function onIrisDesktopMenuRequested(outputName: string, x: real, y: real): void {
+                    if (outputName !== bgRoot.screenName || (Config.options?.panelFamily ?? "ii") !== "iris") return
+                    desktopMenuAnchor.x = x
+                    desktopMenuAnchor.y = y
+                    irisDesktopMenu.requestOpen()
+                }
+            }
+
             IrisDesktopMenu {
                 id: irisDesktopMenu
                 z: 27
@@ -1778,15 +1884,10 @@ Scope {
                 readonly property int gridSize: Config.getNestedValue("background.widgets.editGrid.size", 32)
                 readonly property bool gridSnap: Config.getNestedValue("background.widgets.editGrid.snap", true)
                 model: GlobalStates.widgetEditMode ? [
-                    { type: "quick", items: [
-                        { text: Translation.tr("Widgets"), iconName: "dashboard_customize",
-                            action: () => { widgetManagerPanel.shown = true } },
-                        { text: irisDesktopMenu.gridSnap ? Translation.tr("Snap on") : Translation.tr("Snap off"),
-                            iconName: irisDesktopMenu.gridSnap ? "grid_on" : "grid_off",
-                            action: () => Config.setNestedValue("background.widgets.editGrid.snap", !irisDesktopMenu.gridSnap) },
-                        { text: Translation.tr("Done"), iconName: "check", accent: true,
-                            action: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) } }
-                    ] },
+                    { text: Translation.tr("Add widgets"), iconName: "dashboard_customize", tint: "teal",
+                        action: () => { widgetManagerPanel.shown = true } },
+                    { text: Translation.tr("Snap to grid"), iconName: "grid_on", checked: irisDesktopMenu.gridSnap, keepOpen: true,
+                        action: () => Config.setNestedValue("background.widgets.editGrid.snap", !irisDesktopMenu.gridSnap) },
                     { type: "separator" },
                     { text: Translation.tr("Grid size"), iconName: "grid_4x4", detail: irisDesktopMenu.gridSize + " px",
                         action: () => {
@@ -1795,33 +1896,11 @@ Scope {
                                 sizes[(sizes.indexOf(irisDesktopMenu.gridSize) + 1) % sizes.length])
                         } },
                     { text: Translation.tr("Widget settings"), iconName: "settings",
-                        action: () => GlobalStates.openSettingsPage(14) }
-                ] : [
-                    { type: "quick", items: [
-                        { text: Translation.tr("Wallpaper"), iconName: "wallpaper",
-                            image: bgRoot.wallpaperIsVideo || bgRoot.wallpaperIsGif ? bgRoot.wallpaperThumbnailPath : bgRoot.wallpaperPath,
-                            action: () => {
-                                GlobalStates.wallpaperSelectorTargetMonitor = bgRoot.screenName
-                                GlobalActions.runLauncher(["wallpaperSelector", "toggle"])
-                            } },
-                        { text: Translation.tr("Widgets"), iconName: "widgets",
-                            action: () => GlobalStates.setWidgetEditMode(true) },
-                        { text: Translation.tr("Studio"), iconName: "palette",
-                            action: () => { GlobalStates.irisStudioOpen = true } },
-                        { text: Translation.tr("Search"), iconName: "search",
-                            action: () => { GlobalStates.searchOpen = true } }
-                    ] },
+                        action: () => GlobalStates.openSettingsPage(14) },
                     { type: "separator" },
-                    { text: Translation.tr("Edit iRiS"), iconName: "edit",
-                        action: () => { GlobalStates.irisEdit = true } },
-                    { text: Translation.tr("Quick controls"), iconName: "tune",
-                        action: () => { GlobalStates.controlPanelOpen = true } },
-                    { text: Translation.tr("Settings"), iconName: "settings",
-                        action: () => { Quickshell.execDetached([Quickshell.shellPath("scripts/inir"), "iris", "settings", ""]) } },
-                    { type: "separator" },
-                    { text: Translation.tr("Reload shell"), iconName: "refresh",
-                        action: () => { Quickshell.execDetached(["/usr/bin/bash", Quickshell.shellPath("scripts/restart-shell.sh")]) } }
-                ]
+                    { text: Translation.tr("Done"), iconName: "check", tint: "green",
+                        action: () => { widgetManagerPanel.shown = false; GlobalStates.setWidgetEditMode(false) } }
+                ] : IrisDesktopActions.menu(bgRoot.screenName, bgRoot.wallpaperPath, bgRoot.wallpaperPath)
             }
 
             // Managed items use the same stable screen-level popup path as the
@@ -1850,13 +1929,24 @@ Scope {
             WidgetCanvas {
                 id: widgetCanvas
                 z: 20
+                // Each widget's edit toolbar and quick-controls sheet live here, above every widget and
+                // outside the widget's own opacity and dim, so they stay opaque and on top.
+                readonly property Item editChromeLayer: widgetChromeLayer
+                Component.onDestruction: delete backgroundScope.widgetCanvases[bgRoot.screenName]
                 visible: !GlobalStates.shellLayoutEditMode
                     && DesktopWidgetLayout.outputAllowed(modelData?.name ?? "")
                 enabled: visible && !GlobalStates.screenLocked  // Disable all widget input during lock
+                // Widgets arrive with the shell (boot, reload, family switch): a short settle inward.
+                property real arrival: GlobalStates.shellEntryReady ? 1 : 0
+                Behavior on arrival {
+                    enabled: Appearance.animationsEnabled
+                    NumberAnimation { duration: Appearance.animation.elementMoveEnter.duration * 1.4; easing.type: Appearance.animation.elementMoveEnter.type; easing.bezierCurve: Appearance.animation.elementMoveEnter.bezierCurve }
+                }
+                scale: arrival >= 1 ? 1 : 1.025 - 0.025 * arrival
                 opacity: {
                     const dynOp = Math.max(0, Math.min(100, Number(Config.options?.background?.widgets?.dynamicOpacity) || 0));
-                    if (dynOp <= 0 || !bgRoot.focusWindowsPresent) return 1;
-                    return 1 - (dynOp / 100) * bgRoot.focusPresenceProgress;
+                    const presence = dynOp <= 0 || !bgRoot.focusWindowsPresent ? 1 : 1 - (dynOp / 100) * bgRoot.focusPresenceProgress;
+                    return presence * widgetCanvas.arrival;
                 }
                 Behavior on opacity {
                     enabled: Appearance.animationsEnabled
@@ -1872,8 +1962,9 @@ Scope {
                 // Parallax widget depth: translate the canvas as a whole to create
                 // layered movement relative to the wallpaper.
                 transform: Translate {
-                    x: widgetCanvas._parallaxActive ? (bgRoot.parallaxTotalX * wallpaperContainer.activeValueX * (1 - bgRoot.parallaxWidgetDepth)) : 0
-                    y: widgetCanvas._parallaxActive ? (bgRoot.parallaxTotalY * wallpaperContainer.activeValueY * (1 - bgRoot.parallaxWidgetDepth)) : 0
+                    // Whole pixels: native text on a fractional offset is resampled and goes soft.
+                    x: widgetCanvas._parallaxActive ? Math.round(bgRoot.parallaxTotalX * wallpaperContainer.activeValueX * (1 - bgRoot.parallaxWidgetDepth)) : 0
+                    y: widgetCanvas._parallaxActive ? Math.round(bgRoot.parallaxTotalY * wallpaperContainer.activeValueY * (1 - bgRoot.parallaxWidgetDepth)) : 0
                     Behavior on x {
                         enabled: Appearance.animationsEnabled
                             && ((!bgRoot.parallaxTransitionActive && bgRoot.parallaxResumeProgress >= 1)
@@ -1971,6 +2062,38 @@ Scope {
                     return widgets
                 }
 
+                // The widget lit as a drop target while another is carried over it (iRiS stacks).
+                property string stackHint: ""
+
+                function loadedWidget(instanceKey: string): var {
+                    return widgetCanvas._loadedDesktopWidgets().find(item => item.editInstanceKey === instanceKey) ?? null
+                }
+
+                // The stackable widget most covered by the one being carried, or "" when none is covered enough.
+                function stackDropCandidate(instanceKey: string): string {
+                    const widgets = widgetCanvas._loadedDesktopWidgets()
+                    const carried = widgets.find(item => item.editInstanceKey === instanceKey)
+                    if (!carried || !carried.stackable)
+                        return ""
+                    const area = Math.max(1, carried.width * carried.height)
+                    let best = ""
+                    let bestShare = 0.4
+                    for (const other of widgets) {
+                        if (other === carried || !other.stackable || (carried.stacked && other.stacked))
+                            continue
+                        const across = Math.min(carried.x + carried.width, other.x + other.width) - Math.max(carried.x, other.x)
+                        const down = Math.min(carried.y + carried.height, other.y + other.height) - Math.max(carried.y, other.y)
+                        if (across <= 0 || down <= 0)
+                            continue
+                        const share = across * down / Math.min(area, Math.max(1, other.width * other.height))
+                        if (share > bestShare) {
+                            bestShare = share
+                            best = other.editInstanceKey
+                        }
+                    }
+                    return best
+                }
+
                 function _rectOverlaps(a, b, gap): bool {
                     return a.x < b.x + b.width + gap
                         && a.x + a.width + gap > b.x
@@ -2052,11 +2175,12 @@ Scope {
                     let missingGeometry = false
                     for (const item of widgets) {
                         const strategy = String(item.placementStrategy ?? "free")
-                        if (strategy === "free"
+                        if (DesktopWidgetStacks.isSplit(item.configEntryName)
+                                || (strategy === "free"
                                 && (!DesktopWidgetLayout.hasValue(outputName,
                                         item.configEntryName, "x")
                                     || !DesktopWidgetLayout.hasValue(outputName,
-                                        item.configEntryName, "y"))) {
+                                        item.configEntryName, "y")))) {
                             missingGeometry = true
                             break
                         }
@@ -2072,6 +2196,10 @@ Scope {
                             outputName, b.configEntryName, "x") ? 1 : 0
                         if (!geometryChanged && aLocal !== bLocal)
                             return bLocal - aLocal
+                        // A widget that just left a stack is the one that moves aside.
+                        const aSplit = DesktopWidgetStacks.isSplit(a.configEntryName)
+                        if (aSplit !== DesktopWidgetStacks.isSplit(b.configEntryName))
+                            return aSplit ? 1 : -1
                         if (Boolean(a.locked) !== Boolean(b.locked))
                             return a.locked ? -1 : 1
                         return b.width * b.height - a.width * a.height
@@ -2098,13 +2226,13 @@ Scope {
                         let position = { x: Math.round(desiredX), y: Math.round(desiredY) }
                         const collides = !widgetCanvas._positionIsFree(
                             position.x, position.y, item.width, item.height, placed, 14)
-                        if (collides && !item.locked)
+                        if (collides && (!item.locked || DesktopWidgetStacks.isSplit(item.configEntryName)))
                             position = widgetCanvas._nearestFreePosition(
                                 item, desiredX, desiredY, placed, work)
 
                         const moved = Math.round(position.x) !== Math.round(item.x)
                             || Math.round(position.y) !== Math.round(item.y)
-                        if (needsLocal || moved || (collides && !item.locked)) {
+                        if (needsLocal || moved || (collides && (!item.locked || DesktopWidgetStacks.isSplit(item.configEntryName)))) {
                             updates[item.configEntryName] = {
                                 x: position.x,
                                 y: position.y,
@@ -2122,18 +2250,22 @@ Scope {
                     widgetCanvas._outputLayoutAttempts = 0
                     DesktopWidgetLayout.initializeOutputLayout(
                         outputName, outputWidth, outputHeight, updates)
+                    DesktopWidgetStacks.clearSplits()
                 }
 
                 property int _outputLayoutAttempts: 0
 
                 Timer {
                     id: outputLayoutTimer
-                    interval: 1400
+                    interval: DesktopWidgetStacks.splitPending ? 250 : 1400
                     repeat: false
                     onTriggered: widgetCanvas.initializeOutputWidgetLayout()
                 }
 
-                Component.onCompleted: outputLayoutTimer.restart()
+                Component.onCompleted: {
+                    backgroundScope.widgetCanvases[bgRoot.screenName] = widgetCanvas
+                    outputLayoutTimer.restart()
+                }
 
                 Connections {
                     target: Config
@@ -2154,7 +2286,9 @@ Scope {
                     const current = widgets.find(item => item.editInstanceKey === instanceKey)
                     if (!current || current.width <= 0 || current.height <= 0)
                         return []
+                    // The pages of one stack are one layer, not several piled up.
                     const matches = widgets.filter(item => item.width > 0 && item.height > 0
+                        && (item === current || !current.stacked || item.stack?.id !== current.stack.id)
                         && item.x < current.x + current.width
                         && item.x + item.width > current.x
                         && item.y < current.y + current.height
@@ -2192,11 +2326,11 @@ Scope {
                     return nextKey
                 }
 
-                function promoteDesktopWidget(instanceKey: string): string {
+                function promoteDesktopWidget(instanceKey: string, layerKey: string): string {
                     const key = String(instanceKey ?? "")
                     if (!key)
                         return ""
-                    backgroundScope.promoteDesktopWidgetKey(key)
+                    backgroundScope.promoteDesktopWidgetKey(String(layerKey ?? "") || key)
                     GlobalStates.selectDesktopWidget(key)
                     return key
                 }
@@ -2265,68 +2399,52 @@ Scope {
                     // dock changes both the visible guide and the committed
                     // position instead of leaving two competing coordinate systems.
                     readonly property bool gridNonDefault: gridSize !== 32
-                    Canvas {
+                    // One tiled texture, not a Canvas: painting every dot of a 4K lattice in software
+                    // stalled the main thread ~60 ms as editing began, the toolbar's entrance with it.
+                    Item {
                         id: editGridCanvas
                         x: editGridOverlay.zoneLeft
                         y: editGridOverlay.zoneTop
                         width: editGridOverlay.zoneWidth
                         height: editGridOverlay.zoneHeight
                         visible: editGridOverlay.gridVisible
-                        onPaint: {
-                            const ctx = getContext("2d");
-                            ctx.clearRect(0, 0, width, height);
-                            if (width <= 0 || height <= 0) return;
-                            const gs = editGridOverlay.gridSize;
-                            const dotColor = editGridOverlay.gridColor;
-                            const custom = editGridOverlay.gridNonDefault;
-                            const alpha = custom ? 0.18 : 0.10;
-                            const dotR = custom ? 1.8 : 1.4;
-                            ctx.fillStyle = Qt.rgba(dotColor.r, dotColor.g, dotColor.b, alpha);
-                            const cols = Math.floor(width / gs) + 1;
-                            const rows = Math.floor(height / gs) + 1;
-                            for (let r = 0; r < rows; ++r) {
-                                for (let c = 0; c < cols; ++c) {
-                                    ctx.beginPath();
-                                    ctx.arc(c * gs, r * gs, dotR, 0, 2 * Math.PI);
-                                    ctx.fill();
-                                }
-                            }
-                            // Subtle grid lines for non-default sizes
-                            if (custom) {
-                                ctx.strokeStyle = Qt.rgba(dotColor.r, dotColor.g, dotColor.b, 0.05);
-                                ctx.lineWidth = 0.5;
-                                for (let c = 0; c < cols; ++c) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(c * gs, 0);
-                                    ctx.lineTo(c * gs, height);
-                                    ctx.stroke();
-                                }
-                                for (let r = 0; r < rows; ++r) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(0, r * gs);
-                                    ctx.lineTo(width, r * gs);
-                                    ctx.stroke();
-                                }
-                            }
+                        clip: true
+                        readonly property int gs: Math.max(4, editGridOverlay.gridSize)
+                        readonly property bool custom: editGridOverlay.gridNonDefault
+                        // SVG Tiny paint: a hex colour and its opacity apart (QtSvg reads no rgba()).
+                        function paint(c: color, a: real, kind: string): string {
+                            const hex = n => ("0" + Math.round(n * 255).toString(16)).slice(-2)
+                            return kind + "='#" + hex(c.r) + hex(c.g) + hex(c.b) + "' " + kind + "-opacity='" + a + "'"
                         }
-                        onVisibleChanged: if (visible && available) requestPaint()
-                        onWidthChanged: if (available) requestPaint()
-                        onHeightChanged: if (available) requestPaint()
-                        Component.onCompleted: requestPaint()
-                        Connections {
-                            target: editGridOverlay
-                            function onGridSizeChanged() { editGridCanvas.requestPaint() }
-                            function onGridNonDefaultChanged() { editGridCanvas.requestPaint() }
-                            function onGridColorChanged() { editGridCanvas.requestPaint() }
-                            function onWidthChanged() { editGridCanvas.requestPaint() }
-                            function onHeightChanged() { editGridCanvas.requestPaint() }
-                        }
-                        Connections {
-                            target: GlobalStates
-                            function onWidgetEditModeChanged() {
-                                if (GlobalStates.widgetEditMode && editGridCanvas.available)
-                                    editGridCanvas.requestPaint();
+                        readonly property string tile: {
+                            const g = editGridCanvas.gs, h = g / 2
+                            const dot = editGridCanvas.paint(editGridOverlay.gridColor, editGridCanvas.custom ? 0.18 : 0.10, "fill")
+                            const line = editGridCanvas.paint(editGridOverlay.gridColor, 0.05, "stroke")
+                            const lines = editGridCanvas.custom
+                                ? "<path d='M" + h + " 0V" + g + "M0 " + h + "H" + g + "' fill='none' " + line + " stroke-width='0.5'/>" : ""
+                            const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='" + g + "' height='" + g + "'>" + lines
+                                + "<circle cx='" + h + "' cy='" + h + "' r='" + (editGridCanvas.custom ? 1.8 : 1.4) + "' " + dot + "/></svg>"
+                            // Base64: Qt hands a percent-encoded data URL to the SVG reader undecoded.
+                            const table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+                            let out = ""
+                            for (let i = 0; i < svg.length; i += 3) {
+                                const a = svg.charCodeAt(i), b = svg.charCodeAt(i + 1), c = svg.charCodeAt(i + 2)
+                                const n = (a << 16) | ((b || 0) << 8) | (c || 0)
+                                out += table[(n >> 18) & 63] + table[(n >> 12) & 63]
+                                    + (i + 1 < svg.length ? table[(n >> 6) & 63] : "=") + (i + 2 < svg.length ? table[n & 63] : "=")
                             }
+                            return "data:image/svg+xml;base64," + out
+                        }
+                        Image {
+                            x: -editGridCanvas.gs / 2
+                            y: -editGridCanvas.gs / 2
+                            width: parent.width + editGridCanvas.gs
+                            height: parent.height + editGridCanvas.gs
+                            fillMode: Image.Tile
+                            source: editGridCanvas.tile
+                            sourceSize: Qt.size(editGridCanvas.gs, editGridCanvas.gs)
+                            cache: false
+                            smooth: false
                         }
                     }
 
@@ -2463,6 +2581,12 @@ Scope {
                 }
 
                 Item {
+                    id: widgetChromeLayer
+                    anchors.fill: parent
+                    z: 15000
+                }
+
+                Item {
                     id: editControlsOverlay
                     anchors.fill: parent
                     visible: opacity > 0
@@ -2477,6 +2601,9 @@ Scope {
 
                     DesktopEditToolbar {
                         id: editControlsBar
+                        // iRiS hosts the toolbar in its chassis (IrisWidgetBar) so it joins the frame.
+                        visible: !editControlsBar.iris
+                        enabled: !editControlsBar.iris
                         availableWidth: Math.max(0, editGridOverlay.safeWidth - 16)
                         availableHeight: editGridOverlay.safeHeight
                         outputName: bgRoot.screenName
@@ -2554,7 +2681,10 @@ Scope {
                             })
                         }
 
+                        Timer { id: managerCloseLater; interval: 0; onTriggered: widgetManagerPanel.shown = false }
                         onShownChanged: {
+                            if (shown) GlobalStates.desktopWidgetManagerOutput = bgRoot.screenName
+                            else if (GlobalStates.desktopWidgetManagerOutput === bgRoot.screenName) GlobalStates.desktopWidgetManagerOutput = ""
                             if (!shown) {
                                 geometryReady = false
                                 return
@@ -2570,7 +2700,9 @@ Scope {
                             canvasHeight: widgetManagerPanel.parent?.height ?? 600
                             screenWidth: bgRoot.screen.width
                             screenHeight: bgRoot.screen.height
-                            onCloseRequested: widgetManagerPanel.shown = false
+                            // Closed after its own click returns: unloading the panel inside the
+                            // click that asked for it lost the next click.
+                            onCloseRequested: managerCloseLater.restart()
                             onFocusWidgetRequested: layoutKey => {
                                 GlobalStates.selectDesktopWidget(
                                     bgRoot.screenName + "::" + layoutKey)
@@ -2995,10 +3127,12 @@ Scope {
                 // Extra mascot instances (Settings › Widgets › Mascot › "+"),
                 // one MascotWidget per id under background.widgets.mascotInstances.
                 Repeater {
-                    model: {
-                        void Config.revision;
-                        const obj = Config.getNestedValue("background.widgets.mascotInstances", {});
-                        return Object.keys(obj ?? {}).sort();
+                    model: ScriptModel {
+                        values: {
+                            void Config.revision;
+                            const obj = Config.getNestedValue("background.widgets.mascotInstances", {});
+                            return Object.keys(obj ?? {}).sort();
+                        }
                     }
 
                     Loader {

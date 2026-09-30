@@ -61,6 +61,7 @@ ShellRoot {
     // Tier 4: T+1500ms (background features - updates, sync, content services)
     property var _shellUpdatesService
     property var _autostartService
+    property var _niriAnimationPresetsService
     property var _calendarSyncService
     property var _todoService
     property var _notepadService
@@ -81,6 +82,7 @@ ShellRoot {
         const family = Config.options?.panelFamily ?? "ii"
         root._shellUpdatesService = ShellUpdates
         root._autostartService = Autostart
+        root._niriAnimationPresetsService = NiriAnimationPresets
         if (family !== "iris") {
             root._calendarSyncService = CalendarSync
             root._todoService = Todo
@@ -507,36 +509,63 @@ ShellRoot {
         target: "taskview"
         function _isWaffle(): bool { return (Config.options?.panelFamily ?? "ii") === "waffle" }
         function _isIris(): bool { return (Config.options?.panelFamily ?? "ii") === "iris" }
+        // iRiS: Orbit when it is on, Spotlight (what task view opened before Orbit) when it is off.
+        function _irisOrbit(): bool { return Config.options?.iris?.orbit?.enable ?? false }
         function toggle(): void {
             if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = !GlobalStates.waffleTaskViewOpen; return }
-            if (_isIris()) { GlobalStates.searchOpen = !GlobalStates.searchOpen; return }
+            if (_isIris()) { if (_irisOrbit()) GlobalStates.irisOrbitOpen = !GlobalStates.irisOrbitOpen; else GlobalStates.searchOpen = !GlobalStates.searchOpen; return }
             if (CompositorService.isNiri) GlobalStates.toggleOrbit("")
         }
         function close(): void {
             if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = false; return }
-            if (_isIris()) { GlobalStates.searchOpen = false; return }
+            if (_isIris()) { GlobalStates.irisOrbitOpen = false; GlobalStates.searchOpen = false; return }
             if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview()
         }
         function open(): void {
             if (_isWaffle()) { GlobalStates.waffleTaskViewOpen = true; return }
-            if (_isIris()) { GlobalStates.searchOpen = true; return }
+            if (_isIris()) { if (_irisOrbit()) GlobalStates.irisOrbitOpen = true; else GlobalStates.searchOpen = true; return }
             if (CompositorService.isNiri) GlobalStates.openOrbit("")
         }
     }
 
     IpcHandler {
         target: "orbit"
-        function toggle(): void { if (CompositorService.isNiri) GlobalStates.toggleOrbit("") }
-        function close(): void { if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview() }
-        function open(): void { if (CompositorService.isNiri) GlobalStates.openOrbit("") }
-        function pocket(): void { if (CompositorService.isNiri) GlobalStates.openOrbitPocket("") }
-        function studio(): void { if (CompositorService.isNiri) GlobalStates.openOrbitStudio("") }
-        function find(query: string): void { if (CompositorService.isNiri) GlobalStates.openOrbitLens("", query) }
-        function stage(): void { if (CompositorService.isNiri) GlobalStates.openOrbitView("", "stage") }
-        function orbital(): void { if (CompositorService.isNiri) GlobalStates.openOrbitView("", "orbital") }
-        function next(): void { if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(1) }
-        function previous(): void { if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(-1) }
+        // iRiS has its own Orbit (a Place in the chassis, one layout, no Studio); the rest of the verbs are ii's.
+        function _isIris(): bool { return (Config.options?.panelFamily ?? "ii") === "iris" }
+        function toggle(): void {
+            if (_isIris()) { GlobalStates.irisOrbitOpen = !GlobalStates.irisOrbitOpen; return }
+            if (CompositorService.isNiri) GlobalStates.toggleOrbit("")
+        }
+        function close(): void {
+            if (_isIris()) { GlobalStates.irisOrbitOpen = false; return }
+            if (GlobalStates.overviewMode === "orbit") GlobalStates.closeOverview()
+        }
+        function open(): void {
+            if (_isIris()) { GlobalStates.irisOrbitOpen = true; return }
+            if (CompositorService.isNiri) GlobalStates.openOrbit("")
+        }
+        function pocket(): void {
+            if (_isIris()) { GlobalStates.irisOrbitOpen = true; return }
+            if (CompositorService.isNiri) GlobalStates.openOrbitPocket("")
+        }
+        function studio(): void { if (!_isIris() && CompositorService.isNiri) GlobalStates.openOrbitStudio("") }
+        function find(query: string): void {
+            if (_isIris()) { GlobalStates.irisOrbitQuery = query; GlobalStates.irisOrbitOpen = true; return }
+            if (CompositorService.isNiri) GlobalStates.openOrbitLens("", query)
+        }
+        function stage(): void { if (!_isIris() && CompositorService.isNiri) GlobalStates.openOrbitView("", "stage") }
+        function orbital(): void { if (!_isIris() && CompositorService.isNiri) GlobalStates.openOrbitView("", "orbital") }
+        function next(): void {
+            if (_isIris()) { NiriService.focusWorkspaceDown(); return }
+            if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(1)
+        }
+        function previous(): void {
+            if (_isIris()) { NiriService.focusWorkspaceUp(); return }
+            if (CompositorService.isNiri) GlobalStates.orbitNavigateRequested(-1)
+        }
         function status(): string {
+            if (_isIris()) return JSON.stringify({ family: "iris", open: GlobalStates.irisOrbitOpen,
+                enabled: Config.options?.iris?.orbit?.enable ?? false, output: GlobalStates.focusedScreen?.name ?? "" })
             const outputName = NiriService.currentOutput ?? ""
             const orbitCorner = Config.options?.orbit?.hotCorner ?? "topRight"
             return JSON.stringify(Object.assign({}, GlobalStates.orbitRuntimeStatus, {
@@ -555,7 +584,7 @@ ShellRoot {
             }))
         }
         function toggleView(): void {
-            if (!CompositorService.isNiri) return
+            if (!CompositorService.isNiri || _isIris()) return
             if (GlobalStates.overviewOpen && GlobalStates.overviewMode === "orbit")
                 GlobalStates.toggleOrbitStageView()
             else
@@ -915,9 +944,14 @@ ShellRoot {
 
     function cyclePanelFamily() {
         const currentFamily = Config.options?.panelFamily ?? "ii"
+        const wanted = Array.from(Config.options?.familyCycle ?? families)
+        const order = wanted.filter((family, index) => families.includes(family) && wanted.indexOf(family) === index)
+        if (order.length === 0) return
+        const at = order.indexOf(currentFamily)
+        const nextFamily = order[(at + 1) % order.length]
+        if (nextFamily === currentFamily) return
         const currentIndex = families.indexOf(currentFamily)
-        const nextIndex = (currentIndex + 1) % families.length
-        const nextFamily = families[nextIndex]
+        const nextIndex = families.indexOf(nextFamily)
 
         // Determine direction: ii -> waffle = left, waffle -> ii = right
         const direction = nextIndex > currentIndex ? "left" : "right"
@@ -944,6 +978,8 @@ ShellRoot {
             _transitionInProgress = false
         }
         if (_transitionInProgress) return
+        if ((Config.options?.panelFamily ?? "ii") === "iris")
+            GlobalStates.endIrisEditing()
 
         // If animation is disabled, switch instantly
         if (!(Config.options?.familyTransitionAnimation ?? true)) {

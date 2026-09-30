@@ -110,6 +110,8 @@ Singleton {
     readonly property int checkIntervalMs: (Config.options?.shellUpdates?.checkIntervalMinutes ?? 360) * 60 * 1000
     readonly property string dismissedCommit: Config.options?.shellUpdates?.dismissedCommit ?? ""
     readonly property string lastNotifiedCommit: Config.options?.shellUpdates?.lastNotifiedCommit ?? ""
+    readonly property int remindDays: Math.max(0, Number(Config.options?.shellUpdates?.remindDays ?? 3))
+    readonly property real lastNotifiedAt: Number(Config.options?.shellUpdates?.lastNotifiedAt ?? 0)
     readonly property bool showUpdate: hasUpdate && !isDismissed && !isUpdating
     readonly property bool isDismissed: dismissedCommit.length > 0 && remoteCommit === dismissedCommit
 
@@ -154,9 +156,18 @@ Singleton {
     }
 
     // Handler: notify when a new update is detected
-    onHasUpdateChanged: {
+    onHasUpdateChanged: root.maybeNotifyUpdate()
+
+    // Raised once per upstream commit, then again every `remindDays` while it is still
+    // pending, so an update that is never applied does not go quiet forever.
+    function maybeNotifyUpdate(): void {
         if (!hasUpdate || !available || !initialUpdateCheckDone || isDismissed) return
-        if (remoteCommit.length === 0 || remoteCommit === lastNotifiedCommit) return
+        if (remoteCommit.length === 0) return
+        const now = Date.now()
+        if (remoteCommit === lastNotifiedCommit) {
+            if (root.remindDays <= 0 || root.lastNotifiedAt <= 0) return
+            if (now - root.lastNotifiedAt < root.remindDays * 86400000) return
+        }
 
         const version = root.remoteVersion.length > 0 ? (" v" + root.remoteVersion) : ""
         const commits = root.repoDiverged
@@ -164,17 +175,31 @@ Singleton {
             : (root.commitsBehind > 0 ? (root.commitsBehind + " commits behind") : "New version available")
         Notifications.notify({
             summary: "iNiR Update Available" + version,
-            body: commits + ". Click the update indicator in the bar or open Settings → Services.",
+            body: commits + ". Run `inir update`, or open it from the shell's own updater.",
             urgency: NotificationUrgency.Normal,
             timeout: 15000,
             appName: "iNiR Shell"
         })
-        Config.setNestedValue("shellUpdates.lastNotifiedCommit", remoteCommit)
+        Config.setNestedValues({
+            "shellUpdates.lastNotifiedCommit": remoteCommit,
+            "shellUpdates.lastNotifiedAt": now
+        })
         print("[ShellUpdates] Notification sent: Update available" + version)
+    }
+
+    // A check that could not run for lack of internet; retried when the connection returns.
+    property bool waitingForNetwork: false
+    Connections {
+        target: Network
+        function onOnlineChanged() {
+            if (Network.online && root.waitingForNetwork) root.check()
+        }
     }
 
     function check(): void {
         if (!enabled || isChecking || isUpdating || managedExternally) return
+        root.waitingForNetwork = !Network.online
+        if (root.waitingForNetwork) return
         root.isChecking = true
         root.lastError = ""
         fetchProc.running = true
@@ -956,6 +981,7 @@ Singleton {
                 return
             }
             root.hasUpdate = root.commitsBehind > 0
+            Qt.callLater(() => root.maybeNotifyUpdate())
             print("[ShellUpdates] Repo relation: " + root.repoRelation
                 + " (ahead=" + root.commitsAhead + ", behind=" + root.commitsBehind + "), hasUpdate: " + root.hasUpdate)
             if (root.hasUpdate) {

@@ -623,9 +623,8 @@ schema_checks = {
         'Config.setNestedValue("iris.modules.desktopWidgets", value === "on")'
     ]),
     "iRiS lightweight background retains bare-desktop menu": all(fragment in iris_background for fragment in [
-        "IrisDesktopMenu {", "acceptedButtons: Qt.RightButton | Qt.LeftButton",
-        'Config.setNestedValue("iris.modules.desktopWidgets", true)'
-    ]) and 'component: IrisBackground {}' in (root / "modules/iris/critical/ShellIrisCriticalPanels.qml").read_text(encoding="utf-8")
+        "IrisDesktopMenu {", "acceptedButtons: Qt.RightButton | Qt.LeftButton", "IrisDesktopActions.menu("
+    ]) and 'Config.setNestedValue("iris.modules.desktopWidgets", true)' in (root / "modules/iris/background/IrisDesktopActions.qml").read_text(encoding="utf-8") and 'component: IrisBackground {}' in (root / "modules/iris/critical/ShellIrisCriticalPanels.qml").read_text(encoding="utf-8")
         and 'component: Background {}' in iris_panels,
     "wizard style catalog covers all ii global styles": all(preset in wizard for preset in [
         'id: "material"', 'id: "cards"', 'id: "aurora"', 'id: "inir"',
@@ -1612,13 +1611,13 @@ if ! grep -Fq 'bool cardEdgeMode = ubuf.presentationMode > 1.5 && ubuf.presentat
         || ! grep -Fq 'background.widgets.mediaControls.organicPulse' "$visualizer_settings" \
         || ! grep -Fq 'background.widgets.mediaControls.organicGlow' "$visualizer_settings" \
         || ! grep -Fq 'background.widgets.mediaControls.organicRange' "$visualizer_settings" \
-        || ! grep -Fq 'component MediaVizMetric: ColumnLayout' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerOpacity' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerRange' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerSmoothing' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerBarCount' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerFrequencyProfile' "$media_widget" \
-        || ! grep -Fq 'background.widgets.mediaControls.visualizerAccentStrength' "$media_widget" \
+        || ! grep -Fq 'component VizSlider: WidgetQuickSlider' "$media_widget" \
+        || ! grep -Fq 'key: "visualizerOpacity"' "$media_widget" \
+        || ! grep -Fq 'key: "visualizerRange"' "$media_widget" \
+        || ! grep -Fq 'key: "visualizerSmoothing"' "$media_widget" \
+        || ! grep -Fq 'key: "visualizerBarCount"' "$media_widget" \
+        || ! grep -Fq 'vizPath + "visualizerFrequencyProfile"' "$media_widget" \
+        || ! grep -Fq 'key: "visualizerAccentStrength"' "$media_widget" \
         || ! grep -Fq 'organicCoverUnderlap' "$visualizer_widget" \
         || grep -Fq 'organicInnerGap' "$visualizer_widget" \
         || ! grep -Fq 'background.widgets.visualizer.organicCoverSize' "$visualizer_widget" \
@@ -1632,7 +1631,7 @@ if ! grep -Fq 'bool cardEdgeMode = ubuf.presentationMode > 1.5 && ubuf.presentat
         || ! grep -Fq 'root.paletteMode === "album"' "$visualizer_widget" \
         || ! grep -Fq 'id: albumArtworkQuantizer' "$visualizer_widget" \
         || ! grep -Fq 'organicSensitivitySetting <= 0.4' "$visualizer_widget" \
-        || ! grep -Fq 'labelText: Translation.tr("Smoothing")' "$visualizer_widget" \
+        || ! grep -Fq 'title: Translation.tr("Smoothing"); key: "smoothing"' "$visualizer_widget" \
         || ! grep -Fq 'background.widgets.visualizer.smoothing' "$visualizer_widget" \
         || grep -Fq 'background.widgets.mediaControls.' "$visualizer_widget" \
         || ! grep -Fq 'Idle motion' "$visualizer_settings"; then
@@ -3506,7 +3505,8 @@ if ! grep -Fq 'xbps-query -p pkgver plasma-integration' "$void_files" \
     printf 'FAIL: Void file reconciliation cannot restore KDE platform integration\n' >&2
     exit 1
 fi
-if ! grep -Fq 'install_file "dots/.config/fontconfig/fonts.conf" "${XDG_CONFIG_HOME}/fontconfig/fonts.conf"' "$void_files" \
+if ! grep -Fq 'install_file "dots/.config/fontconfig/conf.d/90-inir-shell.conf" "${XDG_CONFIG_HOME}/fontconfig/conf.d/90-inir-shell.conf"' "$void_files" \
+        || ! grep -Fq 'LEGACY_FONTCONFIG="${XDG_CONFIG_HOME}/fontconfig/fonts.conf"' "$void_files" \
         || grep -Fq 'install_dir__sync "dots/.config/fontconfig" "${XDG_CONFIG_HOME}/fontconfig"' "$void_files"; then
     printf 'FAIL: Fontconfig reconciliation can delete provider/user conf.d entries\n' >&2
     exit 1
@@ -3650,14 +3650,29 @@ if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-i
     step "IPC registry freshness"
     python3 "$runtime_root/scripts/lib/generate-ipc-registry.py" --check
 
+    step "QML parses on Qt 6.10 and older"
+    python3 "$runtime_root/scripts/test-qml-qt-compat.py"
+
     step "iRiS style tokens"
     python3 "$runtime_root/scripts/test-iris-style-tokens.py"
+
+    step "Auto light/dark reads the wallpaper's brightness"
+    python3 "$runtime_root/scripts/test-wallpaper-mode.py"
 
     step "iRiS defaults"
     python3 "$runtime_root/scripts/test-iris-defaults.py"
 
+    step "iRiS anime layer"
+    python3 "$runtime_root/scripts/test-iris-anime-layer.py"
+
     step "iRiS performance contract"
     python3 "$runtime_root/scripts/test-iris-performance-contract.py"
+
+    step "niri config rules and flags"
+    python3 "$runtime_root/scripts/test-niri-config-rules.py"
+
+    step "niri animation presets"
+    python3 "$runtime_root/scripts/test-niri-animation-presets.py"
 fi
 
 if [[ "$run_runtime" == true ]]; then

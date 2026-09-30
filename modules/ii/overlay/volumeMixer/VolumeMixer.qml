@@ -142,10 +142,10 @@ StyledOverlayWidget {
         id: musicContent
 
         readonly property MprisPlayer activePlayer: MprisController.activePlayer
-        readonly property string cleanedTitle: StringUtils.cleanMusicTitle(activePlayer?.trackTitle) || Translation.tr("No media")
+        readonly property string cleanedTitle: StringUtils.cleanMusicTitle(MprisController.titleOf(activePlayer)) || Translation.tr("No media")
 
         // Datos de carátula (cover art) y progreso para la pestaña Music
-        property var artUrl: activePlayer?.trackArtUrl
+        property var artUrl: MprisController.artUrlOf(activePlayer)
         property string artDownloadLocation: Directories.coverArt
         readonly property bool downloaded: MediaArtwork.ready
         property string displayedArtFilePath: MediaArtwork.displaySource
@@ -235,7 +235,7 @@ StyledOverlayWidget {
                         font.pixelSize: Appearance.font.pixelSize.small
                         color: OverlayLook.colSubtext
                         elide: Text.ElideRight
-                        text: activePlayer?.trackArtist || ""
+                        text: MprisController.artistOf(activePlayer) || ""
                     }
 
                     StyledText {
@@ -243,8 +243,8 @@ StyledOverlayWidget {
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: OverlayLook.colSubtext
                         elide: Text.ElideRight
-                        text: (activePlayer && activePlayer.length > 0)
-                              ? `${StringUtils.friendlyTimeForSeconds(activePlayer.position)} / ${StringUtils.friendlyTimeForSeconds(activePlayer.length)}`
+                        text: MprisController.lengthOf(activePlayer) > 0
+                              ? `${StringUtils.friendlyTimeForSeconds(MprisController.positionOf(activePlayer))} / ${StringUtils.friendlyTimeForSeconds(MprisController.lengthOf(activePlayer))}`
                               : ""
                     }
 
@@ -253,8 +253,8 @@ StyledOverlayWidget {
                         wavy: activePlayer?.isPlaying ?? false
                         highlightColor: OverlayLook.colPrimary
                         trackColor: OverlayLook.colSecondaryContainer
-                        value: (activePlayer && activePlayer.length > 0)
-                               ? (activePlayer.position / activePlayer.length)
+                        value: MprisController.lengthOf(activePlayer) > 0
+                               ? (MprisController.positionOf(activePlayer) / MprisController.lengthOf(activePlayer))
                                : 0
                     }
                 }

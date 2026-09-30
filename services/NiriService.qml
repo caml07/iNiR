@@ -520,7 +520,7 @@ Singleton {
 
                 const updatedWorkspaces = {}
                 for (const id in root.workspaces) {
-                    updatedWorkspaces[id] = id === focusedWindow.workspace_id ? updatedWs : root.workspaces[id]
+                    updatedWorkspaces[id] = id === String(focusedWindow.workspace_id) ? updatedWs : root.workspaces[id]
                 }
                 root.workspaces = updatedWorkspaces
             }
@@ -537,13 +537,16 @@ Singleton {
             updatedWs[prop] = ws[prop]
         updatedWs.active_window_id = data.active_window_id
 
+        // for-in keys are strings; Niri's ids are numbers.
         const updatedWorkspaces = {}
         for (const id in root.workspaces)
-            updatedWorkspaces[id] = id === data.workspace_id ? updatedWs : root.workspaces[id]
+            updatedWorkspaces[id] = id === String(data.workspace_id) ? updatedWs : root.workspaces[id]
         root.workspaces = updatedWorkspaces
     }
 
     function handleWindowsChanged(data) {
+        const focused = (data.windows ?? []).find(window => window.is_focused === true)
+        root._latestFocusedWindowId = focused ? focused.id : null
         scheduleWindowsUpdate(data.windows)
     }
 
@@ -569,6 +572,9 @@ Singleton {
             return
 
         const window = data.window
+        // A window opened with focus gets no WindowFocusChanged of its own.
+        if (window.is_focused === true)
+            root._latestFocusedWindowId = window.id
         const currentList = _windowsDirty ? _pendingWindows : windows
         const existingIndex = currentList.findIndex(w => w.id === window.id)
         let updatedWindows
@@ -785,7 +791,7 @@ Singleton {
 
         const updatedWorkspaces = {}
         for (const id in root.workspaces) {
-            updatedWorkspaces[id] = id === data.id ? updatedWs : root.workspaces[id]
+            updatedWorkspaces[id] = id === String(data.id) ? updatedWs : root.workspaces[id]
         }
         root.workspaces = updatedWorkspaces
 

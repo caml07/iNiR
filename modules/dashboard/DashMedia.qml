@@ -14,7 +14,7 @@ DashCard {
     id: root
 
     readonly property MprisPlayer player: MprisController.activePlayer
-    readonly property bool hasPlayer: player !== null && (player?.trackTitle ?? "").length > 0
+    readonly property bool hasPlayer: player !== null && (MprisController.titleOf(player) ?? "").length > 0
     readonly property bool isPlaying: player?.isPlaying ?? false
 
     ColumnLayout {
@@ -91,7 +91,7 @@ DashCard {
             StyledText {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: root.hasPlayer ? (root.player?.trackTitle ?? "") : Translation.tr("Nothing playing")
+                text: root.hasPlayer ? (MprisController.titleOf(root.player) ?? "") : Translation.tr("Nothing playing")
                 font.pixelSize: Appearance.font.pixelSize.normal
                 font.weight: Font.Medium
                 color: root.colText
@@ -100,7 +100,7 @@ DashCard {
             StyledText {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
-                text: root.hasPlayer ? (root.player?.trackArtist ?? "") : Translation.tr("No music is currently playing")
+                text: root.hasPlayer ? (MprisController.artistOf(root.player) ?? "") : Translation.tr("No music is currently playing")
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 color: root.colSubtext
                 elide: Text.ElideRight

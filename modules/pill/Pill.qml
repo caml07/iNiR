@@ -690,7 +690,7 @@ Item {
                 Image {
                     id: pillTrackArt
                     anchors.fill: parent
-                    source: MprisController.activePlayer?.trackArtUrl ?? ""
+                    source: MprisController.artUrlOf(MprisController.activePlayer) ?? ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     visible: status === Image.Ready
@@ -704,7 +704,7 @@ Item {
             Column {
                 anchors.verticalCenter: parent.verticalCenter
                 Text {
-                    text: MprisController.activePlayer?.trackTitle ?? ""
+                    text: MprisController.titleOf(MprisController.activePlayer) ?? ""
                     color: PillTheme.cream
                     font.family: PillTheme.font
                     font.pixelSize: 12.5 * pill.s
@@ -714,7 +714,7 @@ Item {
                 }
                 Text {
                     text: PillTheme.joinArtists(MprisController.activePlayer?.trackArtists,
-                                                MprisController.activePlayer?.trackArtist)
+                                                MprisController.artistOf(MprisController.activePlayer))
                     color: PillTheme.dim
                     font.family: PillTheme.font
                     font.pixelSize: 10.5 * pill.s
@@ -1164,7 +1164,7 @@ Item {
                             width: Math.min(126 * pill.s, implicitWidth)
                             text: pill.mediaVolumeFeedback >= 0
                                 ? Math.round(pill.mediaVolumeFeedback * 100) + "%"
-                                : (MprisController.activePlayer?.trackTitle ?? Translation.tr("Media"))
+                                : (MprisController.titleOf(MprisController.activePlayer) ?? Translation.tr("Media"))
                             color: pill.mediaVolumeFeedback >= 0 ? PillTheme.cream : PillTheme.subtle
                             font.family: PillTheme.font
                             font.pixelSize: 12.5 * pill.s

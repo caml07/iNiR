@@ -58,6 +58,24 @@ if [[ ! -f "$COLOR_SOURCE" ]] || ! command -v jq &>/dev/null; then
     exit 0
 fi
 
+# The icon theme follows the scheme: the chosen theme names a family, and its light or dark sibling
+# is applied (WhiteSur-dark draws white symbolic icons, lost on a light scheme). Everything below
+# (GTK settings.ini, kdeglobals, qt5ct, qt6ct) reads the applied name.
+THEME_MODE=$(jq -r '.mode // empty' "$XDG_STATE_HOME/quickshell/user/generated/theme-meta.json" 2>/dev/null || true)
+if [[ "$THEME_MODE" != "light" && "$THEME_MODE" != "dark" ]]; then
+    [[ "$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)" == "'prefer-light'" ]] \
+        && THEME_MODE="light" || THEME_MODE="dark"
+fi
+CHOSEN_ICON_THEME=$(jq -r '.appearance.iconTheme // empty' "$SHELL_CONFIG_FILE" 2>/dev/null || true)
+[[ -z "$CHOSEN_ICON_THEME" ]] && CHOSEN_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || true)
+APPLIED_ICON_THEME=""
+if [[ -n "$CHOSEN_ICON_THEME" ]]; then
+    APPLIED_ICON_THEME=$("$SCRIPT_DIR/icon-theme-for-mode.sh" "$CHOSEN_ICON_THEME" "$THEME_MODE" 2>/dev/null || echo "$CHOSEN_ICON_THEME")
+    if [[ "$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'")" != "$APPLIED_ICON_THEME" ]]; then
+        gsettings set org.gnome.desktop.interface icon-theme "$APPLIED_ICON_THEME" 2>/dev/null || true
+    fi
+fi
+
 BG=$(jq -r '.app_background // .background // empty' "$COLOR_SOURCE" 2>/dev/null || echo "#1e1e2e")
 FG=$(jq -r '.app_foreground // .on_background // empty' "$COLOR_SOURCE" 2>/dev/null || echo "#cdd6f4")
 PRIMARY=$(jq -r '.app_accent // .primary // empty' "$COLOR_SOURCE" 2>/dev/null || echo "#cba6f7")
@@ -243,7 +261,7 @@ generate_kdeglobals() {
     fi
     if [[ -z "$icon_theme" ]]; then
         if [[ -d "$HOME/.local/share/icons/WhiteSur-dark" || -d "/usr/share/icons/WhiteSur-dark" ]]; then
-            icon_theme="WhiteSur-dark"
+            icon_theme=$("$SCRIPT_DIR/icon-theme-for-mode.sh" WhiteSur-dark "$THEME_MODE")
         else
             icon_theme="Adwaita"
         fi
@@ -976,10 +994,11 @@ fi
 QT6CT_CONF="$HOME/.config/qt6ct/qt6ct.conf"
 mkdir -p "$(dirname "$QT6CT_CONF")"
 touch "$QT6CT_CONF"
-CURRENT_ICON_THEME=$(grep '^icon_theme=' "$QT6CT_CONF" 2>/dev/null | cut -d= -f2 || true)
+CURRENT_ICON_THEME="$APPLIED_ICON_THEME"
+[[ -z "$CURRENT_ICON_THEME" ]] && CURRENT_ICON_THEME=$(grep '^icon_theme=' "$QT6CT_CONF" 2>/dev/null | cut -d= -f2 || true)
 if [[ -z "$CURRENT_ICON_THEME" ]]; then
     if [[ -d "$HOME/.local/share/icons/WhiteSur-dark" || -d "/usr/share/icons/WhiteSur-dark" ]]; then
-        CURRENT_ICON_THEME="WhiteSur-dark"
+        CURRENT_ICON_THEME=$("$SCRIPT_DIR/icon-theme-for-mode.sh" WhiteSur-dark "$THEME_MODE")
     else
         CURRENT_ICON_THEME="Adwaita"
     fi
@@ -998,7 +1017,8 @@ EOF
 QT5CT_CONF="$HOME/.config/qt5ct/qt5ct.conf"
 mkdir -p "$(dirname "$QT5CT_CONF")"
 touch "$QT5CT_CONF"
-CURRENT_QT5_ICON_THEME=$(grep '^icon_theme=' "$QT5CT_CONF" 2>/dev/null | cut -d= -f2 || true)
+CURRENT_QT5_ICON_THEME="$APPLIED_ICON_THEME"
+[[ -z "$CURRENT_QT5_ICON_THEME" ]] && CURRENT_QT5_ICON_THEME=$(grep '^icon_theme=' "$QT5CT_CONF" 2>/dev/null | cut -d= -f2 || true)
 [[ -z "$CURRENT_QT5_ICON_THEME" ]] && CURRENT_QT5_ICON_THEME="$CURRENT_ICON_THEME"
 CURRENT_QT5_STYLE=$(grep '^style=' "$QT5CT_CONF" 2>/dev/null | cut -d= -f2 || true)
 [[ -z "$CURRENT_QT5_STYLE" ]] && CURRENT_QT5_STYLE="Darkly"

@@ -518,10 +518,25 @@ Singleton {
                 root._pendingReload = true;
                 return;
             }
-            configFileView.reload();
-            root._syncVarProperties();
-            root.configChanged();
+            root._echoChecks = Math.min(root._echoChecks + 1, 4);
+            rawConfigReader.reload();
         }
+    }
+
+    // Every save of ours comes back as a fileChanged; reloading it repopulates the whole
+    // adapter and bumps `revision` for every reader. Reload only when the disk differs.
+    property int _echoChecks: 0
+
+    function _reloadIfExternal(): void {
+        if (root._writeInFlight || customInjectTimer.running) {
+            root._pendingReload = true;
+            return;
+        }
+        if (rawConfigReader.text() === configFileView.text())
+            return;
+        configFileView.reload();
+        root._syncVarProperties();
+        root.configChanged();
     }
 
     Timer {
@@ -580,6 +595,18 @@ Singleton {
     FileView {
         id: rawConfigReader
         path: root.filePath
+        onLoaded: {
+            if (root._echoChecks <= 0)
+                return;
+            root._echoChecks--;
+            root._reloadIfExternal();
+        }
+        onLoadFailed: {
+            if (root._echoChecks <= 0)
+                return;
+            root._echoChecks = 0;
+            configFileView.reload();
+        }
     }
 
     FileView {
@@ -643,6 +670,7 @@ Singleton {
             property list<string> knownPanels: [] // Tracks panels the user has seen; used to distinguish "user disabled" from "new in update"
             property string panelFamily: "ii" // "ii", "waffle", or "iris"
             property bool familyTransitionAnimation: true // Show animated overlay when switching families
+            property list<string> familyCycle: ["ii", "waffle", "iris"] // Families the switch shortcut (panelFamily cycle) walks through
 
             property JsonObject policies: JsonObject {
                 property int ai: 0 // 0: No | 1: Yes | 2: Local
@@ -1251,11 +1279,13 @@ Singleton {
                 property JsonObject widgets: JsonObject {
                     // "panel" (stock per-style plate) | "island" (Ricelin card)
                     property string style: "panel"
+                    property string design: "individual" // individual, instrument, readout
+                    property list<var> designUndo: [] // widget looks a design change cleared, for undo
                     property int dynamicOpacity: 0 // 0-100: reduce widget opacity when windows are on current workspace
                     // Opt-in local wallpaper sampling. Off keeps semantic widget
                     // colors stable when widgets move; on lets eligible widgets
                     // choose readable ink/semantic foregrounds from their region.
-                    property bool adaptColorsToWallpaperPosition: false
+                    property bool adaptColorsToWallpaperPosition: true
                     property JsonObject powerSaving: JsonObject {
                         property bool enable: true
                         property bool pauseOnGameMode: true
@@ -1269,6 +1299,9 @@ Singleton {
                     // output-qualified ("OUTPUT::configEntryName") so each screen
                     // keeps its own overlap order after edit mode closes/restarts.
                     property list<string> layerOrder: []
+                    // iRiS widget stacks: [{ id, members: [widget keys], rotate, interval (seconds) }].
+                    // A stack's place and look live in outputOverrides under "stack:<id>".
+                    property list<var> stacks: []
                     property JsonObject clock: JsonObject {
                         property bool enable: false
                         property bool locked: false
@@ -2154,6 +2187,7 @@ Singleton {
                         property string colorMode: "auto"
                         property string style: "card" // "card" | "instrument" (wire bulletin)
                         property bool showMeta: true
+                        property int rotateSeconds: 45
                         property JsonObject palette: JsonObject {
                             property string primary: "primary"
                             property string secondary: "secondary"
@@ -2548,7 +2582,7 @@ Singleton {
                 property int customRounding: -1 // -1: use global theme rounding | 0+: override bar rounding (px)
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property bool borderless: true // true for no grouping of items
-                property string topLeftIcon: "distro" // Options: "distro" or any icon name in ~/.config/quickshell/inir/assets/icons
+                property string topLeftIcon: "distro" // Options: "distro", "avatar" or any icon name in ~/.config/quickshell/inir/assets/icons
                 property bool showBackground: true
                 property bool showScrollHints: true // Show brightness/volume scroll hints on hover
                 property string leftScrollAction: "brightness" // "brightness", "volume", "workspace", "none"
@@ -2993,6 +3027,17 @@ Singleton {
                 property int timeout: 1000
                 property bool mediaEnabled: true
                 property list<string> screenList: []
+                property JsonObject connections: JsonObject {
+                    property bool enable: true
+                    property bool network: true
+                    property bool internet: true
+                    property bool bluetooth: true
+                    property bool usb: true
+                    property bool power: true
+                    property bool audio: true
+                    property bool displays: true
+                    property bool drives: true
+                }
             }
 
             property JsonObject osk: JsonObject {
@@ -3779,11 +3824,22 @@ Singleton {
                 property int adviseUpdateThreshold: 75
                 property int stronglyAdviseUpdateThreshold: 200
             }
+            property JsonObject vpn: JsonObject {
+                // The VPN button in the Control Center / quick controls. Off by default:
+                // it changes the toggle grid's shape, so it is asked for, not assumed.
+                property bool quickToggle: false
+                // The VPN card's details: addresses, name, account, exit node, devices and live traffic.
+                property bool details: false
+            }
             property JsonObject shellUpdates: JsonObject {
                 property bool enabled: true
                 property int checkIntervalMinutes: 360
                 property string dismissedCommit: ""
                 property string lastNotifiedCommit: ""
+                // Days before a still-pending update is raised again. 0 tells it once and
+                // then stays quiet until the next upstream commit.
+                property int remindDays: 3
+                property real lastNotifiedAt: 0
                 // When true, performUpdate() launches setup in a terminal window so the
                 // user sees the full TUI output (progress bars, success/warn/error lines)
                 // instead of just the bar pill X/N indicator. Auto-closes on success,
@@ -3854,11 +3910,17 @@ Singleton {
                 property JsonObject widgets: JsonObject {
                     property int radius: 22
                     property int opacity: 100
-                    property string tint: "wallpaper" // "wallpaper" or "system"
-                    property string design: "iris" // "iris" faces or the "material" family designs
+                    property string tint: "wallpaper" // accents: "wallpaper", "system" (iRiS), "spectrum" or "mono"
+                    property int vibrance: 85 // how strong widget accents are (0-100)
+                    property bool legibleAlways: false // Lume backs every widget as if the wallpaper under it were bright and busy
+                    property string design: "iris" // "iris" faces, "material" (each widget's own style), "instrument" or "readout"
                     property string material: "glass" // "glass", "clear", "solid" or "tinted"
                     property string weight: "regular" // "light", "regular" or "bold"
                     property bool rim: false // Hairline around Transparent widgets
+                }
+                property JsonObject desktopMenu: JsonObject {
+                    property bool wallpaper: true // The wallpaper at the head of the right-click menu
+                    property list<string> items: ["widgets", "customize", "screenshot", "terminal", "settings", "restart"]
                 }
                 property JsonObject dock: JsonObject {
                     property bool enable: true
@@ -3868,6 +3930,7 @@ Singleton {
                     property string material: "inherit" // "inherit" (iRiS glass), "solid", "glass" or "blur" (Niri blurs what is below)
                     property int iconSize: 40
                     property bool notch: true
+                    property string shape: "auto" // "auto" (capsule when notched, else the bubbles' shape), "round", "squircle" or "square"
                     property bool magnification: false
                     property int magnifySize: 150 // hovered icon at its largest, % of its size
                     property bool badges: true // Unread notification counts on app icons
@@ -3879,7 +3942,24 @@ Singleton {
                     property string preset: "iris" // IrisStyle.presets: iris, soft, round, crisp, angular, contrast
                     property string morph: "direct" // IrisStyle.morphStyles: direct, liquid, glide, snap, elastic, instant
                     property string accent: "blue" // "blue", "mint", "rose", "lilac" or "wallpaper"
+                    property string scheme: "auto" // "auto" (follows the system), "dark", "ink" or "light"
+                    property bool followTheme: true // with a colour theme chosen, the shell wears its accent, highlight and material
+                    property bool materialForApps: true // with the wallpaper colour theme, terminals and apps sit on the shell's material
+                    // Per scheme: tone lifts or dims the material (-30..30), colour is how strong accents read (0..100 %),
+                    // widgets is how colourful the desktop widgets read (40..160 %), lume makes bodies frost the wallpaper
+                    // shows through instead of solid.
+                    property JsonObject tune: JsonObject {
+                        property JsonObject dark: JsonObject { property int tone: 0; property int colour: 100; property int widgets: 100; property bool lume: false }
+                        property JsonObject ink: JsonObject { property int tone: 0; property int colour: 100; property int widgets: 120; property bool lume: true }
+                        property JsonObject light: JsonObject { property int tone: 0; property int colour: 85; property int widgets: 110; property bool lume: true }
+                    }
                     property string highlight: "orange" // "orange", "yellow", "red", "pink", "green", "accent" or "wallpaper"
+                    property JsonObject anime: JsonObject {
+                        property bool enabled: false
+                        property string palette: "sakura" // IrisStyle.animePalettes
+                        property int strength: 60 // 0 = the configured accent, 100 = the palette
+                        property bool highlight: false
+                    }
                     // How much of the wallpaper's hue the black surfaces carry.
                     // 0 keeps iRiS pure black; 1 is a few percent of the wallpaper
                     // in the raised surfaces and the neutral fills, never in the
@@ -3891,11 +3971,18 @@ Singleton {
                     property string aura: "subtle"
                     property int adaptive: 0 // how much the wallpaper's brightness, contrast and colour shape iRiS (0-100)
                     property string figureWeight: "bold" // "light", "regular" or "bold"
+                    // The pack every iRiS plate wears: "iris" (the family's tinted squircle)
+                    // or "tile" (the app-icon look: a plate with the glyph in a gradient of
+                    // its own colour). `plate` picks that plate's colour.
+                    property JsonObject icons: JsonObject {
+                        property string style: "iris"
+                        property string plate: "black" // "black", "white", "tint" or "surface"
+                    }
                     property int expandedRadius: 28
                     property int motionDuration: 220
-                    property string fontFamily: "" // Empty = Noto Sans
-                    property string titleFontFamily: "" // Empty = Readex Pro
-                    property string numbersFontFamily: "" // Empty = Rubik (clocks, timers, levels)
+                    property string fontFamily: "" // Empty = Inter (bundled)
+                    property string titleFontFamily: "" // Empty = Inter Display (bundled)
+                    property string numbersFontFamily: "" // Empty = Rubik (bundled; clocks, timers, levels)
                     property real density: 1.0
                     property bool motion: true
                     // iRiS Studio: the user's own tweaks on top of the preset. Every
@@ -3913,6 +4000,7 @@ Singleton {
                         property int melt: 0        // how deeply bodies fuse where they meet (100 = the style's own depth)
                         property int bounce: 100    // how much arrivals and moves bounce (100 = the motion style's own)
                         property int text: 100      // iRiS type size
+                        property string weight: "regular" // iRiS type weight: "light", "regular" or "bold"
                         property bool rim: true     // the hairline around the field's silhouette
                         property string rimTint: "neutral" // that hairline's ink: "neutral", "accent" or "highlight"
                         property int rimWidth: 1    // its width, 1-3 px
@@ -3930,11 +4018,16 @@ Singleton {
                         property int contentTiming: 100 // when content shows up inside a growing shape, % of the style
                         property int press: 100        // how deep controls dip when pressed
                         property string pieceShape: "circle" // bubbles, bars and satellites: "circle", "squircle" or "square"
+                        property bool linkShapes: false // the Island and the Dock take the bubbles' shape
                     }
-                    // iRiS Studio shows the target's preview beside its controls.
-                    property bool studioPreview: true
                     // Animated previews in iRiS Settings and Studio; off builds none of them.
                     property bool previews: true
+                    // How Customize opens: "shell" (on the shell itself) or "studio" (a panel beside it).
+                    property string customize: "shell"
+                    // Choosing a theme takes only its colours; its shapes, layout and motion stay as they are.
+                    property bool themeColoursOnly: false
+                    // How iRiS Settings is laid out: "sidebar", "rail" (icons only) or "home" (a grid of areas to open).
+                    property string settingsLayout: "sidebar"
                     // Looks saved from iRiS Studio: [{ name, values: { "iris.…": value } }].
                     property list<var> saved: []
                     property string themeId: "iris" // the iRiS theme last applied (curated id or a file in ~/.config/inir/iris/themes)
@@ -3942,18 +4035,26 @@ Singleton {
                         property string mode: "off" // "off", "wallpaper" (the output's wallpaper, blurred) or "compositor" (Niri blurs what is below)
                         property int tint: 58       // how much of the material stays over the glass, 0-100
                         property int blur: 100      // wallpaper glass blur, % of the maximum
+                        // The cut edge of Blur glass: light where it faces up, a line elsewhere (%), its width (px)
+                        // and colour ("scene" = the wallpaper's light, "white", "accent", "highlight").
+                        property int edgeLight: 34
+                        property int edgeLine: 10
+                        property real edgeWidth: 1.5
+                        property string edgeColour: "scene"
                     }
                     // Per surface: its own corners (0 = the family's) and its light
                     // ("inherit" = its identity, "wallpaper", or "off").
                     property JsonObject surfaces: JsonObject {
-                        property JsonObject island: JsonObject { property int speed: 100 }
-                        property JsonObject controlCenter: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject cards: JsonObject { property int radius: 0; property string light: "inherit"; property int width: 0; property int speed: 100; property bool joinOrigin: true; property bool header: true; property bool devices: true; property bool mixer: true }
-                        property JsonObject panels: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject spotlight: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject settings: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject gallery: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
-                        property JsonObject menus: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100 }
+                        property JsonObject island: JsonObject { property int radius: 0; property int speed: 100; property string morph: "" }
+                        property JsonObject controlCenter: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject cards: JsonObject { property string design: "welded"; property int radius: 0; property string light: "inherit"; property int width: 0; property int speed: 100; property string morph: ""; property string material: ""; property bool joinOrigin: false; property int gap: 0; property int pad: 0; property string grabber: "auto"; property bool header: true; property bool devices: true; property bool mixer: true }
+                        property JsonObject panels: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject spotlight: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject orbit: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject settings: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject gallery: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
+                        property JsonObject menus: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: ""; property string density: "compact" }
+                        property JsonObject osd: JsonObject { property int radius: 0; property string light: "inherit"; property int speed: 100; property string morph: ""; property string material: "" }
                     }
                 }
                 property JsonObject bar: JsonObject {
@@ -3962,6 +4063,7 @@ Singleton {
                     property bool notch: true
                     // Notch shoulders: how far the Island melts into its edge (%).
                     property int notchCurve: 100
+                    property string shape: "auto" // "auto" (capsule when notched, else the bubbles' shape), "round", "squircle" or "square"
                     property int satelliteGap: 6
                     property int clockScale: 100 // resting clock and date size, %
                     property string clockAccent: "highlight" // time separator and day number: "highlight", "accent" or "plain"
@@ -3971,6 +4073,7 @@ Singleton {
                     // content in the middle, "left"/"right" hug an end, "full"
                     // spans the whole edge as a bar.
                     property string layout: "island"
+                    property string strip: "clear" // menu bar: "clear" (items on the wallpaper) or "band"
                     // A full-width Island is a bar: what rests at its start, centre and end, in order.
                     // "island" (the live Island), "workspaces", "window", "time" and piece kinds.
                     property list<string> fullStart: ["workspaces", "window"]
@@ -3994,27 +4097,59 @@ Singleton {
                     property list<string> mediaBlocks: ["player", "timeline", "transport", "players", "levels"]
                     property string clockStyle: "dateTime" // resting clock: "time", "dateTime" or "weather"
                     property string auxiliary: "tray" // "tray", "tools", "sound", "mic" or "none"
+                    property string piecesSide: "end" // Which end of the resting Island carries its own pieces: "end" or "start"
                     property bool scrollBubbles: true // The scroll action also works over the bubbles beside the Island
                     property bool events: true // Charger, Bluetooth, Do Not Disturb and keyboard events in the Island
                     property string trailing: "controls" // Cluster trailing bubble: "controls", "notifications", "weather", "sound", "mic" or "none"
                     property int height: 42
                     property int margin: 8
+                    property bool autoHide: false // Rest the pointer at the Island's edge to bring it back
                     property bool reserveSpace: true
                     property list<string> screenList: []
                     property list<string> leftModules: []
                     property list<string> centerModules: []
                     property list<string> rightModules: [] // Island Desktop page: "custom:<widget-id>" modules
                 }
+                property JsonObject orbit: JsonObject {
+                    property bool enable: false
+                    property string opens: "island" // "island": the Island becomes Orbit; "floating": a sheet under it
+                    property bool previews: true // Niri's own screenshot of each window, when there is one
+                    property int previewAge: 10 // seconds a picture of the workspace you are on may be old
+                    property int width: 1100
+                    property int cardHeight: 440 // the tallest the workspace you are on gets
+                    property int peek: 56 // how much of the neighbouring workspaces shows (0 hides them)
+                    property bool wallpaper: true
+                    property string titles: "hover" // "hover", "always" or "off"
+                    property string labels: "full" // "full" (number and name) or "number"
+                    property int dimMatches: 78 // how far the windows that do not match a search fall back
+                    property bool hints: true
+                    property bool showRecent: true
+                    property int recentCount: 5
+                    property bool showMinimised: true
+                    property bool showActions: true
+                    property int thumbSize: 88
+                    property bool closeOnGo: true
+                    property bool scroll: true
+                    property bool askSpotlight: true
+                    property string stashRestore: "original" // "original" workspace or the "current" one
+                    property string keys: "niri" // "niri": ↑ ↓ workspaces, ← → windows; "swapped" the other way
+                    property bool hotCorner: true
+                    property string hotCornerAt: "auto" // "auto" picks a free corner; or "topLeft", "topRight", "bottomLeft", "bottomRight"
+                    property int hotCornerSize: 12
+                    property int hotCornerDelay: 150 // ms the pointer rests in the corner before Orbit opens
+                }
                 property JsonObject palette: JsonObject {
                     property string opens: "floating" // "floating" below the Island, or "island": the Island itself becomes Spotlight
                     property int width: 640
                     property int maxResults: 8
+                    property int clipboardResults: 8
                     property bool showHints: true
                 }
                 property JsonObject tray: JsonObject {
                     property bool hidePassive: false
                     property bool labels: true
                     property int columns: 4
+                    property string face: "apps" // "apps" or "count": what the tray bubble shows
                 }
                 property JsonObject wallpaper: JsonObject {
                     property int thumbnailSize: 228
@@ -4023,15 +4158,27 @@ Singleton {
                     property bool livePreview: true
                     property string layout: "showcase" // strip | showcase | wall
                     property bool motion: true // live wallpapers play their preview while chosen
+                    property string liveQuality: "best" // "best": the 4K file when offered; "light": HD
+                    property string sort: "newest" // library order: newest | oldest | name
+                    property string onlineSort: "top" // online sources: top | newest | random
+                    property string topRange: "1w" // what "top" covers online: 1d | 1w | 1M | 1y
+                    property list<string> sources: ["wallhaven", "live"] // online sources shown, in order
+                    property bool suggestive: false // swimsuits, lingerie, fan service in online results
                     property list<string> pinned: []
                 }
                 property JsonObject player: JsonObject {
-                    property bool roundCover: true
+                    property bool roundCover: false
                     property bool artworkBackground: true
                     // What the media bubble becomes: a card floating out of it, or the Island page.
                     property string bubbleOpens: "card"
                     // Keep the card floating beside the Island while something is playing.
                     property bool cardPinned: false
+                    // The visualizer on the Island, its player page and the Visualizer bubble.
+                    property JsonObject visualizer: JsonObject {
+                        property string style: "capsules" // capsules | rise | dots | wave | ring
+                        property int bars: 5
+                        property string colour: "art" // art | accent | highlight | ink
+                    }
                 }
                 // Where each Island bubble slot rests: "island", a zone ("top-left",
                 // "top-right", "left", "right", "bottom-left", "bottom-right") or "free"
@@ -4159,6 +4306,36 @@ Singleton {
                             property real fx: 0.5
                             property real fy: 0.5
                         }
+                        property JsonObject vpn: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject visualizer: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject shellUpdate: JsonObject {
+                            property bool enable: true
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject anime: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
+                        property JsonObject watching: JsonObject {
+                            property bool enable: false
+                            property string place: "right"
+                            property real fx: 0.5
+                            property real fy: 0.5
+                        }
                     }
                     // Distance (px) floating bubbles keep from the screen edges.
                     property int edgeGap: 20
@@ -4186,11 +4363,33 @@ Singleton {
                     // { appId, place, fx, fy }, placed like any other piece.
                     property list<var> apps: []
                 }
+                property JsonObject anime: JsonObject {
+                    property int shows: 5 // how many upcoming episodes the Airing card lists
+                    property list<var> following: [] // AniList ids you follow; the piece shows these first
+                    property string audio: "sub" // "sub" Japanese audio with subtitles | "dub" dubbed (ani-cli --dub)
+                    property string quality: "best" // ani-cli -q: "best" | "1080" | "720" | "480"
+                    property int subtitleScale: 100 // mpv sub-scale, percent
+                    property int subtitlePosition: 100 // mpv sub-pos: 100 is the bottom edge
+                    property bool skipIntro: false // ani-cli --skip, needs ani-skip
+                }
+                property JsonObject pieces: JsonObject {
+                    // Glyph chosen for a piece whose resting face is a glyph:
+                    // { kind, glyph }, glyph being a Material Symbol name.
+                    property list<var> icons: []
+                }
                 // Surround: the shell closes around the display with one band on
                 // every edge, turning the screen's corners inward.
                 property JsonObject surround: JsonObject {
                     property bool enable: true
                     property string music: "widget" // Organic Edge under iRiS: "widget" (its own wave) or "frame" (the frame breathes)
+                    property string musicEdges: "sides" // "sides" | "horizontal" | "all"
+                    property int musicStrength: 160 // 50-300 %, maximum inward swell
+                    property int musicSensitivity: 140 // 50-250 %, response to quiet music
+                    property int musicSpeed: 100 // 40-200 %, travel along the frame
+                    property string musicAppearance: "etched" // "sculpted" | "etched" | "satin"
+                    property string musicColour: "pearl" // "pearl" | "accent" | "highlight" | "wallpaper"
+                    property int musicLight: 35 // 0-100 %, light on the moving inner edge
+                    property int musicLightWidth: 5 // 1-18 px, edge treatment width
                     property int thickness: 10
                     property int radius: 22
                 }
@@ -4200,15 +4399,120 @@ Singleton {
                     // same round body as the connectivity toggles, in a module).
                     property string controls: "tiles"
                     property int width: 360
-                    // Sections, in order: "connectivity", "media", "shortcuts", "levels", "notifications".
+                    // 2.31's composition, read only to seed `modules` for configs that changed it.
                     property list<string> sections: ["connectivity", "media", "shortcuts", "levels", "notifications"]
+                    property string preset: "iris"
+                    property int columns: 4
+                    property bool labels: false
+                    property list<string> modules: ["platter", "media", "darkMode", "nightLight", "levels", "idle", "snip", "devices", "record", "notifications"]
+                    // Per-module shapes, as "<id>:<columns>x<rows>" ("F" = full width).
+                    property list<string> sizes: ["devices:2x1", "record:2x1"]
+                    property list<string> platter: ["network", "bluetooth", "focus", "gameMode"]
+                    property list<string> levels: ["brightness", "volume", "microphone"]
+                    property string accent: "system" // "system", "accent", "colourful" or "mono"
+                    property string sliders: "neutral" // "neutral" or "accent"
+                }
+                property JsonObject lock: JsonObject {
+                    property string preset: "iris"
+                    property string material: "glass" // "glass", "tint" or "none": what the plates are made of
+                    property JsonObject scene: JsonObject {
+                        property string source: "desktop" // "desktop", "custom" or "colour"
+                        property string path: ""
+                        property int blur: 100
+                        property int dim: 0
+                        property int saturation: 15
+                        property string scrim: "gradient" // "gradient", "flat" or "none"
+                        property int scrimStrength: 100
+                        property int vignette: 0
+                        property string motion: "none" // "none" or "drift": a slow Ken Burns over the still
+                        property int driftTime: 40 // seconds for one drift pass
+                        property string fit: "cover" // "cover" or "contain"
+                    }
+                    property JsonObject type: JsonObject {
+                        property int scale: 100
+                        property int clockSize: 112
+                        property string clockFont: "numbers" // "numbers", "main" or "title"
+                        property int clockWeight: 700
+                        property int clockTracking: -2
+                        property string accent: "plain" // "plain", "accent" or "highlight"
+                        property string clockFormat: "auto" // "auto", "24h" or "12h"
+                        property bool seconds: false
+                        property string dateFormat: "long" // "long", "short", "numeric" or "weekday"
+                    }
+                    property JsonObject blocks: JsonObject {
+                        property JsonObject clock: JsonObject {
+                            property bool enable: true
+                            property string style: "stack" // "stack", "inline" or "minimal"
+                            property string zone: "top"
+                            property real fx: 0.5
+                            property real fy: 0.09
+                            property int scale: 100
+                            property bool date: true
+                        }
+                        property JsonObject glance: JsonObject {
+                            property bool enable: true
+                            property string zone: "top"
+                            property real fx: 0.5
+                            property real fy: 0.26
+                            property int scale: 100
+                            property bool weather: true
+                            property bool events: true
+                            property bool battery: true
+                        }
+                        property JsonObject media: JsonObject {
+                            property bool enable: true
+                            property string style: "card" // "card" or "bare"
+                            property string zone: "bottom"
+                            property real fx: 0.5
+                            property real fy: 0.34
+                            property int scale: 100
+                        }
+                        property JsonObject activity: JsonObject {
+                            property bool enable: true
+                            property string zone: "top"
+                            property real fx: 0.5
+                            property real fy: 0.46
+                            property int scale: 100
+                        }
+                        property JsonObject session: JsonObject {
+                            property bool enable: true
+                            property string zone: "bottom"
+                            property real fx: 0.5
+                            property real fy: 0.89
+                            property int scale: 100
+                            property bool avatar: true
+                            property bool name: true
+                            property bool hint: true
+                            property int width: 248
+                        }
+                        property JsonObject status: JsonObject {
+                            property bool enable: false
+                            property string zone: "topRight"
+                            property real fx: 0.9
+                            property real fy: 0.06
+                            property int scale: 100
+                            property bool battery: true
+                            property bool network: true
+                            property bool keyboard: true
+                        }
+                    }
                 }
                 property JsonObject notifications: JsonObject {
                     property int width: 380
                     property int duration: 4000 // Banner time on screen (ms) when the app does not set one
+                    property bool fullscreen: true // banners over fullscreen windows; off holds them for Today
                 }
                 property JsonObject osd: JsonObject {
                     property int width: 320
+                    property string position: "bottom" // "bottom" or "top"
+                    property int offset: 18
+                    property int duration: 1500
+                    property string levels: "yours" // "yours", "every" or "off": volume, brightness and mic
+                    property string media: "yours" // "yours", "every" or "off": song changes
+                    property bool keyboard: true
+                    property string fullscreen: "show" // "show", "quiet" or "hide": over fullscreen windows and in Game mode
+                    property string style: "capsule" // "capsule", "bar" or "minimal": how a level is drawn
+                    property bool figure: true
                 }
                 property JsonObject modules: JsonObject {
                     property bool desktopWidgets: true
@@ -4359,7 +4663,7 @@ Singleton {
                     property bool showUnreadCount: true
                 }
                 property JsonObject actionCenter: JsonObject {
-                    property list<string> toggles: ["network", "hotspot", "bluetooth", "easyEffects", "powerProfile", "idleInhibitor", "nightLight", "darkMode", "antiFlashbang", "cloudflareWarp", "mic", "musicRecognition", "notifications", "onScreenKeyboard", "gameMode", "screenSnip", "colorPicker"]
+                    property list<string> toggles: ["network", "hotspot", "bluetooth", "easyEffects", "powerProfile", "idleInhibitor", "nightLight", "darkMode", "antiFlashbang", "vpn", "cloudflareWarp", "mic", "musicRecognition", "notifications", "onScreenKeyboard", "gameMode", "screenSnip", "colorPicker"]
                 }
                 property JsonObject calendar: JsonObject {
                     property bool force2CharDayOfWeek: true

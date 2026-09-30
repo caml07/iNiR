@@ -6,6 +6,8 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.waffle.looks
 import qs.services
+import qs.modules.iris.components
+import qs.modules.iris.style
 
 // Elegant family transition overlay
 //
@@ -17,7 +19,7 @@ import qs.services
 // Each family has its own visual identity:
 //   Waffle  → Fluent acrylic card with decelerate curve and accent shimmer
 //   Material → Ink ripple with Material emphasized curves and container badge
-//   iRiS    → Minimal optical mark with restrained type and no blur
+//   iRiS    → Minimal optical mark with restrained type over a light blur
 Scope {
     id: root
 
@@ -113,7 +115,10 @@ Scope {
             // Side effect kept out of the source binding: make sure the still
             // for a video/GIF wallpaper exists before the overlay asks for it.
             const wp = Config.options?.background?.wallpaperPath ?? ""
-            if (wp) Wallpapers.ensureVideoStill(wp)
+            if (wp) {
+                Wallpapers.ensureVideoFirstFrame(FileUtils.trimFileProtocol(wp))
+                Wallpapers.ensureVideoStill(wp)
+            }
 
             // Cancel any running exit
             fadeOut.stop()
@@ -173,7 +178,7 @@ Scope {
     NumberAnimation {
         id: blurIn
         target: root; property: "_blurAmount"
-        from: 0; to: root._isIris ? 0 : 0.8
+        from: 0; to: root._isIris ? 0.22 : 0.8
         duration: _animated ? 360 : 5
         easing.type: Easing.OutQuad
     }
@@ -298,7 +303,11 @@ Scope {
                             // Pure: generating the thumbnail from in here mutated
                             // state this same binding reads and Qt flagged a
                             // binding loop. _beginTransition() requests it.
+                            // The full-size first frame, not the 256 px thumbnail still: iRiS
+                            // barely blurs it, and a stretched thumbnail read as pixelated.
                             if (/\.(mp4|webm|mkv|avi|mov)$/i.test(path)) {
+                                const frame = Wallpapers.stillUrlFor(path)
+                                if (frame) return frame
                                 const still = Wallpapers.videoStillPath(path)
                                 if (!still) return ""
                                 return still.startsWith("file://") ? still : "file://" + still
@@ -306,6 +315,8 @@ Scope {
                             return path.startsWith("file://") ? path : "file://" + path
                         }
                         fillMode: Image.PreserveAspectCrop
+                        // Decoded at the output's size: a 4K frame never becomes a 4K texture.
+                        sourceSize: Qt.size(Math.ceil(Screen.width * Screen.devicePixelRatio), Math.ceil(Screen.height * Screen.devicePixelRatio))
                         asynchronous: true
                         cache: true
                         visible: false
@@ -315,7 +326,7 @@ Scope {
                         anchors.fill: parent
                         source: wallpaperImg
                         visible: wallpaperImg.status === Image.Ready
-                        blurEnabled: Appearance.effectsEnabled && !root._isIris
+                        blurEnabled: Appearance.effectsEnabled
                         blur: root._blurAmount
                         blurMax: 64
                         saturation: 0.25
@@ -352,82 +363,46 @@ Scope {
     Component {
         id: irisTransition
 
+        // iRiS arrives as its own mark: the real IrisMark, orbiting, over the veiled wallpaper, its name
+        // under it in the family's title face. It emerges on the family's curve and leaves the way it
+        // came, never bouncing; the shell then grows inward on its own arrival (IrisStyle.arrival).
         Item {
             id: irisRoot
             anchors.fill: parent
             property bool entered: false
             Component.onCompleted: Qt.callLater(() => entered = true)
+            readonly property real shown: root._phase ? 0 : (irisRoot.entered ? 1 : 0)
 
             Column {
                 anchors.centerIn: parent
-                spacing: 13
-                opacity: root._phase ? 0 : (irisRoot.entered ? 1 : 0)
-                scale: root._phase ? 0.96 : (irisRoot.entered ? 1 : 0.92)
-
+                spacing: Math.round(16 * IrisStyle.density)
+                opacity: irisRoot.shown
+                scale: root._phase ? 0.94 : (irisRoot.entered ? 1 : 0.86)
                 Behavior on opacity {
-                    NumberAnimation { duration: root._phase ? 120 : 220; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._phase ? IrisStyle.recedeDuration : IrisStyle.emergeDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: root._phase ? IrisStyle.recedeCurve : IrisStyle.emergeCurve
+                    }
                 }
                 Behavior on scale {
-                    NumberAnimation { duration: root._phase ? 150 : 260; easing.type: Easing.OutCubic }
-                }
-
-                Item {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: 58
-                    height: 58
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 50
-                        height: 50
-                        radius: 25
-                        color: "transparent"
-                        border.width: 4
-                        border.color: root._snapPrimary
-                    }
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 16
-                        height: 16
-                        radius: 8
-                        color: root._snapPrimary
-                    }
-                    Rectangle {
-                        x: 41
-                        y: 8
-                        width: 8
-                        height: 8
-                        radius: 4
-                        color: Appearance.m3colors.m3tertiary
+                    NumberAnimation {
+                        duration: root._phase ? IrisStyle.recedeDuration : IrisStyle.emergeDuration
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: root._phase ? IrisStyle.recedeCurve : IrisStyle.emergeCurve
                     }
                 }
 
-                Text {
+                IrisMark {
                     anchors.horizontalCenter: parent.horizontalCenter
+                    implicitSize: Math.round(72 * IrisStyle.density)
+                    orbiting: true
+                }
+                IrisText {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    role: IrisText.Display
                     text: "iRiS"
-                    font.family: Appearance.font.family.title
-                    font.pixelSize: 25
-                    font.weight: Font.Bold
-                    font.letterSpacing: 0.8
-                    color: root._snapOnSurface
-                }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    width: 38
-                    height: 2
-                    radius: 1
-                    color: root._snapPrimary
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "minimal · modular"
-                    font.family: Appearance.font.family.main
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                    font.letterSpacing: 0.5
-                    color: ColorUtils.applyAlpha(root._snapOnSurface, 0.72)
+                    color: IrisStyle.onMedia
                 }
             }
         }

@@ -95,14 +95,10 @@ Scope {
             readonly property real edgeMargin: Appearance.sizes.elevationMargin
 
             function positionPill(): void {
-                const screenWidth = osdWindow.screen?.width ?? 0
-                if (pill._positioned || pill.width <= 0 || osdWindow.width <= 0)
-                    return
-                if (screenWidth > 0 && osdWindow.width < screenWidth)
+                if (pill._userPositioned || pill.width <= 0 || osdWindow.width <= 0)
                     return
                 pill.x = (osdWindow.width - pill.width) / 2
                 pill.y = Appearance.sizes.elevationMargin
-                pill._positioned = true
                 Qt.callLater(() => { pill.initScale = 1.0 })
             }
 
@@ -173,7 +169,7 @@ Scope {
                 id: pill
                 property bool animatePosition: false
                 property real contentPadding: 6
-                property bool _positioned: false
+                property bool _userPositioned: false
                 property bool _osdHovered: false
 
                 // When auto-hide is active and not revealed: fade + shrink away
@@ -448,7 +444,10 @@ Scope {
             yAxis.minimum: 0
             yAxis.maximum: osdWindow.height - pill.height
             onActiveChanged: {
-                if (active) pill.animatePosition = false
+                if (active) {
+                    pill._userPositioned = true
+                    pill.animatePosition = false
+                }
                 else osdWindow.snapToNearestEdge()
             }
         }

@@ -277,6 +277,35 @@ check_dependencies() {
     fi
 }
 
+check_graphics_stack() {
+    if [[ "${OS_GROUP_ID:-unknown}" != "void" ]]; then
+        doctor_pass "Graphics preflight not required for ${OS_GROUP_ID:-this distro}"
+        return 0
+    fi
+
+    local probe="${DOTS_CORE_CONFDIR:-.}/scripts/check-void-graphics.sh"
+    if [[ ! -f "$probe" && -f ./scripts/check-void-graphics.sh ]]; then
+        probe="./scripts/check-void-graphics.sh"
+    fi
+    if [[ ! -f "$probe" ]]; then
+        doctor_fail "Void graphics preflight helper is missing"
+        return 1
+    fi
+
+    local output rc=0
+    output="$(bash "$probe" 2>&1)" || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        doctor_pass "${output%%$'\n'*}"
+        return 0
+    fi
+
+    doctor_fail "${output%%$'\n'*}"
+    if [[ "$output" == *$'\n'* ]]; then
+        printf '%s\n' "${output#*$'\n'}"
+    fi
+    return "$rc"
+}
+
 get_missing_dependencies() {
     doctor_missing_deps=()
     check_dependencies
@@ -1923,7 +1952,7 @@ _doctor_run_step() {
 }
 
 run_doctor_with_fixes() {
-    local total_steps=23
+    local total_steps=24
     local doctor_started_at=$SECONDS
     doctor_passed=0
     doctor_failed=0
@@ -2050,6 +2079,7 @@ run_doctor_with_fixes() {
     _doctor_run_step 21 $total_steps "Checking wallpaper health"     check_wallpaper_health
     _doctor_run_step 22 $total_steps "Checking environment variables" check_environment_vars
     _doctor_run_step 23 $total_steps "Checking Niri config"          check_niri_config
+    _doctor_run_step 24 $total_steps "Checking graphics renderer"    check_graphics_stack
 
     echo ""
     tui_divider

@@ -17,6 +17,10 @@ run_probe() {
 }
 
 mkdir -p "$tmp/no-dri" "$tmp/no-sys"
+INIR_DRI_ROOT="$tmp/no-dri" INIR_SYSFS_ROOT="$tmp/no-sys" INIR_SKIP_GRAPHICS_PREFLIGHT=1 \
+    bash "$probe" >"$tmp/skipped.out" 2>&1
+grep -Fq 'Graphics preflight skipped' "$tmp/skipped.out"
+
 if run_probe "$tmp/no-dri" "$tmp/no-sys" "$tmp/no-render.out"; then
     printf 'FAIL: graphics preflight accepted a machine with no render node\n' >&2
     exit 1

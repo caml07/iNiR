@@ -218,8 +218,11 @@ extras_mascot_latest_tag() {
     printf '%s\n' "$INIR_MASCOT_RELEASE_TAG"
     return 0
   fi
-  curl -fsI --max-time 10 "https://github.com/snowarch/inir-mascot/releases/latest" 2>/dev/null \
-    | tr -d '\r' | awk -F/ 'tolower($0) ~ /^location:/ { print $NF; exit }'
+  local final_url
+  final_url="$(curl -fsIL --max-time 10 -o /dev/null -w '%{url_effective}' \
+    "https://github.com/snowarch/inir-mascot/releases/latest" 2>/dev/null || true)"
+  [[ "$final_url" == */releases/tag/* ]] || return 0
+  printf '%s\n' "${final_url##*/}"
 }
 
 extras_mascot_release_base_url() {

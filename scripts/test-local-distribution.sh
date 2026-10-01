@@ -1424,6 +1424,27 @@ fi
 step "mascot pack install and repair"
 bash "$runtime_root/scripts/test-mascot-pack-flow.sh"
 
+step "mascot optional-pack runtime gate"
+mascot_catalog="$runtime_root/modules/common/MascotCatalog.qml"
+mascot_image="$runtime_root/modules/common/widgets/MascotImage.qml"
+mascot_companion="$runtime_root/modules/mascot/MascotCompanion.qml"
+mascot_ii_settings="$runtime_root/modules/settings/MascotConfig.qml"
+mascot_waffle_settings="$runtime_root/modules/waffle/settings/pages/WMascotPage.qml"
+if ! grep -Fq 'readonly property bool packAvailable: presenceProbe.loaded' "$mascot_catalog"; then
+    printf 'FAIL: mascot catalog does not expose optional art-pack availability\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'MascotCatalog.packAvailable' "$mascot_image" \
+        || ! grep -Fq 'MascotCatalog.packAvailable' "$mascot_companion"; then
+    printf 'FAIL: mascot runtime surfaces are not gated by optional art-pack availability\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_ii_settings" \
+        || ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_waffle_settings"; then
+    printf 'FAIL: mascot master switches remain interactive without the optional art pack\n' >&2
+    exit 1
+fi
+
 if [[ -f "$runtime_root/Makefile" ]]; then
     step "make install dry run"
     make -n install PREFIX=/tmp/inir-stage-test -C "$runtime_root" >/dev/null

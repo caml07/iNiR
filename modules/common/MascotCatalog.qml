@@ -36,6 +36,7 @@ Singleton {
     property var surfacePools: ({})
     property bool ready: true
     property bool manifestAvailable: false
+    readonly property bool packAvailable: presenceProbe.loaded
     property int revision: 0
     property var _surfaceHistory: ({})
     // Per-pose apparent-size correction, derived from the composition tag
@@ -49,6 +50,12 @@ Singleton {
 
     function characterPose(original, state) {
         return characterProfiles[characterStyle]?.[state] ?? original
+    }
+    FileView {
+        id: presenceProbe
+        path: Quickshell.shellPath("assets/images/mascot/inir-mascot-presence-idle-loop.gif")
+        watchChanges: true
+        printErrors: false
     }
     FileView {
         id: jrpgProbe

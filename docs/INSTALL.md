@@ -73,6 +73,14 @@ machine (kernel/firmware plus a usable Mesa/Vulkan or vendor graphics stack).
 iNiR owns the rice and its userland providers; it does not guess GPU drivers,
 rewrite the bootloader or choose hardware-specific kernel parameters.
 
+Before provisioning Void dependencies, the installer runs a small graphics
+preflight. It requires an accessible DRM render node and, for VirtIO guests,
+rejects a negotiated feature set without `VIRTIO_GPU_F_VIRGL`. The release VM
+uses VirGL (`virtio-vga-gl`/`virtio-gpu-gl`); the earlier plain VirtIO setup
+fell back to software EGL and Niri did not expose a usable output. The check can
+be bypassed explicitly with `INIR_SKIP_GRAPHICS_PREFLIGHT=1` for unsupported
+experiments, but iNiR still does not install or choose GPU drivers.
+
 Disk usage depends on what is already installed. In release testing a 20 GiB
 Void root ran out of space during the large Nerd Fonts transaction, while the
 30 GiB release VM completed the full profile and later had roughly 7 GiB free.

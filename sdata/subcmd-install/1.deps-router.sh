@@ -33,6 +33,11 @@ case "$OS_GROUP_ID" in
     
   void)
     printf "${STY_GREEN}Using Void Linux installer${STY_RST}\n"
+    if ! bash ./scripts/check-void-graphics.sh; then
+      printf "${STY_RED}Void graphics preflight failed.${STY_RST}\n" >&2
+      printf "${STY_YELLOW}Fix the base Void graphics stack before installing iNiR, or set INIR_SKIP_GRAPHICS_PREFLIGHT=1 to bypass this check deliberately.${STY_RST}\n" >&2
+      return 1
+    fi
     source ./sdata/dist-void/install-deps.sh
     ;;
     

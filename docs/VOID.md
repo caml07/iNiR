@@ -333,17 +333,24 @@ Recipe (QEMU, KVM available on the host):
 ```
 qemu-system-x86_64 \
   -accel kvm -m 4096 -smp 4 \
-  -display gtk \
-  -device virtio-gpu \
+  -display gtk,gl=on \
+  -device virtio-vga-gl \
   -drive file=void.img,format=qcow2,if=virtio \
   -netdev user,id=n1 -device virtio-net-pci,netdev=n1
 ```
 
-- Graphics: **lavapipe** (Mesa software Vulkan) — install `mesa-dri` in the
-  guest; Niri runs on it (slow but functional). No host GPU required.
-- Upgrade path (documented, needs host GL + blob support):
-  `-device virtio-gpu-gl,hostmem=8G,blob=true,venus=true` (Vulkan via Venus,
-  QEMU docs). RAM ≥ 8-10GB.
+- Graphics: the validated VM path uses **VirGL**. The original plain
+  `virtio-vga` configuration exposed DRM but negotiated no
+  `VIRTIO_GPU_F_VIRGL`; Niri then skipped the software EGL renderer and had no
+  usable output. Lavapipe/software rendering is therefore not a supported
+  fallback for the Void release VM.
+- `scripts/check-void-graphics.sh` catches that specific VirtIO failure before
+  the installer starts the large dependency transaction. It also rejects a
+  machine with no accessible DRM render node. Set
+  `INIR_SKIP_GRAPHICS_PREFLIGHT=1` only when deliberately testing an unusual
+  graphics stack outside the validated profile.
+- Venus remains an optional VM configuration when the host/QEMU stack supports
+  it: `-device virtio-gpu-gl,hostmem=8G,blob=true,venus=true`.
 - Verification order in the VM:
   0. Quickshell 0.3.0 (repo) runs iNiR — the make-or-break check.
   1. Installer end-to-end on a fresh Void.

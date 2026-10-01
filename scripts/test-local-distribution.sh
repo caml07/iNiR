@@ -2797,15 +2797,33 @@ fi
 rm -rf "$turnstile_test_root"
 
 step "Void dependency profile"
+bash "$runtime_root/scripts/test-void-graphics-preflight.sh"
+python3 "$runtime_root/scripts/test-detect-sensors.py"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
 deps_map="$runtime_root/sdata/lib/deps-map.sh"
 doctor_lib="$runtime_root/sdata/lib/doctor.sh"
+deps_router="$runtime_root/sdata/subcmd-install/1.deps-router.sh"
 void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
 installer_conflicts="$runtime_root/sdata/lib/conflicts.sh"
 runtime_conflict_killer="$runtime_root/services/ConflictKiller.qml"
 pr51_checker="$runtime_root/scripts/check-void-pr51.sh"
 if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greeting"; then
     printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'scripts/check-void-graphics.sh' "$deps_router"; then
+    printf 'FAIL: Void install path does not run the graphics preflight before dependency provisioning\n' >&2
+    exit 1
+fi
+void_doc="$runtime_root/docs/VOID.md"
+if grep -Fq 'Niri runs on it (slow but functional)' "$void_doc" \
+        || ! grep -Fq 'VIRTIO_GPU_F_VIRGL' "$void_doc"; then
+    printf 'FAIL: Void VM docs still advertise lavapipe/software rendering as a supported Niri path\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'check_graphics_stack' "$doctor_lib" \
+        || ! grep -Fq 'scripts/check-void-graphics.sh' "$doctor_lib"; then
+    printf 'FAIL: Doctor does not expose the Void graphics preflight\n' >&2
     exit 1
 fi
 if grep -Fq 'conflict_map["dunst"]=' "$installer_conflicts"; then

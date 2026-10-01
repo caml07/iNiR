@@ -1459,6 +1459,13 @@ if ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_ii_settings" \
     printf 'FAIL: mascot master switches remain interactive without the optional art pack\n' >&2
     exit 1
 fi
+if ! grep -Fq 'if (!MascotCatalog.packAvailable)' "$mascot_ii_settings" \
+        || ! grep -Fq 'if (!MascotCatalog.packAvailable)' "$mascot_waffle_settings" \
+        || ! grep -Fq 'function onPackAvailableChanged()' "$mascot_ii_settings" \
+        || ! grep -Fq 'function onPackAvailableChanged()' "$mascot_waffle_settings"; then
+    printf 'FAIL: mascot settings still build missing thumbnails or fail to refresh after pack changes\n' >&2
+    exit 1
+fi
 
 if [[ -f "$runtime_root/Makefile" ]]; then
     step "make install dry run"

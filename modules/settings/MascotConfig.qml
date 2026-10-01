@@ -481,10 +481,15 @@ ContentPage {
             property var poseOptions: [{ displayName: Translation.tr("Auto (rotate pool)"), value: "" }]
 
             FileView {
+                id: mascotManifestFile
                 path: Quickshell.shellPath("assets/images/mascot/manifest.json")
                 watchChanges: true
                 onLoadedChanged: {
                     if (!loaded) return
+                    if (!MascotCatalog.packAvailable) {
+                        mascotReactionsGroup.poseOptions = [{ displayName: Translation.tr("Auto (rotate pool)"), value: "", image: "" }]
+                        return
+                    }
                     try {
                         const m = JSON.parse(text())
                         const anim = m.animatedPoses ?? []
@@ -499,6 +504,17 @@ ContentPage {
                     } catch (e) {
                         console.warn("[QuickConfig] mascot manifest load failed:", e)
                     }
+                }
+            }
+
+            Connections {
+                target: MascotCatalog
+                function onPackAvailableChanged() {
+                    if (!MascotCatalog.packAvailable) {
+                        mascotReactionsGroup.poseOptions = [{ displayName: Translation.tr("Auto (rotate pool)"), value: "", image: "" }]
+                        return
+                    }
+                    mascotManifestFile.reload()
                 }
             }
 

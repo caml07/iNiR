@@ -2049,6 +2049,11 @@ PY
 step "launcher resolution"
 bash "$launcher" path >/dev/null
 bash "$launcher" status >/dev/null
+doctor_dispatch="$(sed -n '/^[[:space:]]*doctor)/,/^[[:space:]]*;;/p' "$launcher")"
+if [[ "$doctor_dispatch" != *'import_running_instance_environment "$config_dir"'* ]]; then
+    printf 'FAIL: doctor does not recover the live supervised shell environment for TTY/SSH callers\n' >&2
+    exit 1
+fi
 
 step "runit service controls"
 runit_test_root="$(mktemp -d)"

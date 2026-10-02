@@ -19,6 +19,13 @@ ContentPage {
     settingsPageName: Translation.tr("Widgets")
 
     property bool isIiActive: ["ii", "iris"].includes(Config.options?.panelFamily ?? "ii")
+    // Under iRiS, widget design, material and colour are iRiS's own (iRiS Settings › Desktop › Widgets);
+    // Material's rows for them would write keys iRiS does not read.
+    readonly property bool irisActive: (Config.options?.panelFamily ?? "ii") === "iris"
+    function openIrisWidgets(): void {
+        const page = SettingsPageRegistry.pages.findIndex(entry => entry.key === "iris")
+        if (page >= 0) GlobalStates.openSettingsPage(page, "desktop/widgets")
+    }
     property int _customMediaFolderCount: 0
     property int _customMediaFolderImageCount: 0
     property int _customMediaFolderGifCount: 0
@@ -1666,7 +1673,24 @@ ContentPage {
         title: Translation.tr("Widget Colors")
 
         SettingsGroup {
+            StyledText {
+                visible: root.irisActive
+                Layout.fillWidth: true
+                text: Translation.tr("iRiS sets the design, material and colours of every widget in its own Settings. The options on each widget below apply while it wears the Material, iNstrument or Readout design.")
+                color: Appearance.colors.colSubtext
+                font.pixelSize: Appearance.font.pixelSize.smaller
+                wrapMode: Text.WordWrap
+            }
+            SelectionGroupButton {
+                visible: root.irisActive
+                Layout.fillWidth: false
+                leftmost: true; rightmost: true
+                buttonIcon: "widgets"
+                buttonText: Translation.tr("Open iRiS widget settings")
+                onClicked: root.openIrisWidgets()
+            }
             WidgetSettingRow {
+                visible: !root.irisActive
                 label: Translation.tr("Global widget design")
                 icon: "widgets"
                 trailing: false
@@ -1679,6 +1703,7 @@ ContentPage {
                 }
             }
             StyledText {
+                visible: !root.irisActive
                 Layout.fillWidth: true
                 text: Translation.tr("One look on every widget. Individual keeps each widget's own style.")
                 color: Appearance.colors.colSubtext
@@ -1686,7 +1711,7 @@ ContentPage {
                 wrapMode: Text.WordWrap
             }
             RowLayout {
-                visible: DesktopWidgetDesign.exceptionCount > 0 || DesktopWidgetDesign.canUndo
+                visible: !root.irisActive && (DesktopWidgetDesign.exceptionCount > 0 || DesktopWidgetDesign.canUndo)
                 spacing: 6
                 SelectionGroupButton {
                     visible: DesktopWidgetDesign.exceptionCount > 0
@@ -1706,6 +1731,7 @@ ContentPage {
                 }
             }
             StyledText {
+                visible: !root.irisActive
                 Layout.fillWidth: true
                 text: Translation.tr("Apply one wallpaper-generated color preset to every built-in desktop widget. You can still tune any widget individually below.")
                 color: Appearance.colors.colSubtext
@@ -1714,6 +1740,7 @@ ContentPage {
             }
 
             SettingsSwitch {
+                visible: !root.irisActive
                 Layout.fillWidth: true
                 buttonIcon: "wallpaper"
                 text: Translation.tr("Ink follows the wallpaper")
@@ -1728,6 +1755,7 @@ ContentPage {
             }
 
             WidgetPalettePresetPicker {
+                visible: !root.irisActive
                 configPath: ""
                 applyGlobally: true
             }

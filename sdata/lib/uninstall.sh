@@ -816,6 +816,10 @@ uninstall_show_manual_steps() {
     echo ""
     echo -e "  ${STY_YELLOW}•${STY_RST} SDDM theme drop-in: /etc/sddm.conf.d/99-inir-theme.conf"
     echo -e "    ${STY_FAINT}Used by: sets Current=ii-pixel (legacy path: /etc/sddm.conf.d/inir-theme.conf)${STY_RST}"
+    if [[ -f /etc/sddm.conf.d/98-inir-greeter.conf ]]; then
+        echo -e "  ${STY_YELLOW}•${STY_RST} SDDM greeter drop-in: /etc/sddm.conf.d/98-inir-greeter.conf"
+        echo -e "    ${STY_FAINT}Used by: login screen on Wayland with Niri (/usr/share/inir/sddm/niri-greeter.kdl)${STY_RST}"
+    fi
     echo ""
 
     if $ask && tui_confirm "Show commands to revert these changes?" "no"; then
@@ -839,6 +843,10 @@ uninstall_show_manual_steps() {
         echo ""
         echo -e "  ${STY_CYAN}# Remove SDDM theme config drop-in${STY_RST}"
         echo -e "  sudo rm -f /etc/sddm.conf.d/99-inir-theme.conf /etc/sddm.conf.d/inir-theme.conf"
+        if [[ -f /etc/sddm.conf.d/98-inir-greeter.conf ]]; then
+            echo -e "  ${STY_CYAN}# Put the login screen back on the distribution's display server${STY_RST}"
+            echo -e "  sudo rm -f /etc/sddm.conf.d/98-inir-greeter.conf && sudo rm -rf /usr/share/inir/sddm"
+        fi
         echo ""
     fi
 }

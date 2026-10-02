@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs
 import qs.services
+import qs.services.deferred
 import qs.modules.common
 import qs.modules.common.widgets
 
@@ -72,6 +73,36 @@ ContentPage {
     function openFloatingTools(): void {
         GlobalStates.settingsOverlayOpen = false
         GlobalStates.overlayOpen = true
+    }
+
+    SettingsTaskLoader {
+        requested: root.activeSection === "tools"
+        sourceComponent: Component {
+    SettingsCardSection {
+        settingsTaskSection: "tools"
+        expanded: true
+        icon: "keyboard_tab"
+        title: Translation.tr("Alt+Tab")
+
+        SettingsGroup {
+            ConfigSelectionArray {
+                options: [
+                    { displayName: Translation.tr("Niri's Recent Windows"), icon: "view_carousel", value: "niri" },
+                    { displayName: Translation.tr("iNiR switcher"), icon: "keyboard_tab", value: "inir" }
+                ]
+                currentValue: NiriKeybinds.altTabSource
+                onSelected: newValue => NiriKeybinds.setAltTabSource(newValue)
+            }
+            NoticeBox {
+                Layout.fillWidth: true
+                materialIcon: "info"
+                text: NiriKeybinds.altTabSource === "custom"
+                    ? Translation.tr("Alt+Tab is bound in your own Niri binds. Choosing here takes it over; your line stays as it is.")
+                    : Translation.tr("Which window switcher Alt+Tab opens. Niri's shows live previews of every window; iNiR's follows your panel style.")
+            }
+        }
+    }
+        }
     }
 
     SettingsTaskLoader {

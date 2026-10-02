@@ -1290,6 +1290,9 @@
             "screenCastOutput": "HDMI-A-1"
         },
         "verbose": true,
+        "media": {
+            "maxWidth": 220
+        },
         "vertical": false,
         "weather": {
             "city": "",
@@ -2381,7 +2384,7 @@
                 "expanded": []
             }
         },
-        "widgets": { "radius": 22, "opacity": 100, "tint": "wallpaper", "vibrance": 85, "legibleAlways": false, "design": "iris", "material": "glass", "weight": "regular", "rim": false },
+        "widgets": { "radius": 22, "opacity": 100, "tint": "wallpaper", "vibrance": 85, "legibleAlways": false, "design": "iris", "material": "glass", "weight": "regular", "rim": false, "outline": "auto", "brightWallpapers": false },
         "desktopMenu": { "wallpaper": true, "items": ["widgets", "customize", "screenshot", "terminal", "settings", "restart"] },
         "dock": {
             "enable": true,
@@ -2400,6 +2403,7 @@
             "position": "auto"
         },
         "appearance": {
+        "controlPlate": "none",
             "fontFamily": "",
             "titleFontFamily": "",
             "highlight": "orange",
@@ -2452,6 +2456,7 @@
                 "text": 100,
                 "weight": "regular",
                 "rim": true,
+                "edges": "line",
                 "rimTint": "neutral",
                 "rimWidth": 1,
                 "glow": 0,
@@ -2590,6 +2595,11 @@
             "blockStyle": "plain",
             "scrollAction": "volume",
             "desktopBanner": "wallpaper",
+            "desktopBannerFade": 100,
+            "desktopBannerTop": 100,
+            "desktopBannerVeil": 100,
+            "desktopBannerBlur": 0,
+            "navFrame": "auto",
             "desktopBlocks": ["profile", "context", "forecast", "agenda", "modules"],
             "mediaBlocks": [
                 "player",

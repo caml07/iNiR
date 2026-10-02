@@ -196,6 +196,19 @@ Scope {
             root.toggle()
         }
         function random(): void { Wallpapers.randomFromCurrentFolder() }
+        // A new wallpaper every few minutes: `on`, `off`, a number of minutes (turns it on) or `status`.
+        function shuffle(value: string): string {
+            const minutes = parseInt(value)
+            if (value === "on" || value === "off")
+                Config.setNestedValue("background.autoWallpaper.enable", value === "on")
+            else if (minutes >= 1 && minutes <= 1440)
+                Config.setNestedValues({ "background.autoWallpaper.enable": true, "background.autoWallpaper.intervalMinutes": minutes })
+            else if (value !== "status" && value !== "")
+                return "Use on, off, a number of minutes (1-1440) or status"
+            const enabled = value === "on" || minutes >= 1 || (value !== "off" && Wallpapers.autoWallpaperEnabled)
+            const every = minutes >= 1 ? minutes : Wallpapers.autoWallpaperInterval
+            return enabled ? "on, every " + every + " min" : "off"
+        }
         function set(path: string): void { Wallpapers.select(path) }
         function preview(path: string): void { Wallpapers.previewWallpaper(path, "") }
         function cancelPreview(): void { Wallpapers.cancelWallpaperPreview() }

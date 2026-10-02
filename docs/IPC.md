@@ -204,6 +204,11 @@ Alt+Tab window switcher. Works across workspaces, unlike some other implementati
 | `close` | Close switcher |
 | `next` | Focus next window |
 | `previous` | Focus previous window |
+| `opens <which>` | Which switcher Alt+Tab opens: `inir`, `niri` (Niri's own Recent Windows) or `status` |
+
+Fresh installs give Alt+Tab to Niri's Recent Windows. `inir altSwitcher opens inir` hands it to iNiR's switcher
+with a marked block at the end of `~/.config/niri/config.d/90-user-extra.kdl`; `opens niri` removes that block.
+Your own binds are left as they are. The same choice is in Settings, next to the switcher's options.
 
 ```kdl
 Alt+Tab { spawn "inir" "altSwitcher" "next"; }
@@ -473,6 +478,7 @@ Top bar visibility.
 | `toggle` | Show/hide bar |
 | `open` | Show bar |
 | `close` | Hide bar |
+| `mediaWidth <px>` | How wide the song title gets in Material's bar, 120 to 640 px (the window title gives way); empty to read it |
 
 ---
 
@@ -508,6 +514,7 @@ Wallpaper picker with grid, coverflow and compact launcher styles.
 | `openLauncher <mode>` | Open the compact launcher in `static` or `animated` mode |
 | `toggleOnMonitor <name>` | Open wallpaper selector on a specific monitor |
 | `random` | Pick a random wallpaper from the current folder |
+| `shuffle <value>` | A new wallpaper from the folder every few minutes: `on`, `off`, a number of minutes (turns it on) or `status` |
 | `set <path>` | Apply a wallpaper (picture, GIF or video) by path, the same way the picker does |
 | `preview <path>` | Show a wallpaper on the desktop without applying it: no config write, no recoloring |
 | `cancelPreview` | Drop the preview and go back to the applied wallpaper |
@@ -1157,6 +1164,7 @@ Desktop background and widget controls.
 | Function | Description |
 |----------|-------------|
 | `widgetDesign name` | Put every desktop widget on `iris`, `material`, `individual`, `instrument` or `readout`; `undo` brings back the design and each widget's own look from before; `status` reports the design, how many widgets keep their own look and whether an undo is available. |
+| `widgetMaterial action` | iRiS: `status` reports the shared widget material and how many widgets chose their own material or surface opacity in Look; `match` puts them back on the shared ones. |
 | `widgetSearch text` | While arranging (iRiS), find a widget from the bar: the words to look for, `open` for an empty field, `next`/`previous` to move the selection, `take` to add or show the selected widget, `close`. Ctrl+F opens it |
 | `toggleEditMode` | Toggle widget edit mode (drag, resize, configure desktop widgets) |
 | `toggleWidgetManager` | Enter edit mode if needed and toggle the widget manager on the focused output |
@@ -1165,6 +1173,7 @@ Desktop background and widget controls.
 | `desktopItemsState` | Report desktop-item persistence, availability, item count, validation errors and undo state |
 | `quickControlsPage page` | Show a page of the selected widget's quick controls: widget, look or arrange (and stack, for a widget in a stack) |
 | `quickControlsGeometry` | Report where the selected widget's toolbar and quick-controls sheet sit, as JSON |
+| `widgetSnapshot widgetName path` | Save one desktop widget, as it renders now, to a PNG (offscreen: works while windows cover the desktop). |
 | `legibilityState` | Report what each desktop widget reads under itself (brightness, spread, light or dark backdrop) and the ink and accent it chose |
 | `focusWidget widgetName openControls` | Select a desktop widget and optionally open its quick controls |
 | `promoteWidget widgetName` | Move a desktop widget to the top of the persistent layer order |

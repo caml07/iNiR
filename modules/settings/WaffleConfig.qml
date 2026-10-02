@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.services
+import qs.services.deferred
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
@@ -553,6 +554,14 @@ ContentPage {
         title: Translation.tr("Alt+Tab Switcher")
 
         SettingsGroup {
+            ConfigSelectionArray {
+                options: [
+                    { displayName: Translation.tr("Niri's Recent Windows"), icon: "view_carousel", value: "niri" },
+                    { displayName: Translation.tr("iNiR switcher"), icon: "keyboard_tab", value: "inir" }
+                ]
+                currentValue: NiriKeybinds.altTabSource
+                onSelected: newValue => NiriKeybinds.setAltTabSource(newValue)
+            }
             SettingsSwitch {
                 enabled: {
                     const preset = Config.options?.waffles?.altSwitcher?.preset ?? "thumbnails"

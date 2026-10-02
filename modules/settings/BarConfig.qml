@@ -2358,6 +2358,20 @@ ContentPage {
                         onCheckedChanged: Config.setNestedValue("bar.activeWindow.showTitle", checked)
                     }
 
+                    ConfigSpinBox {
+                        visible: Config.options?.bar?.modules?.media ?? true
+                        icon: "music_note"
+                        text: Translation.tr("Music width (px)")
+                        value: Config.options?.bar?.media?.maxWidth ?? 220
+                        from: 120
+                        to: 640
+                        stepSize: 10
+                        onValueChanged: if (value !== (Config.options?.bar?.media?.maxWidth ?? 220)) Config.setNestedValue("bar.media.maxWidth", value)
+                        StyledToolTip {
+                            text: Translation.tr("How wide the song title gets. The window title gives way; a crowded bar still shrinks music first.")
+                        }
+                    }
+
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 4

@@ -2624,6 +2624,9 @@ Singleton {
                     property int pillEdgeFade: 92 // Fade toward screen edges, 0-100
                 }
                 property bool verbose: true
+                property JsonObject media: JsonObject {
+                    property int maxWidth: 220 // Widest the song title gets in the bar; the window title gives way
+                }
                 property bool vertical: false
                 property JsonObject clock: JsonObject {
                     property string timeFontFamily: ""
@@ -3916,7 +3919,9 @@ Singleton {
                     property string design: "iris" // "iris" faces, "material" (each widget's own style), "instrument" or "readout"
                     property string material: "glass" // "glass", "clear", "solid" or "tinted"
                     property string weight: "regular" // "light", "regular" or "bold"
-                    property bool rim: false // Hairline around Transparent widgets
+                    property bool rim: false // Legacy: hairline around Transparent widgets, read by outline "auto"
+                    property string outline: "auto" // "auto" (the shell's outline; Transparent bare), "always" or "none"
+                    property bool brightWallpapers: false // Over a light region a widget turns to frost with dark ink
                 }
                 property JsonObject desktopMenu: JsonObject {
                     property bool wallpaper: true // The wallpaper at the head of the right-click menu
@@ -3945,6 +3950,7 @@ Singleton {
                     property string scheme: "auto" // "auto" (follows the system), "dark", "ink" or "light"
                     property bool followTheme: true // with a colour theme chosen, the shell wears its accent, highlight and material
                     property bool materialForApps: true // with the wallpaper colour theme, terminals and apps sit on the shell's material
+                    property string controlPlate: "none" // rows of round controls: "none", "veil", "glass" or "solid" (IrisControlPlate)
                     // Per scheme: tone lifts or dims the material (-30..30), colour is how strong accents read (0..100 %),
                     // widgets is how colourful the desktop widgets read (40..160 %), lume makes bodies frost the wallpaper
                     // shows through instead of solid.
@@ -4002,6 +4008,7 @@ Singleton {
                         property int text: 100      // iRiS type size
                         property string weight: "regular" // iRiS type weight: "light", "regular" or "bold"
                         property bool rim: true     // the hairline around the field's silhouette
+                        property string edges: "line" // the edge every body wears: "line" (the hairline) or "light" (lit from above like glass); rim false turns it off
                         property string rimTint: "neutral" // that hairline's ink: "neutral", "accent" or "highlight"
                         property int rimWidth: 1    // its width, 1-3 px
                         property int glow: 0        // how much shadows take the accent colour, 0-100
@@ -4091,6 +4098,11 @@ Singleton {
                     property string blockStyle: "plain" // desktop page blocks: "plain" on the Island's black or "grouped" on quiet plates
                     property string scrollAction: "volume" // "volume", "brightness" or "none"
                     property string desktopBanner: "wallpaper" // Island Desktop page header: "wallpaper" or "none"
+                    property int desktopBannerFade: 100 // % of the fade into the Island's body (100 = to solid at the bottom)
+                    property int desktopBannerTop: 100 // % of the fade into the Island's body at the top, under its buttons
+                    property int desktopBannerVeil: 100 // % of the legibility veil over the header wallpaper
+                    property int desktopBannerBlur: 0 // % blur of the header wallpaper
+                    property string navFrame: "auto" // the open Island's page buttons: "auto" (Appearance › Button rows), "none", "veil", "glass" or "solid"
                     // Island Desktop page blocks under the hero, in order:
                     // "profile", "context", "vitals", "modules".
                     property list<string> desktopBlocks: ["profile", "context", "forecast", "agenda", "modules"]

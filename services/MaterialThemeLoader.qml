@@ -300,6 +300,9 @@ Singleton {
     // containers with their own plates and every other style resolves back to
     // the Material roles.
     function _styleAppPaletteOverlay(): var {
+        // iRiS hands its own surface to the generator (IrisAppsSync): the Material style's layers
+        // are another family's, and overwrote the apps' ramp with them (#242122 over iRiS's #221f20).
+        if ((Config.options?.panelFamily ?? "ii") === "iris") return null
         const c = Appearance.colors
         if (!c) return null
 
@@ -381,8 +384,56 @@ Singleton {
         }
     }
 
-    function _applyExternalTheming(): void {
+    // Apps are not restyled under a game: Spotify, Steam and the terminals reload their theme on every
+    // run, mid-match. The shell's own colours still follow; the apps catch up once, when Game mode ends.
+    property bool _externalApplyHeld: false
+    Connections {
+        target: GameMode
+        function onActiveChanged() {
+            if (!GameMode.active && root._externalApplyHeld) {
+                root._externalApplyHeld = false
+                root.requestExternalApply()
+            }
+        }
+    }
+
+    // iRiS hands the generator a surface of its own (ThemeService.appsSurfaceSeed). A new wallpaper is generated at
+    // once with the surface of the old one, and again once iRiS has read the new wallpaper: applying both restyled
+    // every app twice, first with the wrong body. Apps wait for the generation that carries the wanted surface, or
+    // 10 s if none comes.
+    readonly property string _generatedSurfaceSeed: {
+        try { return String(JSON.parse(themeMetaView.text() || "{}").surface_seed ?? "").toLowerCase() } catch (e) { return "" }
+    }
+    readonly property bool surfacePending: ThemeService.appsSurfaceSeed.length > 0
+        && root._generatedSurfaceSeed !== ThemeService.appsSurfaceSeed.toLowerCase()
+    property bool _surfaceHeld: false
+    onSurfacePendingChanged: if (!root.surfacePending && root._surfaceHeld) root.requestExternalApply()
+    Timer {
+        id: surfaceHoldLimit
+        interval: 10000
+        onTriggered: if (root._surfaceHeld) root._applyExternalTheming(true)
+    }
+    FileView {
+        id: themeMetaView
+        path: `${Directories.stateUserPath}/generated/theme-meta.json`
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+    }
+
+    function _applyExternalTheming(surfaceWaitOver = false): void {
         if (!root.defaultApplyExternal) return;
+        if (GameMode.active) {
+            root._externalApplyHeld = true
+            return
+        }
+        if (root.surfacePending && !surfaceWaitOver) {
+            if (!root._surfaceHeld) surfaceHoldLimit.restart()
+            root._surfaceHeld = true
+            return
+        }
+        root._surfaceHeld = false
+        surfaceHoldLimit.stop()
         const applyColorPath = Directories.scriptsPath + "/colors/applycolor.sh"
         const overlay = root._styleAppPaletteOverlay()
         if (!overlay) {

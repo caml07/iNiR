@@ -30,6 +30,11 @@ Add `-y` if you don't want to answer questions:
 When it's done, **restart the computer**. Not log out, restart: the new groups, the login screen and
 Niri's environment only apply after a reboot. Then pick Niri at the login screen.
 
+**Black screen instead of the login screen?** On laptops with an NVIDIA GPU next to the integrated one,
+SDDM's default X11 greeter can start on the GPU that has no screens. Setup already picks the Wayland login
+screen for those machines; to switch by hand, open `./setup` → Extras → Install ii-pixel-sddm and choose
+**Wayland with Niri**. Updates never change your login screen or turn SDDM back on if you use another one.
+
 ```bash
 systemctl reboot
 ```

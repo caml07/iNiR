@@ -104,6 +104,14 @@ Scope {
             return DesktopWidgetDesign.apply(name)
         }
 
+        function widgetMaterial(action: string): string {
+            if (action === "match") return DesktopWidgetDesign.matchSurfaces()
+            if (action === "status")
+                return String(Config.options?.iris?.widgets?.material ?? "glass") + " · "
+                    + DesktopWidgetDesign.ownSurfaceCount + " widgets with their own material or opacity"
+            return "Use status or match"
+        }
+
         function widgetSearch(query: string): string {
             if ((Config.options?.panelFamily ?? "ii") !== "iris")
                 return "the widget search is part of the iRiS widget bar"
@@ -210,6 +218,23 @@ Scope {
             const widget = (backgroundScope.widgetCanvases[output]?._loadedDesktopWidgets() ?? [])
                 .find(item => item.configEntryName === name) ?? null
             return widget ? widget.editControlsGeometryReport : "{}"
+        }
+
+        // Renders one widget to a PNG offscreen, so it can be checked while windows cover the desktop.
+        function widgetSnapshot(widgetName: string, path: string): string {
+            const target = String(path ?? "").trim()
+            if (!target.endsWith(".png")) return "give a path ending in .png"
+            for (const output of Object.keys(backgroundScope.widgetCanvases)) {
+                const canvas = backgroundScope.widgetCanvases[output]
+                if (!canvas || typeof canvas._loadedDesktopWidgets !== "function") continue
+                for (const widget of canvas._loadedDesktopWidgets()) {
+                    if (widget.configEntryName !== widgetName) continue
+                    const ok = widget.grabToImage(result => result.saveToFile(target))
+                    return ok ? output + " · " + Math.round(widget.width) + "×" + Math.round(widget.height) + " → " + target
+                        : "the widget could not be rendered"
+                }
+            }
+            return "no loaded widget named " + widgetName
         }
 
         function legibilityState(): string {

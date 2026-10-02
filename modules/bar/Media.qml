@@ -31,7 +31,7 @@ Item {
     // The bar's centerSideModuleWidth binding already accounts for this, but
     // a stable natural width prevents track-length changes from resizing the
     // center pill every time metadata changes.
-    readonly property real maxMediaWidth: 220 * Appearance.fontSizeScale
+    readonly property real maxMediaWidth: Math.max(120, Config.options?.bar?.media?.maxWidth ?? 220) * Appearance.fontSizeScale
     implicitWidth: lockMediaWidth
         ? maxMediaWidth
         : Math.min(rowLayout.implicitWidth + rowLayout.spacing * 2, maxMediaWidth)

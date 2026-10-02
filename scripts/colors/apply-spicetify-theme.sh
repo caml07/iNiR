@@ -8,8 +8,10 @@
 #   current matugen palette.
 # - Sync the generated user.css directly into the live xpui install so the
 #   running client and the next launch use the same colors.
-# - If Spotify is running with an existing remote-debugging port, trigger a
-#   Page.reload over DevTools. No watch mode, no restart, no spawn.
+# - If Spotify is running with an existing remote-debugging port, swap its
+#   user.css in place over DevTools (Page.reload only when the page has no
+#   theme link). Nothing is sent when the CSS did not change. No watch mode,
+#   no restart, no spawn.
 # - If the live install is not patched yet, fall back to `spicetify -n apply`
 #   so disk state is updated without opening Spotify.
 # - This script never starts/opens Spotify itself.
@@ -166,19 +168,56 @@ response = sock.recv(4096)
 if b" 101 " not in response:
     raise SystemExit(1)
 
-payload = json.dumps({"id": 1, "method": "Page.reload", "params": {"ignoreCache": True}}).encode()
-mask = os.urandom(4)
-header = bytearray([0x81])
-length = len(payload)
-if length < 126:
-    header.append(0x80 | length)
-elif length < 65536:
-    header.extend((0x80 | 126, *struct.pack("!H", length)))
-else:
-    header.extend((0x80 | 127, *struct.pack("!Q", length)))
+def send(message):
+    payload = json.dumps(message).encode()
+    mask = os.urandom(4)
+    header = bytearray([0x81])
+    length = len(payload)
+    if length < 126:
+        header.append(0x80 | length)
+    elif length < 65536:
+        header.extend((0x80 | 126, *struct.pack("!H", length)))
+    else:
+        header.extend((0x80 | 127, *struct.pack("!Q", length)))
+    sock.sendall(bytes(header) + mask + bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload)))
 
-masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
-sock.sendall(bytes(header) + mask + masked)
+def receive(wanted_id):
+    buffer = b""
+    while True:
+        while len(buffer) < 2:
+            buffer += sock.recv(65536)
+        length = buffer[1] & 0x7F
+        offset = 2
+        if length == 126:
+            while len(buffer) < 4:
+                buffer += sock.recv(65536)
+            length = struct.unpack("!H", buffer[2:4])[0]
+            offset = 4
+        elif length == 127:
+            while len(buffer) < 10:
+                buffer += sock.recv(65536)
+            length = struct.unpack("!Q", buffer[2:10])[0]
+            offset = 10
+        while len(buffer) < offset + length:
+            buffer += sock.recv(65536)
+        frame, buffer = buffer[offset:offset + length], buffer[offset + length:]
+        try:
+            message = json.loads(frame)
+        except ValueError:
+            continue
+        if message.get("id") == wanted_id:
+            return message
+
+# Swap the theme stylesheet in place: a page reload flashes the whole client and can raise its window.
+swap = """(() => {
+  const links = [...document.querySelectorAll('link.userCSS, link[href^="user.css"]')];
+  links.forEach(link => { link.href = 'user.css?inir=' + Date.now(); });
+  return links.length;
+})()"""
+send({"id": 1, "method": "Runtime.evaluate", "params": {"expression": swap, "returnByValue": True}})
+swapped = receive(1).get("result", {}).get("result", {}).get("value", 0)
+if not swapped:
+    send({"id": 2, "method": "Page.reload", "params": {"ignoreCache": True}})
 sock.close()
 PY
 }
@@ -386,6 +425,8 @@ content = pattern.sub('', content).lstrip('\n')
 if content and not content.endswith('\n'):
     content += '\n'
 content = content + '\n' + new_block + '\n'
+# Removing a block from the middle leaves its blank lines behind: collapse them, or every run grows the file.
+content = re.sub(r'\n{3,}', '\n\n', content)
 css_path.write_text(content)
 PYEOF
 
@@ -440,6 +481,8 @@ content = pattern.sub('', content)
 content = re.sub(r'/\* === end iNiR playback controls fix === \*/\n?', '', content)
 content = content.lstrip('\n')
 content = new_block + '\n' + content
+# Removing a block from the middle leaves its blank lines behind: collapse them, or every run grows the file.
+content = re.sub(r'\n{3,}', '\n\n', content)
 css_path.write_text(content)
 PYEOF
 
@@ -533,6 +576,8 @@ pattern = re.compile(
 )
 content = pattern.sub('', content).rstrip()
 content += '\n\n' + new_block + '\n'
+# Removing a block from the middle leaves its blank lines behind: collapse them, or every run grows the file.
+content = re.sub(r'\n{3,}', '\n\n', content)
 css_path.write_text(content)
 PYEOF
 
@@ -599,6 +644,8 @@ pattern = re.compile(
 )
 content = pattern.sub('', content).rstrip()
 content += '\n\n' + new_block + '\n'
+# Removing a block from the middle leaves its blank lines behind: collapse them, or every run grows the file.
+content = re.sub(r'\n{3,}', '\n\n', content)
 css_path.write_text(content)
 PYEOF
 
@@ -684,11 +731,13 @@ apply_spicetify_theme() {
 
   return 1
 }
+# 0: copied, 1: no install, 2: the live copy already matches (the running client needs nothing).
 sync_live_user_css() {
   local user_css="$1"
   local xpui_dir="$2"
   local live_user_css="$xpui_dir/user.css"
   [[ -d "$xpui_dir" ]] || return 1
+  cmp -s "$user_css" "$live_user_css" && return 2
   cp "$user_css" "$live_user_css"
 }
 
@@ -782,7 +831,13 @@ main() {
   fi
 
   if [[ -n "$xpui_dir" ]] && is_live_install_patched "$xpui_dir"; then
-    if sync_live_user_css "$active_theme_dir/user.css" "$xpui_dir"; then
+    local sync_status=0
+    sync_live_user_css "$active_theme_dir/user.css" "$xpui_dir" || sync_status=$?
+    if [[ "$sync_status" -eq 2 ]]; then
+      log "Spotify theme unchanged - client left alone"
+      exit 0
+    fi
+    if [[ "$sync_status" -eq 0 ]]; then
       log "Synced live Spotify user.css"
       if $spotify_running; then
         local debugger_port

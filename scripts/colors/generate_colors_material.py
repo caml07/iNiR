@@ -994,6 +994,10 @@ theme_meta = {
     "harmonize_threshold": args.harmonize_threshold,
     "color_strength": args.color_strength,
     "blend_bg_fg": args.blend_bg_fg,
+    # The surface iRiS asked for: the shell holds the apps until a generation carries the one it wants.
+    "surface_seed": ("#" + args.surface_seed.strip().lstrip("#").lower())
+    if args.surface_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.surface_seed.strip())
+    else "",
     "generated_by": "generate_colors_material.py",
 }
 

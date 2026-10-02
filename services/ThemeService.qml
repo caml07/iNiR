@@ -27,6 +27,8 @@ Singleton {
     // What iRiS asks of the system's mode and of the apps' surfaces: both are read by switchwall.sh, so a change regenerates.
     readonly property string irisSchemeChoice: panelFamily === "iris" ? String(Config.options?.iris?.appearance?.scheme ?? "auto") : "auto"
     readonly property bool irisMaterialApps: panelFamily === "iris" && (Config.options?.iris?.appearance?.materialForApps ?? true)
+    // The surface iRiS wants the apps generated on (IrisAppsSync), "" when it hands none.
+    property string appsSurfaceSeed: ""
     // A scheme the person picks is also their saved preference, so Auto keeps what they last saw instead of an older toggle.
     onIrisSchemeChoiceChanged: {
         if (!Config.ready || irisSchemeChoice === "auto") return

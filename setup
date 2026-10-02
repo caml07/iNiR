@@ -2388,6 +2388,12 @@ refresh_sddm_theme_on_update() {
     if ! command -v sddm >/dev/null 2>&1; then
         return 0
     fi
+    # SDDM installed but not the login screen: the person chose another display manager. An update
+    # leaves it alone (re-enabling SDDM here put some machines on a black screen at every update).
+    if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]] \
+            && ! systemctl is-enabled sddm.service >/dev/null 2>&1; then
+        return 0
+    fi
 
     # Always refresh on update — settings like InputMethod may have changed
     local auto_apply_mode="yes"
@@ -2399,7 +2405,7 @@ refresh_sddm_theme_on_update() {
     echo ""
     tui_info "Refreshing ii-pixel SDDM theme..."
 
-    if ! extras_install_sddm_theme "$auto_apply_mode"; then
+    if ! extras_install_sddm_theme "$auto_apply_mode" no keep; then
         tui_warn "SDDM theme refresh failed — you may need to run manually:"
         tui_dim "  sudo bash ${REPO_ROOT}/scripts/sddm/install-pixel-sddm.sh"
     fi

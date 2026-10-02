@@ -240,6 +240,7 @@ binds {
 
     Print      { screenshot; }
     Ctrl+Print { screenshot-screen; }
+    Mod+Print  { screenshot-screen; }
     Alt+Print  { screenshot-window; }
 
     // ═══════════════════════════════════════════════════════════════════════

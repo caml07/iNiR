@@ -74,6 +74,42 @@ Singleton {
         removeBindProcess.running = true
     }
 
+    // ── Alt+Tab: Niri's recent-windows switcher or iNiR's ────────────────
+    // Niri's config is the truth (a managed block in 90-user-extra.kdl, niri-config.py);
+    // "custom" is an Alt+Tab the person bound themselves.
+    property string altTabSource: ""
+    function refreshAltTab(): void {
+        if (!altTabReader.running) altTabReader.running = true
+    }
+    function setAltTabSource(source: string): void {
+        if (source !== "inir" && source !== "niri") return
+        if (altTabWriter.running) return
+        root.altTabSource = source
+        altTabWriter.command = ["/usr/bin/python3", root.niriConfigScript, "set-alt-tab", source]
+        altTabWriter.running = true
+    }
+    Process {
+        id: altTabReader
+        command: ["/usr/bin/python3", root.niriConfigScript, "get-alt-tab"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { root.altTabSource = JSON.parse(text).source ?? "" } catch (e) { root.altTabSource = "" }
+            }
+        }
+    }
+    Process {
+        id: altTabWriter
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(text)
+                    if (!result.success) root.bindError(result.error ?? "Alt+Tab")
+                } catch (e) {}
+                root.refreshAltTab()
+                root.reload()
+            }
+        }
+    }
     // ── Legacy keybind parser (cheatsheet) ───────────────────────────────
     Process {
         id: keybindParser
@@ -264,6 +300,7 @@ Singleton {
 
     Component.onCompleted: {
         reload()
+        refreshAltTab()
     }
 
     // ── Default keybinds (fallback for cheatsheet) ────────────────────────

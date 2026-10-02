@@ -557,7 +557,7 @@ def function_values(fn: IpcFunction) -> list[str]:
     described = re.sub(r"e\.g\.,?\s*`[^`]+`", "", fn.description)
     for raw in _RE_BACKTICK.findall(described):
         token = re.sub(r"<[^>]*>.*$", "", raw.strip())
-        if " " in token or token.startswith(("~", "/", "inir", "-")) or not _RE_VALUE.match(token):
+        if " " in token or token.startswith(("~", "/", "-")) or (token.startswith("inir") and token != "inir") or not _RE_VALUE.match(token):
             continue
         if token.endswith(".json") or token.endswith(".qml") or "|" in token:
             continue

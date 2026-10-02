@@ -340,6 +340,13 @@ ShellRoot {
     // family-agnostic and serves the horizontal bar, vertical bar and waffle.
     IpcHandler {
         target: "bar"
+        // Widest the song title gets in the bar, in pixels (120-640), or "" to read it.
+        function mediaWidth(px: string): string {
+            const value = parseInt(px)
+            if (value >= 120 && value <= 640) Config.setNestedValue("bar.media.maxWidth", value)
+            else if (px.length > 0) return "Use a width from 120 to 640 px"
+            return String(value >= 120 && value <= 640 ? value : (Config.options?.bar?.media?.maxWidth ?? 220))
+        }
         function toggle(): void {
             GlobalStates.barOpen = !GlobalStates.barOpen
         }

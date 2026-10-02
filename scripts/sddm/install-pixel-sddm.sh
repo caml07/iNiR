@@ -15,6 +15,15 @@ SYNC_SCRIPT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/s
 SDDM_CONF="/etc/sddm.conf.d/99-inir-theme.conf"
 SDDM_CONF_LEGACY="/etc/sddm.conf.d/inir-theme.conf"
 AUTO_APPLY_MODE="${INIR_SDDM_AUTO_APPLY:-ask}" # ask|yes|no
+# Whether this run may make SDDM the login screen. An update only refreshes the theme: someone who went
+# back to GDM or another display manager keeps it.
+ENABLE_SERVICE="${INIR_SDDM_ENABLE_SERVICE:-yes}" # yes|no
+# Which display server the login screen runs on: keep (whatever is configured), niri (Wayland, Niri as the
+# greeter's compositor) or x11 (drop iNiR's greeter drop-in and go back to the distro's default).
+GREETER_MODE="${INIR_SDDM_GREETER:-keep}"
+GREETER_CONF="/etc/sddm.conf.d/98-inir-greeter.conf"
+GREETER_KDL_SRC="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/dots/sddm/niri-greeter.kdl"
+GREETER_KDL="/usr/share/inir/sddm/niri-greeter.kdl"
 
 log_info() { echo -e "\033[0;36m[sddm] $*\033[0m"; }
 log_ok()   { echo -e "\033[0;32m[sddm] ✓ $*\033[0m"; }
@@ -214,6 +223,40 @@ else
     fi
 fi
 
+# Login screen display server. X11 is SDDM's default on Arch; on laptops with an NVIDIA GPU next to the
+# integrated one, Xorg can start on the GPU that has no screens attached and the greeter stays black
+# (https://bbs.archlinux.org/viewtopic.php?id=291860). Niri drives the right GPU, as GDM's Wayland greeter does.
+apply_greeter_mode() {
+    case "$GREETER_MODE" in
+        niri)
+            local niri_bin
+            niri_bin="$(command -v niri || true)"
+            if [[ -z "$niri_bin" || ! -f "$GREETER_KDL_SRC" ]]; then
+                log_warn "Niri or the greeter config is missing; login screen left as it is"
+                return 0
+            fi
+            local desired="[General]
+DisplayServer=wayland
+
+[Wayland]
+CompositorCommand=${niri_bin} -c ${GREETER_KDL}"
+            elevate install -Dm644 "$GREETER_KDL_SRC" "$GREETER_KDL"
+            if [[ "$(cat "$GREETER_CONF" 2>/dev/null || true)" != "$desired" ]]; then
+                elevate mkdir -p /etc/sddm.conf.d
+                echo "$desired" | elevate tee "$GREETER_CONF" > /dev/null
+            fi
+            log_ok "Login screen runs on Wayland with Niri (${GREETER_CONF})"
+            ;;
+        x11)
+            if [[ -f "$GREETER_CONF" ]]; then
+                elevate rm -f "$GREETER_CONF"
+                log_ok "Login screen back to the distribution's default display server"
+            fi
+            ;;
+    esac
+}
+apply_greeter_mode
+
 # Clean up legacy drop-in name (if user is migrating from pre-2.26 install).
 # Our new 99- prefixed file already wins by alphabetical merge order.
 migrate_legacy_sddm_conf
@@ -247,7 +290,7 @@ fi
 
 # Enable SDDM service (only on first install — on updates the service is already enabled,
 # and running sudo without a terminal would fail in IPC mode)
-if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
+if [[ "$ENABLE_SERVICE" == "yes" ]] && command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
     if ! systemctl is-enabled sddm.service &>/dev/null 2>&1; then
         # Handle conflicting display-manager.service symlink (e.g., plasmalogin, gdm, etc.)
         if [[ -L /etc/systemd/system/display-manager.service ]]; then

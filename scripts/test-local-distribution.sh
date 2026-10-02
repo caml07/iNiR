@@ -929,8 +929,13 @@ if grep -Fq 'rpmfusion-nonfree-release' "$fedora_installer"; then
     exit 1
 fi
 sddm_installer="$runtime_root/scripts/sddm/install-pixel-sddm.sh"
-if grep -Eq '^[[:space:]]*DisplayServer=' "$sddm_installer" \
-        || grep -Eq '^[[:space:]]*InputMethod=' "$sddm_installer"; then
+# The theme drop-in holds only the theme; a display server is set only by the separate, chosen greeter
+# drop-in (98-inir-greeter.conf, Wayland with Niri), and InputMethod never.
+sddm_theme_conf="$(awk '/^desired_conf="/,/"$/' "$sddm_installer")"
+if grep -Eq 'DisplayServer=|InputMethod=' <<<"$sddm_theme_conf" \
+        || grep -Eq '^[[:space:]]*InputMethod=' "$sddm_installer" \
+        || [[ "$(grep -c 'DisplayServer=' "$sddm_installer")" != "1" ]] \
+        || ! grep -Fq 'GREETER_MODE="${INIR_SDDM_GREETER:-keep}"' "$sddm_installer"; then
     printf 'FAIL: ii-pixel theme installer overrides distro-owned SDDM greeter backend/input policy\n' >&2
     exit 1
 fi

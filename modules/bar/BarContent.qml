@@ -119,18 +119,23 @@ Item { // Bar content region
         + (root.isIslands
             ? root.islandOuterInset + root.islandPad * 2
             : Appearance.rounding.screenRounding * 2)
-    readonly property real leftCenterDemand: leftCenterGroup.empty ? 0 : leftCenterGroup.contentWidth
-    readonly property real rightCenterDemand: rightCenterGroupPill.empty ? 0 : rightCenterGroupPill.contentWidth
-    readonly property real centerDemand: middleCenterGroup.empty ? 0 : middleCenterGroup.contentWidth
+    // Demand is what a zone needs at its narrowest: an elastic module (media) gives way inside its group
+    // first, so hosts are compressed (and clipped) only when even that does not fit. Natural widths here
+    // compressed the whole bar, clock and all, as soon as a long song no longer fitted at full width.
+    readonly property real leftCenterDemand: leftCenterGroup.empty ? 0 : leftCenterGroup.minimumContentWidth
+    readonly property real rightCenterDemand: rightCenterGroupPill.empty ? 0 : rightCenterGroupPill.minimumContentWidth
+    readonly property real centerDemand: middleCenterGroup.empty ? 0 : middleCenterGroup.minimumContentWidth
     readonly property real leftSideDemand: root.leftEdgeDemand + root.leftCenterDemand
         + ((root.leftEdgeDemand > 0 && root.leftCenterDemand > 0) ? root.hostGap : 0)
     readonly property real rightSideDemand: root.rightEdgeDemand + root.rightCenterDemand
         + ((root.rightEdgeDemand > 0 && root.rightCenterDemand > 0) ? root.hostGap : 0)
-    readonly property real symmetricSideDemand: Math.max(root.leftSideDemand, root.rightSideDemand)
-    readonly property real centerBoundaryGap: (root.centerDemand > 0 && root.symmetricSideDemand > 0)
-        ? root.hostGap : 0
+    readonly property real centerBoundaryGap: (root.centerDemand > 0
+            && (root.leftSideDemand > 0 || root.rightSideDemand > 0)) ? root.hostGap : 0
+    // Each side needs only its own room: a heavy side (a full tray) moves the centre cluster
+    // towards the lighter one instead of squeezing the whole bar. Compressing on the heavier
+    // side mirrored twice clipped clock, weather and music while half the bar stood empty.
     readonly property real naturalHostDemand: root.centerDemand
-        + root.symmetricSideDemand * 2 + root.centerBoundaryGap * 2
+        + root.leftSideDemand + root.rightSideDemand + root.centerBoundaryGap * 2
     readonly property real hostScale: root.naturalHostDemand > 0 && root.width > 0
         ? Math.min(1, root.width / root.naturalHostDemand) : 1
     readonly property bool layoutCompressionActive: root.hostScale < 0.999
@@ -139,32 +144,49 @@ Item { // Bar content region
     readonly property real compressedLeftCenterWidth: root.leftCenterDemand * root.hostScale
     readonly property real compressedRightCenterWidth: root.rightCenterDemand * root.hostScale
     readonly property real compressedCenterWidth: root.centerDemand * root.hostScale
-    // Max width a side pill may take before it would collide with an edge
-    // section. Pure outer geometry (screen width, edge sections, workspaces) so
-    // there is no binding loop with the pills' own content width. A pill takes
-    // its NATURAL content width, clamped to this — its modules elide/clip to fit
-    // instead of inflating the pill or pushing into the edges.
-    readonly property real centerSideMaxWidth: {
+    // Room each side pill has before it would collide with its own edge section, with the
+    // centre cluster on the screen centre. Pure outer geometry (screen width, edge sections,
+    // workspaces) so there is no binding loop with the pills' own content width.
+    function _sideRoom(edgeWidth) {
         const total = root.width
         if (!(total > 0)) return root.baseCenterSideModuleWidth
-        const edge = Math.max(barLeftSideMouseArea.implicitWidth, barRightSideMouseArea.implicitWidth)
-        const wsHalf = middleCenterGroup.width / 2
-        return Math.max(0, total / 2 - edge - wsHalf - 12)
+        // Islands: an edge section's capsule reaches `islandPad` past its row, and islands keep `hostGap` of air.
+        const edge = edgeWidth + (root.isIslands ? root.islandPad + root.hostGap : 0)
+        return total / 2 - edge - middleCenterGroup.width / 2 - 12
     }
+    readonly property real leftCenterRoom: root._sideRoom(barLeftSideMouseArea.implicitWidth)
+    readonly property real rightCenterRoom: root._sideRoom(barRightSideMouseArea.implicitWidth)
+    // Offset of the centre cluster from the screen centre: zero while both pills fit their
+    // side at their narrowest, otherwise just what the heavier side is missing, taken from
+    // the lighter side's spare room. Under compression every host scales around it.
+    readonly property real centerShift: {
+        if (!(root.width > 0)) return 0
+        if (root.layoutCompressionActive)
+            return (root.leftSideDemand - root.rightSideDemand) * root.hostScale / 2
+        const leftNeed = root.leftCenterDemand - root.leftCenterRoom
+        const rightNeed = root.rightCenterDemand - root.rightCenterRoom
+        if (rightNeed > 0) return -Math.min(rightNeed, Math.max(0, -leftNeed))
+        if (leftNeed > 0) return Math.min(leftNeed, Math.max(0, -rightNeed))
+        return 0
+    }
+    // Max width a side pill takes: its NATURAL content width is clamped to this, and its
+    // modules elide/clip to fit instead of inflating the pill or pushing into the edges.
+    readonly property real leftCenterMaxWidth: Math.max(0, root.leftCenterRoom + root.centerShift)
+    readonly property real rightCenterMaxWidth: Math.max(0, root.rightCenterRoom - root.centerShift)
     // Both centre pills share one width = the larger of the two non-empty
-    // content widths (clamped to centerSideMaxWidth). This keeps the cluster
+    // content widths (clamped to each side's max width). This keeps the cluster
     // balanced around the workspaces pivot; each BarGroup centres its content,
     // so the narrower side doesn't look stuck to one edge. An empty zone
     // contributes 0 and collapses entirely.
     readonly property real centerPillMirrorSlack: 56 * Appearance.fontSizeScale
-    function _pillWidth(cw) {
+    function _pillWidth(cw, maxWidth) {
         const lw = leftCenterGroup.empty ? 0 : leftCenterGroup.contentWidth
         const rw = rightCenterGroupPill.empty ? 0 : rightCenterGroupPill.contentWidth
         const raw = Math.max(lw, rw)
         if (raw <= 0) return 0
         const own = Math.max(0, cw)
         const mirrored = own > 0 ? Math.min(raw, own + root.centerPillMirrorSlack) : raw
-        return Math.min(mirrored, root.centerSideMaxWidth)
+        return Math.min(mirrored, maxWidth)
     }
     readonly property bool cardStyleEverywhere: (Config.options?.dock?.cardStyle ?? false) && (Config.options?.sidebar?.cardStyle ?? false) && (Config.options?.bar?.cornerStyle === 3)
     readonly property bool zzzEverywhere: root.surfaceDialect === "zzz"
@@ -655,7 +677,7 @@ Item { // Bar content region
     // exclusive: taskbar replaces the active window title).
     // The wrapper deliberately reports implicitWidth: 0 so neither a long title
     // nor extra taskbar items inflate the edge section (which would shrink
-    // centerSideMaxWidth and shuffle the centre pills on every change). The
+    // the side pills' max widths and shuffle the centre pills on every change). The
     // Loader's Layout.fillWidth (see root._fillWidth) gives this item the
     // leftover horizontal space inside the section, and the inner content
     // elides / clips to fit instead of pushing the bar around.
@@ -1255,6 +1277,7 @@ Item { // Bar content region
             spectrumDomain: root
             anchors.verticalCenter: parent.verticalCenter
             anchors.horizontalCenter: parent.horizontalCenter
+            anchors.horizontalCenterOffset: root.centerShift
             padding: 4
             implicitWidth: empty ? 0 : (root.layoutCompressionActive
                 ? root.compressedCenterWidth : contentWidth)
@@ -1331,7 +1354,7 @@ Item { // Bar content region
             // mirrored width so the two side pills stay visually balanced.
             implicitWidth: empty ? 0 : (root.layoutCompressionActive
                 ? root.compressedLeftCenterWidth
-                : (root.isIslands ? Math.min(contentWidth, root.centerSideMaxWidth) : root._pillWidth(contentWidth)))
+                : (root.isIslands ? Math.min(contentWidth, root.leftCenterMaxWidth) : root._pillWidth(contentWidth, root.leftCenterMaxWidth)))
             clipContent: true
 
             Repeater {
@@ -1411,7 +1434,7 @@ Item { // Bar content region
                 // mirrored width so the two side pills stay visually balanced.
                 implicitWidth: empty ? 0 : (root.layoutCompressionActive
                     ? root.compressedRightCenterWidth
-                    : (root.isIslands ? Math.min(contentWidth, root.centerSideMaxWidth) : root._pillWidth(contentWidth)))
+                    : (root.isIslands ? Math.min(contentWidth, root.rightCenterMaxWidth) : root._pillWidth(contentWidth, root.rightCenterMaxWidth)))
                 clipContent: true
 
                 Repeater {

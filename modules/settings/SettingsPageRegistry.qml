@@ -816,6 +816,13 @@ Singleton {
         },
         {
             pageIndex: 2, pageName: root.pages[2].name,
+            section: Translation.tr("Modules"),
+            label: Translation.tr("Music width (px)"),
+            description: Translation.tr("How wide the song title gets. The window title gives way; a crowded bar still shrinks music first."),
+            keywords: ["music", "media", "song", "title", "width", "cut", "cut off", "truncated", "window title", "active window", "bar"]
+        },
+        {
+            pageIndex: 2, pageName: root.pages[2].name,
             section: Translation.tr("Bar module layout"),
             label: Translation.tr("Bar module layout"),
             description: Translation.tr("Reorder modules in horizontal Stock, Islands, Scenic and Frame bars"),
@@ -1050,6 +1057,13 @@ Singleton {
             label: Translation.tr("Overlay opacity"),
             description: Translation.tr("Background opacity of overlay panels"),
             keywords: ["overlay", "opacity", "background", "transparent", "panel"]
+        },
+        {
+            pageIndex: 5, pageName: root.pages[5].name,
+            section: Translation.tr("Alt+Tab"),
+            label: Translation.tr("Alt+Tab opens"),
+            description: Translation.tr("Niri's Recent Windows or the iNiR switcher"),
+            keywords: ["alt", "tab", "alt+tab", "switcher", "window", "windows", "recent", "niri", "inir", "switch", "cycle", "keybind", "shortcut"]
         },
         {
             pageIndex: 5, pageName: root.pages[5].name,

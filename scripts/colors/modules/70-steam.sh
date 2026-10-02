@@ -263,14 +263,15 @@ deploy_millennium_material() {
   for theme_dir in "${theme_dirs[@]}"; do
     [[ -n "$theme_dir" ]] || continue
     mkdir -p "$theme_dir/css/main/colors"
-    cp "$css_file" "$theme_dir/css/main/colors/matugen.css"
+    # Millennium refreshes on every write: an identical copy would restyle a running Steam for nothing.
+    cmp -s "$css_file" "$theme_dir/css/main/colors/matugen.css" || cp "$css_file" "$theme_dir/css/main/colors/matugen.css"
     deployed=$((deployed + 1))
   done
 
   while IFS= read -r loopback_dir; do
     [[ -n "$loopback_dir" ]] || continue
     mkdir -p "$loopback_dir/css/main/colors"
-    cp "$css_file" "$loopback_dir/css/main/colors/matugen.css"
+    cmp -s "$css_file" "$loopback_dir/css/main/colors/matugen.css" || cp "$css_file" "$loopback_dir/css/main/colors/matugen.css"
     loopback_deployed=$((loopback_deployed + 1))
   done < <(resolve_millennium_material_loopback_skin_dir)
 

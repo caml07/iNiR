@@ -2038,6 +2038,58 @@ if [[ "$(<"$runit_test_root/sv.log")" != "restart $runit_test_root/config/servic
     exit 1
 fi
 
+# A supervised shell can be restarted from a TTY/SSH/maintenance context that
+# has no display variables. Quickshell's default `list` filter then hides the
+# live Wayland instance unless --any-display is requested, producing a false
+# restart timeout even though runit successfully started the shell.
+list_instances_function="$(sed -n '/^list_instances() {/,/^}/p' "$launcher")"
+cat > "$runit_test_root/bin/qs-list-mock" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" > "$INIR_TEST_QS_LIST_LOG"
+case " $* " in
+    *" --any-display "*) printf '%s\n' 'Instance test123:' ;;
+    *) printf '%s\n' 'No running instances for test' ;;
+esac
+SH
+chmod +x "$runit_test_root/bin/qs-list-mock"
+if ! tty_list_output="$(
+    export TEST_LIST_INSTANCES_FUNCTION="$list_instances_function"
+    export TEST_QS_BIN="$runit_test_root/bin/qs-list-mock"
+    export INIR_TEST_QS_LIST_LOG="$runit_test_root/qs-list.log"
+    unset WAYLAND_DISPLAY DISPLAY NIRI_SOCKET
+    bash -c '
+        set -e
+        qs_bin="$TEST_QS_BIN"
+        eval "$TEST_LIST_INSTANCES_FUNCTION"
+        list_instances /tmp/inir-runtime
+    '
+)"; then
+    printf 'FAIL: TTY instance lookup failed\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+if [[ "$tty_list_output" != Instance\ * ]] \
+        || [[ "$(<"$runit_test_root/qs-list.log")" != *"list --any-display"* ]]; then
+    printf 'FAIL: TTY instance lookup does not use Quickshell --any-display\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+
+TEST_LIST_INSTANCES_FUNCTION="$list_instances_function" \
+TEST_QS_BIN="$runit_test_root/bin/qs-list-mock" \
+INIR_TEST_QS_LIST_LOG="$runit_test_root/qs-list.log" \
+WAYLAND_DISPLAY=wayland-test bash -c '
+    set -e
+    qs_bin="$TEST_QS_BIN"
+    eval "$TEST_LIST_INSTANCES_FUNCTION"
+    list_instances /tmp/inir-runtime >/dev/null
+'
+if grep -Fq -- '--any-display' "$runit_test_root/qs-list.log"; then
+    printf 'FAIL: graphical-session instance lookup should remain display-scoped\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+
 # Runit owns service lifecycle, but log decoding still belongs to Quickshell.
 # New launcher log options must not be swallowed by the bare `sv status` fallback.
 show_logs_function="$(sed -n '/^show_logs() {/,/^}/p' "$launcher")"

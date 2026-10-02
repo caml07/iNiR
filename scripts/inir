@@ -1936,7 +1936,11 @@ resolve_config_dir() {
 }
 
 list_instances() {
-    "$qs_bin" -p "$1" list 2>/dev/null || true
+    local -a args=(-p "$1" list)
+    if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${DISPLAY:-}" ]]; then
+        args+=(--any-display)
+    fi
+    "$qs_bin" "${args[@]}" 2>/dev/null || true
 }
 
 has_instances() {

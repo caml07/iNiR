@@ -69,7 +69,7 @@ the detected platform:
 | Platform | Dependency path | Session/service model |
 |---|---|---|
 | Arch-based | pacman/AUR providers | systemd user services when available |
-| Void Linux glibc | XBPS first, then validated Flatpak/pinned providers where needed | runit + Turnstile/runsvdir when no usable systemd user manager exists |
+| Void Linux x86_64 glibc | XBPS first, then validated Flatpak/upstream providers where needed | runit + Turnstile/runsvdir when no usable systemd user manager exists |
 | Fedora / Debian / Ubuntu | distro-specific automated dependency routes | existing supported service adapters |
 
 On Void, a first interactive install also makes the potentially disruptive
@@ -85,6 +85,19 @@ hardware summary, backup destination, install stages and low-memory guidance.
 Before large XBPS transactions it calculates the space required by the packages
 still missing plus build/download headroom, rather than assuming every system
 starts from the same package set.
+
+Void-specific optional providers remain opt-in. `./setup` → **Extras** exposes
+Cloudflare WARP only on Void; it is not part of the toolkit profile or Doctor's
+required dependency set. The WARP Extra currently targets x86_64 glibc, uses
+Cloudflare's official APT metadata to select and checksum the upstream artifact,
+and refreshes during later updates only after the user has installed an
+iNiR-managed WARP provider. Account registration and tunnel operation remain
+manual.
+
+The Kira mascot art pack is also optional. The shell ships its manifest and
+behavior, while Extras installs/repairs the separately published art tree. A
+missing pack keeps mascot surfaces inert rather than turning a fresh install
+into a partial feature.
 
 Void package/update/search integration uses native XBPS operations. The shell
 does not emulate pacman commands on Void; Settings and package actions resolve
@@ -128,8 +141,10 @@ What happens:
 10. Updates Python venv packages
 
 For repo-managed Void installs on `prerelease`, the same update engine tracks
-that branch. Provider repair is part of the update/install maintenance path, so
-an older partial provider can be rebuilt when Doctor marks it missing. System
+that branch. Required provider repair is part of the update/install maintenance
+path, so an older partial provider can be rebuilt when Doctor marks it missing.
+Optional Extras are different: Kira/WARP update only when already installed;
+an update never opts a new user into them. System
 ownership changes that can interrupt networking or replace a display manager
 remain confirmation-gated.
 

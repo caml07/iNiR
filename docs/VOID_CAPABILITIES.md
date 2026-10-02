@@ -7,6 +7,7 @@ after provider, provisioning, activation, operation, and verification pass.
 | Capability | Profile | Void provider | Activation | Current state | Owner |
 |---|---|---|---|---|---|
 | Niri + Quickshell | base | XBPS `niri`, `quickshell`, Qt 6 packages | session supervisor | VM validated | PR1-PR3.2 |
+| Graphics preflight | base/install gate | base Void kernel/firmware + a Niri-compatible DRM/Mesa/vendor stack; iNiR does not install GPU drivers | pre-install check only | Physical installs require an accessible render node; the VirtIO-specific branch was validated in the release VM with `virtio-vga-gl`/VirGL and reproduced the misleading plain-VirtIO case where `/dev/dri/renderD128` exists but `VIRTIO_GPU_F_VIRGL=0`, which is rejected before dependency provisioning. VirGL is a VM requirement, not a physical-hardware dependency | 2.32 hardening |
 | Session D-Bus and login | base | XBPS `dbus`, `elogind`, `turnstile` | confirmed runit services + turnstile | VM validated | PR3.1 |
 | Graphical login | base | XBPS `sddm`, `xorg-minimal` + packaged Niri desktop entry | confirmed SDDM runit service | VM validated: ii-pixel greeter persisted across reboot; validation autologin proved SDDM launches `niri --session` into a seat0 Wayland session with one Quickshell instance; Doctor 27/27; autologin removed and final boot returned to greeter | final SDDM closure |
 | iNiR lifecycle | base | installed launcher | systemd, turnstile, or runsvdir by predicate | VM validated | PR3.0-PR3.2 |
@@ -18,7 +19,8 @@ after provider, provisioning, activation, operation, and verification pass.
 | Screenshots | screencapture | XBPS `grim`, `slurp`, `swappy`, `wl-clipboard`, `jq` | direct session processes | VM validated: clipboard fallback roundtrip (`wl-paste`); capture binaries present | PR3.3 |
 | Screen recording | screencapture | XBPS `wf-recorder`, `ffmpeg`; audio profile provides `pipewire` | direct session processes | VM validated: `pipewire`/`wireplumber`/`pipewire-pulse` user services run; `pactl` reports PulseAudio on PipeWire 1.6.7 | PR3.3 |
 | Clipboard history and paste | base/toolkit | XBPS `wl-clipboard`, `cliphist`; verified upstream `ydotool` v1.0.4 source | session watchers + predicate-selected ydotool user service | ydotool provider VM validated: provision, permissions, service, socket, direct injection, idempotency, and lock-screen keyboard UI; Superpaste not separately exercised | PR4.2 |
-| Cloudflare WARP | toolkit | verified upstream `cloudflare-warp` v2026.7.1377.0, extracted without Debian scripts | iNiR-owned `warp-svc` runit service + `vlogger` subservice | VM validated: provision, daemon up, socket, version, runit logging, idempotency; pending: account registration, connection, and trace verification | PR4.3 |
+| Cloudflare WARP | optional Extra; Void x86_64 glibc only | Cloudflare official APT metadata selects the upstream `.deb` + published SHA-256; last verified 2026.7.1377.0 artifact remains the metadata-outage fallback | iNiR-owned `warp-svc` runit service + `vlogger` only after explicit opt-in | Historical VM validation proved extraction, daemon/socket, runit logging and idempotency for 2026.7.1377.0. The 2.32 provider is now fixture-tested for metadata parsing, deterministic fallback, musl rejection and no-downgrade. Account registration, connection and trace remain intentionally manual/non-gate and were not re-exercised on the physical host | PR4.3 + 2.32 optional-extra hardening |
+| Kira mascot art | optional Extra | `snowarch/inir-mascot` release pack; shell keeps manifest/dialogue/behavior, Extras verifies and installs PNG/GIF assets | user setting + deferred companion controller | Published v3 pack validated at 354 assets; VM install + delete/repair restored the exact tree hash; physical Void IPC/visual smoke rendered the companion and dialogue bubble. Missing pack keeps runtime/settings inert. v3 has no JRPG/Codex asset line despite those manifest profiles, so runtime probes actual assets and falls back to classic without rewriting the saved preference | 2.32 mascot hardening |
 | Mission Center | toolkit | Flatpak `io.missioncenter.MissionCenter` from Flathub | Flatpak application + `~/.local/bin/missioncenter` wrapper | VM validated: install, launcher, selective repair, and idempotency | PR5.0 |
 | OCR | toolkit/screencapture | XBPS Tesseract language packages + pinned `tessdata_fast` vertical models | direct process + `tesseract` adapter | VM validated: required horizontal packages, verified vertical models, model-load smoke tests, repair, and idempotency | PR5.1/PR7 |
 | Themes, icons, cursors | fonts/theme | pinned adw-gtk3 6.5, WhiteSur 2026-09-10, Capitaine r5 | files/config only | VM validated: expected GTK/icon/cursor names, Adwaita fallback, and idempotency | PR5.2 |
@@ -36,8 +38,10 @@ after provider, provisioning, activation, operation, and verification pass.
 - Profiles exposed by the Void installer match the Arch installer model.
 - Missing optional profiles do not block the base shell, but selecting a
   profile must install all providers required by that profile.
-- WARP never starts a privileged service or creates an account from QML. It
-  reports the stopped daemon and requires explicit operator registration.
+- WARP is not a required profile dependency. Only `setup` → Extras on Void can
+  provision/update its provider; QML never installs, starts a privileged
+  service, or creates an account. The toggle reports a stopped/missing provider
+  and requires explicit operator registration.
 - Packaging iNiR itself as an XBPS package remains outside V1. This matrix
   covers the per-user installer.
 - Exact package names and upstream versions move from **TBD** only after they

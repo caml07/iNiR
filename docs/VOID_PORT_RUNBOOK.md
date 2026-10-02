@@ -7,18 +7,21 @@ live in `docs/adr/`; capability status lives in
 
 ## Current checkpoint
 
-As of 2026-09-20:
+As of 2026-10-01:
 
 - Canonical integration/release-candidate branch: `prerelease`.
-- Snow `main` and `prerelease` currently both resolve to `9574fa42` (iNiR
-  2.31.0). A fresh fetch found no upstream commit missing from the fork's Void
-  `prerelease`.
-- Fork `prerelease` includes the external-disk NetworkManager/runit lifecycle
-  closure through merge `fd6725f2`.
+- A fresh authoritative fetch resolved Snow `main` and `prerelease` to
+  `c08bb928fe71c6a00bfede3e99ef26fb1825ebe2` (`VERSION=2.32.0`). The active
+  candidate `feat/void-upstream-2.32` integrates that exact baseline; generated
+  IPC/search artifacts were rebuilt from the merged tree rather than choosing
+  one side of the merge.
+- Supported V1 target: **Void Linux x86_64 glibc + runit +
+  elogind/Turnstile**. musl, non-x86_64 and seatd-only sessions are explicitly
+  outside the current release gate.
 - PR1 through PR7 engineering closure, the 2.31 runtime compatibility fixes,
   clean-VM install, reboot/runtime, privileged Power Profiles activation,
   Web Wallpaper, SDDM graphical-login parity, and the versioned PR3.2-PR7
-  checker sweep are VM validated.
+  checker sweep remain historical validated evidence from the previous closure.
 - The external-disk install and post-migration reboot have been performed.
   `nmcli` reported a live connected Wi-Fi device under NetworkManager, runit
   directly supervised the daemon, persistent service ownership was correct,
@@ -29,7 +32,21 @@ As of 2026-09-20:
   installed with KDecoration enabled, `darkly-settings6` passed, and the second
   provider run was idempotent. Foot now has one canonical managed color path,
   `~/.config/foot/inir-colors.ini`.
+- The 2.32 physical gate additionally exercised Doctor 27/27, current
+  NetworkManager/audio/Bluetooth/Power Profiles/ydotool state, Qt 6.11 family
+  switching (`ii -> waffle -> iris -> ii`), TTY/SSH restart + IPC recovery, and
+  the optional Kira v3 art pack/companion path. Current v3 lacks the manifest's
+  optional JRPG/Codex art lines, so runtime capability-detects those assets and
+  falls back to classic art.
+- Cloudflare WARP is now a **Void-only optional Extra**, not a toolkit
+  dependency. Its provider is metadata-driven and glibc/x86_64-gated; account
+  registration and a real tunnel are manual non-gates.
 - Packaging iNiR itself as an XBPS package is outside V1.
+- The docs verifier is baseline-compared, not waived: on 2026-10-01 both the
+  candidate and a detached clean Snow `c08bb928` worktree reported the same
+  `SERVICES.md` IPC-documentation drift and the same 1648 missing `kl_GL`
+  catalog entries. Treat only additional candidate findings as a Void
+  regression.
 
 Do not infer current state from an old feature branch. Check `prerelease` and
 `docs/VOID_VM_VALIDATION.md` first.
@@ -98,17 +115,10 @@ git branch --show-current
 git status --short
 ```
 
-Known user-owned dirty files at the 2026-09-18 checkpoint:
-
-```text
-scripts/generate-settings-search-index.py
-scripts/test-detect-sensors.py
-```
-
-Do not stage, rewrite, revert, or include them unless the user explicitly asks.
-
-The separate `/home/caml/inir` checkout and its `inir-fix` worktree are also
-out of scope.
+Historical physical-validation sessions sometimes had user-owned dirty files
+or parallel worktrees. Treat those as evidence, not scratch space: never stage,
+rewrite, reset or repurpose unrelated local work merely to obtain a clean
+release checkout. Create a disposable worktree/clone instead.
 
 ## Branch and commit workflow
 
@@ -168,15 +178,10 @@ make test-local
 ShellCheck should also be run when available. It was not installed on the host
 at the 2026-09-18 checkpoint.
 
-Before every commit:
-
-```bash
-cp /home/caml/.agents/skills/no-commit-secrets/scripts/scan-staged.js \
-  /tmp/scan-staged.cjs
-node /tmp/scan-staged.cjs
-```
-
-No commit is allowed when that scan reports a secret.
+Before every commit, run the available staged-secret scanner for the local
+agent/tooling environment (when present) and inspect the staged diff manually.
+No commit is allowed when either review reports a secret or unrelated
+user-owned data.
 
 ## Void VM
 
@@ -298,8 +303,11 @@ turnstiled
 NetworkManager
 bluetoothd
 power-profiles-daemon
-warp-svc
 ```
+
+`warp-svc` joins that list only after the user explicitly installs the
+Cloudflare WARP Extra. It is not part of a normal Void install or Doctor's
+required dependency set.
 
 NetworkManager must not run alongside a competing network service such as
 `dhcpcd`, standalone `wpa_supplicant`, or `wicd`. On an interactive Void
@@ -309,7 +317,8 @@ previous links if NetworkManager activation cannot be wired. The migration is
 deferred until all package/config work is complete because switching network
 managers can briefly interrupt connectivity.
 
-WARP owns a runit logger:
+When the optional WARP Extra is installed, its iNiR-owned service also owns a
+runit logger:
 
 ```text
 /etc/sv/warp-svc/log/run
@@ -340,16 +349,19 @@ sidebars use `org.kde.syntaxhighlighting`.
 Important non-XBPS providers:
 
 - ydotool v1.0.4: pinned upstream source;
-- WARP 2026.7.1377.0: pinned upstream Debian artifact extracted without
-  executing Debian maintainer scripts;
+- Cloudflare WARP (optional, Void x86_64 glibc only): latest artifact/version/
+  SHA-256 resolved from Cloudflare's official APT metadata, with the last
+  verified artifact kept as an offline metadata fallback; Debian maintainer
+  scripts are never executed;
 - Mission Center: maintained Flathub application;
 - adw-gtk3 / WhiteSur / Capitaine: pinned upstream providers;
 - Darkly v0.5.39: pinned upstream source, Qt6-only build;
 - vertical OCR models: pinned `tessdata_fast` artifacts;
 - selected UI fonts: pinned upstream files where Void has no suitable package.
 
-Use the exact versions/checksums in `sdata/dist-void/install-deps.sh`, not this
-runbook, as the executable source of truth.
+Use the executable provider as the source of truth: normal profile providers
+live in `sdata/dist-void/install-deps.sh`; optional WARP metadata/fallback
+logic lives in `sdata/lib/extras.sh`.
 
 ## Notification conflict rule
 
@@ -382,6 +394,19 @@ scripts/check-void-pr7.sh
 
 For an integration/audit branch, use `INIR_EXPECTED_BRANCH` rather than
 editing historical checker defaults.
+
+`check-void-pr43.sh` now reflects WARP's optional-provider contract. Its default
+mode checks the provider shape, metadata/fallback fixtures, no-downgrade rule,
+musl rejection and QML non-escalation **without requiring WARP to be installed**.
+Only a tester who explicitly opts in should run the live daemon path:
+
+```bash
+INIR_VERIFY_WARP_LIVE=true ./scripts/check-void-pr43.sh
+```
+
+Add `INIR_VERIFY_IDEMPOTENCY=true` only when that same tester is willing to let
+the optional provider execute a second install/update pass. Neither flag
+registers or connects a Cloudflare account automatically.
 
 Where supported:
 

@@ -23,20 +23,19 @@ capability, `docs/VOID_VM_VALIDATION.md` when interpreting prior evidence, and
 
 ## Current state
 
-The 2.31.0 Void port is closed on the fork's `prerelease` branch through:
+The supported V1 target is **Void Linux x86_64 glibc + runit +
+elogind/Turnstile**. musl, non-x86_64 and seatd-only sessions are compatibility
+profiles, not release targets.
 
-- full Snow baseline parity at `9574fa42` when the gate was closed;
-- PR1-PR7 engineering closure;
-- clean release-VM install/reboot/runtime validation;
-- SDDM graphical-login parity;
-- NetworkManager migration and real post-reboot hardware validation;
-- runit orphan-helper cleanup and Turnstile xembed env repair;
-- Darkly Qt style + KDecoration settings KCM;
-- canonical Foot `~/.config/foot/inir-colors.ini` theming path;
-- documentation/installer/XBPS/runit coverage.
+The historical 2.31 closure at Snow `9574fa42` proved PR1-PR7, clean VM
+install/reboot/runtime, SDDM, NetworkManager migration, real hardware lifecycle,
+Darkly/KDecoration and Foot theming. The 2.32 release-candidate cycle then
+integrated Snow through `c08bb928` and added Qt 6.11 family-switch recovery,
+TTY/SSH shell-environment recovery, graphics preflight hardening, optional Kira
+pack lifecycle and an optional Void-only Cloudflare WARP provider.
 
-Never assume those exact refs are still current. Fetch `origin` and `upstream`
-first and compare the current branch tips before making a new parity claim.
+Never assume those refs remain current. Fetch the current Snow `main` and
+`prerelease` tips before making a parity claim.
 
 ## Load-bearing rules
 
@@ -45,6 +44,9 @@ first and compare the current branch tips before making a new parity claim.
 - Provider, not hopeful detection: a supported capability needs provider,
   provisioning, activation, operation, and repeatable verification.
 - Prefer XBPS, then maintained Flatpak, then pinned upstream artifacts.
+- Required profiles and optional providers are different contracts. WARP and
+  Kira are opt-in Extras; their absence must not make a normal install/Doctor
+  unhealthy.
 - Preserve user-owned dirty files and unrelated work.
 - A dirty physical-validation checkout is evidence, not a scratch tree. Use a
   clean clone/worktree for edits and publishing.

@@ -1,13 +1,14 @@
 # Installation
 
 The normal `./setup install` flow is supported on Arch-based systems and, in
-this fork, on **Void Linux glibc + runit**. Void uses XBPS for packaged
+this fork, on **Void Linux x86_64 glibc + runit**. Void uses XBPS for packaged
 dependencies and explicit providers for the small set of capabilities that are
 not available as suitable Void packages.
 
-> **Void scope:** glibc + elogind + runit/Turnstile is the validated profile.
-> Void musl and a seatd-only session are compatibility profiles, not release
-> targets. See [iNiR on Void Linux](VOID.md).
+> **Void scope:** x86_64 glibc + elogind + runit/Turnstile is the supported
+> release profile. Void musl, non-x86_64 and a seatd-only session are
+> compatibility/experimental profiles, not release targets. See
+> [iNiR on Void Linux](VOID.md).
 >
 > **NixOS:** there is an experimental flake path. See [NixOS](NIXOS.md).
 
@@ -56,7 +57,7 @@ machine. It then:
 
 - installs the selected dependency profiles with XBPS;
 - checks free space before large XBPS transactions (notably the font profile);
-- installs pinned/verified providers only where Void has no suitable package;
+- installs verified providers only where Void has no suitable package;
 - configures the runit/Turnstile user-session path instead of assuming
   `systemd --user`;
 - provisions PipeWire/WirePlumber, BlueZ, Power Profiles and other selected
@@ -72,7 +73,9 @@ iNiR owns the rice and its userland providers; it does not guess GPU drivers,
 rewrite the bootloader or choose hardware-specific kernel parameters.
 
 Before provisioning Void dependencies, the installer runs a small graphics
-preflight. It requires an accessible DRM render node and, for VirtIO guests,
+preflight. Physical machines only need a working Niri-compatible graphics
+stack. For **VirtIO virtual machines specifically**, the preflight requires an
+accessible DRM render node and
 rejects a negotiated feature set without `VIRTIO_GPU_F_VIRGL`. The release VM
 uses VirGL (`virtio-vga-gl`/`virtio-gpu-gl`); the earlier plain VirtIO setup
 fell back to software EGL and Niri did not expose a usable output. The check can
@@ -158,9 +161,22 @@ development package so its settings KCM is available too.
 > verifies the complete archive before touching live assets, records the release
 > tag plus an installed-tree hash, and repairs missing or corrupt files during a
 > later `./setup update` without auto-installing the optional pack for new users.
+> Runtime also verifies a real pack sentinel before enabling mascot surfaces.
+> If a published pack does not contain an optional manifest art line (the v3
+> pack currently omits JRPG/Codex sprites), iNiR falls back to available classic
+> art without rewriting the user's saved preference.
 > iNiR must never publish a shell manifest that depends on mascot art which has
 > not been published by `snowarch/inir-mascot` yet. For Nix, bump the pinned
 > mascot release only after that art release exists.
+>
+> **Void-only networking Extra:** `./setup` → Extras also offers
+> **Install/update Cloudflare WARP** on x86_64 glibc Void. WARP is not installed
+> by a normal profile and Doctor does not require it. The provider reads the
+> current version/artifact/SHA-256 from Cloudflare's official APT metadata,
+> extracts only `warp-cli`/`warp-svc`, and creates an iNiR-owned runit service
+> only after explicit opt-in. Subsequent iNiR updates refresh WARP only when the
+> installation is already managed by that provider. Registration and connecting
+> a WARP account/tunnel remain manual user actions.
 >
 > **Important for minimal Arch installs:**
 > If shell startup fails with `module "org.kde.syntaxhighlighting" is not installed`, install:

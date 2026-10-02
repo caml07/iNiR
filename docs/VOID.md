@@ -1,39 +1,43 @@
 # iNiR on Void Linux
 
-Guide for the Void Linux port of iNiR (glibc + runit + XBPS). The V1 port
+Guide for the Void Linux port of iNiR (x86_64 glibc + runit + XBPS). The V1 port
 implementation is complete through the PR7 engineering-closure sweep plus the
 post-closure hardware/provider fixes found on real Void installs. Decisions:
 see `docs/adr/`; glossary: see `CONTEXT.md`.
 
 ## Status
 
-- V1 scope: **the normal per-user iNiR install path works on Void**. The shell
+- V1 scope: **the normal per-user iNiR install path works on Void Linux x86_64
+  glibc with runit and elogind/Turnstile**. The shell
   payload lives in the user install just as it does on the repo-managed Arch
   path; XBPS dependency transactions and system-service activation still use
   normal privilege elevation when required. Disruptive service ownership
   changes are confirmation-gated. An iNiR XBPS package is a separate milestone
   (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
-  musl libc and `seatd` without elogind.
+  musl libc, non-x86_64 installs, and `seatd` without elogind. The Niri/
+  Quickshell core may be packageable on musl, but the complete provider matrix
+  has not been release-qualified and proprietary/prebuilt providers such as
+  Cloudflare WARP are glibc-only. See ADR-0005.
 - Validation: QEMU VM first, then a real external-disk install. Both are
   recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-20): a fresh fetch shows Snow `main` and
-  `prerelease` both at `9574fa42` (iNiR 2.31.0), and the fork's Void
-  `prerelease` contains that complete upstream baseline plus the Void work. A
-  clean release VM passed the normal installer, reboot/runtime validation,
-  Doctor, Web Wallpaper, Power Profiles, SDDM graphical login, Super-tap
-  opt-in, end-to-end Super+Q through ydotool/uinput, and every versioned
-  PR3.2-PR7 checker. The real external-disk install then found and closed the
-  NetworkManager migration, runit orphan-helper and Turnstile xembed gaps. A
-  later real-Void report exposed two additional packaging/theming regressions:
-  Darkly had been built without its KDecoration settings KCM, and the shipped
-  Foot config referenced the obsolete `colors.ini` path. Both now have explicit
-  regression coverage; Darkly's complete Qt6/KDecoration build was installed
-  and idempotency-tested in the release VM. The final external-disk reboot then
-  closed the hardware gate: NetworkManager owned the live Wi-Fi connection
-  under runit, the old competing network services remained disabled, SDDM
-  launched `niri --session`, and the previously leaking shell helpers remained
-  at one instance each.
+- Current 2.32 candidate checkpoint (2026-10-01): a fresh fetch resolved Snow
+  `main` and `prerelease` to
+  `c08bb928fe71c6a00bfede3e99ef26fb1825ebe2` (`VERSION=2.32.0`). The candidate
+  branch integrates that exact tree plus the Void port, regenerates the IPC
+  registry from merged QML (70 targets / 403 functions) and the Settings search
+  index (1,942 entries), and passes the merged local distribution suite. The
+  physical Void install has also passed Doctor 27/27, live network/audio/
+  Bluetooth/Power Profiles/ydotool checks, Qt 6.11 family switching and a real
+  Kira companion smoke. Final release-VM rerun evidence for this exact merged
+  tree is recorded separately in `docs/VOID_VM_VALIDATION.md` before advancing
+  the fork's `prerelease` branch.
+
+The 2.31 `9574fa42` closure remains useful historical evidence: that cycle
+proved clean install/reinstall, reboot/runtime, SDDM graphical login, the
+NetworkManager handoff, Power Profiles, Web Wallpaper, ydotool input, Darkly/
+Foot repair and the first external-disk hardware gate. Historical SHA/date
+references below describe those runs and are not the current upstream tip.
 
 ## Installer experience on Void
 
@@ -197,7 +201,10 @@ Notes:
   separate UI action.
 - Bluetooth uses the toolkit profile's `bluez` daemon and `blueman` frontend.
   The audio profile adds `libspa-bluetooth` for PipeWire Bluetooth audio.
-- `ddcutil` on musl needs `libexecinfo-devel` + `musl-legacy-compat`.
+- The current release target is glibc. Historical musl package notes (for
+  example `ddcutil` compatibility packages) are not part of the V1 support
+  contract and must not be used to imply that the full shell/provider matrix
+  has been qualified on musl.
 - Repo sanity: `xbps-query -L` (doctor check).
 - Darkly is built from pinned v0.5.39 source with Qt6/KF6 dependencies,
   including `kf6-kdecoration-devel`. The provider requires both
@@ -215,6 +222,27 @@ supported only when iNiR provisions, activates, operates, and verifies every
 capability it exposes. Provider resolution prefers official XBPS packages,
 then a maintained Flatpak, then a pinned upstream artifact with an update
 path. See ADR-0004 and `docs/VOID_CAPABILITIES.md`.
+
+Cloudflare WARP is deliberately outside those required dependency profiles.
+Void does not ship an official `cloudflare-warp` XBPS package, and the WARP
+daemon is privileged networking software rather than a normal sandboxed GUI,
+so Flatpak is not an appropriate provider. On **Void x86_64 glibc** the setup
+Extras menu offers an explicit WARP provider that:
+
+- reads the latest `cloudflare-warp` version, artifact path and SHA-256 from
+  Cloudflare's official APT `Packages` metadata;
+- falls back to the last in-tree verified artifact if that metadata is
+  temporarily unavailable;
+- extracts only `warp-cli` and `warp-svc` without executing Debian maintainer
+  scripts;
+- creates/repairs an iNiR-owned runit service only after the user opts in;
+- never downgrades a newer local WARP version; and
+- refreshes during a later iNiR update only when the installation is already
+  owned by the iNiR WARP provider.
+
+WARP account registration, accepting Cloudflare terms, connecting a tunnel and
+trace verification are user-owned operations and are not part of the Void
+release gate. WARP is not offered by this port on musl or non-x86_64 Void.
 
 `discover-overlay` is not a supported capability: the repository contains no
 provider, origin, install path, or documented user requirement for it. PR3.3
@@ -271,7 +299,8 @@ The implementation was delivered incrementally against
 `snowarch/inir:prerelease`. Those feature/fix branches were useful while the
 port was being built, but they are no longer active development refs. The
 canonical fork branch for the completed Void integration and release candidate
-is now `prerelease`; at the 2026-09-20 pre-Darkly/Foot closure checkpoint the
+is `prerelease`. The table below records the original 2.31 delivery sequence;
+at the 2026-09-20 pre-Darkly/Foot closure checkpoint the
 published integration tip is `fd6725f2`, which already contains Snow's complete
 `9574fa42` 2.31.0 baseline.
 
@@ -300,7 +329,7 @@ The clean Void external-disk installation and its post-migration reboot have
 been performed; the final live NetworkManager/runit state, SDDM session path,
 physical Bluetooth adapter, Power Profiles state and helper-process counts are
 recorded in `docs/VOID_VM_VALIDATION.md`. This closes the 2.31.0 Void hardware
-release gate.
+release gate; it is historical evidence, not the current 2.32 Snow baseline.
 
 ### External hardware prerequisites
 
@@ -403,7 +432,9 @@ contract. SSH is only the transport; export the graphical user's runtime and
 D-Bus address explicitly:
 
 ```bash
-ssh voidcaml@192.168.122.140 '
+VM_IP="$(virsh -c qemu:///system domifaddr voidlinux-release-clean --source lease \
+  | awk '/ipv4/ {sub(/\/.*/, "", $4); print $4; exit}')"
+ssh "voidcaml@$VM_IP" '
 cd ~/inir-src &&
 git fetch origin &&
 git checkout feat/void-nonsystemd-runtime &&

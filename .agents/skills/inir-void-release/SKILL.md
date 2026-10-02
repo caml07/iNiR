@@ -145,3 +145,10 @@ A Void release candidate can be called closed only when:
 For the 2.31.0 closure, WARP account/tunnel operation and pairing an external
 Bluetooth device were intentional non-gates; the external-disk network/session
 hardware gate itself was completed.
+
+For the 2.32 closure, the supported target is Void x86_64 glibc. Kira's
+published optional art pack is part of the optional-content validation matrix.
+Cloudflare WARP moved out of the required toolkit profile into a Void-only
+Extra; provider metadata/fallback/idempotency can be gated automatically, but
+account registration, tunnel connection and trace verification remain manual
+non-gates. Never require WARP presence for Doctor or a normal install.

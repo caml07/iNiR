@@ -240,7 +240,7 @@ The installer handles dependencies, system config and theming. After install, ru
 
 ### Void Linux on this fork
 
-The `caml07/iNiR` fork carries a validated **Void Linux glibc + runit + XBPS**
+The `caml07/iNiR` fork carries a validated **Void Linux x86_64 glibc + runit + XBPS**
 port on `prerelease`. It uses the same setup entry point instead of a separate
 installer:
 
@@ -279,7 +279,8 @@ sudo make install       # system-wide instead of your home
 ```
 
 **Distros:** Arch remains the upstream primary target. This fork also has a
-validated Void Linux glibc/runit path backed by XBPS. Fedora and Debian/Ubuntu
+validated Void Linux x86_64 glibc/runit path backed by XBPS. Void musl is not
+part of the current release target. Fedora and Debian/Ubuntu
 retain their automated dependency paths with distro-repository-first fallbacks;
 other distributions use the generic guidance in the
 [package list](https://github.com/snowarch/inir/wiki/PACKAGES). iNiR needs Qt

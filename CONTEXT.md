@@ -40,8 +40,16 @@ _Avoid_: manual install, repo-linked install
 
 **Compatibility profile**:
 A documented, explicitly out-of-scope-for-V1 configuration: `musl` libc,
-or `seatd` + `turnstile` without elogind (acpid for power management).
+non-x86_64 Void, or `seatd` + `turnstile` without elogind (acpid for power
+management). The supported Void release profile is x86_64 glibc + runit +
+elogind/Turnstile (ADR-0005).
 _Avoid_: supported configuration
+
+**Optional provider**:
+A capability provider that is intentionally absent from a normal profile and
+requires an explicit Extras/user action. Its absence is healthy and must not
+make Doctor fail. Cloudflare WARP and the Kira art pack are current examples.
+_Avoid_: missing dependency
 
 **Capability**:
 A user-visible function of iNiR, such as wallpaper transitions, screen

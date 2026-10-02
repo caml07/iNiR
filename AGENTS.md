@@ -5,48 +5,60 @@ Decisions: `docs/adr/`. Glossary: `CONTEXT.md`. Operational procedure:
 `docs/VOID_PORT_RUNBOOK.md`.
 
 The canonical Void integration/release-candidate branch on the fork is
-`prerelease`. The last fully closed release checkpoint is iNiR 2.31.0 at Snow
-`9574fa42`; PR1 through PR7, the clean release-VM gate, and the external-disk
-hardware gate are complete for that baseline.
+`prerelease`. The supported V1 target is **Void Linux x86_64 glibc + runit +
+elogind/Turnstile**. Void musl, non-x86_64 installs and seatd-only sessions are
+not release targets for this port.
 
-The active 2026-09-29 upstream-sync branch is `feat/void-upstream-2.32`, based
-on `origin/prerelease` and integrating Snow through `5b268a58` with
-`VERSION=2.32.0`. It has not been merged into `prerelease` yet. Local
-distribution tests, PR7, historical provider/runtime checkers, and physical
-Void runtime smoke are green. The previously partial Darkly installation was
-repaired on the live machine through polkit: `kf6-kdecoration-devel` was
-installed, Darkly 0.5.39 was rebuilt with `WITH_DECORATIONS=ON`, the
-KDecoration KCM loaded with complete linkage, and PR5.4 passed in idempotency
-mode.
+The active 2.32 release-candidate work lives on `feat/void-upstream-2.32`. As
+of 2026-10-01 it integrates Snow `main` and `prerelease` through
+`c08bb928fe71c6a00bfede3e99ef26fb1825ebe2` (`VERSION=2.32.0`). The Snow merge
+regenerated the IPC registry from the merged QML (70 targets / 403 functions),
+regenerated the Settings search index (1,942 entries), and preserved both
+upstream translation changes and the two Void-specific runtime strings. The
+post-merge local distribution suite is green with 1,356 QML files and 509 iRiS
+schema keys in sync.
 
-## Current 2.32 sync progress (2026-09-29)
+## Current 2.32 release-candidate state (2026-10-01)
 
-- Snow 2.32 plus post-tag fixes were merged onto a clean branch created from
-  the current fork `prerelease`; the user's dirty live checkout was left
-  untouched.
-- Generated settings-search and IPC registries were regenerated after conflict
-  resolution. `make test-local` and
-  `INIR_EXPECTED_BRANCH=feat/void-upstream-2.32 ./scripts/check-void-pr7.sh`
-  both pass on the physical Void machine.
-- Historical Void checkers PR3.2/3.3/4.0-4.3/5.0-5.5/6 pass after importing the
-  live Niri session environment where required. PR5.4 also passes on the
-  repaired physical Darkly installation with `INIR_VERIFY_IDEMPOTENCY=true`.
-- Runtime was updated to 2.32 through the real update flow. Eight local runtime
-  modifications were auto-preserved before sync, including the user-owned
-  `scripts/colors/modules/05-caelestia-terminal.sh`.
-- Physical Qt 6.11.2 + Quickshell 0.3.1 exposed a reproducible
-  `QQuickWindow::physicalDpiChanged()/QQuickItem::flags()` segfault while
-  switching panel families in-process. The 2.32 branch now restarts the
-  supervised shell around family changes on Qt 6.11 and returns to normal
-  in-process transitions automatically on Qt 6.12+. Repeated
-  `ii -> waffle -> iris -> ii` hardware tests produced no new crash reports
-  or runtime warnings after the workaround.
-- Documentation verification still has upstream/baseline drift (including the
-  `kl_GL` catalog gap and new 2.32 service-documentation mismatches). The two
-  Void runtime strings introduced by the fork are catalogued; do not claim the
-  repository-wide docs verifier is fully green until upstream drift is closed.
+- The physical Void glibc install passed Doctor 27/27, Niri validation, live
+  NetworkManager/audio/Bluetooth/Power Profiles/ydotool checks, PR7, PR5.4
+  idempotency, and repeated `ii -> waffle -> iris -> ii` family transitions
+  with exactly one supervised Quickshell process after each switch.
+- TTY/SSH maintenance exposed two lifecycle bugs that are now regression
+  covered: `inir restart` falsely timed out because Quickshell filtered by the
+  caller's display, and IPC calls from non-graphical shells could discover the
+  instance without adopting its Wayland/D-Bus/Niri environment. The launcher
+  now recovers the supervised shell environment instead of assuming the caller
+  inherited it.
+- Kira remains opt-in. The published `snowarch/inir-mascot` v3 pack was
+  installed and verified at 354 assets, deletion/repair was exercised, and a
+  real physical IPC/visual smoke rendered the companion and dialogue bubble.
+  The current v3 pack does not contain the manifest's optional JRPG/Codex art
+  lines, so runtime capability-probes those assets and falls back to classic
+  art without changing the user's saved preference.
+- Cloudflare WARP is **not a required toolkit dependency**. On Void glibc
+  x86_64 it is an explicit Extras provider that resolves version, artifact and
+  SHA-256 from Cloudflare's official APT metadata, falls back to the last
+  pinned verified artifact when metadata is unavailable, never downgrades a
+  newer local install, and only auto-refreshes an iNiR-managed installation.
+  Account registration, tunnel connection and trace verification remain
+  intentional manual/non-gate checks.
+- The VirtIO/VirGL requirement applies only to the release VM's VirtIO GPU.
+  Physical installs require a working Niri-compatible graphics stack; iNiR
+  does not install or choose GPU drivers. A VM with a DRM render node but no
+  negotiated `VIRTIO_GPU_F_VIRGL` is rejected before the large dependency
+  transaction.
+- The final release-VM rerun against this exact merged Snow tree is required
+  before the fork's `prerelease` branch is advanced. Do not call 2.32 closed
+  until that gate and the final docs/baseline comparison are recorded.
+- `scripts/verify-docs.sh` is not globally green, but the 2026-10-01 comparison
+  against a detached clean Snow `c08bb928` worktree showed the same baseline
+  categories: the existing `docs/SERVICES.md` IPC drift and `kl_GL` missing
+  catalog entries (1648). The Void candidate adds two catalogued runtime keys
+  without adding a new verifier category; do not mislabel the upstream baseline
+  findings as Void regressions.
 
-## Current progress (2026-09-20)
+## Historical 2.31 closure (2026-09-20)
 
 - PR1-PR3: usable-systemd predicate, XBPS dependency routing, runsvdir/
   turnstile supervision, non-systemd runtime adapters, PipeWire user services,

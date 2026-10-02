@@ -11,10 +11,13 @@ The PKGBUILDs live in `sdata/dist-arch/`.
 ## Void Linux
 
 Void uses the normal per-user installer with XBPS-backed dependency profiles.
-The executable source of truth is `sdata/dist-void/install-deps.sh`; use
-`docs/VOID_CAPABILITIES.md` for delivery/validation status and
-`docs/VOID_PORT_RUNBOOK.md` for operational rules. Provider versions and
-checksums live in the installer script, not this reference.
+The executable source of truth for required profiles is
+`sdata/dist-void/install-deps.sh`; use `docs/VOID_CAPABILITIES.md` for
+delivery/validation status and `docs/VOID_PORT_RUNBOOK.md` for operational
+rules. Optional Void Extras can own separate providers; Cloudflare WARP, for
+example, is implemented in `sdata/lib/extras.sh` rather than the dependency
+profile. Provider versions/checksums live in executable provider code, not this
+reference.
 
 Important Void package-name and provider differences:
 
@@ -35,9 +38,11 @@ Important Void package-name and provider differences:
 | Darkly Qt style/settings | pinned Darkly v0.5.39 source + `kf6-kdecoration-devel` and other Qt6/KF6 build deps | Built with Qt6 and KDecoration enabled so both the KStyle and `darkly-settings6` KCM are present |
 
 Validated non-XBPS providers are used only where Void does not provide a
-suitable package: pinned upstream ydotool, WARP, adw-gtk3, WhiteSur,
-Capitaine, Darkly, selected UI fonts and vertical OCR models, plus Mission
-Center from Flathub.
+suitable package: pinned upstream ydotool, adw-gtk3, WhiteSur, Capitaine,
+Darkly, selected UI fonts and vertical OCR models, plus Mission Center from
+Flathub. Cloudflare WARP is separate: it is an **optional Void x86_64 glibc
+Extra**, selected from Cloudflare's official APT metadata and never installed
+by the normal toolkit profile.
 
 The Void Darkly provider is intentionally stricter than a simple
 `darkly6.so` presence check. A complete install also requires
@@ -256,7 +261,7 @@ Not installed by default, but useful. The shell handles their absence gracefully
 
 | Package | Purpose | Used by |
 |---------|---------|---------|
-| `warp-cli` | Cloudflare WARP VPN toggle | Quick toggles panel |
+| `warp-cli` | Cloudflare WARP VPN toggle. On Void x86_64 glibc, install/update it explicitly from `./setup` → Extras; it is not a required profile dependency | Quick toggles panel |
 | `ollama` | Local LLM for AI chat | Sidebar AI assistant |
 | `whisper-cpp` | Local speech-to-text, no API key needed | Voice input and voice search |
 | `cava` | Audio visualizer | Bar widget (optional) |

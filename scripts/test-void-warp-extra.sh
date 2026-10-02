@@ -27,6 +27,21 @@ mkdir -p "$HOME"
 # shellcheck source=/dev/null
 source "$repo_root/sdata/lib/extras.sh"
 
+# Debian payload extraction must preserve explicit compression handling. GNU
+# tar does not auto-detect compressed streams read from stdin, which is exactly
+# how `ar p data.tar.* | tar ...` is used by the provider.
+mkdir -p "$tmp/deb-src/usr/bin" "$tmp/deb-out" "$tmp/deb-build"
+printf '#!/bin/sh\nprintf "fixture\\n"\n' > "$tmp/deb-src/usr/bin/warp-cli"
+printf '2.0\n' > "$tmp/deb-build/debian-binary"
+tar -czf "$tmp/deb-build/control.tar.gz" --files-from /dev/null
+tar -cJf "$tmp/deb-build/data.tar.xz" -C "$tmp/deb-src" .
+( cd "$tmp/deb-build" && ar r "$tmp/fixture.deb" debian-binary control.tar.gz data.tar.xz >/dev/null )
+extras_void_warp_extract_payload "$tmp/fixture.deb" "$tmp/deb-out"
+[[ -f "$tmp/deb-out/usr/bin/warp-cli" ]] || {
+  printf 'FAIL: WARP provider could not extract an xz-compressed Debian payload\n' >&2
+  exit 1
+}
+
 expected=$'2099.4.3.2\tpool/bookworm/main/c/cloudflare-warp/cloudflare-warp_2099.4.3.2_amd64.deb\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 actual="$(extras_void_warp_release_info)"
 [[ "$actual" == "$expected" ]] || {

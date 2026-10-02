@@ -324,6 +324,25 @@ extras_void_warp_install_prereqs() {
   pkg_sudo xbps-install "${flags[@]}" "${pending[@]}"
 }
 
+extras_void_warp_extract_payload() {
+  local archive="$1" payload_dir="$2" data_archive=""
+  data_archive="$(ar t "$archive" 2>/dev/null | grep '^data[.]tar[.]' | head -n1 || true)"
+  [[ -n "$data_archive" ]] || return 1
+  mkdir -p "$payload_dir" || return 1
+
+  local -a tar_flags=(-x)
+  case "$data_archive" in
+    *.tar.gz)  tar_flags=(-xz) ;;
+    *.tar.xz)  tar_flags=(-xJ) ;;
+    *.tar.bz2) tar_flags=(-xj) ;;
+    *.tar.zst) tar_flags=(--zstd -x) ;;
+    *.tar)     tar_flags=(-x) ;;
+    *) return 1 ;;
+  esac
+
+  ar p "$archive" "$data_archive" | tar "${tar_flags[@]}" -C "$payload_dir"
+}
+
 extras_install_void_warp() {
   if [[ -z "${OS_GROUP_ID:-}" ]] && declare -F detect_distro >/dev/null 2>&1; then
     detect_distro
@@ -365,7 +384,7 @@ extras_install_void_warp() {
 
   extras_void_warp_install_prereqs || return 1
 
-  local temp_dir archive data_archive payload_dir warp_cli warp_svc
+  local temp_dir archive payload_dir warp_cli warp_svc
   temp_dir="$(mktemp -d)" || return 1
   archive="$temp_dir/cloudflare-warp.deb"
   payload_dir="$temp_dir/payload"
@@ -374,10 +393,7 @@ extras_install_void_warp() {
   tui_info "Installing Cloudflare WARP v${version} from Cloudflare's verified upstream package..."
   if ! curl -fsSL --retry 2 --max-time 120 -o "$archive" "$url" \
       || ! printf '%s  %s\n' "$sha256" "$archive" | sha256sum -c - >/dev/null \
-      || ! data_archive="$(ar t "$archive" | grep '^data[.]tar[.]' | head -n1)" \
-      || [[ -z "$data_archive" ]] \
-      || ! mkdir -p "$payload_dir" \
-      || ! ar p "$archive" "$data_archive" | tar -x -C "$payload_dir" \
+      || ! extras_void_warp_extract_payload "$archive" "$payload_dir" \
       || ! warp_cli="$(find "$payload_dir" -type f -name warp-cli -print -quit)" \
       || ! warp_svc="$(find "$payload_dir" -type f -name warp-svc -print -quit)" \
       || [[ -z "$warp_cli" || -z "$warp_svc" ]] \

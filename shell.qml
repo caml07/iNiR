@@ -40,6 +40,7 @@ ShellRoot {
     // releases XDG autostart applications. The systemd unit uses Type=dbus.
     property var _trayService: TrayService
     property var _globalActionsService
+    property var _packageSearchService
 
     // Deferred singletons — initialized after first frame to reduce boot contention
     // Tier 3: T+500ms (display/interaction services)
@@ -117,6 +118,11 @@ ShellRoot {
         // scripts and keybinds got "Target not found" until then. Tier 0 also
         // keeps the gap after a config reload as short as every other handler's.
         root._globalActionsService = GlobalActions;
+        // PackageSearch is otherwise a deferred singleton. Its processes stay
+        // idle until a search is requested, but the public IPC target must be
+        // registered from a clean boot so `inir packageSearch ...` works
+        // without first opening Settings or another package UI surface.
+        root._packageSearchService = PackageSearch;
         DevNavigation.registerSettingsPages(SettingsPageRegistry.pages);
         
         // Reset shell entry state (hot-reload may preserve singletons)

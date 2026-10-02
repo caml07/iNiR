@@ -115,6 +115,11 @@ if ! grep -Fq 'property var _trayService: TrayService' "$runtime_root/shell.qml"
     printf 'FAIL: shell startup does not instantiate the StatusNotifier watcher\n' >&2
     exit 1
 fi
+if ! grep -Fq 'property var _packageSearchService' "$runtime_root/shell.qml" \
+        || ! grep -Fq 'root._packageSearchService = PackageSearch' "$runtime_root/shell.qml"; then
+    printf 'FAIL: public packageSearch IPC is not materialized on a clean shell boot\n' >&2
+    exit 1
+fi
 if grep -q '^Environment=MALLOC_' "$service_unit" \
         || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/inir" \
         || grep -Eq '^[[:space:]]*export[[:space:]]+MALLOC_' "$runtime_root/scripts/quickshell-env.sh"; then

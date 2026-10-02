@@ -141,7 +141,7 @@ Item {
         component: TilingOverlay {}
     }
     DeferredPanelLoader { identifier: "iiWorkspaceStrip"; component: WorkspaceStrip {} }
-    DeferredPanelLoader { identifier: "iiMascotCompanion"; extraCondition: MascotCatalog.packAvailable; component: MascotCompanion {} }
+    DeferredPanelLoader { identifier: "iiMascotCompanion"; extraCondition: true; component: MascotCompanion {} }
 
     LazyLoader {
         loading: Config.ready && GlobalStates.shellEntryReady

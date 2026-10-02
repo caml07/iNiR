@@ -2866,6 +2866,7 @@ fi
 rm -rf "$turnstile_test_root"
 
 step "Void dependency profile"
+bash "$runtime_root/scripts/test-void-release-profile.sh"
 bash "$runtime_root/scripts/test-void-warp-extra.sh"
 bash "$runtime_root/scripts/test-void-graphics-preflight.sh"
 python3 "$runtime_root/scripts/test-detect-sensors.py"
@@ -2881,8 +2882,9 @@ if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greetin
     printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
     exit 1
 fi
-if ! grep -Fq 'scripts/check-void-graphics.sh' "$deps_router"; then
-    printf 'FAIL: Void install path does not run the graphics preflight before dependency provisioning\n' >&2
+if ! grep -Fq 'scripts/check-void-release-profile.sh' "$deps_router" \
+        || ! grep -Fq 'scripts/check-void-graphics.sh' "$deps_router"; then
+    printf 'FAIL: Void install path does not run release-profile + graphics preflights before dependency provisioning\n' >&2
     exit 1
 fi
 void_doc="$runtime_root/docs/VOID.md"

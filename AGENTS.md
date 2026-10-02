@@ -20,7 +20,7 @@ schema keys in sync.
 
 ## Current 2.32 release-candidate state (2026-10-01)
 
-- The physical Void glibc install passed Doctor 27/27, Niri validation, live
+- The physical Void glibc install passed Doctor 28/28, Niri validation, live
   NetworkManager/audio/Bluetooth/Power Profiles/ydotool checks, PR7, PR5.4
   idempotency, and repeated `ii -> waffle -> iris -> ii` family transitions
   with exactly one supervised Quickshell process after each switch.

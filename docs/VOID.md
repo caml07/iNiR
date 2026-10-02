@@ -27,11 +27,13 @@ see `docs/adr/`; glossary: see `CONTEXT.md`.
   branch integrates that exact tree plus the Void port, regenerates the IPC
   registry from merged QML (70 targets / 403 functions) and the Settings search
   index (1,942 entries), and passes the merged local distribution suite. The
-  physical Void install has also passed Doctor 27/27, live network/audio/
-  Bluetooth/Power Profiles/ydotool checks, Qt 6.11 family switching and a real
-  Kira companion smoke. Final release-VM rerun evidence for this exact merged
-  tree is recorded separately in `docs/VOID_VM_VALIDATION.md` before advancing
-  the fork's `prerelease` branch.
+  physical Void install has also passed Doctor 28/28, including a TTY/SSH
+  invocation that recovers the live supervised Niri/Quickshell environment,
+  plus live network/audio/Bluetooth/Power Profiles/ydotool checks, Qt 6.11
+  family switching and a real Kira companion smoke. Final release-VM rerun
+  evidence for this exact merged
+  tree must be recorded separately in `docs/VOID_VM_VALIDATION.md` before
+  advancing the fork's `prerelease` branch.
 
 The 2.31 `9574fa42` closure remains useful historical evidence: that cycle
 proved clean install/reinstall, reboot/runtime, SDDM graphical login, the

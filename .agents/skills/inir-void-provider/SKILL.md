@@ -87,6 +87,19 @@ idempotent.
   or feature CLI.
 - **Fonts/large profiles:** keep the dynamic free-space preflight; a successful
   provider design includes enough disk headroom for the real XBPS transaction.
+- **Cloudflare WARP:** keep it outside the required profiles and Doctor. It is a
+  Void x86_64 glibc-only Extra because Void has no official Cloudflare XBPS
+  package and the upstream Linux client is a privileged system daemon rather
+  than a Flatpak-shaped desktop app. Resolve version, artifact path, and SHA-256
+  from Cloudflare's official APT metadata, preserve a verified fallback, never
+  downgrade a newer local install, and only refresh installations that iNiR
+  owns. Account registration and a live tunnel are manual/non-gate unless the
+  release task explicitly asks to exercise them.
+- **Debian artifact extraction:** never assume `tar -x` auto-detects compression
+  when a `data.tar.*` member is piped from `ar`. Handle `.gz`, `.xz`, `.bz2`,
+  `.zst`, and uncompressed tar explicitly and keep a synthetic compressed `.deb`
+  regression fixture. This matters even when provenance and SHA-256 are valid:
+  provider correctness includes decoding the published payload format.
 
 ## Dependency profile rules
 

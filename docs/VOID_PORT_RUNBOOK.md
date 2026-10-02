@@ -32,7 +32,8 @@ As of 2026-10-01:
   installed with KDecoration enabled, `darkly-settings6` passed, and the second
   provider run was idempotent. Foot now has one canonical managed color path,
   `~/.config/foot/inir-colors.ini`.
-- The 2.32 physical gate additionally exercised Doctor 27/27, current
+- The 2.32 physical gate additionally exercised Doctor 28/28 (including
+  TTY/SSH environment recovery), current
   NetworkManager/audio/Bluetooth/Power Profiles/ydotool state, Qt 6.11 family
   switching (`ii -> waffle -> iris -> ii`), TTY/SSH restart + IPC recovery, and
   the optional Kira v3 art pack/companion path. Current v3 lacks the manifest's

@@ -1943,6 +1943,44 @@ list_instances() {
     "$qs_bin" "${args[@]}" 2>/dev/null || true
 }
 
+import_running_instance_environment() {
+    local dir="$1"
+
+    # A graphical terminal already has the authoritative display/session
+    # environment. Only recover it for TTY/SSH/automation callers.
+    if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
+        return 0
+    fi
+
+    local target_qml pid env_file proc_root
+    target_qml="$(readlink -f "$dir/shell.qml" 2>/dev/null || printf '%s' "$dir/shell.qml")"
+    pid="$("$qs_bin" list --all 2>/dev/null | awk -v target="$target_qml" '
+        /^[[:space:]]*Process ID:/ { candidate=$3 }
+        /^[[:space:]]*Config path:/ {
+            path=$0
+            sub(/^[[:space:]]*Config path:[[:space:]]*/, "", path)
+            if (path == target && candidate != "") { print candidate; exit }
+            candidate=""
+        }
+    ')"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+
+    proc_root="${INIR_PROC_ROOT:-/proc}"
+    env_file="$proc_root/$pid/environ"
+    [[ -r "$env_file" ]] || return 1
+
+    local key value
+    while IFS='=' read -r key value; do
+        case "$key" in
+            XDG_RUNTIME_DIR|WAYLAND_DISPLAY|NIRI_SOCKET|DBUS_SESSION_BUS_ADDRESS|QT_QPA_PLATFORM|XDG_SESSION_TYPE|XDG_CURRENT_DESKTOP|XDG_SESSION_DESKTOP|PATH|LANG|LC_ALL)
+                export "$key=$value"
+                ;;
+        esac
+    done < <(tr '\0' '\n' < "$env_file")
+
+    [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]
+}
+
 has_instances() {
     local output
     output="$(list_instances "$1")"
@@ -1979,6 +2017,8 @@ terminate_qml_window() {
 ensure_running_instance() {
     local dir="$1"
 
+    import_running_instance_environment "$dir" >/dev/null 2>&1 || true
+
     if has_instances "$dir"; then
         return 0
     fi
@@ -1994,6 +2034,8 @@ ensure_running_instance() {
 ensure_running_instance_for_ipc() {
     local dir="$1"
     local function_name="${2:-}"
+
+    import_running_instance_environment "$dir" >/dev/null 2>&1 || true
 
     if has_instances "$dir"; then
         return 0

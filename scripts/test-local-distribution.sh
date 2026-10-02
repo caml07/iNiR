@@ -2071,10 +2071,20 @@ fi
 # live Wayland instance unless --any-display is requested, producing a false
 # restart timeout even though runit successfully started the shell.
 list_instances_function="$(sed -n '/^list_instances() {/,/^}/p' "$launcher")"
+import_instance_env_function="$(sed -n '/^import_running_instance_environment() {/,/^}/p' "$launcher")"
 cat > "$runit_test_root/bin/qs-list-mock" <<'SH'
 #!/bin/sh
 printf '%s\n' "$*" > "$INIR_TEST_QS_LIST_LOG"
 case " $* " in
+    *" list --all "*)
+        cat <<EOF
+Instance test123:
+  Process ID: 4242
+  Shell ID: inir
+  Config path: /tmp/inir-runtime/shell.qml
+  Display connection: wayland/wayland-test
+EOF
+        ;;
     *" --any-display "*) printf '%s\n' 'Instance test123:' ;;
     *) printf '%s\n' 'No running instances for test' ;;
 esac
@@ -2114,6 +2124,40 @@ WAYLAND_DISPLAY=wayland-test bash -c '
 '
 if grep -Fq -- '--any-display' "$runit_test_root/qs-list.log"; then
     printf 'FAIL: graphical-session instance lookup should remain display-scoped\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+
+mkdir -p "$runit_test_root/proc/4242"
+printf '%s\0' \
+    'XDG_RUNTIME_DIR=/run/user/1000' \
+    'WAYLAND_DISPLAY=wayland-test' \
+    'NIRI_SOCKET=/run/user/1000/niri.wayland-test.999.sock' \
+    'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus' \
+    'QT_QPA_PLATFORM=wayland' \
+    'PATH=/home/test/.local/bin:/usr/bin' \
+    > "$runit_test_root/proc/4242/environ"
+if ! recovered_env="$(
+    export TEST_IMPORT_INSTANCE_ENV_FUNCTION="$import_instance_env_function"
+    export TEST_QS_BIN="$runit_test_root/bin/qs-list-mock"
+    export INIR_TEST_QS_LIST_LOG="$runit_test_root/qs-list.log"
+    export INIR_PROC_ROOT="$runit_test_root/proc"
+    unset WAYLAND_DISPLAY DISPLAY NIRI_SOCKET DBUS_SESSION_BUS_ADDRESS QT_QPA_PLATFORM
+    bash -c '
+        set -e
+        qs_bin="$TEST_QS_BIN"
+        eval "$TEST_IMPORT_INSTANCE_ENV_FUNCTION"
+        import_running_instance_environment /tmp/inir-runtime
+        printf "%s|%s|%s|%s\n" "$WAYLAND_DISPLAY" "$NIRI_SOCKET" "$DBUS_SESSION_BUS_ADDRESS" "$QT_QPA_PLATFORM"
+    '
+)"; then
+    printf 'FAIL: TTY IPC environment recovery failed\n' >&2
+    rm -rf "$runit_test_root"
+    exit 1
+fi
+if [[ "$recovered_env" != 'wayland-test|/run/user/1000/niri.wayland-test.999.sock|unix:path=/run/user/1000/bus|wayland' ]] \
+        || [[ "$(<"$runit_test_root/qs-list.log")" != *"list --all"* ]]; then
+    printf 'FAIL: TTY IPC environment recovery did not adopt the supervised shell display\n' >&2
     rm -rf "$runit_test_root"
     exit 1
 fi

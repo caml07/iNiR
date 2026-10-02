@@ -1329,3 +1329,112 @@ catalog and service-documentation drift. Detached comparison against the old
 fork baseline and current Snow 2.32 showed that the large new IPC documentation
 set and the `kl_GL` gap are upstream/baseline issues; the two Void-specific
 runtime strings found during this sync were added to the catalogs.
+
+## 2.32 physical install and post-reboot closure (2026-10-01)
+
+The final 2.32 fork validation was performed on the real external-disk Void
+x86_64 glibc installation rather than treating the previous machine state as
+proof. Snow `main` and `prerelease` were freshly resolved to
+`c08bb928fe71c6a00bfede3e99ef26fb1825ebe2`; the Void candidate integrated that
+tree and the final runtime code checkpoint was `66dfd5f6`.
+
+The normal first-install path was exercised from the clean
+`~/iNiR-prerelease-sync` worktree with `./setup install`. The user's older dirty
+`~/iNiR` checkout remained untouched. Cloudflare WARP was not installed or
+connected during this closure: it is an optional Void-only Extra and account /
+tunnel operation remains a manual non-gate.
+
+After a full machine reboot, `/var/log/sddm.log` recorded the normal graphical
+path:
+
+```text
+Reading from "/usr/share/wayland-sessions/niri.desktop"
+Session "/usr/share/wayland-sessions/niri.desktop" selected
+Starting Wayland user session ... "/usr/bin/niri --session"
+Session started true
+```
+
+The resulting seat0 session was Wayland and active. `/proc` credentials for the
+real Niri and Quickshell processes contained the expected supplementary groups,
+including `audio`, `video`, `network`, `input`, `bluetooth`, and `i2c`. The
+automation transport itself retained its own narrower process credentials, so
+plain `id` from that transport is not authoritative for the graphical session.
+
+Post-reboot supervision converged to one Niri compositor and one Quickshell
+instance. Turnstile's user runsvdir supervised `inir`, `pipewire`, `wireplumber`,
+`pipewire-pulse`, `ydotool`, and the XEmbed proxy. System runit links were
+present for `dbus`, `elogind`, `polkitd`, `turnstiled`, `NetworkManager`,
+`bluetoothd`, `power-profiles-daemon`, and `sddm`. The competing standalone
+`dhcpcd`, `wpa_supplicant`, and `wicd` service links were absent.
+
+Live capability checks on the rebooted host recorded:
+
+- NetworkManager connectivity `full` with the Wi-Fi connection owned by the
+  physical wireless device;
+- PipeWire 1.6.8 with WirePlumber and pipewire-pulse supervised, the built-in
+  analog sink/source visible, and an active media stream; `pactl` reported
+  PulseAudio on PipeWire;
+- the physical BlueZ controller powered and exposing its normal roles/profiles;
+- Power Profiles exposing `performance`, `balanced`, and `power-saver` with no
+  degraded driver;
+- the ydotool runtime socket present;
+- Niri reporting the internal `eDP-1` panel at 1920x1080/60 Hz and a valid
+  configuration.
+
+The validated Void repositories did not expose an RTKit package/provider. The
+portal/PipeWire stack therefore logs a missing RealtimeKit D-Bus optimization,
+but the actual audio graph, sink/source and active playback remained healthy;
+this warning is not treated as an iNiR dependency failure. A direct
+`powerprofilesctl set` from the automation transport was rejected by polkit
+because that process is outside the active graphical session. Profile
+enumeration and the supervised PPD service were healthy; the rejected
+out-of-session mutation is not evidence of a broken graphical-session control.
+
+The reboot also exposed a generic IPC lifecycle bug that was not visible once
+package UI surfaces had already been opened: `inir packageSearch search niri`
+returned `Target not found` on a clean shell because the deferred
+`PackageSearch` singleton had not registered its public handler yet. A
+regression test was added first, then `shell.qml` was changed to materialize the
+lightweight singleton at Tier 0 while leaving its XBPS processes idle until a
+search is requested. On `66dfd5f6`, immediately after shell restart the public
+IPC returned:
+
+```text
+searching: niri
+xbps/niri 26.04_1 [installed]
+xbps/niri-float-sticky 0.0.8_1
+```
+
+The exact runtime SHA was then exercised through the Qt 6.11 family sequence:
+
+```text
+waffle -> iris -> ii
+```
+
+Every transition converged to one Quickshell process, the `packageSearch` IPC
+was registered after each supervised restart, and the final settled process
+state was one Niri, one Quickshell, one keyboard-lock daemon, and one ydotoold.
+No crash artifacts or fatal runtime-log entries were produced.
+
+The optional Kira pack also survived the install/reboot intact: v3 retained 354
+assets and the recorded tree hash, with the presence sentinel available. The
+published v3 still lacks the optional JRPG/Codex art lines, so the runtime's
+capability probes correctly retain the classic fallback. Kira remained disabled
+in the user's normal configuration after the smoke tests.
+
+Finally, `inir doctor` on the installed `66dfd5f6` runtime reported:
+
+```text
+Passed 28
+Fixed 0
+Failed 0
+```
+
+That result was obtained even from the non-graphical automation transport,
+confirming the TTY/SSH environment-recovery path for Doctor. Together with the
+green local distribution suite, PR7/PR5.4 idempotency checks, real first-install
+path, full reboot, service ownership, hardware providers and family switching,
+this physical run is the authoritative 2.32 gate for advancing the fork's
+`prerelease`. The QEMU release VM remains useful for destructive fresh-state and
+VirtIO/VirGL regression work, but it is supplementary to this completed
+physical closure rather than a prerequisite for publishing the fork candidate.

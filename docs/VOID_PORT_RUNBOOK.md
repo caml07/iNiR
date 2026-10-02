@@ -39,10 +39,21 @@ As of 2026-10-01:
   the optional Kira v3 art pack/companion path. Current v3 lacks the manifest's
   optional JRPG/Codex art lines, so runtime capability-detects those assets and
   falls back to classic art.
+- The final 2.32 physical pass used the normal `./setup install` path, rebooted
+  through SDDM, and revalidated the exact runtime SHA after login. A clean boot
+  exposed one generic shell bug: the public `packageSearch` target was still
+  lazy and returned `Target not found` until another UI surface instantiated
+  it. `shell.qml` now materializes that lightweight singleton at Tier 0 while
+  leaving its package-manager processes idle until a search is requested. The
+  regression gate lives in `scripts/test-local-distribution.sh`.
 - Cloudflare WARP is now a **Void-only optional Extra**, not a toolkit
   dependency. Its provider is metadata-driven and glibc/x86_64-gated; account
   registration and a real tunnel are manual non-gates.
 - Packaging iNiR itself as an XBPS package is outside V1.
+- A physical exact-SHA install/reboot may satisfy the release environment gate
+  for the fork. Keep the release VM for destructive/fresh-state and VirtIO-only
+  regressions, but do not block a physically validated glibc/runit candidate
+  solely because libvirt is unavailable on the currently booted host.
 - The docs verifier is baseline-compared, not waived: on 2026-10-01 both the
   candidate and a detached clean Snow `c08bb928` worktree reported the same
   `SERVICES.md` IPC-documentation drift and the same 1648 missing `kl_GL`

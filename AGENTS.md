@@ -24,6 +24,11 @@ schema keys in sync.
   NetworkManager/audio/Bluetooth/Power Profiles/ydotool checks, PR7, PR5.4
   idempotency, and repeated `ii -> waffle -> iris -> ii` family transitions
   with exactly one supervised Quickshell process after each switch.
+- A real `./setup install` from the clean candidate worktree was followed by a
+  full reboot through SDDM. On the resulting session, SDDM selected the packaged
+  `niri.desktop`, launched `/usr/bin/niri --session`, Niri/Quickshell inherited
+  the expected supplementary groups, and the runtime reported candidate SHA
+  `66dfd5f6`.
 - TTY/SSH maintenance exposed two lifecycle bugs that are now regression
   covered: `inir restart` falsely timed out because Quickshell filtered by the
   caller's display, and IPC calls from non-graphical shells could discover the
@@ -48,9 +53,11 @@ schema keys in sync.
   does not install or choose GPU drivers. A VM with a DRM render node but no
   negotiated `VIRTIO_GPU_F_VIRGL` is rejected before the large dependency
   transaction.
-- The final release-VM rerun against this exact merged Snow tree is required
-  before the fork's `prerelease` branch is advanced. Do not call 2.32 closed
-  until that gate and the final docs/baseline comparison are recorded.
+- For 2.32, the exact-SHA physical install + reboot is the authoritative
+  `prerelease` closure gate. A release-VM rerun remains useful for destructive
+  fresh-state and VirtIO-specific checks, but is not a blocker once the real
+  glibc/runit installation, reboot, service ownership and runtime gates are
+  green.
 - `scripts/verify-docs.sh` is not globally green, but the 2026-10-01 comparison
   against a detached clean Snow `c08bb928` worktree showed the same baseline
   categories: the existing `docs/SERVICES.md` IPC drift and `kl_GL` missing

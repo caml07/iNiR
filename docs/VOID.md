@@ -19,21 +19,26 @@ see `docs/adr/`; glossary: see `CONTEXT.md`.
   Quickshell core may be packageable on musl, but the complete provider matrix
   has not been release-qualified and proprietary/prebuilt providers such as
   Cloudflare WARP are glibc-only. See ADR-0005.
-- Validation: QEMU VM first, then a real external-disk install. Both are
-  recorded in `docs/VOID_VM_VALIDATION.md`.
+- Validation historically used QEMU first and then the external-disk install.
+  For the 2.32 closure the exact-SHA physical install/reboot is authoritative;
+  QEMU remains an additional fresh-state/VirtIO regression environment. Both
+  kinds of evidence are recorded in `docs/VOID_VM_VALIDATION.md`.
 - Current 2.32 candidate checkpoint (2026-10-01): a fresh fetch resolved Snow
   `main` and `prerelease` to
   `c08bb928fe71c6a00bfede3e99ef26fb1825ebe2` (`VERSION=2.32.0`). The candidate
   branch integrates that exact tree plus the Void port, regenerates the IPC
   registry from merged QML (70 targets / 403 functions) and the Settings search
   index (1,942 entries), and passes the merged local distribution suite. The
-  physical Void install has also passed Doctor 28/28, including a TTY/SSH
-  invocation that recovers the live supervised Niri/Quickshell environment,
-  plus live network/audio/Bluetooth/Power Profiles/ydotool checks, Qt 6.11
-  family switching and a real Kira companion smoke. Final release-VM rerun
-  evidence for this exact merged
-  tree must be recorded separately in `docs/VOID_VM_VALIDATION.md` before
-  advancing the fork's `prerelease` branch.
+  physical Void install has also passed a real `./setup install`, reboot through
+  SDDM, and Doctor 28/28. Doctor was also invoked from a TTY/SSH-style context
+  to verify recovery of the live supervised Niri/Quickshell environment. The
+  same boot passed live network/audio/Bluetooth/Power Profiles/ydotool checks,
+  Qt 6.11 family switching and a real Kira companion smoke. A post-reboot clean-shell
+  check also caught and fixed the lazy `packageSearch` IPC target; the final
+  physical runtime is synced to `66dfd5f6` and package search works immediately
+  after shell startup. The release VM remains a useful follow-up, especially
+  for VirtIO/VirGL, but is no longer the blocking gate for the fork's
+  `prerelease` branch.
 
 The 2.31 `9574fa42` closure remains useful historical evidence: that cycle
 proved clean install/reinstall, reboot/runtime, SDDM graphical login, the

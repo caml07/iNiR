@@ -54,10 +54,11 @@ make test-local
 Add Python compile, versioned checker, and ShellCheck where relevant. If
 ShellCheck is unavailable, record that fact rather than claiming it passed.
 
-## 5. Validate in `voidlinux-release-clean`
+## 5. Validate in a clean Void environment
 
-Discover the VM's current address dynamically. Pull the latest fork
-`prerelease`, overlay the candidate, then run:
+Prefer `voidlinux-release-clean` when it is available, especially for
+destructive fresh-state, reinstall, rollback, and VirtIO/VirGL checks. Pull the
+latest fork `prerelease`, overlay the candidate, then run:
 
 - the relevant versioned checker;
 - idempotency mode when supported;
@@ -66,11 +67,18 @@ Discover the VM's current address dynamically. Pull the latest fork
 
 For lifecycle changes, reboot and re-run the session/service checks.
 
+An exact-SHA physical glibc/runit installation may substitute for this VM gate
+when it exercises the normal installer, survives a real reboot, and records the
+same provider/service/runtime checks. Do not require a VM merely because the
+historical workflow was VM-first; require evidence of the contracts.
+
 ## 6. Use physical Void for the final unvirtualized facts
 
-Only after VM closure, use the external-disk install for hardware facts such as
-real Wi-Fi ownership, Bluetooth controller, laptop power profiles, SDDM login,
-and helper convergence. Preserve the physical checkout if dirty.
+Use the external-disk install for hardware facts such as real Wi-Fi ownership,
+Bluetooth controller, laptop power profiles, SDDM login, and helper convergence.
+When the physical install is also the primary release environment, it may close
+the distro gate directly if the exact candidate SHA is installed and rebooted.
+Preserve the physical checkout if dirty.
 
 When checks are launched from automation, SSH, or another non-graphical shell,
 do not treat missing session variables as runtime failures. Read the live

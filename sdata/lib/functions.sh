@@ -824,7 +824,7 @@ configure_void_networkmanager_service() {
 
 # Install only iNiR-owned service files; never replace a local WARP service.
 configure_void_warp_service() {
-  [[ "${OS_GROUP_ID:-}" == void && "${INSTALL_TOOLKIT:-true}" == true ]] || return 0
+  [[ "${OS_GROUP_ID:-}" == void ]] || return 0
   [[ -x /usr/local/bin/warp-svc ]] || return 0
 
   local run_file=/etc/sv/warp-svc/run

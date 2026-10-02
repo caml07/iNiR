@@ -2861,6 +2861,7 @@ fi
 rm -rf "$turnstile_test_root"
 
 step "Void dependency profile"
+bash "$runtime_root/scripts/test-void-warp-extra.sh"
 bash "$runtime_root/scripts/test-void-graphics-preflight.sh"
 python3 "$runtime_root/scripts/test-detect-sensors.py"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
@@ -2931,6 +2932,30 @@ void_audio_block="$(sed -n '/^VOID_AUDIO_PACKAGES=(/,/^)/p' "$void_deps")"
 void_toolkit_block="$(sed -n '/^VOID_TOOLKIT_PACKAGES=(/,/^)/p' "$void_deps")"
 void_fonts_block="$(sed -n '/^VOID_FONTS_PACKAGES=(/,/^)/p' "$void_deps")"
 void_ocr_block="$(sed -n '/^VOID_OCR_PACKAGES=(/,/^)/p' "$void_deps")"
+void_extras="$runtime_root/sdata/lib/extras.sh"
+if grep -Fq 'warp-cli:cloudflare-warp' "$doctor_lib" \
+        || grep -Fq 'install_void_warp' "$void_deps" \
+        || grep -Fq 'configure_void_warp_service || return 1' "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
+    printf 'FAIL: Cloudflare WARP is still a mandatory Void dependency/provider\n' >&2
+    exit 1
+fi
+for needle in \
+    'extras_install_void_warp()' \
+    'extras_refresh_void_warp_on_update()' \
+    'INIR_WARP_PACKAGES_URL=' \
+    'extras_version_ge' \
+    "Cloudflare WARP's official Linux binary is glibc-only"; do
+    if ! grep -Fq "$needle" "$void_extras"; then
+        printf 'FAIL: Void WARP optional-extra contract missing: %s\n' "$needle" >&2
+        exit 1
+    fi
+done
+if ! grep -Fq 'Install/update Cloudflare WARP' "$runtime_root/setup" \
+        || ! grep -Fq 'if [[ "${OS_GROUP_ID:-}" == void ]]' "$runtime_root/setup" \
+        || ! grep -Fq 'extras_refresh_void_warp_on_update' "$runtime_root/setup"; then
+    printf 'FAIL: setup does not expose/refresh the Void-only WARP extra correctly\n' >&2
+    exit 1
+fi
 for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
         printf 'FAIL: Void base profile is missing required default/runtime provider %s\n' "$pkg" >&2

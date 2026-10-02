@@ -37,7 +37,7 @@ Singleton {
     property bool ready: true
     property bool manifestAvailable: false
     property bool packStateValid: false
-    readonly property bool packAvailable: packStateValid
+    readonly property bool packAvailable: packStateValid && presenceProbe.loaded
     property int revision: 0
     property var _surfaceHistory: ({})
     // Per-pose apparent-size correction, derived from the composition tag
@@ -46,8 +46,8 @@ Singleton {
     property var frameScale: ({})
     property var characterProfiles: ({})
     readonly property string requestedCharacterStyle: Config.options?.mascot?.chaos?.artStyle ?? "jrpg"
-    readonly property string characterStyle: packAvailable && requestedCharacterStyle === "jrpg" ? "jrpg"
-        : packAvailable && requestedCharacterStyle !== "classic" ? "codex" : "classic"
+    readonly property string characterStyle: packAvailable && requestedCharacterStyle === "jrpg" && jrpgProbe.loaded ? "jrpg"
+        : packAvailable && requestedCharacterStyle === "codex" && codexProbe.loaded ? "codex" : "classic"
 
     function characterPose(original, state) {
         return characterProfiles[characterStyle]?.[state] ?? original
@@ -76,6 +76,28 @@ Singleton {
         onLoaded: root._refreshPackState()
         onLoadFailed: root.packStateValid = false
         onFileChanged: reload()
+    }
+
+    // Optional art-line probes. The manifest can describe future/alternate
+    // releases that are not present in the installed pack; never select a
+    // character profile just because its mapping exists in manifest.json.
+    FileView {
+        id: presenceProbe
+        path: Quickshell.shellPath("assets/images/mascot/inir-mascot-presence-idle-loop.gif")
+        watchChanges: true
+        printErrors: false
+    }
+    FileView {
+        id: jrpgProbe
+        path: Quickshell.shellPath("assets/images/mascot/inir-mascot-jrpg-idle-loop.gif")
+        watchChanges: true
+        printErrors: false
+    }
+    FileView {
+        id: codexProbe
+        path: Quickshell.shellPath("assets/images/mascot/inir-mascot-codex-idle-loop.gif")
+        watchChanges: true
+        printErrors: false
     }
 
     function _uniquePoses(values) {

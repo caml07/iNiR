@@ -1432,9 +1432,13 @@ mascot_ii_settings="$runtime_root/modules/settings/MascotConfig.qml"
 mascot_waffle_settings="$runtime_root/modules/waffle/settings/pages/WMascotPage.qml"
 mascot_ii_panels="$runtime_root/modules/ii/ShellIiPanelsImpl.qml"
 mascot_waffle_panels="$runtime_root/modules/waffle/ShellWafflePanelsImpl.qml"
-if ! grep -Fq 'readonly property bool packAvailable: packStateValid' "$mascot_catalog" \
+if ! grep -Fq 'readonly property bool packAvailable: packStateValid && presenceProbe.loaded' "$mascot_catalog" \
         || ! grep -Fq 'mascot-pack-state.json' "$mascot_catalog" \
-        || ! grep -Fq 'asset_tree_sha256' "$mascot_catalog"; then
+        || ! grep -Fq 'asset_tree_sha256' "$mascot_catalog" \
+        || ! grep -Fq 'id: jrpgProbe' "$mascot_catalog" \
+        || ! grep -Fq 'id: codexProbe' "$mascot_catalog" \
+        || ! grep -Fq 'requestedCharacterStyle === "jrpg" && jrpgProbe.loaded' "$mascot_catalog" \
+        || ! grep -Fq 'requestedCharacterStyle === "codex" && codexProbe.loaded' "$mascot_catalog"; then
     printf 'FAIL: mascot catalog does not expose optional art-pack availability\n' >&2
     exit 1
 fi

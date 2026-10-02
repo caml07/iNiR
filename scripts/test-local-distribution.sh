@@ -1430,6 +1430,8 @@ mascot_image="$runtime_root/modules/common/widgets/MascotImage.qml"
 mascot_companion="$runtime_root/modules/mascot/MascotCompanion.qml"
 mascot_ii_settings="$runtime_root/modules/settings/MascotConfig.qml"
 mascot_waffle_settings="$runtime_root/modules/waffle/settings/pages/WMascotPage.qml"
+mascot_ii_panels="$runtime_root/modules/ii/ShellIiPanelsImpl.qml"
+mascot_waffle_panels="$runtime_root/modules/waffle/ShellWafflePanelsImpl.qml"
 if ! grep -Fq 'readonly property bool packAvailable: presenceProbe.loaded' "$mascot_catalog"; then
     printf 'FAIL: mascot catalog does not expose optional art-pack availability\n' >&2
     exit 1
@@ -1442,6 +1444,11 @@ fi
 if ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_ii_settings" \
         || ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_waffle_settings"; then
     printf 'FAIL: mascot master switches remain interactive without the optional art pack\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'identifier: "iiMascotCompanion"; extraCondition: MascotCatalog.packAvailable' "$mascot_ii_panels" \
+        || ! grep -Fq 'identifier: "iiMascotCompanion"; extraCondition: MascotCatalog.packAvailable' "$mascot_waffle_panels"; then
+    printf 'FAIL: mascot companion lifecycle is still tied to the enable toggle instead of pack availability\n' >&2
     exit 1
 fi
 if ! grep -Fq 'if (!MascotCatalog.packAvailable)' "$mascot_ii_settings" \

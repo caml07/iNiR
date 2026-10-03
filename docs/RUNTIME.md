@@ -95,6 +95,12 @@ The Turnstile handoff propagates values such as `WAYLAND_DISPLAY`,
 is startup/session synchronization; Turnstile is not in the hot path of every
 keybind.
 
+The Turnstile-owned iNiR run file also sets `QS_DISABLE_POLKIT=1`. Its service
+manager lives in an elogind background session without the graphical seat, so
+the supported Void profile leaves authentication-agent ownership to the
+external polkit agent that Niri starts in the seat0 Wayland session. The plain
+runsvdir fallback does not set this override.
+
 ## The inir launcher
 
 `scripts/inir` is a 3600+ line bash script that wraps Quickshell. It's not the same as running `qs -c inir` directly:

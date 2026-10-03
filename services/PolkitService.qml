@@ -104,7 +104,9 @@ Singleton {
             "polkit-gnome-authentication-agent-1",
             "lxqt-policykit-agent",
             "polkit-kde-authentication-agent-1",
-            "mate-polkit"
+            "polkit-mate-authentication-agent-1",
+            "mate-polkit",
+            "lxpolkit"
         ]
 
         onExited: (exitCode, exitStatus) => {

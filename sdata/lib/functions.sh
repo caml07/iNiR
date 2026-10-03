@@ -1031,7 +1031,11 @@ reconcile_inir_supervisor() {
     local launcher_quoted
     launcher_quoted="$(printf '%s' "$launcher_path" | sed "s/'/'\\\\''/g")"
     if [[ "$supervisor" == turnstile ]]; then
-      printf "#!/bin/sh\nexec chpst -e \"\$TURNSTILE_ENV_DIR\" '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
+      # Turnstile's user service manager lives in its own elogind background
+      # session. Polkit rejects a shell agent registered from that session as
+      # not matching the graphical caller. Void already installs a graphical
+      # external agent, so disable Quickshell's listener only in this tier.
+      printf "#!/bin/sh\nexec chpst -e \"\$TURNSTILE_ENV_DIR\" /usr/bin/env QS_DISABLE_POLKIT=1 '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
     else
       printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
     fi

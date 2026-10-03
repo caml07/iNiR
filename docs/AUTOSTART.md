@@ -44,7 +44,8 @@ These are defined in `~/.config/niri/config.d/50-startup.kdl` and managed by the
 
 - `wl-paste --no-newline --type text --watch ~/.config/quickshell/inir/scripts/clipboard-store.py` (clipboard text history; avoids synthetic trailing newlines and strips browser markup)
 - `wl-paste --type image --watch ~/.config/quickshell/inir/scripts/clipboard-image-store.sh` (clipboard image history; internal preview frames are filtered)
-- `polkit-mate-authentication-agent-1` (GUI sudo prompts)
+- the detected external polkit agent (GNOME on the supported Void profile;
+  KDE/MATE/LXQt/lxpolkit are accepted where installed)
 - `kbuildsycoca6` (KDE desktop entry cache)
 
 These run before iNiR starts and are independent of the shell.
@@ -98,11 +99,18 @@ Before executing an action, the session screen checks for running package manage
 
 ## Polkit agent
 
-iNiR includes a PolicyKit authentication agent. When a privileged operation needs authorization (installing a package, mounting a disk), a dialog appears asking for your password.
+iNiR includes a PolicyKit authentication agent. When a privileged operation
+needs authorization (installing a package, mounting a disk), a dialog appears
+asking for your password.
 
-The shell's polkit agent coexists with the system one (mate-polkit, which niri starts). If the shell's agent fails to register (because another one is already active), that's fine. You'll still get prompted.
-
-Disable the shell's agent with `QS_DISABLE_POLKIT=1` if it causes issues.
+On the supported Void Turnstile tier, the shell deliberately starts with
+`QS_DISABLE_POLKIT=1` and Niri owns the graphical external agent instead.
+Turnstile's per-user service manager belongs to an elogind background session,
+so a Quickshell listener registered from that service is not the same subject as
+the seat0 graphical session and polkit rejects it. The normal Void dependency
+profile installs `polkit-gnome`, and setup writes the detected external agent
+into Niri startup. The non-Turnstile tiers keep the shell agent available; its
+process detector also recognizes GNOME, KDE, MATE, LXQt and lxpolkit agents.
 
 ## Idle management
 

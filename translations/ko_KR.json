@@ -8881,5 +8881,7 @@
   "Apps use this font": "앱에서도 이 글꼴 사용",
   "Your apps' text follows the font the shell shows.": "앱의 텍스트가 셸에 표시되는 글꼴을 따릅니다.",
   "Claude Code": "Claude Code",
-  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Claude Code의 테마 목록에 iNiR 테마를 추가합니다. 두 가지는 배경화면 색상을 따르고, 두 가지는 고정된 Monokai 팔레트를 사용합니다"
+  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Claude Code의 테마 목록에 iNiR 테마를 추가합니다. 두 가지는 배경화면 색상을 따르고, 두 가지는 고정된 Monokai 팔레트를 사용합니다",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

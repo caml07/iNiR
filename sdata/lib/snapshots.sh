@@ -340,7 +340,7 @@ get_update_tracking_branch() {
 }
 
 repo_worktree_is_clean() {
-    [[ -d "${REPO_ROOT}/.git" ]] || return 1
+    [[ -e "${REPO_ROOT}/.git" ]] || return 1
     [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal 2>/dev/null)" ]]
 }
 
@@ -417,7 +417,7 @@ check_remote_updates() {
     #   2 = error (offline/no git/no tracked remote branch)
     #   3 = local ahead of remote
     #   4 = diverged
-    if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+    if [[ ! -e "${REPO_ROOT}/.git" ]]; then
         return 2
     fi
 

@@ -121,6 +121,14 @@ ii is built for **Niri**. Some features were inherited from the original Hyprlan
 - **Supported tools**: Auto-theming covers foot, kitty, alacritty, starship, fuzzel, pywalfox, btop, lazygit, and yazi. Each can be toggled individually in Settings → Terminal Colors.
 - **Other terminals**: Not supported. You'll need to manually set colors or use pywal/similar.
 
+### Void Linux
+
+- **Validated profile**: the supported Void target is **x86_64 glibc + runit + elogind/Turnstile**. Void musl, non-x86_64 and a seatd-only session are not release targets for this port. The core Niri/Quickshell stack may be available on musl, but the complete provider matrix has not been qualified there and some upstream binary providers (notably Cloudflare WARP) are glibc-only.
+- **First install should be interactive**: `./setup install -y` intentionally avoids taking over networking or enabling SDDM. Run the interactive installer once if you want setup to offer the NetworkManager and graphical-login handoffs.
+- **Hardware drivers stay with the base OS**: iNiR installs its shell and userland providers, not GPU firmware, Mesa/Vulkan selection, proprietary drivers, bootloader configuration or hardware-specific kernel parameters.
+- **VirGL is VM-only**: the release VM uses VirtIO + VirGL. A physical Void install does not need VirGL; it needs a graphics stack that already works with Niri on that machine.
+- **Cloudflare WARP is optional**: it is available from `./setup` → Extras on supported Void glibc/x86_64 installs, but it is not a normal dependency and WARP account/tunnel operation is not a release gate.
+
 ---
 
 ## Overview & Window Management

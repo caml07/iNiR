@@ -250,6 +250,8 @@ inir doctor                     # auto-diagnose and fix
 inir update                     # pull + migrate + restart
 ```
 
+**Поддерживаемые дистрибутивы:** Arch; этот fork также добавляет проверенный автоматизированный путь для Void Linux x86_64 glibc + runit через XBPS. Для Void см. [VOID.md](../VOID.md), для пакетов — [PACKAGES.md](../PACKAGES.md).
+
 Другие способы, если `./setup install` вам не подходит:
 
 ```bash

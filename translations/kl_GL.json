@@ -7233,5 +7233,7 @@
   "Apps use this font": "Qinnutit allagaq una atortarpaat",
   "Your apps' text follows the font the shell shows.": "Qinnutit allagaasa shell-ip allagaa malittarpaat.",
   "Claude Code": "Claude Code",
-  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Claude Code-p qalipaasersuutaanut iNiR-ip qalipaasersuutai ilanngullugit: marluk tunngaviup assiliartaa malittarpaat, marluk Monokai-p qalipaatai aalajangersimasut atortarpaat"
+  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Claude Code-p qalipaasersuutaanut iNiR-ip qalipaasersuutai ilanngullugit: marluk tunngaviup assiliartaa malittarpaat, marluk Monokai-p qalipaatai aalajangersimasut atortarpaat",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

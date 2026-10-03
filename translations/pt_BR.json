@@ -8881,5 +8881,7 @@
   "Apps use this font": "Os apps usam esta fonte",
   "Your apps' text follows the font the shell shows.": "O texto dos seus apps segue a fonte que o shell mostra.",
   "Claude Code": "Claude Code",
-  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Adiciona temas do iNiR à lista de temas do Claude Code: dois seguem as cores do seu papel de parede e dois mantêm uma paleta Monokai fixa"
+  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "Adiciona temas do iNiR à lista de temas do Claude Code: dois seguem as cores do seu papel de parede e dois mantêm uma paleta Monokai fixa",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

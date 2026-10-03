@@ -8881,5 +8881,7 @@
   "Apps use this font": "应用使用此字体",
   "Your apps' text follows the font the shell shows.": "应用的文字跟随外壳显示的字体。",
   "Claude Code": "Claude Code",
-  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "向 Claude Code 的主题列表添加 iNiR 主题：两个跟随壁纸颜色，两个使用固定的 Monokai 配色"
+  "Adds iNiR themes to Claude Code's theme list: two follow your wallpaper, two keep a fixed Monokai palette": "向 Claude Code 的主题列表添加 iNiR 主题：两个跟随壁纸颜色，两个使用固定的 Monokai 配色",
+  "Generated during installation": "Generated during installation",
+  "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry.": "The WARP daemon is stopped. Start warp-svc with your system service manager, then retry."
 }

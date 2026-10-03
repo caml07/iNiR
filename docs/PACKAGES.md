@@ -1,10 +1,63 @@
 # Package Reference
 
-Complete list of packages used by iNiR, organized by category. These are what the setup script installs on Arch-based systems.
+Package reference for iNiR, organized by category. The existing package tables
+below describe the Arch-based install. Void Linux uses the same user-facing
+profiles through XBPS plus a small set of pinned or Flatpak providers.
 
 The PKGBUILDs live in `sdata/dist-arch/`.
 
 > **`inir-deps`** is a meta-package that depends on all the groups below. It exists so that `pacman -Qdtq | pacman -Rns -` (clean orphans) doesn't remove iNiR's dependencies. It has no files of its own.
+
+## Void Linux
+
+Void uses the normal per-user installer with XBPS-backed dependency profiles.
+The executable source of truth for required profiles is
+`sdata/dist-void/install-deps.sh`; use `docs/VOID_CAPABILITIES.md` for
+delivery/validation status and `docs/VOID_PORT_RUNBOOK.md` for operational
+rules. Optional Void Extras can own separate providers; Cloudflare WARP, for
+example, is implemented in `sdata/lib/extras.sh` rather than the dependency
+profile. Provider versions/checksums live in executable provider code, not this
+reference.
+
+Important Void package-name and provider differences:
+
+| Capability | Void provider | Notes |
+|---|---|---|
+| Fish shell | `fish-shell` | Provides `/usr/bin/fish` |
+| Qt 6 Qt5 compatibility | `qt6-qt5compat` | Void package name |
+| Quickshell | `quickshell` | Official XBPS package |
+| Python Pillow | `python3-Pillow` | Toolkit profile |
+| Geolocation | `geoclue2` | Toolkit profile |
+| ImageMagick | `ImageMagick` | Screencapture profile |
+| Network editor | `network-manager-applet` | Base profile with `NetworkManager` |
+| QML syntax highlighting | `kf6-syntax-highlighting` | Required base runtime for both sidebars |
+| KDE integration | `kf6-kconfig`, `plasma-integration` | Toolkit/fonts-theme profiles |
+| OCR | `tesseract-ocr` plus language packages | Vertical models are pinned upstream artifacts |
+| Night light | `wlsunset` | Base profile |
+| Wallpaper | `awww` | Official XBPS package |
+| Darkly Qt style/settings | pinned Darkly v0.5.39 source + `kf6-kdecoration-devel` and other Qt6/KF6 build deps | Built with Qt6 and KDecoration enabled so both the KStyle and `darkly-settings6` KCM are present |
+
+Validated non-XBPS providers are used only where Void does not provide a
+suitable package: pinned upstream ydotool, adw-gtk3, WhiteSur, Capitaine,
+Darkly, selected UI fonts and vertical OCR models, plus Mission Center from
+Flathub. Cloudflare WARP is separate: it is an **optional Void x86_64 glibc
+Extra**, selected from Cloudflare's official APT metadata and never installed
+by the normal toolkit profile.
+
+The Void Darkly provider is intentionally stricter than a simple
+`darkly6.so` presence check. A complete install also requires
+`org.kde.kdecoration3.kcm/kcm_darklydecoration.so`; otherwise
+`darkly-settings6` opens with a missing-plugin error even though normal Qt apps
+can still use the style. Doctor treats that partial state as repairable.
+
+Terminal theming is distro-independent. Foot's managed color file is
+`~/.config/foot/inir-colors.ini`; `foot.ini` should include that path. The old
+`~/.config/foot/colors.ini` name is treated as a legacy artifact and removed or
+cleaned during repair/uninstall paths.
+
+Void intentionally installs `dunst` for the `dunstify` client. The package
+itself is not an installer conflict; a running `dunst` daemon remains a
+runtime conflict.
 
 ---
 
@@ -208,7 +261,7 @@ Not installed by default, but useful. The shell handles their absence gracefully
 
 | Package | Purpose | Used by |
 |---------|---------|---------|
-| `warp-cli` | Cloudflare WARP VPN toggle | Quick toggles panel |
+| `warp-cli` | Cloudflare WARP VPN toggle. On Void x86_64 glibc, install/update it explicitly from `./setup` → Extras; it is not a required profile dependency | Quick toggles panel |
 | `ollama` | Local LLM for AI chat | Sidebar AI assistant |
 | `whisper-cpp` | Local speech-to-text, no API key needed | Voice input and voice search |
 | `cava` | Audio visualizer | Bar widget (optional) |

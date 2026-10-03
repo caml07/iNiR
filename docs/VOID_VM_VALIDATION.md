@@ -1438,3 +1438,77 @@ this physical run is the authoritative 2.32 gate for advancing the fork's
 `prerelease`. The QEMU release VM remains useful for destructive fresh-state and
 VirtIO/VirGL regression work, but it is supplementary to this completed
 physical closure rather than a prerequisite for publishing the fork candidate.
+
+## Post-2.32 prerelease sync: WARP and Turnstile polkit (2026-10-03)
+
+The release VM was reused after syncing the Void fork candidate
+`569e0992` onto Snow's `prerelease` at `1b7b9590` to close two runtime
+reports before the next candidate.
+
+The WARP CLI initially accepted `warp-cli connect` but remained
+`Disconnected (Manual Disconnection)`; no tunnel interface or policy route
+appeared and Cloudflare trace remained `warp=off`. The daemon log isolated the
+first failing state:
+
+```text
+Failed to start firewall: No such file or directory
+Failed to connect err=FirewallUpdateFailed(...)
+```
+
+The official Cloudflare package declares `nftables` as a runtime dependency
+and `warp-svc` invokes `/usr/sbin/nft`. The Void provider had copied the
+upstream binaries without installing that dependency. After adding `nftables`
+to the provider prerequisites and installing it in the VM, the same registered
+account reached `Connected / Network: healthy` within two seconds. The
+`CloudflareWARP` interface and policy rule were present, Cloudflare trace
+reported `warp=on`, disconnect returned `warp=off`, and a second connect
+returned `warp=on` again. WARP was still connected and healthy after the later
+VM reboot. The live transition also exposed a UI race: immediately after
+`warp-cli connect` exits successfully, one status sample can still report the
+previous `Disconnected` state before the daemon reaches `Connected`. The
+common, Android and classic WARP toggles now do bounded 500 ms transition
+polling independently of whether the panel remains open, while the normal
+5-second status poll remains the steady-state path.
+
+The polkit warning was reproduced independently from WARP. A Quickshell agent
+started by the Turnstile user service belongs to Turnstile's elogind background
+session; even when its `XDG_SESSION_ID` and the session resolved from its PID
+matched, PolicyKit rejected listener registration with:
+
+```text
+Passed session and the session the caller is in differs.
+They must be equal for now.
+```
+
+The supported Void profile already installs `polkit-gnome` and Niri starts
+that agent inside the real seat0 Wayland session. The Turnstile-generated iNiR
+run file therefore now sets `QS_DISABLE_POLKIT=1`, leaving graphical
+authentication ownership to that external agent while preserving the shell
+listener on non-Turnstile tiers. The shell's fallback detector was also aligned
+with installer-supported MATE/LXPolkit executable names.
+
+A temporary SDDM autologin exercised the real graphical path after reboot.
+`loginctl` reported an active seat0 Wayland session, Niri started
+`polkit-gnome-authentication-agent-1`, the supervised Quickshell environment
+contained `QS_DISABLE_POLKIT=1`, and `inir logs --issues` returned no warnings
+or errors. A graphical `pkexec /usr/bin/true` request opened a floating
+`polkit-gnome-authentication-agent-1` window titled `Autenticar`, confirming
+that a real authorization request reached the graphical agent. Password
+submission was intentionally not automated.
+
+For the Snow prerelease integration itself, the combined tree passed the full
+`scripts/test-local-distribution.sh` suite from an isolated temporary
+validation repository, including the Void release-profile, WARP fixture,
+graphics preflight, supervisor/Turnstile contracts, SDDM/NetworkManager/BlueZ/
+ydotool providers, IPC registry freshness, Qt compatibility and runtime-payload
+tests. The new Snow SDDM takeover policy stayed behind the existing Void
+runit/systemd split, while its new theme/app integrations remained optional or
+command-probed. A 12-second launch of the combined tree on the VM's real Niri
+session and Qt 6.11 reached `shellEntryReady` without missing QML modules,
+JavaScript exceptions, fatal errors or crashes.
+
+`scripts/verify-docs.sh` remains non-zero, but a clean checkout of Snow
+`1b7b9590` reports the same baseline: the same eight service/IPC documentation
+drifts, Greenlandic missing 1648 canonical keys, and one existing Chinese
+semantic-term finding. The Void sync therefore adds no new docs/i18n verifier
+regression.

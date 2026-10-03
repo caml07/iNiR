@@ -373,6 +373,8 @@ extras_install_void_warp() {
 
   local installed_version
   installed_version="$(extras_void_warp_installed_version)"
+  extras_void_warp_install_prereqs || return 1
+
   if [[ -n "$installed_version" ]] && extras_version_ge "$installed_version" "$version"; then
     if [[ "$installed_version" == "$version" ]]; then
       log_success "Cloudflare WARP v${version} already installed"
@@ -385,8 +387,6 @@ extras_install_void_warp() {
     fi
     return 0
   fi
-
-  extras_void_warp_install_prereqs || return 1
 
   local temp_dir archive payload_dir warp_cli warp_svc
   temp_dir="$(mktemp -d)" || return 1

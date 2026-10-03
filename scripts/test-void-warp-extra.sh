@@ -44,6 +44,31 @@ grep -Eq '(^|[[:space:]])nftables($|[[:space:]])' "$prereq_log" || {
 unset -f xbps-query pkg_sudo tui_info
 unset ask
 
+# A managed WARP install at the same version still needs prerequisite repair
+# during setup update. Keep the overrides inside a subshell so the fixture tests
+# below continue using the real provider functions.
+same_version_prereq_log="$tmp/warp-same-version-prereqs"
+(
+  OS_GROUP_ID=void
+  XDG_STATE_HOME="$tmp/same-version-state"
+  extras_void_warp_release_info() {
+    printf '2026.7.1377.0\tfixture.deb\t%s\n' \
+      '95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55'
+  }
+  extras_void_warp_installed_version() { printf '2026.7.1377.0\n'; }
+  xbps-query() { return 1; }
+  pkg_sudo() { printf '%s\n' "$*" > "$same_version_prereq_log"; }
+  tui_info() { :; }
+  log_success() { :; }
+  configure_void_warp_service() { :; }
+  ask=false
+  extras_install_void_warp
+)
+grep -Eq '(^|[[:space:]])nftables($|[[:space:]])' "$same_version_prereq_log" || {
+  printf 'FAIL: managed same-version WARP refresh skipped nftables prerequisite repair\n' >&2
+  exit 1
+}
+
 # Debian payload extraction must preserve explicit compression handling. GNU
 # tar does not auto-detect compressed streams read from stdin, which is exactly
 # how `ar p data.tar.* | tar ...` is used by the provider.
@@ -92,6 +117,7 @@ log_warning() { :; }
 log_success() { :; }
 log_info() { :; }
 tui_info() { :; }
+xbps-query() { return 0; }
 if ! extras_install_void_warp; then
   printf 'FAIL: WARP provider rejected a newer installed version\n' >&2
   exit 1
@@ -116,5 +142,6 @@ if extras_install_void_warp; then
 fi
 [[ ! -e "$state_file" ]] || { printf 'FAIL: musl rejection wrote provider state\n' >&2; exit 1; }
 
+unset -f xbps-query
 export PATH="$old_path"
 printf 'Void WARP optional-extra checks passed\n'

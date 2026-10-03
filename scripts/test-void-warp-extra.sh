@@ -27,6 +27,23 @@ mkdir -p "$HOME"
 # shellcheck source=/dev/null
 source "$repo_root/sdata/lib/extras.sh"
 
+# Cloudflare's daemon shells out to nft(8) before it can establish a tunnel.
+# Exercise the provider seam directly so a future dependency trim cannot leave
+# warp-cli reporting Success while warp-svc immediately falls back to
+# Disconnected(FirewallUpdateFailed).
+prereq_log="$tmp/warp-prereqs"
+xbps-query() { return 1; }
+pkg_sudo() { printf '%s\n' "$*" > "$prereq_log"; }
+tui_info() { :; }
+ask=false
+extras_void_warp_install_prereqs
+grep -Eq '(^|[[:space:]])nftables($|[[:space:]])' "$prereq_log" || {
+  printf 'FAIL: WARP provider does not install nftables required by warp-svc firewall setup\n' >&2
+  exit 1
+}
+unset -f xbps-query pkg_sudo tui_info
+unset ask
+
 # Debian payload extraction must preserve explicit compression handling. GNU
 # tar does not auto-detect compressed streams read from stdin, which is exactly
 # how `ar p data.tar.* | tar ...` is used by the provider.

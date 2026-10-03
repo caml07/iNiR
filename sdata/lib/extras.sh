@@ -311,7 +311,11 @@ PY
 }
 
 extras_void_warp_install_prereqs() {
-  local required=(binutils dbus-libs libpcap nss tpm2-tss)
+  # warp-svc applies its Linux firewall through nft(8) before bringing the
+  # tunnel up. The upstream Debian package declares nftables as a runtime
+  # dependency; without it warp-cli accepts "connect" but the daemon aborts
+  # with FirewallUpdateFailed and remains Disconnected.
+  local required=(binutils dbus-libs libpcap nftables nss tpm2-tss)
   local pending=() pkg
   for pkg in "${required[@]}"; do
     xbps-query -p pkgver "$pkg" >/dev/null 2>&1 || pending+=("$pkg")

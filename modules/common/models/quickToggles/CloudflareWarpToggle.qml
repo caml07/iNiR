@@ -21,10 +21,27 @@ QuickToggleModel {
     hasStatusText: true
 
     property bool _daemonRunning: true
+    property int _transitionPollsRemaining: 0
+    property bool _transitionExpectedConnected: false
 
     function refreshStatus() {
         fetchActiveState.running = false;
         fetchActiveState.running = true;
+    }
+
+    function beginTransitionPoll(expectedConnected: bool): void {
+        root._transitionExpectedConnected = expectedConnected
+        root._transitionPollsRemaining = 10
+        root.refreshStatus()
+        transitionPollTimer.restart()
+    }
+
+    function noteObservedState(connected: bool): void {
+        root.toggled = connected
+        if (root._transitionPollsRemaining > 0 && connected === root._transitionExpectedConnected) {
+            root._transitionPollsRemaining = 0
+            transitionPollTimer.stop()
+        }
     }
 
     function showServiceInstructions() {
@@ -54,8 +71,10 @@ QuickToggleModel {
                     Translation.tr("Disconnect failed. Please inspect manually with the <tt>warp-cli</tt> command"),
                     "-a", "Shell"
                 ])
+                root.refreshStatus();
+                return;
             }
-            root.refreshStatus();
+            root.beginTransitionPoll(false)
         }
     }
 
@@ -69,8 +88,10 @@ QuickToggleModel {
                     Translation.tr("Connection failed. Please inspect manually with the <tt>warp-cli</tt> command")
                     , "-a", "Shell"
                 ])
+                root.refreshStatus();
+                return;
             }
-            root.refreshStatus();
+            root.beginTransitionPoll(true)
         }
     }
 
@@ -90,14 +111,16 @@ QuickToggleModel {
                 if (out.includes("Unable to connect")) {
                     root._daemonRunning = false
                     root.toggled = false
+                    root._transitionPollsRemaining = 0
+                    transitionPollTimer.stop()
                     return;
                 }
 
                 root._daemonRunning = true
                 if (out.includes("Connected")) {
-                    root.toggled = true
+                    root.noteObservedState(true)
                 } else if (out.includes("Disconnected")) {
-                    root.toggled = false
+                    root.noteObservedState(false)
                 }
             }
         }
@@ -108,6 +131,8 @@ QuickToggleModel {
             if (exitCode !== 0) {
                 root.available = false
                 root._daemonRunning = false
+                root._transitionPollsRemaining = 0
+                transitionPollTimer.stop()
             }
         }
     }
@@ -121,6 +146,23 @@ QuickToggleModel {
         triggeredOnStart: true
         running: root.available && (GlobalStates.sidebarRightOpen || GlobalStates.waffleActionCenterOpen)
         onTriggered: root.refreshStatus()
+    }
+
+    Timer {
+        id: transitionPollTimer
+        interval: 500
+        repeat: true
+        running: false
+        onTriggered: {
+            if (root._transitionPollsRemaining <= 1) {
+                root._transitionPollsRemaining = 0
+                transitionPollTimer.stop()
+                root.refreshStatus()
+                return
+            }
+            root._transitionPollsRemaining -= 1
+            root.refreshStatus()
+        }
     }
 
     Component.onCompleted: root.refreshStatus()

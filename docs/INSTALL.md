@@ -175,7 +175,8 @@ development package so its settings KCM is available too.
 > **Install/update Cloudflare WARP** on x86_64 glibc Void. WARP is not installed
 > by a normal profile and Doctor does not require it. The provider reads the
 > current version/artifact/SHA-256 from Cloudflare's official APT metadata,
-> extracts only `warp-cli`/`warp-svc`, and creates an iNiR-owned runit service
+> installs the Void runtime prerequisites required by the daemon (including
+> `nftables`), extracts only `warp-cli`/`warp-svc`, and creates an iNiR-owned runit service
 > only after explicit opt-in. Subsequent iNiR updates refresh WARP only when the
 > installation is already managed by that provider. Registration and connecting
 > a WARP account/tunnel remain manual user actions.

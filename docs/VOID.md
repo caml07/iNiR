@@ -240,6 +240,8 @@ Extras menu offers an explicit WARP provider that:
   Cloudflare's official APT `Packages` metadata;
 - falls back to the last in-tree verified artifact if that metadata is
   temporarily unavailable;
+- installs the Void runtime prerequisites required by the upstream daemon,
+  including `nftables` for its Linux firewall path;
 - extracts only `warp-cli` and `warp-svc` without executing Debian maintainer
   scripts;
 - creates/repairs an iNiR-owned runit service only after the user opts in;
@@ -247,9 +249,12 @@ Extras menu offers an explicit WARP provider that:
 - refreshes during a later iNiR update only when the installation is already
   owned by the iNiR WARP provider.
 
-WARP account registration, accepting Cloudflare terms, connecting a tunnel and
-trace verification are user-owned operations and are not part of the Void
-release gate. WARP is not offered by this port on musl or non-x86_64 Void.
+WARP account registration and accepting Cloudflare terms remain user-owned
+operations. The optional provider's end-to-end VM gate now also covers a real
+`connect -> Connected` transition, the `CloudflareWARP` interface/routing
+state, `warp=on`, disconnect/`warp=off`, and reconnect. WARP remains an
+optional Extra rather than a base-release dependency, and is not offered by
+this port on musl or non-x86_64 Void.
 
 `discover-overlay` is not a supported capability: the repository contains no
 provider, origin, install path, or documented user requirement for it. PR3.3

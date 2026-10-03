@@ -84,6 +84,7 @@ else
 
   check command -v warp-cli
   check command -v warp-svc
+  check command -v nft
   check test -x /usr/local/bin/warp-cli
   check test -x /usr/local/bin/warp-svc
   check test -L /var/service/warp-svc

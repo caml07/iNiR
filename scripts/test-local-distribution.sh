@@ -1424,6 +1424,62 @@ while IFS= read -r runtime_dir; do
 done < "$runtime_root/sdata/runtime-payload-dirs.txt"
 
 snapshot_lib="$runtime_root/sdata/lib/snapshots.sh"
+if grep -Fq 'nohup qs -p "$runtime_target"' "$snapshot_lib" \
+        || grep -Fq 'qs -p "$runtime_target" kill' "$snapshot_lib"; then
+    printf 'FAIL: snapshot rollback bypasses the supervised inir restart path\n' >&2
+    exit 1
+fi
+
+snapshot_restore_root="$(mktemp -d)"
+mkdir -p \
+    "$snapshot_restore_root/config/quickshell/inir/scripts" \
+    "$snapshot_restore_root/state/quickshell/snapshots/test-snapshot/inir/scripts"
+snapshot_lifecycle_log="$snapshot_restore_root/lifecycle.log"
+cat > "$snapshot_restore_root/config/quickshell/inir/scripts/inir" <<'SH'
+#!/usr/bin/env bash
+printf 'current:%s\n' "$*" >> "$SNAPSHOT_LIFECYCLE_LOG"
+[[ "$1" == stop ]]
+SH
+cat > "$snapshot_restore_root/state/quickshell/snapshots/test-snapshot/inir/scripts/inir" <<'SH'
+#!/usr/bin/env bash
+printf 'restored:%s\n' "$*" >> "$SNAPSHOT_LIFECYCLE_LOG"
+[[ "$1" == restart ]]
+SH
+printf 'old\n' > "$snapshot_restore_root/config/quickshell/inir/runtime-marker"
+printf 'restored\n' > "$snapshot_restore_root/state/quickshell/snapshots/test-snapshot/inir/runtime-marker"
+cat > "$snapshot_restore_root/state/quickshell/snapshots/test-snapshot/snapshot.json" <<'JSON'
+{"commit_before":"unknown","version_before":"2.32.0"}
+JSON
+if ! (
+    export XDG_CONFIG_HOME="$snapshot_restore_root/config"
+    export XDG_STATE_HOME="$snapshot_restore_root/state"
+    export SNAPSHOT_LIFECYCLE_LOG="$snapshot_lifecycle_log"
+    export NIRI_SOCKET="$snapshot_restore_root/fake-niri.sock"
+    REPO_ROOT="$runtime_root"
+    STY_CYAN=""
+    STY_RST=""
+    get_installed_update_strategy() { printf 'repo-setup\n'; }
+    set_installed_version() { :; }
+    log_error() { printf 'ERROR: %s\n' "$*" >&2; }
+    log_info() { :; }
+    tui_success() { :; }
+    tui_warn() { :; }
+    tui_info() { :; }
+    source "$snapshot_lib"
+    restore_snapshot test-snapshot
+    [[ "$(cat "$XDG_CONFIG_HOME/quickshell/inir/runtime-marker")" == restored ]]
+    [[ "$(sed -n '1p' "$SNAPSHOT_LIFECYCLE_LOG")" == \
+        "current:stop -c $XDG_CONFIG_HOME/quickshell/inir" ]]
+    [[ "$(sed -n '2p' "$SNAPSHOT_LIFECYCLE_LOG")" == \
+        "restored:restart -c $XDG_CONFIG_HOME/quickshell/inir" ]]
+    [[ "$(wc -l < "$SNAPSHOT_LIFECYCLE_LOG")" -eq 2 ]]
+); then
+    printf 'FAIL: snapshot rollback does not stop-before-restore and restart-after-restore through the runtime launcher\n' >&2
+    rm -rf "$snapshot_restore_root"
+    exit 1
+fi
+rm -rf "$snapshot_restore_root"
+
 if ! grep -Fq 'quickshell/user/desktop-items.json' "$snapshot_lib" \
         || ! grep -Fq 'desktop-items.json' "$snapshot_lib"; then
     printf 'FAIL: managed desktop items are absent from update snapshots\n' >&2
@@ -1569,29 +1625,29 @@ fi
 rm -rf "$versioning_root"
 
 step "Void release checker canonical branch"
-pr7_branch_root="$(mktemp -d)"
+closure_branch_root="$(mktemp -d)"
 if ! (
-    git clone --quiet --shared "$runtime_root" "$pr7_branch_root/repo"
-    git -C "$pr7_branch_root/repo" switch --quiet -C prerelease
+    git clone --quiet --shared "$runtime_root" "$closure_branch_root/repo"
+    git -C "$closure_branch_root/repo" switch --quiet -C prerelease
     for path in \
-        scripts/check-void-pr7.sh \
+        scripts/check-void-closure.sh \
         scripts/sddm/install-pixel-sddm.sh \
         sdata/dist-void/install-deps.sh \
         sdata/lib/functions.sh \
         setup; do
-        cp "$runtime_root/$path" "$pr7_branch_root/repo/$path"
+        cp "$runtime_root/$path" "$closure_branch_root/repo/$path"
     done
-    expected_commit="$(git -C "$pr7_branch_root/repo" rev-parse HEAD)"
+    expected_commit="$(git -C "$closure_branch_root/repo" rev-parse HEAD)"
     INIR_STATIC_ONLY=true \
         INIR_ALLOW_DIRTY=true \
         INIR_EXPECTED_COMMIT="$expected_commit" \
-        "$pr7_branch_root/repo/scripts/check-void-pr7.sh" >/dev/null
+        "$closure_branch_root/repo/scripts/check-void-closure.sh" >/dev/null
 ); then
-    rm -rf "$pr7_branch_root"
-    printf 'FAIL: PR7 checker does not accept canonical prerelease branch by default\n' >&2
+    rm -rf "$closure_branch_root"
+    printf 'FAIL: Void closure checker does not accept canonical prerelease branch by default\n' >&2
     exit 1
 fi
-rm -rf "$pr7_branch_root"
+rm -rf "$closure_branch_root"
 
 step "release polish guards"
 config_qml="$runtime_root/modules/common/Config.qml"
@@ -2069,6 +2125,53 @@ if [[ "$doctor_dispatch" != *'import_running_instance_environment "$config_dir"'
     printf 'FAIL: doctor does not recover the live supervised shell environment for TTY/SSH callers\n' >&2
     exit 1
 fi
+
+manual_stop_root="$(mktemp -d)"
+mkdir -p \
+    "$manual_stop_root/bin" \
+    "$manual_stop_root/home" \
+    "$manual_stop_root/config" \
+    "$manual_stop_root/runtime" \
+    "$manual_stop_root/runtime-shell"
+touch "$manual_stop_root/runtime-shell/shell.qml"
+cat > "$manual_stop_root/bin/qs" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+chmod +x "$manual_stop_root/bin/qs"
+if ! PATH="$manual_stop_root/bin:$PATH" HOME="$manual_stop_root/home" \
+        XDG_CONFIG_HOME="$manual_stop_root/config" \
+        XDG_RUNTIME_DIR="$manual_stop_root/runtime" \
+        bash "$launcher" stop -c "$manual_stop_root/runtime-shell"; then
+    printf 'FAIL: launcher stop aborts when no supervisor service is active\n' >&2
+    rm -rf "$manual_stop_root"
+    exit 1
+fi
+
+mkdir -p "$manual_stop_root/config/service/inir"
+cat > "$manual_stop_root/bin/sv" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+    status)
+        printf 'run: %s: (pid 123) 1s\n' "$2"
+        exit 0
+        ;;
+    down)
+        exit 1
+        ;;
+esac
+exit 2
+SH
+chmod +x "$manual_stop_root/bin/sv"
+if PATH="$manual_stop_root/bin:$PATH" HOME="$manual_stop_root/home" \
+        XDG_CONFIG_HOME="$manual_stop_root/config" \
+        XDG_RUNTIME_DIR="$manual_stop_root/runtime" \
+        bash "$launcher" stop -c "$manual_stop_root/runtime-shell" >/dev/null 2>&1; then
+    printf 'FAIL: launcher stop hides a supervisor shutdown failure\n' >&2
+    rm -rf "$manual_stop_root"
+    exit 1
+fi
+rm -rf "$manual_stop_root"
 
 step "runit service controls"
 runit_test_root="$(mktemp -d)"
@@ -2901,7 +3004,7 @@ deps_router="$runtime_root/sdata/subcmd-install/1.deps-router.sh"
 void_greeting="$runtime_root/sdata/subcmd-install/0.greeting.sh"
 installer_conflicts="$runtime_root/sdata/lib/conflicts.sh"
 runtime_conflict_killer="$runtime_root/services/ConflictKiller.qml"
-pr51_checker="$runtime_root/scripts/check-void-pr51.sh"
+ocr_checker="$runtime_root/scripts/check-void-ocr.sh"
 if ! grep -Eq '^[[:space:]]*arch\|fedora\|debian\|ubuntu\|void\)' "$void_greeting"; then
     printf 'FAIL: Void still falls through to the generic compatibility warning\n' >&2
     exit 1
@@ -2930,8 +3033,8 @@ if ! grep -Fq 'killall", "mako", "dunst"' "$runtime_conflict_killer"; then
     printf 'FAIL: runtime conflict handling no longer covers an active dunst daemon\n' >&2
     exit 1
 fi
-if ! grep -Fq 'XDG_BIN_HOME' "$pr51_checker"; then
-    printf 'FAIL: PR5.1 checker does not expose the user-local tesseract adapter on PATH\n' >&2
+if ! grep -Fq 'XDG_BIN_HOME' "$ocr_checker"; then
+    printf 'FAIL: Void OCR checker does not expose the user-local tesseract adapter on PATH\n' >&2
     exit 1
 fi
 mod_q_default="$runtime_root/defaults/niri/config.d/70-binds.kdl"
@@ -3221,7 +3324,7 @@ if ! grep -Fq 'xbps-query -p pkgver quickshell' "$runtime_root/setup" \
     printf 'FAIL: setup info does not report Quickshell XBPS package origin on Void\n' >&2
     exit 1
 fi
-for checker in check-void-pr40.sh check-void-pr41.sh check-void-pr43.sh; do
+for checker in check-void-networkmanager.sh check-void-bluez.sh check-void-warp.sh; do
     checker_path="$runtime_root/scripts/$checker"
     if ! grep -Fq 'sudo -n true' "$checker_path" \
             || ! grep -Fq 'privileged sv status skipped' "$checker_path"; then

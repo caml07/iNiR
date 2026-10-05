@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.0 checks for the Mission Center Flatpak provider in a live Void session.
+# Void Mission Center checks for the Mission Center Flatpak provider in a live Void session.
 set -u
 
 failures=0
@@ -68,7 +68,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.0 check(s) failed\n' "$failures" >&2
+  printf '%d Void Mission Center check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.0 checks passed\n'
+printf 'All Void Mission Center checks passed\n'

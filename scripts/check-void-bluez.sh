@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only PR4.1 checks for a live Void session (BlueZ provider).
+# Read-only Void BlueZ checks for a live Void session (BlueZ provider).
 set -u
 
 failures=0
@@ -94,7 +94,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR4.1 check(s) failed\n' "$failures" >&2
+  printf '%d Void BlueZ check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR4.1 checks passed\n'
+printf 'All Void BlueZ checks passed\n'

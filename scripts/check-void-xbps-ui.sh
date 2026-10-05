@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR6 XBPS UI checks for Void package-management surfaces.
+# Void XBPS UI XBPS UI checks for Void package-management surfaces.
 set -u
 
 failures=0
@@ -90,10 +90,10 @@ PY
 
 if [[ "${INIR_STATIC_ONLY:-false}" == true ]]; then
   if ((failures > 0)); then
-    printf '%d PR6 static check(s) failed\n' "$failures" >&2
+    printf '%d Void XBPS UI static check(s) failed\n' "$failures" >&2
     exit 1
   fi
-  printf 'All PR6 static checks passed\n'
+  printf 'All Void XBPS UI static checks passed\n'
   exit 0
 fi
 
@@ -178,7 +178,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR6 check(s) failed\n' "$failures" >&2
+  printf '%d Void XBPS UI check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR6 checks passed\n'
+printf 'All Void XBPS UI checks passed\n'

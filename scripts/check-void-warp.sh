@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR4.3 / current Void contract for the optional Cloudflare WARP provider.
+# Void WARP / current Void contract for the optional Cloudflare WARP provider.
 # Static/provider-shape checks are always safe. Live daemon/account-adjacent checks
 # only run when INIR_VERIFY_WARP_LIVE=true is explicitly requested.
 set -u
@@ -138,7 +138,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR4.3 check(s) failed\n' "$failures" >&2
+  printf '%d Void WARP check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR4.3 optional-provider checks passed\n'
+printf 'All Void WARP optional-provider checks passed\n'

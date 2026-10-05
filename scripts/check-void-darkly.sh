@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.4 checks for the Void Darkly Qt6 provider.
+# Void Darkly checks for the Void Darkly Qt6 provider.
 set -u
 
 failures=0
@@ -116,7 +116,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.4 check(s) failed\n' "$failures" >&2
+  printf '%d Void Darkly check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.4 checks passed\n'
+printf 'All Void Darkly checks passed\n'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.2 checks for Void GTK/icon/cursor providers.
+# Void visual-provider checks for Void GTK/icon/cursor providers.
 set -u
 
 failures=0
@@ -93,7 +93,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.2 check(s) failed\n' "$failures" >&2
+  printf '%d Void visual-provider check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.2 checks passed\n'
+printf 'All Void visual-provider checks passed\n'

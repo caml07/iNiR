@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only PR3.3 checks for a live Void session.
+# Read-only Void runtime adapters checks for a live Void session.
 set -u
 
 failures=0
@@ -93,7 +93,7 @@ check sv status "$service_root/pipewire-pulse"
 check pactl info
 
 if ((failures > 0)); then
-  printf '%d PR3.3 check(s) failed\n' "$failures" >&2
+  printf '%d Void runtime adapters check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR3.3 checks passed\n'
+printf 'All Void runtime adapters checks passed\n'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the full PR4.2 Void VM contract without manual session exports.
+# Run the full Void ydotool Void VM contract without manual session exports.
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,4 +12,4 @@ exec env \
   INIR_VERIFY_IDEMPOTENCY=true \
   INIR_EXPECTED_BRANCH="$branch" \
   INIR_EXPECTED_COMMIT="$(git -C "$repo_root" rev-parse "origin/$branch")" \
-  "$repo_root/scripts/check-void-pr42.sh"
+  "$repo_root/scripts/check-void-ydotool.sh"

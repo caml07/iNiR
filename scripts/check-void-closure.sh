@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR7 final closure checks for Void doctor/versioning/predicate behavior.
+# Void closure final closure checks for Void doctor/versioning/predicate behavior.
 set -u
 
 failures=0
@@ -243,10 +243,10 @@ check versioning_fixture
 
 if [[ "${INIR_STATIC_ONLY:-false}" == true ]]; then
   if ((failures > 0)); then
-    printf '%d PR7 static check(s) failed\n' "$failures" >&2
+    printf '%d Void closure static check(s) failed\n' "$failures" >&2
     exit 1
   fi
-  printf 'All PR7 static checks passed\n'
+  printf 'All Void closure static checks passed\n'
   exit 0
 fi
 
@@ -296,7 +296,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR7 check(s) failed\n' "$failures" >&2
+  printf '%d Void closure check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR7 checks passed\n'
+printf 'All Void closure checks passed\n'

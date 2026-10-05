@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR4.2 checks for a live Void session (ydotool provider).
+# Void ydotool checks for a live Void session (ydotool provider).
 set -u
 
 failures=0
@@ -94,7 +94,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR4.2 check(s) failed\n' "$failures" >&2
+  printf '%d Void ydotool check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR4.2 checks passed\n'
+printf 'All Void ydotool checks passed\n'

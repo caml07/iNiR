@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only PR4.0 checks for a live Void session (NetworkManager provider).
+# Read-only Void NetworkManager checks for a live Void session (NetworkManager provider).
 set -u
 
 failures=0
@@ -82,7 +82,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR4.0 check(s) failed\n' "$failures" >&2
+  printf '%d Void NetworkManager check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR4.0 checks passed\n'
+printf 'All Void NetworkManager checks passed\n'

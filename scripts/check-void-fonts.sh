@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.3 checks for Void font providers.
+# Void font-provider checks for Void font providers.
 set -u
 
 failures=0
@@ -97,7 +97,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.3 check(s) failed\n' "$failures" >&2
+  printf '%d Void font-provider check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.3 checks passed\n'
+printf 'All Void font-provider checks passed\n'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.5 closure checks for Void desktop/default parity.
+# Void desktop-parity closure checks for Void desktop/default parity.
 set -u
 
 failures=0
@@ -100,7 +100,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.5 check(s) failed\n' "$failures" >&2
+  printf '%d Void desktop-parity check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.5 checks passed\n'
+printf 'All Void desktop-parity checks passed\n'

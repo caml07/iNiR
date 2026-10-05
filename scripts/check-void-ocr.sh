@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PR5.1 checks for the complete OCR language provider in a live Void session.
+# Void OCR checks for the complete OCR language provider in a live Void session.
 set -u
 
 XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
@@ -106,7 +106,7 @@ else
 fi
 
 if ((failures > 0)); then
-  printf '%d PR5.1 check(s) failed\n' "$failures" >&2
+  printf '%d Void OCR check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR5.1 checks passed\n'
+printf 'All Void OCR checks passed\n'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only PR3.2 checks for a live Void session.
+# Read-only Void runtime checks for a live Void session.
 set -u
 
 failures=0
@@ -82,7 +82,7 @@ printf 'INFO: session=%s bus=%s runtime=%s\n' \
   "$runtime_dir"
 
 if ((failures > 0)); then
-  printf '%d PR3.2 check(s) failed\n' "$failures" >&2
+  printf '%d Void runtime check(s) failed\n' "$failures" >&2
   exit 1
 fi
-printf 'All PR3.2 checks passed\n'
+printf 'All Void runtime checks passed\n'

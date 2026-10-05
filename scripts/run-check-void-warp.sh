@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the PR4.3 optional-provider contract. Live WARP verification remains
+# Run the Void WARP optional-provider contract. Live WARP verification remains
 # opt-in; this wrapper does not register or connect an account by itself.
 set -euo pipefail
 
@@ -11,4 +11,4 @@ exec env \
   INIR_EXPECTED_COMMIT="${INIR_EXPECTED_COMMIT:-$(git -C "$repo_root" rev-parse HEAD)}" \
   INIR_VERIFY_WARP_LIVE="${INIR_VERIFY_WARP_LIVE:-false}" \
   INIR_VERIFY_IDEMPOTENCY="${INIR_VERIFY_IDEMPOTENCY:-false}" \
-  "$repo_root/scripts/check-void-pr43.sh"
+  "$repo_root/scripts/check-void-warp.sh"

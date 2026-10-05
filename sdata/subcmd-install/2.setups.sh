@@ -62,7 +62,8 @@ function setup_systemd_services(){
       log_warning "runit 'sv' not found, skipping Void service setup"
       return 0
     fi
-    if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Void session services (dbus, elogind, polkitd, turnstiled)?" "yes"; then
+    if [[ "${assume_yes:-false}" == true ]] \
+        || { [[ "${ask:-true}" == true ]] && tui_confirm "Enable Void session services (dbus, elogind, polkitd, turnstiled)?" "yes"; }; then
       if elevate sh -c 'ln -sfn /etc/sv/dbus /var/service/dbus && ln -sfn /etc/sv/elogind /var/service/elogind && ln -sfn /etc/sv/polkitd /var/service/polkitd && ln -sfn /etc/sv/turnstiled /var/service/turnstiled'; then
         log_success "Void session services enabled"
       else
@@ -73,7 +74,8 @@ function setup_systemd_services(){
       log_info "Enable Void session services with: sudo ln -s /etc/sv/{dbus,elogind,polkitd,turnstiled} /var/service/"
     fi
     if [[ -f /etc/turnstile/turnstiled.conf ]]; then
-      if [[ "${ask:-true}" == true ]] && tui_confirm "Set turnstile manage_rundir=no for elogind?" "yes"; then
+      if [[ "${assume_yes:-false}" == true ]] \
+          || { [[ "${ask:-true}" == true ]] && tui_confirm "Set turnstile manage_rundir=no for elogind?" "yes"; }; then
         if elevate sh -c 'if grep -q "^[[:space:]]*manage_rundir[[:space:]]*=" /etc/turnstile/turnstiled.conf; then sed -i -E "s/^[[:space:]]*manage_rundir[[:space:]]*=.*/manage_rundir = no/" /etc/turnstile/turnstiled.conf; else printf "\nmanage_rundir = no\n" >> /etc/turnstile/turnstiled.conf; fi'; then
           log_success "Turnstile configured to use elogind's runtime directory"
         else
@@ -91,7 +93,8 @@ function setup_systemd_services(){
     # D-Bus service directly, so Void needs the packaged runit service active.
     if [[ ! -d /etc/sv/power-profiles-daemon ]]; then
       log_warning "Power Profiles service directory missing (/etc/sv/power-profiles-daemon); reinstall power-profiles-daemon"
-    elif [[ "${ask:-true}" == true ]] && tui_confirm "Enable power-profiles-daemon system service?" "yes"; then
+    elif [[ "${assume_yes:-false}" == true ]] \
+        || { [[ "${ask:-true}" == true ]] && tui_confirm "Enable power-profiles-daemon system service?" "yes"; }; then
       if elevate sh -c 'ln -sfn /etc/sv/power-profiles-daemon /var/service/power-profiles-daemon'; then
         log_success "Power Profiles service enabled"
       else
@@ -104,7 +107,8 @@ function setup_systemd_services(){
     # Bluetooth toolkit provider: enable bluetoothd via runit with confirmation.
     if ${INSTALL_TOOLKIT:-true}; then
       if [[ -d /etc/sv/bluetoothd ]]; then
-        if [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth (bluetoothd) system service?" "yes"; then
+        if [[ "${assume_yes:-false}" == true ]] \
+            || { [[ "${ask:-true}" == true ]] && tui_confirm "Enable Bluetooth (bluetoothd) system service?" "yes"; }; then
           if elevate sh -c 'ln -sfn /etc/sv/bluetoothd /var/service/bluetoothd'; then
             log_success "Bluetooth service enabled"
           else

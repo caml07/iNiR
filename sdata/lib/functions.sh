@@ -712,7 +712,7 @@ configure_void_sddm_service() {
       log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
       return 0
     fi
-  else
+  elif [[ "${assume_yes:-false}" != true ]]; then
     log_info "SDDM left disabled in non-interactive mode"
     log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
     return 0
@@ -773,15 +773,17 @@ configure_void_networkmanager_service() {
   fi
 
   if [[ ${#enabled_links[@]} -gt 0 ]]; then
-    if [[ "${ask:-true}" != true ]]; then
+    if [[ "${ask:-true}" != true && "${assume_yes:-false}" != true ]]; then
       log_info "NetworkManager migration left unchanged in non-interactive mode"
       log_info "Disable dhcpcd/wpa_supplicant/wicd and enable NetworkManager when a brief network interruption is acceptable"
       return 0
     fi
-    log_warning "Switching network managers may briefly interrupt connectivity"
-    if ! tui_confirm "Replace enabled dhcpcd/wpa_supplicant/wicd services with NetworkManager?" "yes"; then
-      log_info "Existing Void network services left unchanged"
-      return 0
+    if [[ "${ask:-true}" == true ]]; then
+      log_warning "Switching network managers may briefly interrupt connectivity"
+      if ! tui_confirm "Replace enabled dhcpcd/wpa_supplicant/wicd services with NetworkManager?" "yes"; then
+        log_info "Existing Void network services left unchanged"
+        return 0
+      fi
     fi
 
     for index in "${!enabled_links[@]}"; do
@@ -794,12 +796,12 @@ configure_void_networkmanager_service() {
       fi
     done
   elif [[ "$networkmanager_enabled" != true ]]; then
-    if [[ "${ask:-true}" != true ]]; then
+    if [[ "${ask:-true}" != true && "${assume_yes:-false}" != true ]]; then
       log_info "NetworkManager left disabled in non-interactive mode"
       log_info "Enable later with: sudo ln -s ${service_dir} ${service_link}"
       return 0
     fi
-    if ! tui_confirm "Enable NetworkManager system service?" "yes"; then
+    if [[ "${ask:-true}" == true ]] && ! tui_confirm "Enable NetworkManager system service?" "yes"; then
       log_info "NetworkManager left disabled"
       return 0
     fi

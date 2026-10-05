@@ -3439,6 +3439,56 @@ if ! (
 fi
 
 rm -f "$sddm_test_root/var/service/sddm"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=false
+    export assume_yes=true
+    export INIR_SDDM_SERVICE_DIR="$sddm_test_root/etc/sv/sddm"
+    export INIR_RUNIT_SERVICE_ROOT="$sddm_test_root/var/service"
+    export INIR_NIRI_SESSION_ENTRY="$sddm_test_root/usr/share/wayland-sessions/niri.desktop"
+    export PATH="$sddm_test_root/bin:$PATH"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 1; }
+    elevate() { "$@"; }
+
+    configure_void_sddm_service
+    test -L "$INIR_RUNIT_SERVICE_ROOT/sddm"
+); then
+    rm -rf "$sddm_test_root"
+    printf 'FAIL: explicit --yes does not auto-enable the Void SDDM provider\n' >&2
+    exit 1
+fi
+
+rm -f "$sddm_test_root/var/service/sddm"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=false
+    export assume_yes=false
+    export INIR_SDDM_SERVICE_DIR="$sddm_test_root/etc/sv/sddm"
+    export INIR_RUNIT_SERVICE_ROOT="$sddm_test_root/var/service"
+    export INIR_NIRI_SESSION_ENTRY="$sddm_test_root/usr/share/wayland-sessions/niri.desktop"
+    export PATH="$sddm_test_root/bin:$PATH"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 1; }
+    elevate() { "$@"; }
+
+    configure_void_sddm_service
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/sddm"
+); then
+    rm -rf "$sddm_test_root"
+    printf 'FAIL: implicit non-interactive mode unexpectedly enables SDDM\n' >&2
+    exit 1
+fi
+
+rm -f "$sddm_test_root/var/service/sddm"
 mkdir -p "$sddm_test_root/etc/sv/lightdm"
 ln -s "$sddm_test_root/etc/sv/lightdm" "$sddm_test_root/var/service/lightdm"
 if ! (
@@ -3565,6 +3615,62 @@ if ! (
     exit 1
 fi
 rm -rf "$nm_test_root"
+
+nm_auto_yes_root="$(mktemp -d)"
+mkdir -p "$nm_auto_yes_root/etc/sv/NetworkManager" "$nm_auto_yes_root/var/service"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=false
+    export assume_yes=true
+    export INIR_NETWORKMANAGER_SERVICE_DIR="$nm_auto_yes_root/etc/sv/NetworkManager"
+    export INIR_RUNIT_SERVICE_ROOT="$nm_auto_yes_root/var/service"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 1; }
+    elevate() { "$@"; }
+
+    configure_void_networkmanager_service
+    test -L "$INIR_RUNIT_SERVICE_ROOT/NetworkManager"
+); then
+    rm -rf "$nm_auto_yes_root"
+    printf 'FAIL: explicit --yes does not auto-enable the Void NetworkManager provider\n' >&2
+    exit 1
+fi
+rm -rf "$nm_auto_yes_root"
+
+nm_noninteractive_root="$(mktemp -d)"
+mkdir -p "$nm_noninteractive_root/etc/sv/NetworkManager" "$nm_noninteractive_root/var/service"
+if ! (
+    set -euo pipefail
+    source "$void_functions"
+    export OS_GROUP_ID=void
+    export ask=false
+    export assume_yes=false
+    export INIR_NETWORKMANAGER_SERVICE_DIR="$nm_noninteractive_root/etc/sv/NetworkManager"
+    export INIR_RUNIT_SERVICE_ROOT="$nm_noninteractive_root/var/service"
+    log_info() { :; }
+    log_success() { :; }
+    log_warning() { :; }
+    tui_confirm() { return 1; }
+    elevate() { "$@"; }
+
+    configure_void_networkmanager_service
+    test ! -e "$INIR_RUNIT_SERVICE_ROOT/NetworkManager"
+); then
+    rm -rf "$nm_noninteractive_root"
+    printf 'FAIL: implicit non-interactive mode unexpectedly enables NetworkManager\n' >&2
+    exit 1
+fi
+rm -rf "$nm_noninteractive_root"
+
+if ! grep -Fq 'assume_yes=true' "$runtime_root/setup" \
+        || ! grep -Fq 'assume_yes' "$runtime_root/sdata/subcmd-install/2.setups.sh"; then
+    printf 'FAIL: setup --yes is not wired into Void system-service activation\n' >&2
+    exit 1
+fi
 
 nm_rollback_root="$(mktemp -d)"
 mkdir -p "$nm_rollback_root/etc/sv/NetworkManager" "$nm_rollback_root/etc/sv/dhcpcd" \

@@ -115,6 +115,7 @@ prevent_sudo_or_root
 # Defaults
 ask=true
 quiet=false
+assume_yes=false
 
 # Auto-detect non-interactive context (no terminal on stdin).
 # Forces non-interactive mode when launched from QML Process, cron, systemd, etc.
@@ -3052,7 +3053,7 @@ while [[ $# -gt 0 ]]; do
             SUBCMD_ARGS=("$@")
             break
             ;;
-        -y|--yes) ask=false; shift ;;
+        -y|--yes) ask=false; assume_yes=true; shift ;;
         -q|--quiet) quiet=true; shift ;;
         --local) export _II_POST_PULL=local; shift ;;
         --realign) export INIR_REALIGN_REMOTE=1; shift ;;
@@ -3087,7 +3088,7 @@ case "$COMMAND" in
     reinstall)
         for _arg in "${SUBCMD_ARGS[@]}"; do
             case "$_arg" in
-                -y|--yes) ask=false ;;
+                -y|--yes) ask=false; assume_yes=true ;;
                 -q|--quiet) quiet=true ;;
             esac
         done
@@ -3097,7 +3098,7 @@ case "$COMMAND" in
     update)
         for _arg in "${SUBCMD_ARGS[@]}"; do
             case "$_arg" in
-                -y|--yes) ask=false ;;
+                -y|--yes) ask=false; assume_yes=true ;;
                 -q|--quiet) quiet=true ;;
                 --local) export _II_POST_PULL=local ;;
                 --realign) export INIR_REALIGN_REMOTE=1 ;;

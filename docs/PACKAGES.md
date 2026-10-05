@@ -12,9 +12,9 @@ The PKGBUILDs live in `sdata/dist-arch/`.
 
 Void uses the normal per-user installer with XBPS-backed dependency profiles.
 The executable source of truth is `sdata/dist-void/install-deps.sh`; use
-`docs/VOID_CAPABILITIES.md` for delivery/validation status and
-`docs/VOID_PORT_RUNBOOK.md` for operational rules. Provider versions and
-checksums live in the installer script, not this reference.
+`docs/VOID_CAPABILITIES.md` for provider status and `docs/VOID.md` for the
+runtime/install architecture. Provider versions and checksums live in the
+installer script, not this reference.
 
 Important Void package-name and provider differences:
 

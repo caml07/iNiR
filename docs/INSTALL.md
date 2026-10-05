@@ -1,7 +1,7 @@
 # Installation
 
-The normal `./setup install` flow is supported on Arch-based systems and, in
-this fork, on **Void Linux glibc + runit**. Void uses XBPS for packaged
+The normal `./setup install` flow is supported on Arch-based systems and on
+**Void Linux glibc + runit**. Void uses XBPS for packaged
 dependencies and explicit providers for the small set of capabilities that are
 not available as suitable Void packages.
 
@@ -43,14 +43,8 @@ systemctl reboot
 
 ## The Easy Way (Void Linux)
 
-Use the Void-enabled fork and its release-candidate branch:
-
-```bash
-git clone https://github.com/caml07/iNiR.git
-cd iNiR
-git checkout prerelease
-./setup install
-```
+Use the normal iNiR checkout and run `./setup install`. Void uses the same
+installer entry point as the other supported distributions.
 
 The first Void run is intentionally guided. The TUI shows a system snapshot,
 the installation plan, backup location and progress stages before changing the

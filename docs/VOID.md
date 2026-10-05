@@ -1,9 +1,7 @@
 # iNiR on Void Linux
 
-Guide for the Void Linux port of iNiR (glibc + runit + XBPS). The V1 port
-implementation is complete through the PR7 engineering-closure sweep plus the
-post-closure hardware/provider fixes found on real Void installs. Decisions:
-see `docs/adr/`; glossary: see `CONTEXT.md`.
+Guide for running iNiR on Void Linux with glibc, runit, Turnstile, and XBPS.
+Architecture decisions for the port live in `docs/adr/`.
 
 ## Status
 
@@ -15,41 +13,15 @@ see `docs/adr/`; glossary: see `CONTEXT.md`.
   (see Packaging).
 - Non-goals for V1 (documented as *compatibility profiles*, not supported):
   musl libc and `seatd` without elogind.
-- Validation: QEMU VM first, then a real external-disk install. Both are
-  recorded in `docs/VOID_VM_VALIDATION.md`.
-- Current checkpoint (2026-09-20): a fresh fetch shows Snow `main` and
-  `prerelease` both at `9574fa42` (iNiR 2.31.0), and the fork's Void
-  `prerelease` contains that complete upstream baseline plus the Void work. A
-  clean release VM passed the normal installer, reboot/runtime validation,
-  Doctor, Web Wallpaper, Power Profiles, SDDM graphical login, Super-tap
-  opt-in, end-to-end Super+Q through ydotool/uinput, and every versioned
-  PR3.2-PR7 checker. The real external-disk install then found and closed the
-  NetworkManager migration, runit orphan-helper and Turnstile xembed gaps. A
-  later real-Void report exposed two additional packaging/theming regressions:
-  Darkly had been built without its KDecoration settings KCM, and the shipped
-  Foot config referenced the obsolete `colors.ini` path. Both now have explicit
-  regression coverage; Darkly's complete Qt6/KDecoration build was installed
-  and idempotency-tested in the release VM. The final external-disk reboot then
-  closed the hardware gate: NetworkManager owned the live Wi-Fi connection
-  under runit, the old competing network services remained disabled, SDDM
-  launched `niri --session`, and the previously leaking shell helpers remained
-  at one instance each.
+- Validation covers the normal installer, reboot persistence, the graphical
+  SDDM/Niri session path, provider idempotency, and non-systemd supervision.
 
 ## Installer experience on Void
 
-Use the fork's release-candidate branch for the current Void port:
-
-```bash
-git clone https://github.com/caml07/iNiR.git
-cd iNiR
-git checkout prerelease
-./setup install
-```
-
-For the first install, keep it interactive so setup can offer the
-NetworkManager and SDDM ownership handoffs described below. Later updates from
-that repo-managed checkout continue tracking `prerelease` through the normal
-`inir update` / `./setup update` flow.
+Run `./setup install` from a normal iNiR checkout. For the first install, keep
+it interactive so setup can offer the NetworkManager and SDDM ownership
+handoffs described below. Later updates use the normal `inir update` /
+`./setup update` flow.
 
 Void does not get a second-class manual-only path. `./setup install` uses the
 same TUI shell as the other automated installers and adapts the operations
@@ -189,7 +161,7 @@ Notes:
   the shell: systemd when the ADR-0002 predicate succeeds, otherwise Turnstile
   or the runsvdir fallback. It remains disabled unless
   `II_ENABLE_SUPER_DAEMON=1` is explicitly set.
-- `ydotool` is not packaged in the current Void repositories. PR4.2 provides
+- `ydotool` is not packaged in the current Void repositories. iNiR uses the
   verified upstream v1.0.4 source, a predicate-selected user service,
   input-group `/dev/uinput` permissions, and install/Doctor update paths.
   The provider's UI operation is VM validated through the lock-screen keyboard;
@@ -217,9 +189,8 @@ then a maintained Flatpak, then a pinned upstream artifact with an update
 path. See ADR-0004 and `docs/VOID_CAPABILITIES.md`.
 
 `discover-overlay` is not a supported capability: the repository contains no
-provider, origin, install path, or documented user requirement for it. PR3.3
-removes its GameMode setting and process control instead of inventing a Void
-service.
+provider, origin, install path, or documented user requirement for it, so the
+Void path does not invent a service for it.
 
 ## Package management UI (Updates / PackageSearch / AppCatalog)
 
@@ -245,8 +216,7 @@ milestone with its own recipe (documented here, not yet built):
 - `version.json` must report `install_mode: package-managed`,
   `package_manager: xbps` (`INIR_PACKAGE_MANAGER`), so iNiR updates via
   `xbps-install -Su` instead of `inir update`.
-- Upstream (void-packages) submission is unlikely to be accepted for a
-  theme/shell script; `distro/void/` in this repo is the official path.
+- An official XBPS package is intentionally outside the current port scope.
 
 ## Startup template
 
@@ -265,44 +235,7 @@ no-ops when the predicate is false (their `command -v systemctl` check is
 not enough — without the user-manager socket, `systemctl --user` hangs for
 10-30s).
 
-## Historical delivery queue and branch policy
-
-The implementation was delivered incrementally against
-`snowarch/inir:prerelease`. Those feature/fix branches were useful while the
-port was being built, but they are no longer active development refs. The
-canonical fork branch for the completed Void integration and release candidate
-is now `prerelease`; at the 2026-09-20 pre-Darkly/Foot closure checkpoint the
-published integration tip is `fd6725f2`, which already contains Snow's complete
-`9574fa42` 2.31.0 baseline.
-
-| Order | Historical delivery | Scope | Closure evidence |
-|---|---|---|---|
-| 1 | PR1 / `feat/void-systemd-predicate` | Usable-systemd predicate, migrations 021/022, and local-distribution guards. | Arch local tests plus predicate validation on Void. |
-| 2 | PR2 / `feat/void-dependencies` | Void dependency router, XBPS install script, and package-map corrections. | Fresh-VM dependency install and second-run idempotency. |
-| 3 | PR3.0-PR3.3 | Supervisors, lifecycle, session runtime, and optional runtime adapters. | Versioned PR3.2/PR3.3 contracts and live non-systemd session validation. |
-| 4 | PR4.0-PR4.3 | NetworkManager, BlueZ, ydotool, and WARP providers/lifecycle. | Provider provisioning, activation, repair, and representative operation checks. |
-| 5 | PR5.0-PR5.5 | Mission Center, OCR, visual providers, fonts, Darkly, and desktop/runtime parity. | All PR5 checkers plus live Niri/sidebar/theme/keybind validation. |
-| 6 | PR6 / `feat/void-xbps-ui` | XBPS updates, search, install/remove, and app-catalog targets. | UI wiring and a real isolated-root XBPS transaction. |
-| 7 | PR7 / `feat/void-port-closure` | Doctor/versioning, final ADR-0002 sweep, capability audit, and release-VM closure. | Doctor 27/27, full checker sweep, clean install/reinstall, reboot, live Power Profiles, Web Wallpaper, and local gates. |
-
-Current fork policy:
-
-- `main` follows `upstream/main` by fast-forward and is not the Void
-  integration branch.
-- `prerelease` is the only active Void integration/release-candidate branch.
-- completed short-lived port branches are removed after integration; a
-  divergent historical tip is preserved by an
-  `archive/void-preintegration/*` tag before branch deletion.
-- `main` and `prerelease` are protected against deletion and force-push.
-
-Documentation and VM observations travel with the canonical integration branch.
-The clean Void external-disk installation and its post-migration reboot have
-been performed; the final live NetworkManager/runit state, SDDM session path,
-physical Bluetooth adapter, Power Profiles state and helper-process counts are
-recorded in `docs/VOID_VM_VALIDATION.md`. This closes the 2.31.0 Void hardware
-release gate.
-
-### External hardware prerequisites
+## External hardware prerequisites
 
 iNiR installs the shell/rice and its userland capability providers. It does not
 install or choose kernel GPU drivers, firmware, Mesa/Vulkan drivers, proprietary
@@ -317,18 +250,13 @@ own desktop dependencies afterward, but it should not guess which hardware
 driver is correct for an unknown machine.
 
 The default dependency set is large because `nerd-fonts-ttf` alone expands to
-several GiB. The Void installer now performs a dynamic XBPS disk-space preflight
-for only the packages still missing and includes 2 GiB of download/build
-headroom. In the clean release VM, a 20 GiB root filesystem ran out of space
-during the initial font transaction; a 30 GiB virtual disk completed the full
-install and later idempotent installs passed with about 7 GiB free.
+several GiB. The Void installer performs a dynamic XBPS disk-space preflight for
+only the packages still missing and includes 2 GiB of download/build headroom.
 
-## VM validation
+## Validation
 
-The detailed 2026-08-29, 2026-08-30 and 2026-08-31 VM execution log is in
-`docs/VOID_VM_VALIDATION.md`.
-
-Recipe (QEMU, KVM available on the host):
+For VM validation, use KVM plus VirGL (or another working accelerated Wayland
+graphics path). A minimal QEMU shape is:
 
 ```
 qemu-system-x86_64 \
@@ -339,11 +267,8 @@ qemu-system-x86_64 \
   -netdev user,id=n1 -device virtio-net-pci,netdev=n1
 ```
 
-- Graphics: the validated VM path uses **VirGL**. The original plain
-  `virtio-vga` configuration exposed DRM but negotiated no
-  `VIRTIO_GPU_F_VIRGL`; Niri then skipped the software EGL renderer and had no
-  usable output. Lavapipe/software rendering is therefore not a supported
-  fallback for the Void release VM.
+- Plain `virtio-vga` without `VIRTIO_GPU_F_VIRGL` is rejected by the graphics
+  preflight because Niri has no usable accelerated output in that setup.
 - `scripts/check-void-graphics.sh` catches that specific VirtIO failure before
   the installer starts the large dependency transaction. It also rejects a
   machine with no accessible DRM render node. Set
@@ -351,31 +276,17 @@ qemu-system-x86_64 \
   graphics stack outside the validated profile.
 - Venus remains an optional VM configuration when the host/QEMU stack supports
   it: `-device virtio-gpu-gl,hostmem=8G,blob=true,venus=true`.
-- Verification order in the VM:
-  0. Quickshell 0.3.0 (repo) runs iNiR — the make-or-break check.
-  1. Installer end-to-end on a fresh Void.
-  2. Session: SDDM → packaged Niri entry (`niri --session`) → shell supervised
-     by the selected non-systemd user supervisor. Direct TTY launch remains a
-     recovery path, not the normal installed flow.
-  3. Services: dbus/elogind/polkitd/turnstiled up.
-  4. UI: updates list, search/install/remove via xbps.
-  5. `test-local-distribution.sh` with predicate-conditional invariants.
+Recommended validation order:
 
-PR3 is split into four sequential PRs:
-- PR3.0 `feat/void-runsvdir-supervisor`: runit fallback, no turnstile.
-  If turnstiled is already enabled, setup leaves supervision to it and does
-  not inject a second runsvdir supervisor; full turnstile configuration is
-  PR3.1.
-- PR3.1 `feat/void-turnstile-session`: turnstile + elogind with confirmed elevation.
-  Complete and VM validated.
-- PR3.2 `feat/void-nonsystemd-runtime`: non-systemd runtime adapters for UI/services.
-  Implementation and VM validation are complete. XEmbed uses a runit user
-  service so crashes are restarted by `runsv` instead of `systemd-run`; the
-  service is optional when `xembedsniproxy` is not installed.
-- PR3.3 `feat/void-optional-systemd-adapters`: predicate-safe Awww, GameMode,
-  clipboard, captures, and thumbnails; install the official Void Awww provider;
-  remove the undefined `discover-overlay` integration. WARP remains visible
-  but its supported provider and runit lifecycle are delivered in PR4.
+1. `make test-local` on the development host.
+2. `./setup install` end-to-end on a fresh Void glibc VM.
+3. Reboot and log in through SDDM using the packaged `niri --session` entry.
+4. Run `inir doctor` and verify the selected supervisor and session D-Bus.
+5. Verify NetworkManager, BlueZ, Power Profiles, PipeWire, ydotool and any
+   selected optional providers.
+6. Exercise package search/install/remove and both panel families.
+7. Run the versioned `scripts/check-void-*.sh` contracts when changing a
+   provider or lifecycle boundary.
 
 ## FAQ / gotchas
 
@@ -395,30 +306,6 @@ PR3 is split into four sequential PRs:
   `spice-vdagent` requires an X11 `DISPLAY`. The SPICE channel and daemon can
   be healthy while clipboard integration remains unavailable. This does not
   affect iNiR or turnstile.
-
-## PR3.2 VM checkpoint
-
-Keep `scripts/check-void-pr32.sh` as the repeatable, versioned validation
-contract. SSH is only the transport; export the graphical user's runtime and
-D-Bus address explicitly:
-
-```bash
-ssh voidcaml@192.168.122.140 '
-cd ~/inir-src &&
-git fetch origin &&
-git checkout feat/void-nonsystemd-runtime &&
-git pull --ff-only &&
-export XDG_RUNTIME_DIR=/run/user/$(id -u) &&
-export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus &&
-INIR_EXPECTED_COMMIT="$(git rev-parse origin/feat/void-nonsystemd-runtime)" \
-  ./scripts/check-void-pr32.sh
-'
-```
-
-The checker requires the false usable-systemd-user-manager predicate, a real
-session bus, `sv` supervision of iNiR, supported `loginctl` power verbs, and a
-clean expected branch. XEmbed is optional and is checked only when its binary
-is installed.
 
 ## Sources
 

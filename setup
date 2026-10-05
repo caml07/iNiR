@@ -1571,18 +1571,26 @@ run_theme() {
 # Extras — Optional post-install components
 ###############################################################################
 run_extras() {
+    detect_distro
     echo ""
     tui_title "Optional Extras"
     echo ""
 
     local action
-    action=$(tui_choose_rich "Extras" \
-        "${ICON_DOT}|Install iNiR-Walls|Download optional wallpaper pack and copy image files" \
-        "${ICON_DOT}|Install ii-pixel-sddm|Install/apply iNiR SDDM login theme" \
-        "${ICON_DOT}|Install YAMIS icons|Install/update yet-another-monochrome-icon-set (GPL-3, ~23 MiB)" \
-        "${ICON_DOT}|Install mascot pack|Kira mascot art pack (optional download, feature stays opt-in)" \
-        "${ICON_DOT}|Install all|Run all optional installers" \
-        "${ICON_CIRCLE}|Back|Return to main menu")
+    local -a extra_choices=(
+        "${ICON_DOT}|Install iNiR-Walls|Download optional wallpaper pack and copy image files"
+        "${ICON_DOT}|Install ii-pixel-sddm|Install/apply iNiR SDDM login theme"
+        "${ICON_DOT}|Install YAMIS icons|Install/update yet-another-monochrome-icon-set (GPL-3, ~23 MiB)"
+        "${ICON_DOT}|Install mascot pack|Kira mascot art pack (optional download, feature stays opt-in)"
+    )
+    if [[ "${OS_GROUP_ID:-}" == void ]]; then
+        extra_choices+=("${ICON_DOT}|Install/update Cloudflare WARP|Void glibc x86_64 only; official Cloudflare package, optional")
+    fi
+    extra_choices+=(
+        "${ICON_DOT}|Install all|Run all non-networking optional installers"
+        "${ICON_CIRCLE}|Back|Return to main menu"
+    )
+    action=$(tui_choose_rich "Extras" "${extra_choices[@]}")
 
     case "$action" in
         "Install iNiR-Walls")
@@ -1600,6 +1608,10 @@ run_extras() {
         "Install mascot pack")
             echo ""
             extras_install_mascot_pack
+            ;;
+        "Install/update Cloudflare WARP")
+            echo ""
+            extras_install_void_warp
             ;;
         "Install all")
             echo ""
@@ -2427,6 +2439,7 @@ run_update() {
         refresh_sddm_theme_on_update "$ask"
         extras_refresh_yamis_icons_on_update
         extras_refresh_mascot_pack_on_update
+        extras_refresh_void_warp_on_update
 
         echo ""
         tui_success "Package-managed installation left unchanged"
@@ -2743,6 +2756,7 @@ run_update() {
     refresh_sddm_theme_on_update "$ask"
     extras_refresh_yamis_icons_on_update
     extras_refresh_mascot_pack_on_update
+    extras_refresh_void_warp_on_update
 
     # Update Vesktop themes (themes live outside quickshell/ii tree)
     if [[ -d "${REPO_ROOT}/dots/.config/vesktop/themes" ]]; then

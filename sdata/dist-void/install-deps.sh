@@ -164,13 +164,6 @@ VOID_TOOLKIT_PACKAGES=(
   # Desktop applications delivered through maintained Flatpaks
   flatpak
 
-  # Cloudflare WARP upstream provider extraction
-  binutils
-  dbus-libs
-  libpcap
-  nss
-  tpm2-tss
-
 )
 
 # OCR is shared by the toolkit and screencapture profiles. Keep the package
@@ -226,9 +219,6 @@ VOID_FONTS_PACKAGES=(
 
 YDOTOOL_VERSION="1.0.4"
 YDOTOOL_SOURCE_SHA256="ba075a43aa6ead51940e892ecffa4d0b8b40c241e4e2bc4bd9bd26b61fde23bd"
-WARP_VERSION="2026.7.1377.0"
-WARP_DEB_SHA256="95d33c2b4fc42f21c204981c51470a6a679d618fb0b78ee64bdd0db142230c55"
-WARP_DEB_URL="https://pkg.cloudflareclient.com/pool/bookworm/main/c/cloudflare-warp/cloudflare-warp_${WARP_VERSION}_amd64.deb"
 TESSDATA_FAST_COMMIT="87416418657359cb625c412a48b6e1d6d41c29bd"
 ADW_GTK3_VERSION="6.5"
 ADW_GTK3_SHA256="a81780fadfc432be0fc3d89c4ebb41aa28e4f032d42c36f9789c57dd10cfa41c"
@@ -817,51 +807,6 @@ install_void_ydotool() {
   log_success "ydotool v${YDOTOOL_VERSION} installed"
 }
 
-install_void_warp() {
-  local installed_version
-  installed_version="$(warp-cli --version 2>/dev/null || true)"
-  if [[ "$installed_version" == *"$WARP_VERSION"* ]]; then
-    log_success "Cloudflare WARP v${WARP_VERSION} already installed"
-    return 0
-  fi
-
-  tui_info "Installing Cloudflare WARP v${WARP_VERSION} from verified upstream package..."
-  local temp_dir archive data_archive payload_dir warp_cli warp_svc tar_flags
-  temp_dir="$(mktemp -d)" || return 1
-  archive="$temp_dir/cloudflare-warp.deb"
-  payload_dir="$temp_dir/payload"
-
-  if ! curl -fsSL --max-time 90 -o "$archive" "$WARP_DEB_URL" \
-      || ! printf '%s  %s\n' "$WARP_DEB_SHA256" "$archive" | sha256sum -c - >/dev/null \
-      || ! data_archive="$(ar t "$archive" | grep '^data\.tar\.' | head -n1)" \
-      || [[ -z "$data_archive" ]] \
-      || ! mkdir -p "$payload_dir"; then
-    rm -rf "$temp_dir"
-    log_warning "Cloudflare WARP v${WARP_VERSION} installation failed"
-    return 1
-  fi
-  local tar_flags=-x
-  case "${data_archive##*.}" in
-    gz) tar_flags=-xz ;;
-    xz) tar_flags=-xJ ;;
-    bz2) tar_flags=-xj ;;
-  esac
-  if ! ar p "$archive" "$data_archive" | tar $tar_flags -C "$payload_dir" \
-      || ! warp_cli="$(find "$payload_dir" -type f -name warp-cli -print -quit)" \
-      || ! warp_svc="$(find "$payload_dir" -type f -name warp-svc -print -quit)" \
-      || [[ -z "$warp_cli" || -z "$warp_svc" ]] \
-      || ! pkg_sudo install -Dm755 "$warp_cli" /usr/local/bin/warp-cli \
-      || ! pkg_sudo install -Dm755 "$warp_svc" /usr/local/bin/warp-svc \
-      || ! /usr/local/bin/warp-cli --version | grep -Fq "$WARP_VERSION"; then
-    rm -rf "$temp_dir"
-    log_warning "Cloudflare WARP v${WARP_VERSION} installation failed"
-    return 1
-  fi
-
-  rm -rf "$temp_dir"
-  log_success "Cloudflare WARP v${WARP_VERSION} installed"
-}
-
 #####################################################################################
 # Optional: install only a specific list of missing deps (update path)
 #####################################################################################
@@ -931,7 +876,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   _miss_pkgs=()
   _miss_cmds=()
   _need_ydotool=false
-  _need_warp=false
   _need_missioncenter=false
   _need_tesseract_adapter=false
   _need_visual_providers=false
@@ -943,13 +887,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     if [[ "$cmd" == ydotool || "$cmd" == ydotoold ]]; then
       _need_ydotool=true
       for _miss_pkg in curl cmake; do
-        [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
-      done
-      continue
-    fi
-    if [[ "$cmd" == warp-cli || "$cmd" == warp-svc ]]; then
-      _need_warp=true
-      for _miss_pkg in binutils curl dbus-libs libpcap nss tpm2-tss; do
         [[ " ${_miss_pkgs[*]} " == *" ${_miss_pkg} "* ]] || _miss_pkgs+=("$_miss_pkg")
       done
       continue
@@ -1022,9 +959,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   fi
   if $_need_ydotool; then
     install_void_ydotool || return 1
-  fi
-  if $_need_warp; then
-    install_void_warp || return 1
   fi
   if $_need_missioncenter; then
     install_void_missioncenter || return 1
@@ -1113,7 +1047,6 @@ if ${INSTALL_TOOLKIT:-true}; then
   tui_info "Installing toolkit packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_TOOLKIT_PACKAGES[@]}"
   install_void_ydotool || return 1
-  install_void_warp || return 1
   install_void_missioncenter || return 1
 fi
 

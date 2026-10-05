@@ -2519,7 +2519,10 @@ show_logs() {
     if [[ "${1:-}" == "--debug" ]]; then
         echo "Stopping shell and relaunching in foreground with full debug logging." >&2
         echo "(QS_DEBUG=1, no QT_LOGGING_RULES filtering — Ctrl+C to stop, then 'inir restart')" >&2
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            return 1
+        fi
         kill_shell "$config_dir"
         sleep 1
         exec env QS_DEBUG=1 QT_LOGGING_RULES= "$qs_bin" -p "$config_dir"
@@ -2830,18 +2833,13 @@ is_current_process_inir_service() {
 
 stop_inir_service_if_active() {
     if is_using_runit_supervisor; then
-        if is_inir_service_active; then
-            sv down "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1 || true
-            return 0
-        fi
-        return 1
+        is_inir_service_active || return 0
+        sv down "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+        return $?
     fi
-    if is_inir_service_active; then
-        systemctl --user stop inir.service >/dev/null 2>&1 || true
-        return 0
-    fi
-
-    return 1
+    is_inir_service_active || return 0
+    systemctl --user stop inir.service >/dev/null 2>&1
+    return $?
 }
 
 restart_inir_service_if_active() {
@@ -4219,7 +4217,10 @@ case "$command_name" in
             esac
         done
         resolve_config_dir
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            exit 1
+        fi
         kill_shell "$config_dir"
         ;;
     run)
@@ -4353,7 +4354,10 @@ case "$command_name" in
             esac
         done
         resolve_config_dir
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            exit 1
+        fi
         kill_shell "$config_dir"
         ;;
     logs)

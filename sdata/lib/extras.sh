@@ -310,7 +310,11 @@ PY
 }
 
 extras_void_warp_install_prereqs() {
-  local required=(binutils dbus-libs libpcap nss tpm2-tss)
+  # warp-svc applies its Linux firewall through nft(8) before bringing the
+  # tunnel up. The upstream Debian package declares nftables as a runtime
+  # dependency; without it warp-cli accepts "connect" but the daemon aborts
+  # with FirewallUpdateFailed and remains Disconnected.
+  local required=(binutils dbus-libs libpcap nftables nss tpm2-tss)
   local pending=() pkg
   for pkg in "${required[@]}"; do
     xbps-query -p pkgver "$pkg" >/dev/null 2>&1 || pending+=("$pkg")
@@ -321,6 +325,25 @@ extras_void_warp_install_prereqs() {
   [[ "${ask:-true}" == true ]] || flags+=(-y)
   tui_info "Installing Cloudflare WARP runtime prerequisites: ${pending[*]}"
   pkg_sudo xbps-install "${flags[@]}" "${pending[@]}"
+}
+
+extras_void_warp_extract_payload() {
+  local archive="$1" payload_dir="$2" data_archive=""
+  data_archive="$(ar t "$archive" 2>/dev/null | grep '^data[.]tar[.]' | head -n1 || true)"
+  [[ -n "$data_archive" ]] || return 1
+  mkdir -p "$payload_dir" || return 1
+
+  local -a tar_flags=(-x)
+  case "$data_archive" in
+    *.tar.gz)  tar_flags=(-xz) ;;
+    *.tar.xz)  tar_flags=(-xJ) ;;
+    *.tar.bz2) tar_flags=(-xj) ;;
+    *.tar.zst) tar_flags=(--zstd -x) ;;
+    *.tar)     tar_flags=(-x) ;;
+    *) return 1 ;;
+  esac
+
+  ar p "$archive" "$data_archive" | tar "${tar_flags[@]}" -C "$payload_dir"
 }
 
 extras_install_void_warp() {
@@ -349,6 +372,8 @@ extras_install_void_warp() {
 
   local installed_version
   installed_version="$(extras_void_warp_installed_version)"
+  extras_void_warp_install_prereqs || return 1
+
   if [[ -n "$installed_version" ]] && extras_version_ge "$installed_version" "$version"; then
     if [[ "$installed_version" == "$version" ]]; then
       log_success "Cloudflare WARP v${version} already installed"
@@ -362,9 +387,7 @@ extras_install_void_warp() {
     return 0
   fi
 
-  extras_void_warp_install_prereqs || return 1
-
-  local temp_dir archive data_archive payload_dir warp_cli warp_svc
+  local temp_dir archive payload_dir warp_cli warp_svc
   temp_dir="$(mktemp -d)" || return 1
   archive="$temp_dir/cloudflare-warp.deb"
   payload_dir="$temp_dir/payload"
@@ -373,10 +396,7 @@ extras_install_void_warp() {
   tui_info "Installing Cloudflare WARP v${version} from Cloudflare's verified upstream package..."
   if ! curl -fsSL --retry 2 --max-time 120 -o "$archive" "$url" \
       || ! printf '%s  %s\n' "$sha256" "$archive" | sha256sum -c - >/dev/null \
-      || ! data_archive="$(ar t "$archive" | grep '^data[.]tar[.]' | head -n1)" \
-      || [[ -z "$data_archive" ]] \
-      || ! mkdir -p "$payload_dir" \
-      || ! ar p "$archive" "$data_archive" | tar -x -C "$payload_dir" \
+      || ! extras_void_warp_extract_payload "$archive" "$payload_dir" \
       || ! warp_cli="$(find "$payload_dir" -type f -name warp-cli -print -quit)" \
       || ! warp_svc="$(find "$payload_dir" -type f -name warp-svc -print -quit)" \
       || [[ -z "$warp_cli" || -z "$warp_svc" ]] \

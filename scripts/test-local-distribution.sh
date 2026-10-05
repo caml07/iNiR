@@ -1445,7 +1445,15 @@ mascot_image="$runtime_root/modules/common/widgets/MascotImage.qml"
 mascot_companion="$runtime_root/modules/mascot/MascotCompanion.qml"
 mascot_ii_settings="$runtime_root/modules/settings/MascotConfig.qml"
 mascot_waffle_settings="$runtime_root/modules/waffle/settings/pages/WMascotPage.qml"
-if ! grep -Fq 'readonly property bool packAvailable: presenceProbe.loaded' "$mascot_catalog"; then
+mascot_ii_panels="$runtime_root/modules/ii/ShellIiPanelsImpl.qml"
+mascot_waffle_panels="$runtime_root/modules/waffle/ShellWafflePanelsImpl.qml"
+if ! grep -Fq 'readonly property bool packAvailable: packStateValid && presenceProbe.loaded' "$mascot_catalog" \
+        || ! grep -Fq 'mascot-pack-state.json' "$mascot_catalog" \
+        || ! grep -Fq 'asset_tree_sha256' "$mascot_catalog" \
+        || ! grep -Fq 'id: jrpgProbe' "$mascot_catalog" \
+        || ! grep -Fq 'id: codexProbe' "$mascot_catalog" \
+        || ! grep -Fq 'requestedCharacterStyle === "jrpg" && jrpgProbe.loaded' "$mascot_catalog" \
+        || ! grep -Fq 'requestedCharacterStyle === "codex" && codexProbe.loaded' "$mascot_catalog"; then
     printf 'FAIL: mascot catalog does not expose optional art-pack availability\n' >&2
     exit 1
 fi
@@ -1457,6 +1465,11 @@ fi
 if ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_ii_settings" \
         || ! grep -Fq 'enabled: MascotCatalog.packAvailable' "$mascot_waffle_settings"; then
     printf 'FAIL: mascot master switches remain interactive without the optional art pack\n' >&2
+    exit 1
+fi
+if ! grep -Fq 'identifier: "iiMascotCompanion"; extraCondition: true; component: MascotCompanion {}' "$mascot_ii_panels" \
+        || ! grep -Fq 'identifier: "iiMascotCompanion"; extraCondition: true; component: MascotCompanion {}' "$mascot_waffle_panels"; then
+    printf 'FAIL: mascot companion controller is not available independently of optional art-pack timing\n' >&2
     exit 1
 fi
 if ! grep -Fq 'if (!MascotCatalog.packAvailable)' "$mascot_ii_settings" \

@@ -2848,6 +2848,7 @@ if ! (
     turnstile_run="$turnstile_test_root/home/.config/service/inir/run"
     turnstile_conf="$turnstile_test_root/home/.config/service/turnstile-ready/conf"
     grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$turnstile_run"
+    grep -Fq 'QS_DISABLE_POLKIT=1' "$turnstile_run"
     grep -Fq 'BEGIN inir-turnstile-environment' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'turnstile-update-runit-env WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq '[ -n \"${WAYLAND_DISPLAY:-}\" ]' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
@@ -2883,11 +2884,34 @@ if ! (
     rm -rf "$turnstile_test_root"
     exit 1
 fi
+
+polkit_service="$runtime_root/services/PolkitService.qml"
+if ! grep -Fq '"polkit-mate-authentication-agent-1"' "$polkit_service" \
+        || ! grep -Fq '"lxpolkit"' "$polkit_service"; then
+    printf 'FAIL: shell polkit fallback does not recognize all installer-supported external agents\n' >&2
+    exit 1
+fi
 rm -rf "$turnstile_test_root"
 
 step "Void dependency profile"
 bash "$runtime_root/scripts/test-void-release-profile.sh"
 bash "$runtime_root/scripts/test-void-warp-extra.sh"
+for warp_toggle in \
+        "$runtime_root/modules/common/models/quickToggles/CloudflareWarpToggle.qml" \
+        "$runtime_root/modules/sidebarRight/quickToggles/androidStyle/AndroidCloudflareWarpToggle.qml" \
+        "$runtime_root/modules/sidebarRight/quickToggles/classicStyle/CloudflareWarp.qml"; do
+    for needle in \
+            'function beginTransitionPoll(expectedConnected: bool): void' \
+            'property int _transitionPollsRemaining: 0' \
+            'interval: 500' \
+            'root.beginTransitionPoll(true)' \
+            'root.beginTransitionPoll(false)'; do
+        if ! grep -Fq "$needle" "$warp_toggle"; then
+            printf 'FAIL: WARP toggle lacks bounded transition polling (%s): %s\n' "$needle" "$warp_toggle" >&2
+            exit 1
+        fi
+    done
+done
 bash "$runtime_root/scripts/test-void-graphics-preflight.sh"
 python3 "$runtime_root/scripts/test-detect-sensors.py"
 void_deps="$runtime_root/sdata/dist-void/install-deps.sh"
@@ -2983,7 +3007,7 @@ if ! grep -Fq 'Install/update Cloudflare WARP' "$runtime_root/setup" \
     printf 'FAIL: setup does not expose/refresh the Void-only WARP extra correctly\n' >&2
     exit 1
 fi
-for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct power-profiles-daemon qt6-webengine layer-shell-qt; do
+for pkg in curl wget git ripgrep bc xdg-utils xdg-user-dirs libnotify xwayland-satellite xdg-desktop-portal-gnome gnome-keyring libsecret nautilus kitty kf6-kirigami kdialog breeze-icons qt6ct polkit-gnome power-profiles-daemon qt6-webengine layer-shell-qt; do
     if ! grep -Eq "^[[:space:]]+$pkg$" <<< "$void_base_block"; then
         printf 'FAIL: Void base profile is missing required default/runtime provider %s\n' "$pkg" >&2
         exit 1

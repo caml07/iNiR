@@ -552,10 +552,7 @@ repair_legacy_quickshell_malloc_environment() {
   return 0
 }
 
-# Check if a usable systemd user manager is available.
-# Returns 0 if the socket exists AND systemctl --user responds within 3s.
-# This is the predicate from ADR-0002, gating all systemd-sensitive paths.
-# Does NOT check distro name or mere presence of systemctl binary.
+# A systemctl binary alone does not prove the user manager is usable.
 function has_usable_systemd_user_manager() {
   [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
     timeout 3s systemctl --user show-environment >/dev/null 2>&1
@@ -640,8 +637,7 @@ configure_void_ydotool_uinput() {
   log_info "Then add a udev rule granting group input mode 0660 on /dev/uinput and load the uinput module"
 }
 
-# Enable Void's packaged SDDM runit service without replacing another display manager.
-# The service root is overridable so this policy can be tested without touching /var/service.
+# Never replace another enabled display manager.
 configure_void_sddm_service() {
   [[ "${OS_GROUP_ID:-}" == void ]] || return 0
 
@@ -727,9 +723,7 @@ configure_void_sddm_service() {
   return 1
 }
 
-# Move a Void install from the base dhcpcd/wpa_supplicant stack to the
-# NetworkManager provider that iNiR's network UI controls. The service root is
-# overridable so the migration and rollback policy can be tested safely.
+# Migrate network ownership atomically so failed activation can restore the previous services.
 configure_void_networkmanager_service() {
   [[ "${OS_GROUP_ID:-}" == void ]] || return 0
 
@@ -894,11 +888,7 @@ configure_void_warp_service() {
   fi
 }
 
-# Reconcile PipeWire user services for non-systemd supervisors.
-# Void ships pipewire without activating it; recording needs pipewire,
-# wireplumber, and pipewire-pulse supervised in ~/.config/service.
-# Owned services carry "# Managed by iNiR." so systemd tier can remove them.
-# Args: $1 = supervisor (systemd|turnstile|runsvdir)
+# Void does not activate PipeWire user services; only replace files marked as iNiR-owned.
 reconcile_audio_user_services() {
   local supervisor="$1"
   local service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
@@ -940,7 +930,6 @@ reconcile_audio_user_services() {
   return "$failed"
 }
 
-# Reconcile Void's ydotool daemon across the same user-supervisor tiers as iNiR.
 reconcile_ydotool_user_service() {
   local supervisor="$1"
   local enabled="${2:-true}"
@@ -1011,10 +1000,6 @@ reconcile_ydotool_user_service() {
   fi
 }
 
-# Reconcile supervisor state for iNiR (shared by install and update).
-# Creates/updates runit service, renders startup KDL block.
-# Args: (none - uses XDG_CONFIG_HOME, XDG_BIN_HOME)
-# Returns: 0 on success, prints the selected supervisor on stdout.
 reconcile_inir_supervisor() {
   local launcher_path="${XDG_BIN_HOME:-$HOME/.local/bin}/inir"
   local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
@@ -1027,16 +1012,12 @@ reconcile_inir_supervisor() {
   local supervisor
   supervisor="$(inir_supervisor)"
 
-  # Ensure runit service exists (used by both runsvdir and turnstile tiers).
   if [[ -x "$launcher_path" ]]; then
     mkdir -p "$runit_service_dir"
     local launcher_quoted
     launcher_quoted="$(printf '%s' "$launcher_path" | sed "s/'/'\\\\''/g")"
     if [[ "$supervisor" == turnstile ]]; then
-      # Turnstile's user service manager lives in its own elogind background
-      # session. Polkit rejects a shell agent registered from that session as
-      # not matching the graphical caller. Void already installs a graphical
-      # external agent, so disable Quickshell's listener only in this tier.
+      # Turnstile is outside seat0; its shell polkit listener is rejected as the wrong session.
       printf "#!/bin/sh\nexec chpst -e \"\$TURNSTILE_ENV_DIR\" /usr/bin/env QS_DISABLE_POLKIT=1 '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"
     else
       printf "#!/bin/sh\nexec '%s' run --session\n" "$launcher_quoted" > "$runit_run_file"

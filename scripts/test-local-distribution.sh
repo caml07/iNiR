@@ -2104,10 +2104,6 @@ if [[ "$(<"$runit_test_root/sv.log")" != "restart $runit_test_root/config/servic
     exit 1
 fi
 
-# A supervised shell can be restarted from a TTY/SSH/maintenance context that
-# has no display variables. Quickshell's default `list` filter then hides the
-# live Wayland instance unless --any-display is requested, producing a false
-# restart timeout even though runit successfully started the shell.
 list_instances_function="$(sed -n '/^list_instances() {/,/^}/p' "$launcher")"
 import_instance_env_function="$(sed -n '/^import_running_instance_environment() {/,/^}/p' "$launcher")"
 cat > "$runit_test_root/bin/qs-list-mock" <<'SH'
@@ -2200,8 +2196,6 @@ if [[ "$recovered_env" != 'wayland-test|/run/user/1000/niri.wayland-test.999.soc
     exit 1
 fi
 
-# Runit owns service lifecycle, but log decoding still belongs to Quickshell.
-# New launcher log options must not be swallowed by the bare `sv status` fallback.
 show_logs_function="$(sed -n '/^show_logs() {/,/^}/p' "$launcher")"
 cat > "$runit_test_root/bin/qs-mock" <<'SH'
 #!/bin/sh
@@ -2627,9 +2621,6 @@ for migration_file in "$migration_021" "$migration_022"; do
         export XDG_RUNTIME_DIR="$migration_test_root/runtime"
         export PATH="$migration_test_root/bin:$PATH"
         export INIR_TEST_SYSTEMCTL_CALLED="$migration_test_root/systemctl.called"
-        # Arrange: no user-manager socket or migration state.
-        # Act: evaluate the migration in the non-systemd profile.
-        # Assert: it is a no-op without invoking systemctl.
         source "$migration_file"
         migration_check && exit 1
         migration_apply
@@ -2672,14 +2663,11 @@ fi
 rm -rf "$dolphin_migration_root"
 
 step "rsync failure propagation"
-# rsync_dir__sync must fail when rsync fails, not succeed via awk pipe
-# Need ask=false for non-interactive x function behavior
 ask=false
 source "$runtime_root/sdata/lib/functions.sh"
 rsync_test_root="$(mktemp -d)"
 mkdir -p "$rsync_test_root/bin" "$rsync_test_root/src/dir" "$rsync_test_root/dst"
 echo "content" > "$rsync_test_root/src/dir/file.txt"
-# Fake rsync that fails
 cat > "$rsync_test_root/bin/rsync" <<'SH'
 #!/bin/sh
 exit 1
@@ -2692,7 +2680,6 @@ if rsync_dir__sync "$rsync_test_root/src" "$rsync_test_root/dst" 2>/dev/null; th
     rm -rf "$rsync_test_root"
     exit 1
 fi
-# Verify no manifest was written on failure
 if [[ -f "$rsync_test_root/installed.list" && -s "$rsync_test_root/installed.list" ]]; then
     printf 'FAIL: installed.list written despite rsync failure\n' >&2
     rm -rf "$rsync_test_root"
@@ -2701,10 +2688,8 @@ fi
 rm -rf "$rsync_test_root"
 
 step "supervisor reconciliation helper"
-# Need ask=false for non-interactive x function behavior
 ask=false
 source "$runtime_root/sdata/lib/functions.sh"
-# Test runsvdir path (no systemd and no turnstile)
 reconcile_test_root="$(mktemp -d)"
 mkdir -p "$reconcile_test_root/bin" "$reconcile_test_root/home/.local/bin" "$reconcile_test_root/home/.config/niri/config.d" "$reconcile_test_root/var/service"
 cat > "$reconcile_test_root/home/.local/bin/inir" <<'SH'
@@ -2728,7 +2713,6 @@ for audio_bin in pipewire wireplumber pipewire-pulse; do
 done
 printf '#!/bin/sh\nexit 0\n' > "$reconcile_test_root/bin/ydotoold"
 chmod +x "$reconcile_test_root/bin/ydotoold"
-# Create startup KDL file (required for reconcile to render)
 cat > "$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl" <<'KDL'
 // 50 — Processes spawned at login
 spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
@@ -2741,13 +2725,11 @@ export INIR_TURNSTILED_SERVICE_PATH="$reconcile_test_root/var/service/turnstiled
 export OS_GROUP_ID=void
 export INSTALL_TOOLKIT=true
 export PATH="$reconcile_test_root/bin:$PATH"
-# No systemd socket = predicate false = runsvdir
 if ! reconcile_inir_supervisor | grep -q '^runsvdir$'; then
     printf 'FAIL: reconcile_inir_supervisor did not select runsvdir\n' >&2
     rm -rf "$reconcile_test_root"
     exit 1
 fi
-# Verify runit service created
 if [[ ! -x "$reconcile_test_root/home/.config/service/inir/run" ]]; then
     printf 'FAIL: runit service not created\n' >&2
     rm -rf "$reconcile_test_root"
@@ -2775,14 +2757,12 @@ if ! grep -Fq 'exec user-pipewire' "$reconcile_test_root/home/.config/service/pi
     rm -rf "$reconcile_test_root"
     exit 1
 fi
-# Verify KDL has runsvdir block
 startup_kdl="$reconcile_test_root/home/.config/niri/config.d/50-startup.kdl"
 if ! grep -q 'runsvdir ~/.config/service' "$startup_kdl"; then
     printf 'FAIL: KDL missing runsvdir block\n' >&2
     rm -rf "$reconcile_test_root"
     exit 1
 fi
-# Idempotent: second run should not change KDL
 cp "$startup_kdl" "$startup_kdl.bak"
 reconcile_inir_supervisor >/dev/null
 if ! diff -q "$startup_kdl" "$startup_kdl.bak" >/dev/null; then
@@ -3336,7 +3316,6 @@ for pkg in rsync base-devel pkg-config cairo-devel python3-devel glib-devel gobj
         exit 1
     fi
 done
-# ONLY_MISSING_DEPS handling present
 if ! grep -q 'ONLY_MISSING_DEPS' "$void_deps"; then
     printf 'FAIL: Void installer missing ONLY_MISSING_DEPS handling\n' >&2
     exit 1
@@ -3429,7 +3408,6 @@ if ! (
     test -L "$INIR_RUNIT_SERVICE_ROOT/sddm"
     test "$(readlink "$INIR_RUNIT_SERVICE_ROOT/sddm")" = "$INIR_SDDM_SERVICE_DIR"
 
-    # Idempotence: the already-correct link must be accepted without prompting.
     tui_confirm() { return 1; }
     configure_void_sddm_service
 ); then
@@ -3515,9 +3493,7 @@ if ! (
 fi
 rm -rf "$sddm_test_root"
 
-# On real Void installs, unprivileged `sv status /var/service/dbus` can be
-# inaccessible even while the system bus is healthy. Verify the provider
-# accepts the authoritative D-Bus socket in that case.
+# The D-Bus socket is authoritative when unprivileged `sv status` is unreadable.
 sddm_socket_root="$(mktemp -d)"
 mkdir -p "$sddm_socket_root/bin" "$sddm_socket_root/etc/sv/sddm" \
     "$sddm_socket_root/etc/sv/dbus" "$sddm_socket_root/usr/share/wayland-sessions" \
@@ -3606,7 +3582,6 @@ if ! (
     test ! -e "$INIR_RUNIT_SERVICE_ROOT/dhcpcd"
     test ! -e "$INIR_RUNIT_SERVICE_ROOT/wpa_supplicant"
 
-    # Idempotence: once NetworkManager owns networking, do not prompt or mutate.
     tui_confirm() { return 1; }
     configure_void_networkmanager_service
 ); then

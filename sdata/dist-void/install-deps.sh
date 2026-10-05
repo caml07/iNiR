@@ -3,20 +3,12 @@
 
 # shellcheck shell=bash
 
-#####################################################################################
-# Verify we're on Void
-#####################################################################################
 if ! command -v xbps-install >/dev/null 2>&1; then
   printf "${STY_RED}[$0]: xbps-install not found. This script is for Void Linux only.${STY_RST}\n"
   exit 1
 fi
 
-#####################################################################################
-# Package definitions per profile (glibc + elogind primary profile)
-# Based on docs/VOID.md "Dependencies (XBPS)" section
-#####################################################################################
 
-# Base: Niri, Quickshell, Qt6, session services, essential utilities
 VOID_BASE_PACKAGES=(
   # Core compositor, shell, and graphical login
   niri
@@ -807,9 +799,6 @@ install_void_ydotool() {
   log_success "ydotool v${YDOTOOL_VERSION} installed"
 }
 
-#####################################################################################
-# Optional: install only a specific list of missing deps (update path)
-#####################################################################################
 if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   tui_info "Installing missing dependencies only..."
 
@@ -983,9 +972,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
   return 0
 fi
 
-#####################################################################################
-# Preflight selected dependency profiles before modifying the system
-#####################################################################################
 _void_selected_packages=("${VOID_BASE_PACKAGES[@]}")
 if ${INSTALL_AUDIO:-true}; then
   _void_selected_packages+=("${VOID_AUDIO_PACKAGES[@]}")
@@ -1005,9 +991,6 @@ fi
 check_void_install_space "${_void_selected_packages[@]}" || return 1
 unset _void_selected_packages
 
-#####################################################################################
-# System update
-#####################################################################################
 case ${SKIP_SYSUPDATE:-false} in
   true) sleep 0;;
   *)
@@ -1019,30 +1002,20 @@ case ${SKIP_SYSUPDATE:-false} in
     ;;
 esac
 
-#####################################################################################
-# Install base packages
-#####################################################################################
 tui_info "Installing base packages..."
 
 installflags=(-S)
 $ask || installflags+=(-y)
 
-# Filter packages based on flags
 _install_base=("${VOID_BASE_PACKAGES[@]}")
 
 v pkg_sudo xbps-install "${installflags[@]}" "${_install_base[@]}"
 
-#####################################################################################
-# Install audio packages
-#####################################################################################
 if ${INSTALL_AUDIO:-true}; then
   tui_info "Installing audio packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_AUDIO_PACKAGES[@]}"
 fi
 
-#####################################################################################
-# Install toolkit packages
-#####################################################################################
 if ${INSTALL_TOOLKIT:-true}; then
   tui_info "Installing toolkit packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_TOOLKIT_PACKAGES[@]}"
@@ -1050,9 +1023,6 @@ if ${INSTALL_TOOLKIT:-true}; then
   install_void_missioncenter || return 1
 fi
 
-#####################################################################################
-# Install screencapture packages
-#####################################################################################
 if ${INSTALL_SCREENCAPTURE:-true}; then
   tui_info "Installing screencapture packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_SCREENCAPTURE_PACKAGES[@]}"
@@ -1067,9 +1037,6 @@ if ${INSTALL_TOOLKIT:-true} || ${INSTALL_SCREENCAPTURE:-true}; then
   install_void_ocr_models jpn_vert chi_sim_vert chi_tra_vert || return 1
 fi
 
-#####################################################################################
-# Install fonts and theming packages
-#####################################################################################
 if ${INSTALL_FONTS:-true}; then
   tui_info "Installing fonts and theming packages..."
   v pkg_sudo xbps-install "${installflags[@]}" "${VOID_FONTS_PACKAGES[@]}"
@@ -1078,11 +1045,6 @@ if ${INSTALL_FONTS:-true}; then
   install_void_darkly || return 1
 fi
 
-#####################################################################################
-# Post-install: Check for Qt/Quickshell ABI mismatch
-# Void rebuilds quickshell in lockstep with Qt updates, so this should self-heal.
-# But we keep the check for completeness.
-#####################################################################################
 if command -v qs >/dev/null 2>&1; then
   qs_abi_output="$(timeout 5 env QT_QPA_PLATFORM=offscreen qs --version 2>&1 || true)"
   if echo "$qs_abi_output" | grep -qiE "built against Qt|Qt.*mismatch|incompatible Qt"; then

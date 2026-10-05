@@ -936,11 +936,6 @@ ShellRoot {
     property string _pendingFamily: ""
     property bool _transitionInProgress: false
     property bool _transitionUsesOverlay: false
-    // Qt 6.11 can deliver an output-scale update while layer-shell windows are
-    // being destroyed.  If the old and new family trees swap in one binding
-    // turn, QQuickWindow::physicalDpiChanged() can then walk an item that has
-    // just been freed.  Keep the transition overlay up, unload the old family,
-    // yield to Wayland, change the persisted family, then load the new tree.
     property bool _familyPanelsSuspended: false
     property string _familySwapTarget: ""
     property bool _familyRestartPending: false
@@ -1014,11 +1009,7 @@ ShellRoot {
         if (currentFamily === "iris")
             GlobalStates.endIrisEditing()
 
-        // Qt 6.11's Wayland backend can segfault in physicalDpiChanged() while
-        // live layer-shell windows are destroyed during a family switch.  A
-        // controlled process boundary is the only reliable guard we found on
-        // Quickshell 0.3.1: stop the shell, persist the requested family, then
-        // start a fresh process.  Qt 6.12+ keeps the normal in-process UX.
+        // Qt 6.11 can segfault during layer-shell teardown; restart the supervised shell.
         const qt611LayerShellRisk = Quickshell.hasQtVersion(6, 11)
             && !Quickshell.hasQtVersion(6, 12)
         if (qt611LayerShellRisk) {
@@ -1028,8 +1019,7 @@ ShellRoot {
             return
         }
 
-        // With animation disabled, still serialize the layer-shell teardown/load
-        // so the old and new trees never change in the same Wayland dispatch.
+        // Keep old and new layer-shell trees out of the same Wayland dispatch.
         if (!(Config.options?.familyTransitionAnimation ?? true)) {
             _transitionInProgress = true
             _transitionUsesOverlay = false
@@ -1067,8 +1057,6 @@ ShellRoot {
         interval: 8000
         repeat: false
         onTriggered: {
-            // Normally this object is gone because the service restarted. If
-            // the helper could not stop the supervisor, let the user retry.
             root._familyRestartPending = false
             root._transitionInProgress = false
             root._transitionUsesOverlay = false
@@ -1131,9 +1119,7 @@ ShellRoot {
     }
 
     function finishFamilyTransition() {
-        // The fade can finish before a busy compositor has completed the
-        // serialized family swap.  Do not release the fullscreen transition
-        // cover until the new family is allowed to instantiate.
+        // Keep the transition cover until the serialized family swap finishes.
         if (root._familyPanelsSuspended) {
             familyFinishSettleTimer.restart()
             return
@@ -1144,8 +1130,7 @@ ShellRoot {
         GlobalStates.familyTransitionTarget = ""
     }
 
-    // Family transition overlay stays absent outside a real family switch, so
-    // the inactive family's visual tree and font/token imports are not retained.
+    // Do not retain the inactive family's visual imports outside a transition.
     Loader {
         active: Config.ready
             && root._transitionUsesOverlay

@@ -27,10 +27,7 @@ mkdir -p "$HOME"
 # shellcheck source=/dev/null
 source "$repo_root/sdata/lib/extras.sh"
 
-# Cloudflare's daemon shells out to nft(8) before it can establish a tunnel.
-# Exercise the provider seam directly so a future dependency trim cannot leave
-# warp-cli reporting Success while warp-svc immediately falls back to
-# Disconnected(FirewallUpdateFailed).
+# warp-svc cannot establish a tunnel without nftables.
 prereq_log="$tmp/warp-prereqs"
 xbps-query() { return 1; }
 pkg_sudo() { printf '%s\n' "$*" > "$prereq_log"; }
@@ -44,9 +41,7 @@ grep -Eq '(^|[[:space:]])nftables($|[[:space:]])' "$prereq_log" || {
 unset -f xbps-query pkg_sudo tui_info
 unset ask
 
-# A managed WARP install at the same version still needs prerequisite repair
-# during setup update. Keep the overrides inside a subshell so the fixture tests
-# below continue using the real provider functions.
+# Same-version refresh must still repair missing runtime prerequisites.
 same_version_prereq_log="$tmp/warp-same-version-prereqs"
 (
   OS_GROUP_ID=void
@@ -69,9 +64,7 @@ grep -Eq '(^|[[:space:]])nftables($|[[:space:]])' "$same_version_prereq_log" || 
   exit 1
 }
 
-# Debian payload extraction must preserve explicit compression handling. GNU
-# tar does not auto-detect compressed streams read from stdin, which is exactly
-# how `ar p data.tar.* | tar ...` is used by the provider.
+# tar does not auto-detect compression for a payload streamed from `ar p`.
 mkdir -p "$tmp/deb-src/usr/bin" "$tmp/deb-out" "$tmp/deb-build"
 printf '#!/bin/sh\nprintf "fixture\\n"\n' > "$tmp/deb-src/usr/bin/warp-cli"
 printf '2.0\n' > "$tmp/deb-build/debian-binary"
@@ -91,8 +84,7 @@ actual="$(extras_void_warp_release_info)"
   exit 1
 }
 
-# Metadata outage falls back to the last release whose artifact/hash is kept in
-# tree. Override curl instead of touching the network.
+# Metadata outages use the last verified in-tree artifact.
 unset INIR_WARP_PACKAGES_FILE
 curl() { return 1; }
 fallback="$(extras_void_warp_release_info)"
@@ -128,8 +120,7 @@ state_file="$(extras_void_warp_state_file)"
   exit 1
 }
 
-# The provider is intentionally glibc-only. Simulate musl at the ldd seam and
-# make sure it fails before provisioning anything.
+# musl must fail before provisioning.
 cat > "$tmp/bin/ldd" <<'EOF'
 #!/bin/sh
 printf '%s\n' 'musl libc (x86_64)'

@@ -1624,16 +1624,11 @@ _get_systemd_user_env() {
     printf '%s' "$_cached_systemd_env"
 }
 
-# Check if the usable systemd user manager predicate holds.
-# Returns 0 if systemd user manager is usable, 1 otherwise.
-# This is the same predicate used in the installer (ADR-0002).
 has_usable_systemd_user_manager() {
   [[ -S "${XDG_RUNTIME_DIR:-}/systemd/private" ]] &&
     timeout 3s systemctl --user show-environment >/dev/null 2>&1
 }
 
-# Check if we're using runit supervisor (predicate is false)
-# Returns 0 if runit supervisor should be used, 1 if systemd is active.
 is_using_runit_supervisor() {
   ! has_usable_systemd_user_manager
 }
@@ -1946,8 +1941,7 @@ list_instances() {
 import_running_instance_environment() {
     local dir="$1"
 
-    # A graphical terminal already has the authoritative display/session
-    # environment. Only recover it for TTY/SSH/automation callers.
+    # Outside a graphical session, recover the authoritative environment from the live shell.
     if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
         return 0
     fi
@@ -2249,10 +2243,7 @@ cleanup_orphans() {
         done <<< "$alive_pids"
     fi
 
-    # Phase 5: Kill orphaned iNiR helper processes from the previous shell.
-    # systemd keeps them in inir.service's cgroup after KillMode=process. Runit
-    # reparents them to PID 1, so use their iNiR runtime path as the ownership
-    # boundary there instead of relying on cgroups that all share the session.
+    # Runit reparents helpers to PID 1, so runtime paths are the ownership boundary.
     local _pid _cgroup _ppid _cmdline _runtime_root _owned
     local _using_runit=false
     is_using_runit_supervisor && _using_runit=true
@@ -3122,7 +3113,6 @@ run_service_command() {
         fi
         case "$action" in
             install)
-                # Runit service is installed by the installer (3.files.sh)
                 echo "Runit service already installed at $runit_service_dir"
                 ;;
             uninstall|remove)
@@ -3151,7 +3141,6 @@ run_service_command() {
                 exec sv status "$runit_service_dir" "$@"
                 ;;
             logs)
-                # For runit, use sv status (journalctl doesn't exist without systemd)
                 exec sv status "$runit_service_dir" "$@"
                 ;;
             -h|--help|"")
@@ -4703,9 +4692,7 @@ case "$command_name" in
         cleanup_orphans
         ;;
     doctor)
-        # TTY/SSH/automation callers may not inherit the graphical session even
-        # while the supervised shell is healthy. Reuse the same live-instance
-        # environment recovery as IPC/restart before delegating to setup Doctor.
+        # Doctor may run outside the graphical session; reuse the live shell environment.
         resolve_config_dir
         import_running_instance_environment "$config_dir" >/dev/null 2>&1 || true
         # Quick path: `inir doctor --fix-abi` rebuilds quickshell directly without

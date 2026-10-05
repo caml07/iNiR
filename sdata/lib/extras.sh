@@ -211,15 +211,8 @@ extras_refresh_yamis_icons_on_update() {
   fi
 }
 
-#####################################################################################
-# Void-only Cloudflare WARP extra
-#####################################################################################
-
-# Cloudflare does not publish an XBPS repository. Void glibc therefore consumes
-# the official amd64 Debian artifact without executing Debian maintainer scripts.
-# The APT Packages index is the source of truth for version, path and SHA-256;
-# the pinned fallback keeps an already-supported build installable if metadata is
-# temporarily unavailable.
+# Void has no Cloudflare XBPS package; official APT metadata supplies the version,
+# artifact path and SHA-256 without executing Debian maintainer scripts.
 INIR_WARP_PACKAGES_URL="${INIR_WARP_PACKAGES_URL:-https://pkg.cloudflareclient.com/dists/bookworm/main/binary-amd64/Packages}"
 INIR_WARP_REPO_BASE_URL="${INIR_WARP_REPO_BASE_URL:-https://pkg.cloudflareclient.com/}"
 INIR_WARP_FALLBACK_VERSION="${INIR_WARP_FALLBACK_VERSION:-2026.7.1377.0}"
@@ -310,10 +303,7 @@ PY
 }
 
 extras_void_warp_install_prereqs() {
-  # warp-svc applies its Linux firewall through nft(8) before bringing the
-  # tunnel up. The upstream Debian package declares nftables as a runtime
-  # dependency; without it warp-cli accepts "connect" but the daemon aborts
-  # with FirewallUpdateFailed and remains Disconnected.
+  # warp-svc requires nft(8); Cloudflare declares nftables as a runtime dependency.
   local required=(binutils dbus-libs libpcap nftables nss tpm2-tss)
   local pending=() pkg
   for pkg in "${required[@]}"; do

@@ -78,9 +78,7 @@ Singleton {
         onFileChanged: reload()
     }
 
-    // Optional art-line probes. The manifest can describe future/alternate
-    // releases that are not present in the installed pack; never select a
-    // character profile just because its mapping exists in manifest.json.
+    // Optional art profiles are valid only when their published assets are installed.
     FileView {
         id: presenceProbe
         path: Quickshell.shellPath("assets/images/mascot/inir-mascot-presence-idle-loop.gif")

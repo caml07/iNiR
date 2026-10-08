@@ -493,7 +493,45 @@ Scope {
         id: bgRoot
 
         required property var modelData
-        readonly property Item wallpaperLayer: wallpaperContainer
+        // Afterglow draws the container graded (and hides it): glass copies what is seen.
+        readonly property Item wallpaperLayer: afterglowLoader.item ?? wallpaperContainer
+        // Bumped whenever what the wallpaper layer shows can change (picture, parallax, Afterglow arriving): iRiS glass
+        // copies the layer only after a bump instead of every frame the desktop redraws.
+        property int wallpaperLayerRevision: 0
+        readonly property bool wallpaperLayerAnimating: bgRoot.internalShaderTransitionRequested
+        onWallpaperPathRawChanged: {
+            bgRoot.wallpaperLayerRevision++
+            const now = Date.now()
+            bgRoot.previewBrisk = Wallpapers.internalPreviewActive && now - bgRoot._lastWallpaperSwitch < 1200
+            bgRoot._lastWallpaperSwitch = now
+            const raw = bgRoot.wallpaperPathRaw
+            if (Wallpapers.isVideoFile(raw)) {
+                bgRoot._videoPath = raw
+                bgRoot._outgoingVideo = ""
+                videoHandoff.stop()
+            } else if (bgRoot._videoPath.length > 0) {
+                bgRoot._outgoingVideo = bgRoot._videoPath
+                bgRoot._videoPath = ""
+                videoHandoff.restart()
+            }
+        }
+        // Leaving a video for a picture: the crossfader starts from nothing (the video was never its texture), so the
+        // desktop went black until the picture arrived. The video holds its frame on top until the picture has made its
+        // transition underneath, then fades out.
+        property string _videoPath: Wallpapers.isVideoFile(bgRoot.wallpaperPathRaw) ? bgRoot.wallpaperPathRaw : ""
+        property string _outgoingVideo: ""
+        Timer {
+            id: videoHandoff
+            interval: bgRoot.wallpaperTransitionMs + 450
+        }
+        // Browsing previews quickly: a transition finishes before the next picture may start, so the configured length
+        // (800 ms) left the desktop a second behind the gallery. While the previews come fast they keep its pace.
+        property real _lastWallpaperSwitch: 0
+        property bool previewBrisk: false
+        readonly property int wallpaperTransitionMs: {
+            const base = Config.options?.background?.transition?.duration ?? 800
+            return bgRoot.previewBrisk && Wallpapers.internalPreviewActive ? Math.min(base, 340) : base
+        }
 
         // Hide when fullscreen
         property list<HyprlandWorkspace> workspacesForMonitor: CompositorService.isHyprland ? Hyprland.workspaces.values.filter(workspace => workspace.monitor && workspace.monitor.name == monitor.name) : []
@@ -802,12 +840,15 @@ Scope {
             const sensitiveNetwork = (CF.StringUtils.stringListContainsSubstring(Network.networkName.toLowerCase(), networkKeywords));
             return enabled && sensitiveWallpaper && sensitiveNetwork;
         }
-        readonly property string fillMode: bgRoot.backgroundOptions.fillMode ?? "fill"
+        // Wallpapers.fillMode: one answer for every desktop and awww (span on one screen is fill).
+        readonly property string fillMode: Wallpapers.fillMode
+        // Span: this output shows its own slice of one picture laid across the box around every screen.
+        readonly property bool spanning: bgRoot.fillMode === "span"
         readonly property var panOptions: bgRoot.backgroundOptions.pan ?? {}
         readonly property real panX: bgRoot.panOptions.x ?? 0.0
         readonly property real panY: bgRoot.panOptions.y ?? 0.0
         readonly property real panZoom: Math.max(1.0, Math.min(3.0, bgRoot.panOptions.zoom ?? 1.0))
-        readonly property bool hasPan: bgRoot.panX !== 0.0 || bgRoot.panY !== 0.0 || bgRoot.panZoom !== 1.0
+        readonly property bool hasPan: bgRoot.fillMode === "fill" && (bgRoot.panX !== 0.0 || bgRoot.panY !== 0.0 || bgRoot.panZoom !== 1.0)
         property string _panReadyWallpaperPath: bgRoot.wallpaperPath
         readonly property bool parallaxEnabled: bgRoot.parallaxOptions.enable
             ?? ((bgRoot.parallaxOptions.enableWorkspace ?? false) || (bgRoot.parallaxOptions.enableSidebar ?? false))
@@ -821,6 +862,7 @@ Scope {
         readonly property int parallaxTransitionSettleMs: ParallaxMath.resolveTransitionSettle(bgRoot.parallaxOptions, 220)
         readonly property bool externalMainWallpaperEligible: !wallpaperSafetyTriggered
             && !bgRoot.webWallpaperActive
+            && !bgRoot.afterglowWallpaperActive
             && !((bgRoot.backgroundOptions.backdrop?.enable ?? false) && (bgRoot.backgroundOptions.backdrop?.hideWallpaper ?? false))
             && AwwwBackend.supportsVisibleMainWallpaper(
                 bgRoot.wallpaperPathRaw,
@@ -838,6 +880,19 @@ Scope {
         readonly property bool externalMainWallpaperActive: bgRoot.externalMainWallpaperEligible
             && !bgRoot.effectiveHasPan
             && !bgRoot.internalShaderTransitionRequested
+            && !afterglowHandoff.running
+        // iRiS Afterglow grades whatever is drawn here (still, transition, preview, video, GIF), so the picture is drawn
+        // here, not by awww; leaving it, the picture stays drawn here until awww shows it.
+        readonly property bool afterglowWallpaperActive: (Config.options?.panelFamily ?? "ii") === "iris"
+            && String(Config.options?.iris?.appearance?.texture ?? "solid") === "afterglow"
+            && (Config.options?.iris?.appearance?.afterglow?.wallpaper ?? true)
+            && bgRoot.wallpaperPathRaw.length > 0
+            && !bgRoot.webWallpaperActive && !bgRoot.wallpaperSafetyTriggered && !bgRoot.backdropActive
+        Timer {
+            id: afterglowHandoff
+            interval: AwwwBackend.transitionDurationMs + 1800
+        }
+        onAfterglowWallpaperActiveChanged: if (!bgRoot.afterglowWallpaperActive) afterglowHandoff.restart()
         property real preferredWallpaperScale: ParallaxMath.resolveZoom(bgRoot.parallaxOptions, 1.0)
         property real _manualWallpaperScaleOverride: 0
         property int wallpaperWidth: modelData.width
@@ -1410,6 +1465,8 @@ Scope {
                 )
                 property real effectiveValueX: Math.max(0, Math.min(1, valueX))
                 property real effectiveValueY: Math.max(0, Math.min(1, valueY))
+                onEffectiveValueXChanged: bgRoot.wallpaperLayerRevision++
+                onEffectiveValueYChanged: bgRoot.wallpaperLayerRevision++
                 
                 // Internal rendering and parallax geometry are separate concerns.
                 // Shader transitions temporarily move static wallpaper ownership into
@@ -1435,18 +1492,22 @@ Scope {
                         || bgRoot.internalShaderTransitionRequested)
                 readonly property real panOffsetX: bgRoot.effectiveHasPan ? (bgRoot.panX * (bgRoot.parallaxTotalX / 2)) : 0
                 readonly property real panOffsetY: bgRoot.effectiveHasPan ? (bgRoot.panY * (bgRoot.parallaxTotalY / 2)) : 0
-                readonly property real targetX: useParallax
+                readonly property real targetX: bgRoot.spanning ? Wallpapers.spanArea.x - bgRoot.screen.x
+                    : useParallax
                     ? (bgRoot.parallaxTotalX > 0
                         ? (ParallaxMath.parallaxPosition(bgRoot.parallaxTotalX, activeValueX) + panOffsetX)
                         : ParallaxMath.centerOffset(bgRoot.scaledWallpaperWidth, bgRoot.screen.width))
                     : panOffsetX
-                readonly property real targetY: useParallax
+                readonly property real targetY: bgRoot.spanning ? Wallpapers.spanArea.y - bgRoot.screen.y
+                    : useParallax
                     ? (bgRoot.parallaxTotalY > 0
                         ? (ParallaxMath.parallaxPosition(bgRoot.parallaxTotalY, activeValueY) + panOffsetY)
                         : ParallaxMath.centerOffset(bgRoot.scaledWallpaperHeight, bgRoot.screen.height))
                     : panOffsetY
-                readonly property real targetWidth: (useParallax || bgRoot.effectiveHasPan) ? bgRoot.scaledWallpaperWidth : bgRoot.screen.width
-                readonly property real targetHeight: (useParallax || bgRoot.effectiveHasPan) ? bgRoot.scaledWallpaperHeight : bgRoot.screen.height
+                readonly property real targetWidth: bgRoot.spanning ? Wallpapers.spanArea.width
+                    : (useParallax || bgRoot.effectiveHasPan) ? bgRoot.scaledWallpaperWidth : bgRoot.screen.width
+                readonly property real targetHeight: bgRoot.spanning ? Wallpapers.spanArea.height
+                    : (useParallax || bgRoot.effectiveHasPan) ? bgRoot.scaledWallpaperHeight : bgRoot.screen.height
                 x: targetX
                 y: targetY
                 Behavior on x {
@@ -1516,6 +1577,16 @@ Scope {
                     ? bgRoot.parallaxFreezeValueY
                     : (bgRoot.parallaxFreezeValueY + ((effectiveValueY - bgRoot.parallaxFreezeValueY) * bgRoot.parallaxResumeProgress))
 
+                // Fit and center leave bars around the picture: they are black, as awww draws them, never the wallpaper
+                // awww still holds underneath (the applied one while a preview is shown, or the last still under a video).
+                Rectangle {
+                    anchors.fill: parent
+                    color: "black"
+                    visible: (bgRoot.fillMode === "fit" || bgRoot.fillMode === "center") && !bgRoot.webWallpaperActive
+                        && !bgRoot.backdropActive
+                        && (wallpaperContainer.showInternalStaticWallpaper || bgRoot.wallpaperIsGif || bgRoot.wallpaperIsVideo)
+                }
+
                 // Static wallpaper — when awww manages the visible wallpaper
                 // (externalMainWallpaperActive), this is just a hidden texture for blur.
                 // Otherwise (parallax, unsupported fill mode, etc.), this is the visible
@@ -1544,16 +1615,16 @@ Scope {
                         ? "" : bgRoot.wallpaperPath
                     // NEVER use crossfader transitions when awww is active — awww handles all transitions.
                     // When parallax is on, the crossfader fades out to reveal awww's native transition.
+                    // A scaling awww does not draw (fit, stretch, tile, center, span) hides its transition: this one runs.
                     enableTransitions: (!AwwwBackend.active
-                            || bgRoot.internalShaderTransitionRequested)
+                            || bgRoot.internalShaderTransitionRequested
+                            || bgRoot.afterglowWallpaperActive
+                            || !AwwwBackend.supportsFillMode(bgRoot.fillMode))
                         && (Config.options?.background?.transition?.enable ?? true)
                     transitionType: Config.options?.background?.transition?.type ?? "crossfade"
                     transitionDirection: Config.options?.background?.transition?.direction ?? "right"
-                    transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
-                    fillMode: bgRoot.fillMode === "fit" ? Image.PreserveAspectFit
-                            : bgRoot.fillMode === "tile" ? Image.Tile
-                            : bgRoot.fillMode === "center" ? Image.Pad
-                            : Image.PreserveAspectCrop
+                    transitionBaseDuration: bgRoot.wallpaperTransitionMs
+                    fillMode: Wallpapers.imageFillFor(bgRoot.fillMode)
                     // Decoded at the size it is drawn, not the file's: a 6000 px wallpaper was held twice at full size
                     // (~70 MB each) for a 1080p output. Crop and fit are then decoded at their optimal size (Qt's
                     // Image.sourceSize); tile and center draw the image at its own size, so they keep it. The target
@@ -1590,12 +1661,13 @@ Scope {
                         && Wallpapers.videoMotionAllowedOn(bgRoot.screenName)
                     asynchronous: true
                     source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif || bgRoot.backdropActive) ? "" : bgRoot.wallpaperPathRaw
-                    fillMode: Image.PreserveAspectCrop
+                    fillMode: Wallpapers.imageFillFor(bgRoot.fillMode)
                     // No sourceSize for GIFs - let Qt handle native size for performance
 
                     layer.enabled: visible && Appearance.effectsEnabled
                         && (bgRoot.effectsOptions.enableAnimatedBlur ?? false)
                         && (bgRoot.effectsOptions.blurRadius ?? 0) > 0
+                        && (bgRoot.effectsOptions.thumbnailBlurStrength ?? 50) > 0
                     layer.effect: GaussianBlur {
                         radius: Math.round((bgRoot.effectsOptions.blurRadius ?? 32) * Math.max(0, Math.min(1, (bgRoot.effectsOptions.thumbnailBlurStrength ?? 50) / 100)))
                         // Cap samples — beyond ~33 the visual difference is imperceptible
@@ -1612,8 +1684,10 @@ Scope {
                 VideoCrossfader {
                     id: videoWallpaper
                     anchors.fill: parent
-                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive && bgRoot.wallpaperIsVideo
-                    opacity: bgRoot.wallpaperIsVideo ? 1 : 0
+                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive
+                        && (bgRoot.wallpaperIsVideo || bgRoot._outgoingVideo.length > 0)
+                    opacity: bgRoot.wallpaperIsVideo || videoHandoff.running ? 1 : 0
+                    onOpacityChanged: if (opacity === 0 && !bgRoot.wallpaperIsVideo) bgRoot._outgoingVideo = ""
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled
                         animation: NumberAnimation { duration: Appearance.animation.elementMoveFast.duration; easing.type: Appearance.animation.elementMoveFast.type; easing.bezierCurve: Appearance.animation.elementMoveFast.bezierCurve }
@@ -1625,11 +1699,11 @@ Scope {
                     // the source releases the decoder outright instead of only
                     // pausing it; the transition overlay covers the swap.
                     source: {
-                        if (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsVideo || bgRoot.backdropActive) return "";
+                        if (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || bgRoot.backdropActive) return "";
                         if (!bgRoot._familyOwnsScreen) return "";
-                        return bgRoot.wallpaperPathRaw;
+                        return bgRoot.wallpaperIsVideo ? bgRoot.wallpaperPathRaw : bgRoot._outgoingVideo;
                     }
-                    fillMode: VideoOutput.PreserveAspectCrop
+                    fillMode: Wallpapers.videoFillFor(bgRoot.fillMode)
                     enableTransitions: Config.options?.background?.transition?.enable ?? true
                     transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
                     shouldPlay: bgRoot.enableAnimation && !GlobalStates.screenLocked
@@ -1641,6 +1715,7 @@ Scope {
                     layer.enabled: visible && Appearance.effectsEnabled
                         && (bgRoot.effectsOptions.enableAnimatedBlur ?? false)
                         && (bgRoot.effectsOptions.blurRadius ?? 0) > 0
+                        && (bgRoot.effectsOptions.thumbnailBlurStrength ?? 50) > 0
                     layer.effect: GaussianBlur {
                         radius: Math.round((bgRoot.effectsOptions.blurRadius ?? 32) * Math.max(0, Math.min(1, (bgRoot.effectsOptions.thumbnailBlurStrength ?? 50) / 100)))
                         // See #159 — cap samples to bound fragment shader cost
@@ -1649,7 +1724,21 @@ Scope {
                 }
             }
 
-            // Always-on wallpaper blur — reads from crossfader texture (works with both QML and awww rendering; disabled for GIFs/videos)
+            Loader {
+                id: afterglowLoader
+                z: 0.5
+                anchors.fill: wallpaperContainer
+                active: bgRoot.afterglowWallpaperActive && bgRoot._familyOwnsScreen
+                sourceComponent: IrisAfterglowWallpaper {
+                    onShown: bgRoot.wallpaperLayerRevision++
+                    source: wallpaperContainer
+                    live: bgRoot.wallpaperIsVideo || bgRoot.wallpaperIsGif
+                }
+            }
+
+            // Blur behind windows. Reads what is actually drawn: the crossfader (QML or awww rendering), the
+            // Afterglow grade over it, or a video/GIF when "blur live wallpapers" is on. The resting layer blur on
+            // live wallpapers above is separate (thumbnailBlurStrength) and never stands in for this one.
             Loader {
                 id: blurAlwaysLoader
                 z: 1
@@ -1661,8 +1750,7 @@ Scope {
                         && (bgRoot.effectsOptions.blurRadius ?? 0) > 0
                         && !blurLoader.active
                         && !bgRoot.backdropActive
-                        && !bgRoot.wallpaperIsGif
-                        && !bgRoot.wallpaperIsVideo
+                        && (!(bgRoot.wallpaperIsGif || bgRoot.wallpaperIsVideo) || (bgRoot.effectsOptions.enableAnimatedBlur ?? false))
                 anchors.fill: wallpaperContainer
                 sourceComponent: Item {
                     anchors.fill: parent
@@ -1670,7 +1758,8 @@ Scope {
 
                     GaussianBlur {
                         anchors.fill: parent
-                        source: wallpaper
+                        source: afterglowLoader.item ?? (bgRoot.wallpaperIsVideo ? videoWallpaper
+                            : bgRoot.wallpaperIsGif ? gifWallpaper : wallpaper)
                         radius: bgRoot.effectsOptions.blurRadius ?? 32
                         // See #159 — cap samples to bound fragment shader cost
                         samples: Math.min(33, radius * 2 + 1)

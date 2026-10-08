@@ -58,9 +58,8 @@ _show_privilege_instructions() {
     echo -e "${STY_YELLOW}Detected: Graphical environment (Wayland/X11)${STY_RST}" >&2
     echo "" >&2
     echo -e "${STY_CYAN}Recommended solutions:${STY_RST}" >&2
-    echo "  1. Use a polkit authentication agent (recommended for Wayland):" >&2
-    echo "     - Install: polkit-kde-authentication-agent-1 or polkit-gnome" >&2
-    echo "     - It should auto-launch in your graphical session" >&2
+    echo "  1. Run it from a terminal, so sudo can ask for your password," >&2
+    echo "     or with the iNiR shell running, which answers password prompts" >&2
     echo "" >&2
     echo "  2. Configure sudo with passwordless NOPASSWD (quick fix):" >&2
     echo "     sudo visudo" >&2
@@ -1107,34 +1106,6 @@ EOF
   fi
 
   log_success "Zsh shell configuration set"
-}
-
-#####################################################################################
-# Distro-specific Polkit Agent Detection
-#####################################################################################
-
-get-polkit-agent(){
-  # Returns the path to the polkit authentication agent for the current distro
-  local agents=(
-    "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
-    "/usr/lib/polkit-kde-authentication-agent-1"
-    "/usr/libexec/polkit-kde-authentication-agent-1"
-    "/usr/lib/mate-polkit/polkit-mate-authentication-agent-1"
-    "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
-    "/usr/libexec/polkit-gnome-authentication-agent-1"
-    "/usr/lib/lxpolkit/lxpolkit"
-  )
-
-  for agent in "${agents[@]}"; do
-    if [[ -x "$agent" ]]; then
-      echo "$agent"
-      return 0
-    fi
-  done
-
-  # Not found
-  echo ""
-  return 1
 }
 
 #####################################################################################

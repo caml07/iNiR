@@ -40,6 +40,21 @@ Scope {
     signal pieceTapRequested(string kind)
     property bool pieceTapped: false
     property string editScreen: ""
+    // The update overlay is Material's; under iRiS its details live in the New iNiR card.
+    Connections {
+        target: ShellUpdates
+        function onOverlayOpenChanged(): void {
+            if (!ShellUpdates.overlayOpen) return
+            ShellUpdates.closeOverlay()
+            if (!ShellUpdates.hasUpdate && !ShellUpdates.isUpdating) {
+                const page = SettingsPageRegistry.pages.findIndex(entry => entry.key === "about")
+                if (page >= 0) GlobalStates.openSettingsPage(page, "")
+                return
+            }
+            GlobalStates.irisBubbleCardRequest = ""
+            GlobalStates.irisBubbleCardRequest = "shellUpdate"
+        }
+    }
     Connections {
         target: GlobalStates
         function onIrisEditChanged(): void {
@@ -379,6 +394,7 @@ Scope {
             Config.setNestedValue("iris.appearance.adaptive", Math.max(0, Math.min(100, value)))
             return String(Math.max(0, Math.min(100, value)))
         }
+        function tokens(): string { return JSON.stringify(IrisStyle.audit()) }
         function palette(id: string): string {
             const known = IrisOptions.colourThemeIds
             if (id === "list") return JSON.stringify(known)
@@ -690,13 +706,18 @@ Scope {
                     ? (islandLoader.item?.suppressed ?? false) : false
 
                 readonly property bool islandAutoHide: IrisFrame.islandAutoHide && islandLoader.active
+                readonly property bool islandWorkspaceEmpty: {
+                    if (!(root.options?.revealOnEmpty ?? true) || !CompositorService.isNiri) return false
+                    const active = (NiriService.allWorkspaces ?? []).find(ws => ws.output === barWindow.screen?.name && ws.is_active)
+                    return active !== undefined && !(NiriService.windows ?? []).some(w => w.workspace_id === active.id)
+                }
                 property bool islandEdgeIntent: false
                 readonly property bool islandWants: barWindow.expanded || barWindow.pinned || barWindow.editHere
                     || (islandLoader.item?.feedback ?? false) || (islandLoader.item?.eventShown ?? false)
                     || (islandLoader.item?.morphing ?? false) || stage.cardPresent
                     || (controlCentreLoader.item?.present ?? false)
                 readonly property bool islandRevealed: !barWindow.islandAutoHide
-                    || barWindow.islandEdgeIntent || barWindow.islandWants
+                    || barWindow.islandWorkspaceEmpty || barWindow.islandEdgeIntent || barWindow.islandWants
                 // Off the edge the chassis is gone, but its fuse still reaches back onto
                 // the screen and leaves a smudge where the Island used to melt in.
                 readonly property bool islandTucked: islandLoader.tuck > islandLoader.hidden - 1

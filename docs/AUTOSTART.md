@@ -44,8 +44,6 @@ These are defined in `~/.config/niri/config.d/50-startup.kdl` and managed by the
 
 - `wl-paste --no-newline --type text --watch ~/.config/quickshell/inir/scripts/clipboard-store.py` (clipboard text history; avoids synthetic trailing newlines and strips browser markup)
 - `wl-paste --type image --watch ~/.config/quickshell/inir/scripts/clipboard-image-store.sh` (clipboard image history; internal preview frames are filtered)
-- the detected external polkit agent (GNOME on the supported Void profile;
-  KDE/MATE/LXQt/lxpolkit are accepted where installed)
 - `kbuildsycoca6` (KDE desktop entry cache)
 
 These run before iNiR starts and are independent of the shell.
@@ -99,18 +97,18 @@ Before executing an action, the session screen checks for running package manage
 
 ## Polkit agent
 
-iNiR includes a PolicyKit authentication agent. When a privileged operation
-needs authorization (installing a package, mounting a disk), a dialog appears
-asking for your password.
+iNiR is your PolicyKit authentication agent. When a privileged operation needs authorization (installing a package, mounting a disk), its dialog asks for your password, in the look of the family you use. Niri starts no other agent.
 
-On the supported Void Turnstile tier, the shell deliberately starts with
-`QS_DISABLE_POLKIT=1` and Niri owns the graphical external agent instead.
-Turnstile's per-user service manager belongs to an elogind background session,
-so a Quickshell listener registered from that service is not the same subject as
-the seat0 graphical session and polkit rejects it. The normal Void dependency
-profile installs `polkit-gnome`, and setup writes the detected external agent
-into Niri startup. The non-Turnstile tiers keep the shell agent available; its
-process detector also recognizes GNOME, KDE, MATE, LXQt and lxpolkit agents.
+If you run an agent of your own, iNiR sees it at start and steps aside. Turn the shell's agent off with `QS_DISABLE_POLKIT=1`.
+
+While the shell is restarting, nothing answers graphical prompts and they fail as not authorized; try again once it is back (systemd restarts it on its own). `pkexec` and `run0` in a terminal ask there instead.
+
+On the supported Void Turnstile tier the shell starts with `QS_DISABLE_POLKIT=1`.
+Turnstile's per-user service manager belongs to an elogind background session, so
+a Quickshell listener registered from that service is not the same subject as the
+seat0 graphical session and polkit rejects it. There, run a graphical agent of
+your own from the Niri session (the Void dependency profile installs
+`polkit-gnome`); the other tiers answer password prompts with the shell's agent.
 
 ## Idle management
 

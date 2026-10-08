@@ -106,9 +106,11 @@ While the shell is restarting, nothing answers graphical prompts and they fail a
 On the supported Void Turnstile tier the shell starts with `QS_DISABLE_POLKIT=1`.
 Turnstile's per-user service manager belongs to an elogind background session, so
 a Quickshell listener registered from that service is not the same subject as the
-seat0 graphical session and polkit rejects it. There, run a graphical agent of
-your own from the Niri session (the Void dependency profile installs
-`polkit-gnome`); the other tiers answer password prompts with the shell's agent.
+seat0 graphical session and polkit rejects it. Because the shell runs outside the
+session there, Niri starts `polkit-gnome` (installed by the Void dependency
+profile) from the Turnstile block of the startup file; setup writes that line only
+for this tier and removes it if the tier changes. The systemd and runsvdir tiers
+run the shell inside the session, where it stays the only agent.
 
 ## Idle management
 

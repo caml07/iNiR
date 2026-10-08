@@ -2879,6 +2879,11 @@ if ! grep -q 'runsvdir ~/.config/service' "$startup_kdl"; then
     rm -rf "$reconcile_test_root"
     exit 1
 fi
+if grep -Fq 'polkit-gnome' "$startup_kdl"; then
+    printf 'FAIL: runsvdir tier starts an external polkit agent beside the shell\n' >&2
+    rm -rf "$reconcile_test_root"
+    exit 1
+fi
 cp "$startup_kdl" "$startup_kdl.bak"
 reconcile_inir_supervisor >/dev/null
 if ! diff -q "$startup_kdl" "$startup_kdl.bak" >/dev/null; then
@@ -2953,6 +2958,8 @@ if ! (
     grep -Fq 'export INIR_VENV=\"$HOME/.local/state/quickshell/.venv\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'turnstile-update-runit-env PATH INIR_VENV ILLOGICAL_IMPULSE_VIRTUAL_ENV WAYLAND_DISPLAY XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS NIRI_SOCKET' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     grep -Fq 'sv restart \"$HOME/.config/service/inir\"' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
+    # Only Turnstile: its shell runs outside the session, so Niri starts the agent (the runsvdir test above asserts none).
+    grep -Fq 'spawn-sh-at-startup "for agent in /usr/libexec/polkit-gnome-authentication-agent-1' "$turnstile_test_root/home/.config/niri/config.d/50-startup.kdl"
     for audio_svc in pipewire wireplumber pipewire-pulse; do
         audio_run="$turnstile_test_root/home/.config/service/$audio_svc/run"
         grep -Fq 'chpst -e "$TURNSTILE_ENV_DIR"' "$audio_run"
